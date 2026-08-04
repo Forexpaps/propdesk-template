@@ -624,16 +624,11 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
           setMobileOpen={setMobileOpen}
           onOpenCalculator={() => setIsCalculatorOpen(true)}
           onOpenChecklist={() => setIsChecklistOpen(true)}
-          onOpenCalendar={() => setIsCalendarOpen(true)}
-          onOpenCertificate={() => setIsCertificateOpen(true)}
           onOpenProfileModal={() => {
             setProfileModalTab("profile");
             setIsProfileModalOpen(true);
           }}
           onOpenNotifications={() => setIsNotificationsModalOpen(true)}
-          onOpenPropFirmRules={() => setIsPropFirmRulesOpen(true)}
-          onOpenMindsetModal={() => setIsMindsetModalOpen(true)}
-          onOpenAISetupAnalyzer={() => setIsAISetupAnalyzerOpen(true)}
           unreadNotificationsCount={notifications.filter((n) => !n.read).length}
         />
 

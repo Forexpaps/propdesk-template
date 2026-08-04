@@ -1,5 +1,5 @@
 import React from "react";
-import { Menu, Activity, ShieldCheck, Bell, Sparkles, TrendingUp, Clock, Calculator, CheckSquare, Calendar, Award, User, Crown, Sliders, Trophy, Brain, FileText, Download } from "lucide-react";
+import { Menu, Activity, ShieldCheck, Bell, TrendingUp, Clock, Calculator, CheckSquare, Award, User, Crown, Sliders, FileText, Download } from "lucide-react";
 import { StudentProfile } from "../types";
 
 import { TabType } from "./Sidebar";
@@ -10,13 +10,8 @@ interface TopHeaderProps {
   setMobileOpen: (open: boolean) => void;
   onOpenCalculator?: () => void;
   onOpenChecklist?: () => void;
-  onOpenCalendar?: () => void;
-  onOpenCertificate?: () => void;
   onOpenProfileModal?: () => void;
   onOpenNotifications?: () => void;
-  onOpenPropFirmRules?: () => void;
-  onOpenMindsetModal?: () => void;
-  onOpenAISetupAnalyzer?: () => void;
   unreadNotificationsCount?: number;
 }
 
@@ -26,13 +21,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   setMobileOpen,
   onOpenCalculator,
   onOpenChecklist,
-  onOpenCalendar,
-  onOpenCertificate,
   onOpenProfileModal,
   onOpenNotifications,
-  onOpenPropFirmRules,
-  onOpenMindsetModal,
-  onOpenAISetupAnalyzer,
   unreadNotificationsCount = 0,
 }) => {
   const getBreadcrumbTitle = () => {
@@ -74,7 +64,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         </button>
 
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-slate-500 font-medium">Prop Desk /</span>
           <h1 className="font-bold text-white tracking-tight">{getBreadcrumbTitle()}</h1>
           <span className="text-slate-500 text-xs font-normal ml-2 hidden sm:inline">Vue d'ensemble</span>
         </div>
@@ -82,61 +71,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
       {/* Right Header Badges & Quick Tools */}
       <div className="flex items-center gap-2 sm:gap-2.5 text-xs">
-        {/* Quick Tools */}
-        {onOpenPropFirmRules && (
-          <button
-            onClick={onOpenPropFirmRules}
-            className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#111615] hover:bg-[#1B2320] border border-[#1B2320] hover:border-amber-500/40 text-slate-300 hover:text-amber-400 transition-all text-[11px] font-mono"
-            title="Suivi & Règles Challenge Prop Firm"
-          >
-            <Trophy className="w-3.5 h-3.5 text-amber-400" />
-            <span className="font-bold">Prop Firm</span>
-          </button>
-        )}
-
-        {onOpenMindsetModal && (
-          <button
-            onClick={onOpenMindsetModal}
-            className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#111615] hover:bg-[#1B2320] border border-[#1B2320] hover:border-purple-500/40 text-slate-300 hover:text-purple-300 transition-all text-[11px] font-mono"
-            title="Mindset & Anti-Tilt Radar"
-          >
-            <Brain className="w-3.5 h-3.5 text-purple-400" />
-            <span className="font-bold">Mindset</span>
-          </button>
-        )}
-
-        {onOpenCalendar && (
-          <button
-            onClick={onOpenCalendar}
-            className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#111615] hover:bg-[#1B2320] border border-[#1B2320] hover:border-cyan-500/40 text-slate-300 hover:text-cyan-300 transition-all text-[11px] font-mono"
-            title="Calendrier économique & news à haut impact"
-          >
-            <Calendar className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="font-bold">Calendrier</span>
-          </button>
-        )}
-
-        {onOpenCertificate && (
-          <button
-            onClick={onOpenCertificate}
-            className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#111615] hover:bg-[#1B2320] border border-[#1B2320] hover:border-amber-500/40 text-slate-300 hover:text-amber-300 transition-all text-[11px] font-mono"
-            title="Certificat officiel de réussite SMC Pro"
-          >
-            <Award className="w-3.5 h-3.5 text-amber-400" />
-            <span className="font-bold">Certificat</span>
-          </button>
-        )}
-
-        {onOpenAISetupAnalyzer && (
-          <button
-            onClick={onOpenAISetupAnalyzer}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#111615] hover:bg-[#1B2320] border border-[#1B2320] hover:border-[#00E676]/40 text-slate-300 hover:text-[#00E676] transition-all text-[11px] font-mono"
-            title="Audit Confluences SMC IA"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-[#00E676]" />
-            <span className="font-bold">Audit Setup</span>
-          </button>
-        )}
 
         {/* Live Session NY Pill (from PropDesk aesthetic) */}
         <div className="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#111615] border border-[#1B2320] text-slate-300 font-mono text-[11px]">
