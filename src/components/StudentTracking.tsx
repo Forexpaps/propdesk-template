@@ -38,7 +38,6 @@ interface StudentTrackingProps {
 const STATUS_TAG_STYLES: Record<StudentStatusTag, string> = {
   "En Évaluation FTMO": "bg-purple-500/10 text-purple-400 border-purple-500/30",
   "Prop Firm Financé": "bg-[#00E676]/20 text-[#00E676] border-[#00E676]/40 font-bold",
-  "Accompagnement VIP": "bg-[#00E676]/20 text-[#00E676] border-[#00E676]/40",
   "Besoin Coaching": "bg-blue-500/10 text-blue-400 border-blue-500/30",
   "Alerte Tilt": "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse font-bold",
 };
@@ -196,7 +195,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
 
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
           <span className="text-xs text-slate-400 shrink-0">Statut:</span>
-          {["ALL", "En Évaluation FTMO", "Prop Firm Financé", "Accompagnement VIP", "Besoin Coaching", "Alerte Tilt"].map((tag) => (
+          {["ALL", "En Évaluation FTMO", "Prop Firm Financé", "Besoin Coaching", "Alerte Tilt"].map((tag) => (
             <button
               key={tag}
               onClick={() => setSelectedTagFilter(tag)}
@@ -395,7 +394,6 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   >
                     <option value="En Évaluation FTMO">En Évaluation FTMO</option>
                     <option value="Prop Firm Financé">Prop Firm Financé 🏆</option>
-                    <option value="Accompagnement VIP">Accompagnement VIP ⭐</option>
                     <option value="Besoin Coaching">Besoin Coaching ⚠️</option>
                     <option value="Alerte Tilt">Alerte Tilt 🔴</option>
                   </select>

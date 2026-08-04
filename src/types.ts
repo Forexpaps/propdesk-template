@@ -141,7 +141,7 @@ export interface StudentProfile {
   hiddenSidebarItems?: string[];
 }
 
-export type StudentStatusTag = "En Évaluation FTMO" | "Prop Firm Financé" | "Accompagnement VIP" | "Besoin Coaching" | "Alerte Tilt";
+export type StudentStatusTag = "En Évaluation FTMO" | "Prop Firm Financé" | "Besoin Coaching" | "Alerte Tilt";
 
 export interface EnrolledStudent {
   id: string;
