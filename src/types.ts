@@ -134,6 +134,11 @@ export interface StudentProfile {
   phone?: string;
   bio?: string;
   preferredPairs?: string;
+  /**
+   * Clés des entrées de la sidebar masquées par l'administrateur (modules pas
+   * encore terminés). Voir SIDEBAR_TOGGLEABLE_KEYS dans components/Sidebar.tsx.
+   */
+  hiddenSidebarItems?: string[];
 }
 
 export type StudentStatusTag = "En Évaluation FTMO" | "Prop Firm Financé" | "Accompagnement VIP" | "Besoin Coaching" | "Alerte Tilt";

@@ -613,6 +613,17 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
           setProfileModalTab("badges");
           setIsProfileModalOpen(true);
         }}
+        onToggleSidebarItem={(key) =>
+          setStudent((prev) => {
+            const hidden = prev.hiddenSidebarItems ?? [];
+            return {
+              ...prev,
+              hiddenSidebarItems: hidden.includes(key)
+                ? hidden.filter((k) => k !== key)
+                : [...hidden, key],
+            };
+          })
+        }
       />
 
       {/* Main Content Area (offset by sidebar width on large screens) */}
