@@ -1,0 +1,6 @@
+{
+  "name": "Académie de Trading - Horizon",
+  "description": "Plate-forme complète pour académie de trading en ligne avec modules vidéo, journal de trading interactif, messagerie coach et tableau de bord de performance.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
