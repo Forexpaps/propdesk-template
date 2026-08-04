@@ -60,6 +60,21 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
 
 export type SidebarItemKey = (typeof SIDEBAR_TOGGLEABLE_KEYS)[number];
 
+/**
+ * Onglet atteint par chaque entrée masquable, `null` pour celles qui ouvrent
+ * une modale et ne changent donc jamais d'onglet.
+ *
+ * Sert à détecter qu'on vient de masquer le dernier accès à l'onglet courant.
+ */
+export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
+  exam: "exam",
+  checklist: null,
+  replay: "simulator",
+  badges: null,
+  propfirm: "simulator",
+  academy: "academy",
+};
+
 interface SidebarProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;

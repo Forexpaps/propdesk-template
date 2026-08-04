@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Sidebar, TabType } from "./components/Sidebar";
+import {
+  Sidebar,
+  TabType,
+  SIDEBAR_TOGGLEABLE_KEYS,
+  SIDEBAR_ITEM_TABS,
+} from "./components/Sidebar";
 import { TopHeader } from "./components/TopHeader";
 import { MainDashboard } from "./components/MainDashboard";
 import { VideoAcademy } from "./components/VideoAcademy";
@@ -613,7 +618,10 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
           setProfileModalTab("badges");
           setIsProfileModalOpen(true);
         }}
-        onToggleSidebarItem={(key) =>
+        onToggleSidebarItem={(key) => {
+          // Forme fonctionnelle obligatoire : deux bascules dans le même lot de
+          // rendu liraient sinon le même `student`, et la seconde écraserait la
+          // première.
           setStudent((prev) => {
             const hidden = prev.hiddenSidebarItems ?? [];
             return {
@@ -622,8 +630,22 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
                 ? hidden.filter((k) => k !== key)
                 : [...hidden, key],
             };
-          })
-        }
+          });
+
+          // Masquer le dernier accès à l'onglet courant en ferait un cul-de-sac.
+          // Deux entrées pouvant mener au même onglet (« Replay » et « Sim
+          // propfirm »), on ne bascule que si plus aucune n'y conduit.
+          const hidden = student.hiddenSidebarItems ?? [];
+          if (hidden.includes(key) || SIDEBAR_ITEM_TABS[key] !== activeTab) return;
+
+          const stillReachable = SIDEBAR_TOGGLEABLE_KEYS.some(
+            (k) =>
+              k !== key &&
+              !hidden.includes(k) &&
+              SIDEBAR_ITEM_TABS[k] === activeTab
+          );
+          if (!stillReachable) setActiveTab("dashboard");
+        }}
       />
 
       {/* Main Content Area (offset by sidebar width on large screens) */}
