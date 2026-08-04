@@ -614,10 +614,6 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
           setIsProfileModalOpen(true);
         }}
         onOpenChecklist={() => setIsChecklistOpen(true)}
-        onOpenBadges={() => {
-          setProfileModalTab("badges");
-          setIsProfileModalOpen(true);
-        }}
         onToggleSidebarItem={(key) => {
           // Forme fonctionnelle obligatoire : deux bascules dans le même lot de
           // rendu liraient sinon le même `student`, et la seconde écraserait la

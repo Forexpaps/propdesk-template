@@ -61,7 +61,6 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
   "exam",
   "checklist",
   "replay",
-  "badges",
   "propfirm",
   "academy",
   "messaging",
@@ -85,7 +84,6 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   exam: "exam",
   checklist: null,
   replay: "simulator",
-  badges: null,
   propfirm: "simulator",
   academy: "academy",
   messaging: "messaging",
@@ -103,8 +101,6 @@ interface SidebarProps {
   setIsCollapsed: (collapsed: boolean) => void;
   onOpenProfileModal: () => void;
   onOpenChecklist?: () => void;
-  /** Ouvre le profil directement sur l'onglet Badges. */
-  onOpenBadges?: () => void;
   /** Masque ou réaffiche une entrée. Réservé à l'administrateur. */
   onToggleSidebarItem?: (key: SidebarItemKey) => void;
 }
@@ -121,7 +117,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsCollapsed,
   onOpenProfileModal,
   onOpenChecklist,
-  onOpenBadges,
   onToggleSidebarItem,
 }) => {
   const capitalDiff = student.currentCapital - student.startingCapital;
@@ -150,11 +145,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       : []),
   ];
 
+  // « Badges & paliers » ne figure plus ici : les badges restent accessibles par
+  // le profil (UserProfileModal, onglet Badges).
   const pratiqueItems = [
     { key: "exam" as const, id: "exam" as const, label: "Examen", icon: Award },
     { key: "checklist" as const, id: "checklist" as const, label: "Exercice du jour", icon: Sliders },
     { key: "replay" as const, id: "simulator" as const, label: "Replay", icon: Zap },
-    { key: "badges" as const, id: "forum" as const, label: "Badges & paliers", icon: Users },
     { key: "propfirm" as const, id: "simulator" as const, label: "Sim propfirm", icon: Radio },
   ];
 
@@ -372,8 +368,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onClick={() => {
                       if (item.label === "Exercice du jour" && onOpenChecklist) {
                         onOpenChecklist();
-                      } else if (item.label === "Badges & paliers" && onOpenBadges) {
-                        onOpenBadges();
                       } else {
                         setActiveTab(item.id as TabType);
                       }
