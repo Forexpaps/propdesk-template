@@ -105,9 +105,9 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
   return (
     <div className="space-y-6">
       {/* Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/50 p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-[#111615] via-[#111615] to-purple-950/50 p-6 rounded-2xl border border-[#1B2320] flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl relative overflow-hidden">
         <div className="space-y-2 z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-mono font-bold">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-mono font-bold">
             <Zap className="w-3.5 h-3.5" /> Simulateur de Backtesting & Replay SMC
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
@@ -119,23 +119,23 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800 z-10 shrink-0">
-          <Award className="w-8 h-8 text-indigo-400" />
+        <div className="flex items-center gap-3 bg-[#0D1110] p-3 rounded-xl border border-[#1B2320] z-10 shrink-0">
+          <Award className="w-8 h-8 text-purple-400" />
           <div>
             <div className="text-[10px] text-slate-400 font-mono">Score de Rigueur Backtest</div>
-            <div className="text-xl font-black text-indigo-300 font-mono">{userScore} XP</div>
+            <div className="text-xl font-black text-purple-300 font-mono">{userScore} XP</div>
           </div>
         </div>
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+      <div className="flex items-center gap-2 border-b border-[#1B2320] pb-2">
         <button
           onClick={() => setActiveTab("REPLAY")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === "REPLAY"
-              ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
-              : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
+              ? "bg-purple-600 text-white shadow-md shadow-purple-600/20"
+              : "bg-[#111615] border border-[#1B2320] text-slate-400 hover:text-white"
           }`}
         >
           <Clock className="w-4 h-4" /> Replay Historique ({scenarios.length})
@@ -146,7 +146,7 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             activeTab === "MONTE_CARLO"
               ? "bg-[#00E676] text-slate-950 font-extrabold shadow-md shadow-[#00E676]/20"
-              : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
+              : "bg-[#111615] border border-[#1B2320] text-slate-400 hover:text-white"
           }`}
         >
           <BarChart3 className="w-4 h-4" /> Simulateur Monte Carlo & Compounding
@@ -236,14 +236,14 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
               <div className="text-2xl font-black text-[#00E676] font-mono">
                 {mcResult.finalBalance.toLocaleString("fr-FR")} €
               </div>
-              <div className="text-[10px] text-emerald-400">
+              <div className="text-[10px] text-[#00E676]">
                 +{mcResult.netReturnPercent}% de rendement
               </div>
             </div>
 
             <div className="bg-[#0D1110] border border-[#1B2320] p-4 rounded-xl space-y-1">
               <div className="text-[11px] text-slate-400 font-mono">PnL Net Simulé</div>
-              <div className={`text-2xl font-black font-mono ${mcResult.netProfit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+              <div className={`text-2xl font-black font-mono ${mcResult.netProfit >= 0 ? "text-[#00E676]" : "text-rose-400"}`}>
                 {mcResult.netProfit >= 0 ? `+${mcResult.netProfit.toLocaleString("fr-FR")} €` : `${mcResult.netProfit.toLocaleString("fr-FR")} €`}
               </div>
               <div className="text-[10px] text-slate-500">
@@ -274,7 +274,7 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
         {/* Scenarios Sidebar */}
         <div className="space-y-3 lg:col-span-1">
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-2">
-            <Clock className="w-4 h-4 text-indigo-400" /> Cas d'Étude Disponibles ({scenarios.length})
+            <Clock className="w-4 h-4 text-purple-400" /> Cas d'Étude Disponibles ({scenarios.length})
           </h2>
 
           {scenarios.map((item) => {
@@ -285,21 +285,21 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
                 onClick={() => handleSelectScenario(item)}
                 className={`p-4 rounded-xl border transition-all cursor-pointer space-y-2 ${
                   isSelected
-                    ? "bg-slate-900 border-indigo-500 shadow-lg shadow-indigo-500/10"
-                    : "bg-slate-950 border-slate-850 hover:border-slate-750"
+                    ? "bg-[#111615] border-purple-500 shadow-lg shadow-purple-500/10"
+                    : "bg-[#0D1110] border-[#151D1A] hover:border-[#232D29]"
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-900 border border-slate-800 text-slate-300 font-mono">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#111615] border border-[#1B2320] text-slate-300 font-mono">
                     {item.pair} • {item.timeframe}
                   </span>
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                       item.difficulty === "Débutant"
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20"
                         : item.difficulty === "Intermédiaire"
                         ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                        : "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20"
+                        : "bg-purple-500/10 text-purple-400 border border-purple-500/20"
                     }`}
                   >
                     {item.difficulty}
@@ -315,11 +315,11 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
 
         {/* Replay Playground Station */}
         {scenario && (
-          <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 gap-4">
+          <div className="lg:col-span-2 bg-[#111615] border border-[#1B2320] rounded-2xl p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#1B2320] pb-4 gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-xs font-mono font-bold">
+                  <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-mono font-bold">
                     {scenario.pair}
                   </span>
                   <span className="text-xs text-slate-400 font-mono">{scenario.timeframe}</span>
@@ -330,14 +330,14 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
 
               <button
                 onClick={() => setIsExecuted(false)}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-300 text-xs font-bold flex items-center gap-1.5"
               >
                 <RotateCcw className="w-3.5 h-3.5" /> Réinitialiser
               </button>
             </div>
 
             {/* Scenario Chart Display */}
-            <div className="relative rounded-xl overflow-hidden border border-slate-800 bg-slate-950 aspect-video flex items-center justify-center">
+            <div className="relative rounded-xl overflow-hidden border border-[#1B2320] bg-[#0D1110] aspect-video flex items-center justify-center">
               <img
                 src={scenario.chartUrl}
                 alt={scenario.title}
@@ -345,10 +345,10 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
               />
 
               {/* Chart Overlay Controls */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent p-4 flex flex-col justify-end">
-                <div className="bg-slate-950/90 backdrop-blur-md p-3.5 rounded-xl border border-slate-800 space-y-1">
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0D1110] via-transparent to-transparent p-4 flex flex-col justify-end">
+                <div className="bg-[#0D1110]/90 backdrop-blur-md p-3.5 rounded-xl border border-[#1B2320] space-y-1">
                   <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <Eye className="w-4 h-4 text-indigo-400" /> Contexte du marché
+                    <Eye className="w-4 h-4 text-purple-400" /> Contexte du marché
                   </div>
                   <p className="text-xs text-slate-300">{scenario.description}</p>
                 </div>
@@ -357,7 +357,7 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
 
             {/* Execution Controls Form */}
             {!isExecuted ? (
-              <div className="bg-slate-950 p-5 rounded-xl border border-slate-850 space-y-4">
+              <div className="bg-[#0D1110] p-5 rounded-xl border border-[#151D1A] space-y-4">
                 <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
                   1. Prenez votre décision de trading
                 </h3>
@@ -367,8 +367,8 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
                     onClick={() => setUserDirection("LONG")}
                     className={`py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
                       userDirection === "LONG"
-                        ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20"
-                        : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
+                        ? "bg-[#00E676] text-slate-950 shadow-lg shadow-[#00E676]/20"
+                        : "bg-[#111615] border border-[#1B2320] text-slate-400 hover:text-white"
                     }`}
                   >
                     <ArrowUpRight className="w-4 h-4" /> Achat (BUY / LONG)
@@ -379,7 +379,7 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
                     className={`py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
                       userDirection === "SHORT"
                         ? "bg-rose-500 text-white shadow-lg shadow-rose-500/20"
-                        : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
+                        : "bg-[#111615] border border-[#1B2320] text-slate-400 hover:text-white"
                     }`}
                   >
                     <ArrowDownRight className="w-4 h-4" /> Vente (SELL / SHORT)
@@ -389,7 +389,7 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
                 <div className="grid grid-cols-3 gap-3 text-xs">
                   <div>
                     <label className="block text-slate-400 font-mono mb-1">Prix d'Entrée Proposé</label>
-                    <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 font-mono text-white font-bold">
+                    <div className="p-2.5 rounded-xl bg-[#111615] border border-[#1B2320] font-mono text-white font-bold">
                       {scenario.suggestedEntry}
                     </div>
                   </div>
@@ -401,7 +401,7 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
                       step="0.0001"
                       value={userSL}
                       onChange={(e) => setUserSL(parseFloat(e.target.value))}
-                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 font-mono text-rose-400 font-bold focus:outline-none"
+                      className="w-full p-2.5 rounded-xl bg-[#111615] border border-[#1B2320] font-mono text-rose-400 font-bold focus:outline-none"
                     />
                   </div>
 
@@ -412,7 +412,7 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
                       step="0.0001"
                       value={userTP}
                       onChange={(e) => setUserTP(parseFloat(e.target.value))}
-                      className="w-full p-2.5 rounded-xl bg-slate-900 border border-slate-800 font-mono text-emerald-400 font-bold focus:outline-none"
+                      className="w-full p-2.5 rounded-xl bg-[#111615] border border-[#1B2320] font-mono text-[#00E676] font-bold focus:outline-none"
                     />
                   </div>
                 </div>
@@ -424,7 +424,7 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
                       setUserScore((prev) => prev + 150);
                     }
                   }}
-                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all"
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white font-bold text-sm shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 cursor-pointer transition-all"
                 >
                   <Play className="w-4 h-4 fill-white" /> Lancer le Replay & Tester l'Exécution
                 </button>
@@ -435,13 +435,13 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
                 <div
                   className={`p-5 rounded-2xl border ${
                     isUserCorrect
-                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                      ? "bg-[#00E676]/10 border-[#00E676]/30 text-[#00E676]"
                       : "bg-rose-500/10 border-rose-500/30 text-rose-400"
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     {isUserCorrect ? (
-                      <CheckCircle2 className="w-8 h-8 text-emerald-400 shrink-0" />
+                      <CheckCircle2 className="w-8 h-8 text-[#00E676] shrink-0" />
                     ) : (
                       <XCircle className="w-8 h-8 text-rose-400 shrink-0" />
                     )}
@@ -460,7 +460,7 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
                 </div>
 
                 {/* Detailed Coach Explanation Box */}
-                <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-3">
+                <div className="bg-[#0D1110] p-5 rounded-xl border border-[#1B2320] space-y-3">
                   <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider font-mono">
                     <Sparkles className="w-4 h-4 text-amber-400" /> Débriefing Officiel du Head Coach
                   </div>

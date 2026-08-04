@@ -186,8 +186,8 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
             onClick={() => setFilterType(type)}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
               filterType === type
-                ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
-                : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
+                ? "bg-[#00E676] text-slate-950 shadow-md shadow-[#00E676]/20"
+                : "bg-[#111615] border border-[#1B2320] text-slate-400 hover:text-white"
             }`}
           >
             {type === "ALL" ? "Tous les Portefeuilles" : type}
@@ -200,7 +200,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
         {/* Left Column: List of Accounts */}
         <div className="space-y-3 lg:col-span-1">
           <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
-            <Layers className="w-4 h-4 text-emerald-400" /> Sélectionner un Compte ({filteredAccounts.length})
+            <Layers className="w-4 h-4 text-[#00E676]" /> Sélectionner un Compte ({filteredAccounts.length})
           </h2>
 
           {filteredAccounts.map((acc) => {
@@ -214,13 +214,13 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 onClick={() => setSelectedAccountId(acc.id)}
                 className={`p-4 rounded-xl border transition-all cursor-pointer space-y-3 ${
                   isSelected
-                    ? "bg-slate-900 border-emerald-500 shadow-lg shadow-emerald-500/10"
-                    : "bg-slate-950 border-slate-850 hover:border-slate-750"
+                    ? "bg-[#111615] border-[#00E676] shadow-lg shadow-[#00E676]/10"
+                    : "bg-[#0D1110] border-[#151D1A] hover:border-[#232D29]"
                 }`}
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-emerald-400">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#111615] border border-[#1B2320] text-[#00E676]">
                       {acc.firmOrBroker}
                     </span>
                     <h3 className="text-sm font-bold text-white mt-1">{acc.name}</h3>
@@ -230,7 +230,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                       acc.status === "ACTIVE"
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20"
                         : acc.status === "PAID_OUT"
                         ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
                         : "bg-blue-500/10 text-blue-300 border border-blue-500/20"
@@ -240,7 +240,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   </span>
                 </div>
 
-                <div className="flex items-baseline justify-between pt-2 border-t border-slate-850">
+                <div className="flex items-baseline justify-between pt-2 border-t border-[#151D1A]">
                   <div>
                     <div className="text-[10px] text-slate-500">Solde Actuel</div>
                     <div className="text-base font-bold font-mono text-white">
@@ -252,7 +252,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     <div className="text-[10px] text-slate-500">Performance</div>
                     <div
                       className={`text-xs font-bold font-mono ${
-                        pnl >= 0 ? "text-emerald-400" : "text-rose-400"
+                        pnl >= 0 ? "text-[#00E676]" : "text-rose-400"
                       }`}
                     >
                       {pnl >= 0 ? `+${pnlPercent}%` : `${pnlPercent}%`}
@@ -266,11 +266,11 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
 
         {/* Right Column: Selected Account Deep-Dive Inspector */}
         {selectedAccount && (
-          <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 gap-4">
+          <div className="lg:col-span-2 bg-[#111615] border border-[#1B2320] rounded-2xl p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#1B2320] pb-4 gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-mono font-bold">
+                  <span className="px-2.5 py-1 rounded bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20 text-xs font-mono font-bold">
                     {selectedAccount.type}
                   </span>
                   <span className="text-xs text-slate-400 font-mono">
@@ -280,7 +280,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 <h2 className="text-xl font-bold text-white mt-1">{selectedAccount.name}</h2>
                 <p className="text-xs text-slate-400">
                   Fournisseur / Broker: <span className="text-slate-200 font-bold">{selectedAccount.firmOrBroker}</span> | N° Compte:{" "}
-                  <span className="text-emerald-400 font-mono">{selectedAccount.accountNumber}</span>
+                  <span className="text-[#00E676] font-mono">{selectedAccount.accountNumber}</span>
                 </p>
               </div>
 
@@ -298,7 +298,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                       }
                     }
                   }}
-                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-colors"
+                  className="px-3 py-2 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-colors"
                 >
                   <RefreshCw className="w-3.5 h-3.5" /> Ajuster le Solde
                 </button>
@@ -308,12 +308,12 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
             {/* Drawdown & Objectives Tracker Bars */}
             <div className="space-y-4">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" /> Règles de Risk & Drawdown Prop Firm
+                <ShieldCheck className="w-4 h-4 text-[#00E676]" /> Règles de Risk & Drawdown Prop Firm
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Daily Loss Limit Card */}
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-3">
+                <div className="bg-[#0D1110] p-4 rounded-xl border border-[#151D1A] space-y-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400 font-medium flex items-center gap-1">
                       <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Drawdown Quotidien Max
@@ -325,18 +325,18 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   </div>
 
                   {/* Progress bar */}
-                  <div className="w-full h-3 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
-                    <div className="h-full bg-emerald-500 rounded-full w-[22%]" />
+                  <div className="w-full h-3 bg-[#111615] rounded-full overflow-hidden border border-[#1B2320]">
+                    <div className="h-full bg-[#00E676] rounded-full w-[22%]" />
                   </div>
 
                   <div className="flex justify-between text-[11px] text-slate-400 font-mono">
-                    <span>Perte aujourd'hui: <span className="text-emerald-400 font-bold">-0.8%</span></span>
-                    <span className="text-emerald-400">Sécurisé ✅</span>
+                    <span>Perte aujourd'hui: <span className="text-[#00E676] font-bold">-0.8%</span></span>
+                    <span className="text-[#00E676]">Sécurisé ✅</span>
                   </div>
                 </div>
 
                 {/* Total Drawdown Limit Card */}
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-850 space-y-3">
+                <div className="bg-[#0D1110] p-4 rounded-xl border border-[#151D1A] space-y-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400 font-medium flex items-center gap-1">
                       <XCircle className="w-3.5 h-3.5 text-rose-400" /> Drawdown Total Max (Invalidation)
@@ -348,34 +348,34 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   </div>
 
                   {/* Progress bar */}
-                  <div className="w-full h-3 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
-                    <div className="h-full bg-emerald-500 rounded-full w-[15%]" />
+                  <div className="w-full h-3 bg-[#111615] rounded-full overflow-hidden border border-[#1B2320]">
+                    <div className="h-full bg-[#00E676] rounded-full w-[15%]" />
                   </div>
 
                   <div className="flex justify-between text-[11px] text-slate-400 font-mono">
-                    <span>Distance de l'invalidation: <span className="text-emerald-400 font-bold">+8.5%</span></span>
-                    <span className="text-emerald-400">Zone Sûre ✅</span>
+                    <span>Distance de l'invalidation: <span className="text-[#00E676] font-bold">+8.5%</span></span>
+                    <span className="text-[#00E676]">Zone Sûre ✅</span>
                   </div>
                 </div>
               </div>
 
               {/* Profit Target Progress (If Prop Firm Evaluation) */}
               {selectedAccount.profitTargetPercent > 0 && (
-                <div className="bg-slate-950 p-4 rounded-xl border border-emerald-500/30 space-y-3">
+                <div className="bg-[#0D1110] p-4 rounded-xl border border-[#00E676]/30 space-y-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-200 font-bold flex items-center gap-1.5">
                       <Award className="w-4 h-4 text-amber-400" /> Objectif de Validation (Profit Target)
                     </span>
-                    <span className="text-emerald-400 font-mono font-bold">
+                    <span className="text-[#00E676] font-mono font-bold">
                       +{selectedAccount.profitTargetPercent}% (+
                       {((selectedAccount.initialBalance * selectedAccount.profitTargetPercent) / 100).toLocaleString("fr-FR")} €)
                     </span>
                   </div>
 
                   {/* Progress bar */}
-                  <div className="w-full h-3.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                  <div className="w-full h-3.5 bg-[#111615] rounded-full overflow-hidden border border-[#1B2320]">
                     <div
-                      className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all"
+                      className="h-full bg-gradient-to-r from-[#00E676] to-teal-400 rounded-full transition-all"
                       style={{
                         width: `${Math.min(
                           100,
@@ -393,7 +393,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <div className="flex justify-between text-xs font-mono">
                     <span className="text-slate-400">
                       Bénéfice Actuel:{" "}
-                      <span className="text-emerald-400 font-bold">
+                      <span className="text-[#00E676] font-bold">
                         +{(selectedAccount.equity - selectedAccount.initialBalance).toLocaleString("fr-FR")} €
                       </span>
                     </span>
@@ -411,7 +411,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
             </div>
 
             {/* Quick Stats Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950 p-4 rounded-xl border border-slate-850 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#0D1110] p-4 rounded-xl border border-[#151D1A] text-xs">
               <div>
                 <div className="text-slate-400 font-mono">Jours de Trading</div>
                 <div className="text-sm font-bold text-white mt-1">
@@ -435,7 +435,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
 
               <div>
                 <div className="text-slate-400 font-mono">Solde Actuel</div>
-                <div className="text-sm font-bold text-emerald-400 mt-1 font-mono">
+                <div className="text-sm font-bold text-[#00E676] mt-1 font-mono">
                   {selectedAccount.equity.toLocaleString("fr-FR")} €
                 </div>
               </div>
@@ -446,11 +446,11 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
 
       {/* Modal Add Account */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl relative">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
               <div className="flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-emerald-400" />
+                <Wallet className="w-5 h-5 text-[#00E676]" />
                 <h3 className="text-base font-bold text-white">Ajouter un nouveau Portefeuille</h3>
               </div>
               <button
@@ -470,7 +470,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   placeholder="ex: FTMO $100K Phase 1"
                   value={newAccName}
                   onChange={(e) => setNewAccName(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]"
                 />
               </div>
 
@@ -483,7 +483,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     placeholder="FTMO, MyFundedFX, IC Markets..."
                     value={newAccFirm}
                     onChange={(e) => setNewAccFirm(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]"
                   />
                 </div>
 
@@ -492,7 +492,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <select
                     value={newAccType}
                     onChange={(e) => setNewAccType(e.target.value as AccountType)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]"
                   >
                     <option value="Prop Firm Evaluation">Prop Firm Evaluation</option>
                     <option value="Prop Firm Funded">Prop Firm Funded</option>
@@ -510,7 +510,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     required
                     value={newAccBalance}
                     onChange={(e) => setNewAccBalance(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676] font-mono"
                   />
                 </div>
 
@@ -520,7 +520,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     type="number"
                     value={newAccProfitTarget}
                     onChange={(e) => setNewAccProfitTarget(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676] font-mono"
                   />
                 </div>
               </div>
@@ -532,7 +532,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     type="number"
                     value={newAccMaxDailyDrawdown}
                     onChange={(e) => setNewAccMaxDailyDrawdown(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676] font-mono"
                   />
                 </div>
 
@@ -542,22 +542,22 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     type="number"
                     value={newAccMaxTotalDrawdown}
                     onChange={(e) => setNewAccMaxTotalDrawdown(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-emerald-500 font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676] font-mono"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1B2320]">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold"
+                  className="px-4 py-2.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 font-bold"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold"
+                  className="px-5 py-2.5 rounded-xl bg-[#00E676] hover:bg-[#00E676] text-slate-950 font-bold"
                 >
                   Créer le Portefeuille
                 </button>

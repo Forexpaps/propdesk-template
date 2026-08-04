@@ -149,7 +149,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
       case "Psychologie & Discipline":
         return "bg-rose-500/10 text-rose-400 border-rose-500/20";
       case "Risk Management":
-        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+        return "bg-[#00E676]/10 text-[#00E676] border-[#00E676]/20";
       case "Analyses de Marché":
         return "bg-blue-500/10 text-blue-400 border-blue-500/20";
       default:
@@ -167,13 +167,13 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
     }
     if (role === "Modérateur") {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
-          <ShieldCheck className="w-3 h-3 text-indigo-400" /> MODÉRATEUR
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
+          <ShieldCheck className="w-3 h-3 text-purple-400" /> MODÉRATEUR
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-300">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-[#1B2320] text-slate-300">
         Élève Premium
       </span>
     );
@@ -182,12 +182,12 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
   return (
     <div className="space-y-6 pb-12">
       {/* Top Banner & Moderator Switch */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 rounded-2xl border border-slate-800 p-6 shadow-2xl relative overflow-hidden">
-        <div className="absolute -top-24 -right-24 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="bg-gradient-to-r from-[#111615] via-[#151D1A] to-[#111615] rounded-2xl border border-[#1B2320] p-6 shadow-2xl relative overflow-hidden">
+        <div className="absolute -top-24 -right-24 w-72 h-72 bg-[#00E676]/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-semibold border border-emerald-500/20">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00E676]/10 text-[#00E676] text-xs font-semibold border border-[#00E676]/20">
               <Sparkles className="w-3.5 h-3.5" />
               Forum d'Échange & Entraide Académique
             </div>
@@ -201,10 +201,10 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
 
           {/* Action Header & Moderator Mode Control */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl flex items-center gap-3">
+            <div className="p-3 bg-[#0D1110]/80 border border-[#1B2320] rounded-xl flex items-center gap-3">
               <div className="text-left">
                 <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#00E676]" />
                   Espace Modération
                 </div>
                 <div className="text-[10px] text-slate-400">
@@ -214,11 +214,11 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
               <button
                 onClick={() => setIsModMode(!isModMode)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  isModMode ? "bg-emerald-500" : "bg-slate-700"
+                  isModMode ? "bg-[#00E676]" : "bg-[#232D29]"
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-slate-950 transition-transform ${
+                  className={`inline-block h-4 w-4 transform rounded-full bg-[#0D1110] transition-transform ${
                     isModMode ? "translate-x-6" : "translate-x-1"
                   }`}
                 />
@@ -227,7 +227,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
 
             <button
               onClick={() => setShowNewTopicModal(true)}
-              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/20 transition-all shrink-0"
+              className="flex items-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-[#00E676] to-teal-500 hover:from-[#00E676] hover:to-teal-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-[#00E676]/20 transition-all shrink-0"
             >
               <PlusCircle className="w-4 h-4" />
               <span>Nouveau Sujet</span>
@@ -244,7 +244,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
           <div className="flex items-center justify-between">
             <button
               onClick={() => setSelectedTopicId(null)}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition-colors"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#111615] border border-[#1B2320] text-slate-300 hover:text-white text-xs font-semibold transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
               <span>Retour à la liste des sujets</span>
@@ -252,14 +252,14 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
 
             {/* Moderator Action Toolbar for Topic */}
             {isModMode && (
-              <div className="flex items-center gap-2 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800">
+              <div className="flex items-center gap-2 bg-[#111615]/90 p-1.5 rounded-xl border border-[#1B2320]">
                 <span className="text-[10px] font-mono text-slate-400 px-2">Modération:</span>
                 <button
                   onClick={() => onTogglePinTopic(selectedTopic.id)}
                   className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 ${
                     selectedTopic.isPinned
                       ? "bg-amber-500 text-slate-950"
-                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      : "bg-[#1B2320] text-slate-300 hover:bg-[#232D29]"
                   }`}
                   title="Épingler le sujet en haut du forum"
                 >
@@ -271,8 +271,8 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                   onClick={() => onToggleSolveTopic(selectedTopic.id)}
                   className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 ${
                     selectedTopic.isSolved
-                      ? "bg-emerald-500 text-slate-950"
-                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      ? "bg-[#00E676] text-slate-950"
+                      : "bg-[#1B2320] text-slate-300 hover:bg-[#232D29]"
                   }`}
                   title="Marquer comme résolu"
                 >
@@ -285,7 +285,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                   className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 ${
                     selectedTopic.isLocked
                       ? "bg-rose-500 text-slate-950"
-                      : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      : "bg-[#1B2320] text-slate-300 hover:bg-[#232D29]"
                   }`}
                   title="Verrouiller les réponses"
                 >
@@ -310,7 +310,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
           </div>
 
           {/* Original Topic Card */}
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-6 shadow-xl">
+          <div className="bg-[#111615] rounded-2xl border border-[#1B2320] p-6 space-y-6 shadow-xl">
             {/* Topic Meta Badges */}
             <div className="flex flex-wrap items-center gap-2">
               <span className={`text-xs px-2.5 py-1 rounded-md border font-semibold ${getCategoryBadgeColor(selectedTopic.category)}`}>
@@ -324,7 +324,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
               )}
 
               {selectedTopic.isSolved && (
-                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold">
+                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-md bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/30 font-bold">
                   <CheckCircle2 className="w-3.5 h-3.5" /> Résolu
                 </span>
               )}
@@ -342,12 +342,12 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
             </h1>
 
             {/* Author Info Row */}
-            <div className="flex items-center justify-between border-y border-slate-800/80 py-3 text-xs text-slate-400">
+            <div className="flex items-center justify-between border-y border-[#1B2320]/80 py-3 text-xs text-slate-400">
               <div className="flex items-center gap-3">
                 <img
                   src={selectedTopic.authorAvatar}
                   alt={selectedTopic.authorName}
-                  className="w-10 h-10 rounded-full object-cover border-2 border-emerald-500/40"
+                  className="w-10 h-10 rounded-full object-cover border-2 border-[#00E676]/40"
                 />
                 <div>
                   <div className="font-bold text-slate-200 flex items-center gap-2">
@@ -369,7 +369,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
             </div>
 
             {/* Content Body */}
-            <div className="text-sm text-slate-200 leading-relaxed space-y-4 whitespace-pre-line bg-slate-950/40 p-5 rounded-xl border border-slate-800/60">
+            <div className="text-sm text-slate-200 leading-relaxed space-y-4 whitespace-pre-line bg-[#0D1110]/40 p-5 rounded-xl border border-[#1B2320]/60">
               {selectedTopic.content}
             </div>
 
@@ -377,9 +377,9 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
             <div className="flex items-center justify-between pt-2">
               <button
                 onClick={() => onToggleLikeTopic(selectedTopic.id)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 text-xs font-semibold transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1B2320] hover:bg-[#1F2825] text-slate-200 text-xs font-semibold transition-colors"
               >
-                <ThumbsUp className="w-4 h-4 text-emerald-400" />
+                <ThumbsUp className="w-4 h-4 text-[#00E676]" />
                 <span>J'aime ({selectedTopic.likesCount})</span>
               </button>
 
@@ -392,7 +392,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
           {/* Replies Thread List */}
           <div className="space-y-4">
             <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <MessageCircle className="w-4 h-4 text-emerald-400" />
+              <MessageCircle className="w-4 h-4 text-[#00E676]" />
               Réponses de la communauté ({selectedTopic.replies.length})
             </h2>
 
@@ -401,10 +401,10 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                 key={reply.id}
                 className={`p-5 rounded-2xl border transition-all ${
                   reply.isSolution
-                    ? "bg-slate-900/90 border-emerald-500/50 shadow-lg shadow-emerald-500/5 ring-1 ring-emerald-500/30"
+                    ? "bg-[#111615]/90 border-[#00E676]/50 shadow-lg shadow-[#00E676]/5 ring-1 ring-[#00E676]/30"
                     : reply.isCoachCertified
-                    ? "bg-slate-900/90 border-amber-500/40"
-                    : "bg-slate-900/70 border-slate-800"
+                    ? "bg-[#111615]/90 border-amber-500/40"
+                    : "bg-[#111615]/70 border-[#1B2320]"
                 }`}
               >
                 <div className="flex items-start justify-between gap-4 mb-3">
@@ -412,14 +412,14 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                     <img
                       src={reply.authorAvatar}
                       alt={reply.authorName}
-                      className="w-9 h-9 rounded-full object-cover border-2 border-emerald-500/30"
+                      className="w-9 h-9 rounded-full object-cover border-2 border-[#00E676]/30"
                     />
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-bold text-white">{reply.authorName}</span>
                         {getRoleBadge(reply.authorRole)}
                         {reply.isSolution && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500 text-slate-950">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-[#00E676] text-slate-950">
                             <CheckCircle2 className="w-3 h-3" /> SOLUTION VALIDÉE
                           </span>
                         )}
@@ -430,9 +430,9 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
 
                   <button
                     onClick={() => onToggleLikeReply(selectedTopic.id, reply.id)}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-300 text-xs transition-colors"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#1B2320]/80 hover:bg-[#1B2320] text-slate-300 text-xs transition-colors"
                   >
-                    <ThumbsUp className="w-3.5 h-3.5 text-emerald-400" />
+                    <ThumbsUp className="w-3.5 h-3.5 text-[#00E676]" />
                     <span>{reply.likesCount}</span>
                   </button>
                 </div>
@@ -446,20 +446,20 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
 
           {/* Reply Form Box */}
           {selectedTopic.isLocked ? (
-            <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-center text-xs text-rose-400 flex items-center justify-center gap-2 font-medium">
+            <div className="p-4 rounded-xl bg-[#111615] border border-[#1B2320] text-center text-xs text-rose-400 flex items-center justify-center gap-2 font-medium">
               <Lock className="w-4 h-4" /> Ce sujet a été verrouillé par un modérateur. Les réponses sont fermées.
             </div>
           ) : (
-            <form onSubmit={handleReplySubmit} className="bg-slate-900 rounded-2xl border border-slate-800 p-5 space-y-4 shadow-lg">
+            <form onSubmit={handleReplySubmit} className="bg-[#111615] rounded-2xl border border-[#1B2320] p-5 space-y-4 shadow-lg">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Send className="w-4 h-4 text-emerald-400" />
+                  <Send className="w-4 h-4 text-[#00E676]" />
                   Répondre à cette discussion
                 </h3>
 
                 {/* Switch to Reply as Coach if Mod Mode */}
                 {isModMode && (
-                  <div className="flex items-center gap-2 text-xs bg-slate-950 p-1.5 rounded-lg border border-slate-800">
+                  <div className="flex items-center gap-2 text-xs bg-[#0D1110] p-1.5 rounded-lg border border-[#1B2320]">
                     <span className="text-slate-400">Poste en tant que :</span>
                     <select
                       value={replyAsCoach ? selectedCoachId : "student"}
@@ -471,7 +471,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                           setSelectedCoachId(e.target.value);
                         }
                       }}
-                      className="bg-slate-900 border border-slate-700 text-xs text-amber-400 rounded px-2 py-1 font-bold focus:outline-none"
+                      className="bg-[#111615] border border-[#232D29] text-xs text-amber-400 rounded px-2 py-1 font-bold focus:outline-none"
                     >
                       <option value="student">Élève ({student.name})</option>
                       {coaches.map((c) => (
@@ -489,7 +489,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                 onChange={(e) => setReplyText(e.target.value)}
                 placeholder="Rédigez votre réponse construite, courtoise et argumentée..."
                 rows={3}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#00E676] transition-colors"
               />
 
               <div className="flex items-center justify-between">
@@ -499,7 +499,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                 <button
                   type="submit"
                   disabled={!replyText.trim()}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#00E676] hover:bg-[#00E676] disabled:opacity-50 text-slate-950 font-bold text-xs shadow-lg shadow-[#00E676]/20 transition-all"
                 >
                   <Send className="w-3.5 h-3.5" />
                   Publier la réponse
@@ -512,7 +512,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
         /* Forum Topics List View */
         <div className="space-y-6">
           {/* Search, Category Filters & Sub-Tabs Bar */}
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-4">
+          <div className="bg-[#111615] rounded-2xl border border-[#1B2320] p-4 space-y-4">
             {/* Search and Quick Filters */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="relative w-full sm:w-80">
@@ -522,7 +522,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Rechercher une question, un mot clé, un coach..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl pl-9 pr-4 py-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#00E676] transition-colors"
                 />
               </div>
 
@@ -532,8 +532,8 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                   onClick={() => setActiveTabFilter("all")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                     activeTabFilter === "all"
-                      ? "bg-emerald-500 text-slate-950 font-bold shadow"
-                      : "bg-slate-950 text-slate-400 hover:text-white hover:bg-slate-800"
+                      ? "bg-[#00E676] text-slate-950 font-bold shadow"
+                      : "bg-[#0D1110] text-slate-400 hover:text-white hover:bg-[#1B2320]"
                   }`}
                 >
                   Tous ({topics.length})
@@ -544,7 +544,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                     activeTabFilter === "unsolved"
                       ? "bg-amber-500 text-slate-950 font-bold shadow"
-                      : "bg-slate-950 text-slate-400 hover:text-white hover:bg-slate-800"
+                      : "bg-[#0D1110] text-slate-400 hover:text-white hover:bg-[#1B2320]"
                   }`}
                 >
                   Non Résolus
@@ -555,7 +555,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                     activeTabFilter === "pinned"
                       ? "bg-amber-500 text-slate-950 font-bold shadow"
-                      : "bg-slate-950 text-slate-400 hover:text-white hover:bg-slate-800"
+                      : "bg-[#0D1110] text-slate-400 hover:text-white hover:bg-[#1B2320]"
                   }`}
                 >
                   Épinglés
@@ -565,8 +565,8 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                   onClick={() => setActiveTabFilter("my_topics")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                     activeTabFilter === "my_topics"
-                      ? "bg-indigo-500 text-white font-bold shadow"
-                      : "bg-slate-950 text-slate-400 hover:text-white hover:bg-slate-800"
+                      ? "bg-purple-500 text-white font-bold shadow"
+                      : "bg-[#0D1110] text-slate-400 hover:text-white hover:bg-[#1B2320]"
                   }`}
                 >
                   Mes Sujets
@@ -575,15 +575,15 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
             </div>
 
             {/* Category Pills Row */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t border-slate-800/80 scrollbar-none">
+            <div className="flex items-center gap-1.5 overflow-x-auto pt-2 border-t border-[#1B2320]/80 scrollbar-none">
               {categories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
                   className={`px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                     selectedCategory === cat
-                      ? "bg-slate-800 text-emerald-400 border border-emerald-500/40 font-bold"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-950"
+                      ? "bg-[#1B2320] text-[#00E676] border border-[#00E676]/40 font-bold"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-[#0D1110]"
                   }`}
                 >
                   {cat}
@@ -595,7 +595,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
           {/* Topics Card List */}
           <div className="space-y-3">
             {filteredTopics.length === 0 ? (
-              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-12 text-center space-y-3">
+              <div className="bg-[#111615] rounded-2xl border border-[#1B2320] p-12 text-center space-y-3">
                 <AlertCircle className="w-8 h-8 text-slate-500 mx-auto" />
                 <h3 className="text-base font-bold text-white">Aucun sujet trouvé</h3>
                 <p className="text-xs text-slate-400 max-w-sm mx-auto">
@@ -603,7 +603,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                 </p>
                 <button
                   onClick={() => setShowNewTopicModal(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#00E676] text-slate-950 font-bold text-xs"
                 >
                   <PlusCircle className="w-4 h-4" /> Créer un sujet
                 </button>
@@ -613,10 +613,10 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                 <div
                   key={topic.id}
                   onClick={() => setSelectedTopicId(topic.id)}
-                  className={`group bg-slate-900/90 hover:bg-slate-850 rounded-2xl border p-5 transition-all cursor-pointer shadow-lg hover:shadow-xl ${
+                  className={`group bg-[#111615]/90 hover:bg-[#151D1A] rounded-2xl border p-5 transition-all cursor-pointer shadow-lg hover:shadow-xl ${
                     topic.isPinned
-                      ? "border-amber-500/40 bg-slate-900/95"
-                      : "border-slate-800 hover:border-slate-700"
+                      ? "border-amber-500/40 bg-[#111615]/95"
+                      : "border-[#1B2320] hover:border-[#232D29]"
                   }`}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -634,7 +634,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                         )}
 
                         {topic.isSolved ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/30">
                             <CheckCircle2 className="w-3 h-3" /> RÉSOLU
                           </span>
                         ) : (
@@ -642,7 +642,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                         )}
                       </div>
 
-                      <h3 className="text-base font-bold text-white group-hover:text-emerald-400 transition-colors line-clamp-2">
+                      <h3 className="text-base font-bold text-white group-hover:text-[#00E676] transition-colors line-clamp-2">
                         {topic.title}
                       </h3>
 
@@ -651,7 +651,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                           <img
                             src={topic.authorAvatar}
                             alt={topic.authorName}
-                            className="w-5 h-5 rounded-full object-cover border border-emerald-500/30"
+                            className="w-5 h-5 rounded-full object-cover border border-[#00E676]/30"
                           />
                           <span className="text-slate-300 font-medium">{topic.authorName}</span>
                           {getRoleBadge(topic.authorRole)}
@@ -662,14 +662,14 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                     </div>
 
                     {/* Right Reply Stats & Like Pills */}
-                    <div className="flex items-center gap-4 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-800">
-                      <div className="text-center px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 min-w-[64px]">
+                    <div className="flex items-center gap-4 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-[#1B2320]">
+                      <div className="text-center px-3 py-1.5 rounded-xl bg-[#0D1110] border border-[#1B2320] min-w-[64px]">
                         <div className="text-sm font-bold text-white font-mono">{topic.repliesCount}</div>
                         <div className="text-[9px] text-slate-500 uppercase tracking-wider">Réponses</div>
                       </div>
 
-                      <div className="text-center px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 min-w-[64px]">
-                        <div className="text-sm font-bold text-emerald-400 font-mono">{topic.likesCount}</div>
+                      <div className="text-center px-3 py-1.5 rounded-xl bg-[#0D1110] border border-[#1B2320] min-w-[64px]">
+                        <div className="text-sm font-bold text-[#00E676] font-mono">{topic.likesCount}</div>
                         <div className="text-[9px] text-slate-500 uppercase tracking-wider">J'aime</div>
                       </div>
                     </div>
@@ -683,18 +683,18 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
 
       {/* New Topic Modal */}
       {showNewTopicModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-xl w-full p-6 space-y-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
               <div>
-                <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-[#00E676] uppercase tracking-wider">
                   Nouveau Sujet de Discussion
                 </span>
                 <h3 className="text-lg font-bold text-white">Poser une question à la communauté</h3>
               </div>
               <button
                 onClick={() => setShowNewTopicModal(false)}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                className="p-2 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-400 hover:text-white"
               >
                 ✕
               </button>
@@ -709,7 +709,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="Ex: Validation d'un Order Block M5 sur EUR/USD..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-[#00E676] transition-colors"
                 />
               </div>
 
@@ -718,7 +718,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                 <select
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value as ForumCategory)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 transition-colors font-medium"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-[#00E676] transition-colors font-medium"
                 >
                   <option value="SMC & Price Action">SMC & Price Action</option>
                   <option value="Psychologie & Discipline">Psychologie & Discipline</option>
@@ -736,21 +736,21 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                   value={newContent}
                   onChange={(e) => setNewContent(e.target.value)}
                   placeholder="Expliquez clairement votre question, le contexte de votre trade, la paire et la timeframe..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500 transition-colors"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl p-3 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-[#00E676] transition-colors"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1B2320]">
                 <button
                   type="button"
                   onClick={() => setShowNewTopicModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
+                  className="px-4 py-2 rounded-xl bg-[#1B2320] text-slate-300 text-xs font-semibold"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/20 transition-all"
+                  className="px-5 py-2 rounded-xl bg-[#00E676] hover:bg-[#00E676] text-slate-950 font-extrabold text-xs shadow-lg shadow-[#00E676]/20 transition-all"
                 >
                   Créer le Sujet
                 </button>

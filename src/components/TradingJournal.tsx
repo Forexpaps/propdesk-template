@@ -175,7 +175,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   const getEmotionBadge = (emotion: EmotionState) => {
     switch (emotion) {
       case "Disciplined":
-        return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">🧘 Discipline</span>;
+        return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/30">🧘 Discipline</span>;
       case "FOMO":
         return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/30">🚀 FOMO</span>;
       case "Impulsive":
@@ -260,7 +260,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
             onClick={exportToCSV}
-            className="flex items-center justify-center gap-2 px-3.5 py-3 rounded-xl bg-[#1B2320] hover:bg-slate-800 text-slate-200 border border-[#1B2320] font-bold text-xs transition-all cursor-pointer"
+            className="flex items-center justify-center gap-2 px-3.5 py-3 rounded-xl bg-[#1B2320] hover:bg-[#1B2320] text-slate-200 border border-[#1B2320] font-bold text-xs transition-all cursor-pointer"
             title="Télécharger l'ensemble des trades en format CSV"
           >
             <Download className="w-4 h-4 text-[#00E676]" />
@@ -270,7 +270,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           {onOpenCalculator && (
             <button
               onClick={onOpenCalculator}
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#1B2320] hover:bg-slate-800 text-[#00E676] border border-[#1B2320] font-bold text-xs transition-all cursor-pointer"
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-[#1B2320] hover:bg-[#1B2320] text-[#00E676] border border-[#1B2320] font-bold text-xs transition-all cursor-pointer"
             >
               <Calculator className="w-4 h-4" />
               <span>Calculer Lot</span>
@@ -309,15 +309,15 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           <div className="text-[11px] text-slate-500">Gains vs Pertes</div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 p-4 rounded-xl space-y-1 shadow-md">
+        <div className="bg-[#111615]/90 border border-[#1B2320] p-4 rounded-xl space-y-1 shadow-md">
           <div className="text-xs text-slate-400 font-medium">Ratio R:R Moyen</div>
-          <div className="text-2xl font-black text-indigo-400 font-mono">1:{avgRR}</div>
+          <div className="text-2xl font-black text-purple-400 font-mono">1:{avgRR}</div>
           <div className="text-[11px] text-slate-500">Espérance par trade</div>
         </div>
 
-        <div className="col-span-2 md:col-span-1 bg-slate-900/90 border border-slate-800 p-4 rounded-xl space-y-1 shadow-md">
+        <div className="col-span-2 md:col-span-1 bg-[#111615]/90 border border-[#1B2320] p-4 rounded-xl space-y-1 shadow-md">
           <div className="text-xs text-slate-400 font-medium">Discipline Émotionnelle</div>
-          <div className="text-2xl font-black text-emerald-400 font-mono">
+          <div className="text-2xl font-black text-[#00E676] font-mono">
             {totalTrades > 0
               ? `${Math.round((trades.filter((t) => t.emotion === "Disciplined" || t.emotion === "Calm").length / totalTrades) * 100)}%`
               : "100%"}
@@ -327,7 +327,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-[#111615]/60 p-4 rounded-xl border border-[#1B2320]">
         <div className="relative w-full md:w-64">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -335,7 +335,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             value={searchPair}
             onChange={(e) => setSearchPair(e.target.value)}
             placeholder="Paire ou stratégie (ex: EUR/USD)..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
+            className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg pl-9 pr-4 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
           />
         </div>
 
@@ -343,7 +343,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           <select
             value={selectedMarket}
             onChange={(e) => setSelectedMarket(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none"
+            className="bg-[#0D1110] border border-[#1B2320] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none"
           >
             <option value="Tous">Tous les marchés</option>
             <option value="Forex">Forex</option>
@@ -355,7 +355,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           <select
             value={selectedResult}
             onChange={(e) => setSelectedResult(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none"
+            className="bg-[#0D1110] border border-[#1B2320] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none"
           >
             <option value="Tous">Résultat: Tous</option>
             <option value="WIN">Gagnants (WIN)</option>
@@ -366,7 +366,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           <select
             value={selectedEmotion}
             onChange={(e) => setSelectedEmotion(e.target.value)}
-            className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none"
+            className="bg-[#0D1110] border border-[#1B2320] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none"
           >
             <option value="Tous">Émotion: Toutes</option>
             <option value="Disciplined">Discipliné</option>
@@ -379,10 +379,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       </div>
 
       {/* Trades Table / List */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      <div className="bg-[#111615] border border-[#1B2320] rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-950/80 text-slate-400 font-semibold border-b border-slate-800">
+            <thead className="bg-[#0D1110]/80 text-slate-400 font-semibold border-b border-[#1B2320]">
               <tr>
                 <th className="py-3.5 px-4">Date & Heure</th>
                 <th className="py-3.5 px-4">Actif / Paire</th>
@@ -394,7 +394,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 <th className="py-3.5 px-4 text-center">Actions Coach IA</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-[#1B2320]/60">
               {filteredTrades.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-12 text-slate-500">
@@ -403,7 +403,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 </tr>
               ) : (
                 filteredTrades.map((trade) => (
-                  <tr key={trade.id} className="hover:bg-slate-850/80 transition-colors">
+                  <tr key={trade.id} className="hover:bg-[#151D1A]/80 transition-colors">
                     {/* Date */}
                     <td className="py-4 px-4 whitespace-nowrap">
                       <div className="font-semibold text-slate-200">{trade.date}</div>
@@ -415,7 +415,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                       <div className="font-extrabold text-sm text-white tracking-tight">
                         {trade.pair}
                       </div>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#1B2320] text-slate-400">
                         {trade.marketCategory}
                       </span>
                     </td>
@@ -425,7 +425,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                       <span
                         className={`inline-flex items-center gap-1 font-bold px-2.5 py-1 rounded-lg text-xs ${
                           trade.direction === "LONG"
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                            ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/30"
                             : "bg-rose-500/10 text-rose-400 border border-rose-500/30"
                         }`}
                       >
@@ -456,7 +456,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     </td>
 
                     {/* Risk Reward */}
-                    <td className="py-4 px-4 whitespace-nowrap font-mono font-bold text-indigo-400">
+                    <td className="py-4 px-4 whitespace-nowrap font-mono font-bold text-purple-400">
                       1:{trade.riskRewardRatio}
                     </td>
 
@@ -465,7 +465,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                       <div
                         className={
                           trade.pnl > 0
-                            ? "text-emerald-400"
+                            ? "text-[#00E676]"
                             : trade.pnl < 0
                             ? "text-rose-400"
                             : "text-slate-400"
@@ -485,7 +485,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                         {trade.chartUrl && (
                           <button
                             onClick={() => setSelectedChartTrade(trade)}
-                            className="p-1.5 rounded-lg bg-[#1B2320] text-slate-300 hover:text-[#00E676] hover:bg-slate-800 transition-colors"
+                            className="p-1.5 rounded-lg bg-[#1B2320] text-slate-300 hover:text-[#00E676] hover:bg-[#1B2320] transition-colors"
                             title="Agrandir le graphique du trade"
                           >
                             <Eye className="w-4 h-4" />
@@ -509,7 +509,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                         {/* Send to Coach button */}
                         <button
                           onClick={() => onSendTradeToCoach(trade)}
-                          className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
+                          className="p-1.5 rounded-lg bg-[#1B2320] text-slate-400 hover:text-white hover:bg-[#232D29]"
                           title="Discuter de ce trade avec le coach"
                         >
                           <MessageSquare className="w-4 h-4 text-amber-400" />
@@ -518,7 +518,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                         {/* Delete trade */}
                         <button
                           onClick={() => onDeleteTrade(trade.id)}
-                          className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-rose-400 hover:bg-slate-700"
+                          className="p-1.5 rounded-lg bg-[#1B2320] text-slate-400 hover:text-rose-400 hover:bg-[#232D29]"
                           title="Supprimer la saisie"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -535,9 +535,9 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
       {/* Add Trade Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
               <div>
                 <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
                   Nouveau Trade
@@ -546,7 +546,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               </div>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                className="p-2 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-400 hover:text-white"
               >
                 ✕
               </button>
@@ -560,7 +560,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     type="date"
                     value={formData.date}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
                     required
                   />
                 </div>
@@ -572,7 +572,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     value={formData.pair}
                     onChange={(e) => setFormData({ ...formData, pair: e.target.value.toUpperCase() })}
                     placeholder="ex: EUR/USD, NAS100"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white uppercase font-bold"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white uppercase font-bold"
                     required
                   />
                 </div>
@@ -582,7 +582,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <select
                     value={formData.marketCategory}
                     onChange={(e) => setFormData({ ...formData, marketCategory: e.target.value as MarketCategory })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
                   >
                     <option value="Forex">Forex</option>
                     <option value="Crypto">Crypto</option>
@@ -598,7 +598,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <select
                     value={formData.direction}
                     onChange={(e) => setFormData({ ...formData, direction: e.target.value as TradeDirection })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-bold"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-bold"
                   >
                     <option value="LONG">LONG (Achat)</option>
                     <option value="SHORT">SHORT (Vente)</option>
@@ -612,7 +612,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     step="any"
                     value={formData.entryPrice}
                     onChange={(e) => setFormData({ ...formData, entryPrice: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
                 </div>
@@ -624,7 +624,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     step="any"
                     value={formData.stopLoss}
                     onChange={(e) => setFormData({ ...formData, stopLoss: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
                 </div>
@@ -636,7 +636,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     step="any"
                     value={formData.takeProfit}
                     onChange={(e) => setFormData({ ...formData, takeProfit: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
                 </div>
@@ -650,7 +650,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     step="any"
                     value={formData.exitPrice}
                     onChange={(e) => setFormData({ ...formData, exitPrice: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                   />
                 </div>
 
@@ -661,7 +661,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     step="any"
                     value={formData.lotSize}
                     onChange={(e) => setFormData({ ...formData, lotSize: parseFloat(e.target.value) || 1 })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
                 </div>
@@ -671,7 +671,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <select
                     value={formData.strategy}
                     onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
                   >
                     <option value="SMC Orderblock">SMC Orderblock</option>
                     <option value="Breakout FVG">Breakout Fair Value Gap</option>
@@ -700,7 +700,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                       className={`p-2 rounded-lg border text-xs font-semibold text-center transition-all ${
                         formData.emotion === item.id
                           ? "bg-amber-500 text-slate-950 border-amber-400 font-bold"
-                          : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
+                          : "bg-[#0D1110] border-[#1B2320] text-slate-400 hover:text-white"
                       }`}
                     >
                       {item.label}
@@ -716,15 +716,15 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   placeholder="Expliquez votre analyse, confluence ou ce que vous avez ressenti pendant le trade..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1B2320]">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold"
+                  className="px-4 py-2 rounded-xl bg-[#1B2320] text-slate-300 text-xs font-semibold"
                 >
                   Annuler
                 </button>
@@ -742,7 +742,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
       {/* Chart Screenshot Modal */}
       {selectedChartTrade && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-[#0D1110]/85 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-4xl w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#1B2320] pb-3">
               <div className="flex items-center gap-2.5">

@@ -41,7 +41,7 @@ export const CoachSignals: React.FC<CoachSignalsProps> = ({
   return (
     <div className="space-y-6">
       {/* Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-rose-950/40 p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-[#111615] via-[#111615] to-rose-950/40 p-6 rounded-2xl border border-[#1B2320] flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-xl relative overflow-hidden">
         <div className="space-y-2 z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 text-xs font-mono font-bold">
             <Radio className="w-3.5 h-3.5 animate-pulse" /> Centre de Signaux & Analyses Coach en Direct
@@ -65,7 +65,7 @@ export const CoachSignals: React.FC<CoachSignalsProps> = ({
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
               filterStatus === st
                 ? "bg-rose-500 text-white shadow-md shadow-rose-500/20"
-                : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
+                : "bg-[#111615] border border-[#1B2320] text-slate-400 hover:text-white"
             }`}
           >
             {st === "ALL"
@@ -89,16 +89,16 @@ export const CoachSignals: React.FC<CoachSignalsProps> = ({
           return (
             <div
               key={sig.id}
-              className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4 hover:border-slate-750 transition-colors shadow-lg relative flex flex-col justify-between"
+              className="bg-[#111615] border border-[#1B2320] rounded-2xl p-6 space-y-4 hover:border-[#232D29] transition-colors shadow-lg relative flex flex-col justify-between"
             >
               <div className="space-y-4">
                 {/* Header Info */}
-                <div className="flex items-start justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-start justify-between border-b border-[#1B2320] pb-3">
                   <div className="flex items-center gap-3">
                     <img
                       src={sig.coachAvatar}
                       alt={sig.coachName}
-                      className="w-10 h-10 rounded-full object-cover border-2 border-slate-700"
+                      className="w-10 h-10 rounded-full object-cover border-2 border-[#232D29]"
                     />
                     <div>
                       <div className="text-xs font-bold text-white">{sig.coachName}</div>
@@ -109,7 +109,7 @@ export const CoachSignals: React.FC<CoachSignalsProps> = ({
                   <span
                     className={`px-2.5 py-1 rounded-full text-[10px] font-bold font-mono ${
                       sig.status === "ACTIF"
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse"
+                        ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20 animate-pulse"
                         : sig.status === "TP_ATTEINT"
                         ? "bg-blue-500/10 text-blue-300 border border-blue-500/20"
                         : sig.status === "EN_ATTENTE"
@@ -137,7 +137,7 @@ export const CoachSignals: React.FC<CoachSignalsProps> = ({
                   <span
                     className={`px-3 py-1.5 rounded-xl font-black text-xs font-mono flex items-center gap-1 ${
                       sig.direction === "LONG"
-                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                        ? "bg-[#00E676]/20 text-[#00E676] border border-[#00E676]/30"
                         : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
                     }`}
                   >
@@ -154,7 +154,7 @@ export const CoachSignals: React.FC<CoachSignalsProps> = ({
                 </div>
 
                 {/* Technical Levels Table */}
-                <div className="grid grid-cols-4 gap-2 bg-slate-950 p-3 rounded-xl border border-slate-850 text-xs font-mono">
+                <div className="grid grid-cols-4 gap-2 bg-[#0D1110] p-3 rounded-xl border border-[#151D1A] text-xs font-mono">
                   <div>
                     <div className="text-[10px] text-slate-500">Zone d'Entrée</div>
                     <div className="font-bold text-white text-[11px] truncate">{sig.entryZone}</div>
@@ -167,23 +167,23 @@ export const CoachSignals: React.FC<CoachSignalsProps> = ({
 
                   <div>
                     <div className="text-[10px] text-slate-500">Take Profit 1</div>
-                    <div className="font-bold text-emerald-400 text-[11px]">{sig.takeProfit1}</div>
+                    <div className="font-bold text-[#00E676] text-[11px]">{sig.takeProfit1}</div>
                   </div>
 
                   <div>
                     <div className="text-[10px] text-slate-500">Take Profit 2</div>
-                    <div className="font-bold text-emerald-300 text-[11px]">{sig.takeProfit2}</div>
+                    <div className="font-bold text-[#00E676] text-[11px]">{sig.takeProfit2}</div>
                   </div>
                 </div>
 
                 {/* SMC Commentary */}
-                <div className="p-3 rounded-xl bg-slate-950 border-l-2 border-amber-400 text-xs text-slate-300 italic">
+                <div className="p-3 rounded-xl bg-[#0D1110] border-l-2 border-amber-400 text-xs text-slate-300 italic">
                   "{sig.smcNotes}"
                 </div>
               </div>
 
               {/* Action Footer */}
-              <div className="pt-4 border-t border-slate-800 flex items-center justify-between mt-4">
+              <div className="pt-4 border-t border-[#1B2320] flex items-center justify-between mt-4">
                 <span className="text-[11px] text-slate-400 font-mono">
                   Risque Recommandé: <span className="text-white font-bold">{sig.riskLevel}</span>
                 </span>
@@ -193,8 +193,8 @@ export const CoachSignals: React.FC<CoachSignalsProps> = ({
                   disabled={isImported}
                   className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
                     isImported
-                      ? "bg-slate-800 text-emerald-400 border border-emerald-500/30 cursor-default"
-                      : "bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 shadow-md shadow-emerald-500/10 cursor-pointer"
+                      ? "bg-[#1B2320] text-[#00E676] border border-[#00E676]/30 cursor-default"
+                      : "bg-gradient-to-r from-[#00E676] to-teal-400 hover:from-[#00E676] hover:to-teal-300 text-slate-950 shadow-md shadow-[#00E676]/10 cursor-pointer"
                   }`}
                 >
                   {isImported ? (

@@ -36,8 +36,8 @@ interface StudentTrackingProps {
 }
 
 const STATUS_TAG_STYLES: Record<StudentStatusTag, string> = {
-  "En Évaluation FTMO": "bg-indigo-500/10 text-indigo-400 border-indigo-500/30",
-  "Prop Firm Financé": "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold",
+  "En Évaluation FTMO": "bg-purple-500/10 text-purple-400 border-purple-500/30",
+  "Prop Firm Financé": "bg-[#00E676]/20 text-[#00E676] border-[#00E676]/40 font-bold",
   "Accompagnement VIP": "bg-amber-500/20 text-amber-300 border-amber-500/40",
   "Besoin Coaching": "bg-blue-500/10 text-blue-400 border-blue-500/30",
   "Alerte Tilt": "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse font-bold",
@@ -144,7 +144,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-amber-950/20 to-slate-900 border border-slate-800 rounded-2xl p-6 relative overflow-hidden shadow-xl">
+      <div className="bg-gradient-to-r from-[#111615] via-amber-950/20 to-[#111615] border border-[#1B2320] rounded-2xl p-6 relative overflow-hidden shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -182,7 +182,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
       </div>
 
       {/* Controls Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#111615]/80 border border-[#1B2320] p-4 rounded-xl">
         <div className="relative flex-1 max-w-md">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
           <input
@@ -190,7 +190,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
             placeholder="Rechercher un élève, un email, un coach..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+            className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
           />
         </div>
 
@@ -203,7 +203,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border whitespace-nowrap transition-all ${
                 selectedTagFilter === tag
                   ? "bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold"
-                  : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"
+                  : "bg-[#0D1110] text-slate-400 border-[#1B2320] hover:text-white"
               }`}
             >
               {tag === "ALL" ? "Tous les élèves" : tag}
@@ -221,14 +221,14 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
           return (
             <div
               key={st.id}
-              className="bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 space-y-4 transition-all hover:shadow-xl relative group"
+              className="bg-[#111615]/90 border border-[#1B2320] hover:border-[#232D29] rounded-2xl p-5 space-y-4 transition-all hover:shadow-xl relative group"
             >
-              <div className="flex items-start justify-between gap-3 border-b border-slate-800/80 pb-4">
+              <div className="flex items-start justify-between gap-3 border-b border-[#1B2320]/80 pb-4">
                 <div className="flex items-center gap-3">
                   <img
                     src={st.avatar}
                     alt={st.name}
-                    className="w-12 h-12 rounded-full object-cover border-2 border-slate-700"
+                    className="w-12 h-12 rounded-full object-cover border-2 border-[#232D29]"
                   />
                   <div>
                     <div className="flex items-center gap-2">
@@ -261,13 +261,13 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               </div>
 
               {/* Performance & Capital Metrics */}
-              <div className="grid grid-cols-3 gap-2 bg-slate-950 p-3 rounded-xl border border-slate-850 text-xs">
+              <div className="grid grid-cols-3 gap-2 bg-[#0D1110] p-3 rounded-xl border border-[#151D1A] text-xs">
                 <div>
                   <span className="text-[10px] text-slate-500 block">Capital Enregistré</span>
                   <span className="font-mono font-bold text-white text-sm">
                     {st.currentCapital.toLocaleString("fr-FR")} €
                   </span>
-                  <span className={`text-[10px] block ${isProfit ? "text-emerald-400" : "text-rose-400"}`}>
+                  <span className={`text-[10px] block ${isProfit ? "text-[#00E676]" : "text-rose-400"}`}>
                     {isProfit ? "+" : ""}{pnlTotal.toLocaleString("fr-FR")} €
                   </span>
                 </div>
@@ -279,7 +279,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 <div>
                   <span className="text-[10px] text-slate-500 block">Progression Cours</span>
                   <span className="font-mono font-bold text-blue-400 text-sm">{st.courseCompletionPercentage}%</span>
-                  <div className="w-full bg-slate-800 h-1.5 rounded-full mt-1 overflow-hidden">
+                  <div className="w-full bg-[#1B2320] h-1.5 rounded-full mt-1 overflow-hidden">
                     <div
                       className="bg-blue-500 h-full rounded-full"
                       style={{ width: `${st.courseCompletionPercentage}%` }}
@@ -291,16 +291,16 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               {/* Accounts & Risk Tag */}
               <div className="flex items-center justify-between text-xs pt-1">
                 <div className="flex items-center gap-1.5 text-slate-300">
-                  <Wallet className="w-3.5 h-3.5 text-emerald-400" />
+                  <Wallet className="w-3.5 h-3.5 text-[#00E676]" />
                   <span>{st.accounts.length} Compte(s) Prop Firm / Broker</span>
                 </div>
-                <span className="px-2 py-0.5 rounded text-[11px] bg-slate-950 border border-slate-800 font-medium">
+                <span className="px-2 py-0.5 rounded text-[11px] bg-[#0D1110] border border-[#1B2320] font-medium">
                   {st.riskStatus}
                 </span>
               </div>
 
               {/* Private Notes Preview */}
-              <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-850/80 text-[11px] text-slate-400 italic flex items-start gap-2">
+              <div className="bg-[#0D1110]/60 p-2.5 rounded-xl border border-[#151D1A]/80 text-[11px] text-slate-400 italic flex items-start gap-2">
                 <MessageSquare className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
                 <span className="line-clamp-2">
                   <strong className="not-italic text-slate-300">Note Coach : </strong>
@@ -314,9 +314,9 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
 
       {/* EDIT MODAL / FICHE ÉLÈVE MODULABLE */}
       {isEditingFile && selectedStudent && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full p-6 space-y-6 shadow-2xl relative my-8">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="fixed inset-0 z-50 bg-[#0D1110]/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-3xl w-full p-6 space-y-6 shadow-2xl relative my-8">
+            <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
               <div className="flex items-center gap-3">
                 <img
                   src={selectedStudent.avatar}
@@ -333,7 +333,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               </div>
               <button
                 onClick={() => setIsEditingFile(false)}
-                className="text-slate-400 hover:text-white text-sm p-1 rounded-lg hover:bg-slate-800"
+                className="text-slate-400 hover:text-white text-sm p-1 rounded-lg hover:bg-[#1B2320]"
               >
                 ✕
               </button>
@@ -348,7 +348,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     required
                     value={editForm.name || ""}
                     onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
                   />
                 </div>
 
@@ -359,7 +359,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     required
                     value={editForm.email || ""}
                     onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
                   />
                 </div>
 
@@ -369,7 +369,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     type="text"
                     value={editForm.phone || ""}
                     onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
                   />
                 </div>
 
@@ -378,7 +378,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   <select
                     value={editForm.assignedCoach || "Thomas Laurent"}
                     onChange={(e) => setEditForm({ ...editForm, assignedCoach: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
                   >
                     <option value="Thomas Laurent">Thomas Laurent (Head Coach)</option>
                     <option value="Sarah Benali">Sarah Benali (Psychologie & Risk)</option>
@@ -391,7 +391,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   <select
                     value={editForm.statusTag || "En Évaluation FTMO"}
                     onChange={(e) => setEditForm({ ...editForm, statusTag: e.target.value as StudentStatusTag })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-bold"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white font-bold"
                   >
                     <option value="En Évaluation FTMO">En Évaluation FTMO</option>
                     <option value="Prop Firm Financé">Prop Firm Financé 🏆</option>
@@ -406,7 +406,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   <select
                     value={editForm.riskStatus || "🟢 Risque Maîtrisé"}
                     onChange={(e) => setEditForm({ ...editForm, riskStatus: e.target.value as any })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
                   >
                     <option value="🟢 Risque Maîtrisé">🟢 Risque Maîtrisé</option>
                     <option value="⚠️ Attention Risk">⚠️ Attention Risk</option>
@@ -421,7 +421,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     type="number"
                     value={editForm.startingCapital || 0}
                     onChange={(e) => setEditForm({ ...editForm, startingCapital: Number(e.target.value) })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white font-mono"
                   />
                 </div>
 
@@ -431,7 +431,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     type="number"
                     value={editForm.currentCapital || 0}
                     onChange={(e) => setEditForm({ ...editForm, currentCapital: Number(e.target.value) })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-emerald-400 font-mono font-bold"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-[#00E676] font-mono font-bold"
                   />
                 </div>
 
@@ -442,7 +442,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     step="0.1"
                     value={editForm.winRate || 0}
                     onChange={(e) => setEditForm({ ...editForm, winRate: Number(e.target.value) })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-amber-400 font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-amber-400 font-mono"
                   />
                 </div>
 
@@ -452,7 +452,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     type="number"
                     value={editForm.courseCompletionPercentage || 0}
                     onChange={(e) => setEditForm({ ...editForm, courseCompletionPercentage: Number(e.target.value) })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-blue-400 font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-blue-400 font-mono"
                   />
                 </div>
               </div>
@@ -464,11 +464,11 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   value={editForm.privateCoachNotes || ""}
                   onChange={(e) => setEditForm({ ...editForm, privateCoachNotes: e.target.value })}
                   placeholder="Inscrivez les observations sur les biais psychologiques, règles de sur-lotage et plans d'actions..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl p-3 text-white"
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+              <div className="flex items-center justify-between pt-4 border-t border-[#1B2320]">
                 <button
                   type="button"
                   onClick={() => {
@@ -486,7 +486,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsEditingFile(false)}
-                    className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 font-bold"
+                    className="px-4 py-2 rounded-xl bg-[#1B2320] text-slate-300 font-bold"
                   >
                     Annuler
                   </button>
@@ -505,9 +505,9 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
 
       {/* CREATE STUDENT MODAL */}
       {isCreatingStudent && (
-        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-5 shadow-2xl relative my-8">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-[#0D1110]/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-xl w-full p-6 space-y-5 shadow-2xl relative my-8">
+            <div className="flex items-center justify-between border-b border-[#1B2320] pb-3">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Plus className="w-5 h-5 text-amber-400" /> Inscrire un Nouvel Élève
               </h3>
@@ -523,7 +523,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   value={editForm.name || ""}
                   onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                   placeholder="ex: Jean Dupont"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
                 />
               </div>
 
@@ -535,7 +535,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   value={editForm.email || ""}
                   onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                   placeholder="jean.dupont@gmail.com"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
                 />
               </div>
 
@@ -546,7 +546,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     type="number"
                     value={editForm.startingCapital || 10000}
                     onChange={(e) => setEditForm({ ...editForm, startingCapital: Number(e.target.value) })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
                   />
                 </div>
                 <div>
@@ -554,7 +554,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   <select
                     value={editForm.assignedCoach || "Thomas Laurent"}
                     onChange={(e) => setEditForm({ ...editForm, assignedCoach: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
                   >
                     <option value="Thomas Laurent">Thomas Laurent</option>
                     <option value="Sarah Benali">Sarah Benali</option>
@@ -569,15 +569,15 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   value={editForm.privateCoachNotes || ""}
                   onChange={(e) => setEditForm({ ...editForm, privateCoachNotes: e.target.value })}
                   placeholder="Notes lors de la première évaluation..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl p-2.5 text-white"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#1B2320]">
                 <button
                   type="button"
                   onClick={() => setIsCreatingStudent(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300"
+                  className="px-4 py-2 rounded-xl bg-[#1B2320] text-slate-300"
                 >
                   Annuler
                 </button>
@@ -595,8 +595,8 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
 
       {/* READ ONLY PREVIEW MODAL / MODE LECTURE ÉLÈVE */}
       {isReadOnlyPreview && selectedStudent && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl max-w-4xl w-full p-6 space-y-6 shadow-2xl relative my-8">
+        <div className="fixed inset-0 z-50 bg-[#0D1110]/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-[#111615] border border-amber-500/40 rounded-2xl max-w-4xl w-full p-6 space-y-6 shadow-2xl relative my-8">
             {/* Top Banner indicating Read-Only Inspection Mode */}
             <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl flex items-center justify-between text-xs">
               <div className="flex items-center gap-2 text-amber-300 font-medium">
@@ -614,7 +614,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
             </div>
 
             {/* Profile Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1B2320] pb-5">
               <div className="flex items-center gap-4">
                 <img
                   src={selectedStudent.avatar}
@@ -633,10 +633,10 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+              <div className="flex items-center gap-3 bg-[#0D1110] p-3 rounded-xl border border-[#1B2320]">
                 <div className="text-right">
                   <span className="text-[10px] text-slate-500 block uppercase font-bold">Capital sous Gestion</span>
-                  <span className="text-lg font-mono font-black text-emerald-400">
+                  <span className="text-lg font-mono font-black text-[#00E676]">
                     {selectedStudent.currentCapital.toLocaleString("fr-FR")} €
                   </span>
                 </div>
@@ -650,17 +650,17 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {selectedStudent.accounts.map((acc) => (
-                  <div key={acc.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
+                  <div key={acc.id} className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] space-y-2 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-white">{acc.name}</span>
-                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-mono border border-emerald-500/20">
+                      <span className="px-2 py-0.5 rounded bg-[#00E676]/10 text-[#00E676] text-[10px] font-mono border border-[#00E676]/20">
                         {acc.status}
                       </span>
                     </div>
                     <div className="text-slate-400 text-[11px]">Courtier/Prop Firm : {acc.firmOrBroker} ({acc.type})</div>
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-900 font-mono">
+                    <div className="flex items-center justify-between pt-2 border-t border-[#151D1A] font-mono">
                       <span className="text-slate-500">Solde Réel:</span>
-                      <span className="font-bold text-emerald-400 text-sm">{acc.currentBalance.toLocaleString("fr-FR")} €</span>
+                      <span className="font-bold text-[#00E676] text-sm">{acc.currentBalance.toLocaleString("fr-FR")} €</span>
                     </div>
                   </div>
                 ))}
@@ -673,16 +673,16 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 <Activity className="w-4 h-4 text-amber-400" /> Historique Récent des Trades
               </h4>
               {selectedStudent.recentTrades.length === 0 ? (
-                <div className="bg-slate-950 p-4 rounded-xl text-center text-slate-500 text-xs italic">
+                <div className="bg-[#0D1110] p-4 rounded-xl text-center text-slate-500 text-xs italic">
                   Aucune position enregistrée récemment pour cet élève.
                 </div>
               ) : (
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {selectedStudent.recentTrades.map((tr) => (
-                    <div key={tr.id} className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
+                    <div key={tr.id} className="bg-[#0D1110] p-3 rounded-xl border border-[#1B2320] flex items-center justify-between text-xs">
                       <div className="flex items-center gap-3">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          tr.direction === "LONG" ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+                          tr.direction === "LONG" ? "bg-[#00E676]/20 text-[#00E676]" : "bg-rose-500/20 text-rose-300"
                         }`}>
                           {tr.direction}
                         </span>
@@ -692,7 +692,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                         </div>
                       </div>
                       <div className="text-right font-mono">
-                        <span className={`font-bold ${tr.pnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                        <span className={`font-bold ${tr.pnl >= 0 ? "text-[#00E676]" : "text-rose-400"}`}>
                           {tr.pnl >= 0 ? "+" : ""}{tr.pnl} €
                         </span>
                         <span className="text-[10px] text-slate-500 block">{tr.date}</span>
@@ -704,7 +704,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
             </div>
 
             {/* Private Coach Notes */}
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-xs space-y-1">
+            <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] text-xs space-y-1">
               <span className="text-amber-400 font-bold block flex items-center gap-1.5">
                 <MessageSquare className="w-3.5 h-3.5" /> Notes Confidentielles du Coach :
               </span>

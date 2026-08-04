@@ -86,7 +86,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
       case "Zap":
         return <Zap className="w-5 h-5 text-purple-400" />;
       case "ShieldCheck":
-        return <ShieldCheck className="w-5 h-5 text-emerald-400" />;
+        return <ShieldCheck className="w-5 h-5 text-[#00E676]" />;
       case "Brain":
         return <Brain className="w-5 h-5 text-rose-400" />;
       default:
@@ -143,7 +143,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
             <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
               <span>{completedLessonsCount} / {totalLessons} Leçons terminées</span>
               {globalProgress === 100 ? (
-                <span className="text-emerald-400 font-bold flex items-center gap-1">
+                <span className="text-[#00E676] font-bold flex items-center gap-1">
                   <Award className="w-3.5 h-3.5" /> Certifié
                 </span>
               ) : (
@@ -155,7 +155,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#111615]/60 p-4 rounded-xl border border-[#1B2320]">
         {/* Category Tabs */}
         <div className="flex items-center gap-1 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 scrollbar-none">
           {["Tous", "Débutant", "Intermédiaire", "Avancé", "Masterclass"].map((level) => (
@@ -165,7 +165,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
               className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                 selectedLevel === level
                   ? "bg-amber-500 text-slate-950 font-bold shadow"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800"
+                  : "text-slate-400 hover:text-white hover:bg-[#1B2320]"
               }`}
             >
               {level}
@@ -181,7 +181,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Rechercher un cours ou sujet..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
+            className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
           />
         </div>
       </div>
@@ -197,15 +197,15 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
           return (
             <div
               key={module.id}
-              className="bg-slate-900 rounded-2xl border border-slate-800/90 overflow-hidden shadow-lg transition-all"
+              className="bg-[#111615] rounded-2xl border border-[#1B2320]/90 overflow-hidden shadow-lg transition-all"
             >
               {/* Module Header Bar */}
               <div
                 onClick={() => toggleModuleExpand(module.id)}
-                className="p-5 bg-slate-900/90 hover:bg-slate-850 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/60 transition-colors"
+                className="p-5 bg-[#111615]/90 hover:bg-[#151D1A] cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#1B2320]/60 transition-colors"
               >
                 <div className="flex items-start gap-4">
-                  <div className="p-3 rounded-xl bg-slate-800/90 border border-slate-700/60 shrink-0">
+                  <div className="p-3 rounded-xl bg-[#1B2320]/90 border border-[#232D29]/60 shrink-0">
                     {getModuleIcon(module.iconName)}
                   </div>
                   <div className="space-y-1">
@@ -227,7 +227,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                 </div>
 
                 {/* Right Progress Pill, Quiz Module Button & Arrow */}
-                <div className="flex items-center justify-between md:justify-end gap-4 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-800/60">
+                <div className="flex items-center justify-between md:justify-end gap-4 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[#1B2320]/60">
                   {/* Module Quiz Badge & Launcher */}
                   {module.quiz && module.quiz.length > 0 && (
                     <div
@@ -243,7 +243,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                           }}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm ${
                             quizResults[module.id].passed
-                              ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/25"
+                              ? "bg-[#00E676]/15 border-[#00E676]/40 text-[#00E676] hover:bg-[#00E676]/25"
                               : "bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/25"
                           }`}
                           title="Recommencer le quiz du module"
@@ -261,10 +261,10 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                             setQuizAnswers({});
                             setQuizSubmitted(false);
                           }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-xs font-extrabold transition-all shadow-sm"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-extrabold transition-all shadow-sm"
                           title="Tester vos connaissances sur ce module"
                         >
-                          <GraduationCap className="w-4 h-4 text-indigo-400" />
+                          <GraduationCap className="w-4 h-4 text-purple-400" />
                           <span>Quiz du Module ({module.quiz.length} q.)</span>
                         </button>
                       )}
@@ -275,7 +275,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                     <div className="text-xs font-semibold text-slate-300">
                       {modCompleted} / {modTotal} leçons ({modPercent}%)
                     </div>
-                    <div className="w-28 bg-slate-800 h-2 rounded-full overflow-hidden">
+                    <div className="w-28 bg-[#1B2320] h-2 rounded-full overflow-hidden">
                       <div
                         className="bg-amber-400 h-full rounded-full transition-all duration-300"
                         style={{ width: `${modPercent}%` }}
@@ -283,7 +283,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                     </div>
                   </div>
 
-                  <button className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-white">
+                  <button className="p-2 rounded-lg bg-[#1B2320] text-slate-400 hover:text-white">
                     {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                   </button>
                 </div>
@@ -291,11 +291,11 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
 
               {/* Lesson Items */}
               {isExpanded && (
-                <div className="p-4 bg-slate-950/40 divide-y divide-slate-800/50">
+                <div className="p-4 bg-[#0D1110]/40 divide-y divide-[#1B2320]/50">
                   {module.lessons.map((lesson, idx) => (
                     <div
                       key={lesson.id}
-                      className="py-3.5 px-3 rounded-xl hover:bg-slate-850/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors"
+                      className="py-3.5 px-3 rounded-xl hover:bg-[#151D1A]/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors"
                     >
                       {/* Left Lesson Info & Play */}
                       <div className="flex items-start gap-3.5">
@@ -312,7 +312,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                             <span className="text-xs font-bold text-slate-200">
                               Leçon {idx + 1}: {lesson.title}
                             </span>
-                            <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
+                            <span className="text-[11px] px-2 py-0.5 rounded bg-[#1B2320] text-slate-400 font-mono">
                               {lesson.duration}
                             </span>
                           </div>
@@ -329,7 +329,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                                     e.preventDefault();
                                     alert(`Téléchargement de : ${res.title}`);
                                   }}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] transition-colors"
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1B2320] hover:bg-[#232D29] text-slate-300 text-[11px] transition-colors"
                                 >
                                   <FileText className="w-3 h-3 text-amber-400" />
                                   <span>{res.title}</span>
@@ -354,7 +354,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                               setQuizAnswers({});
                               setQuizSubmitted(false);
                             }}
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-xs font-semibold transition-colors"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-semibold transition-colors"
                           >
                             <HelpCircle className="w-3.5 h-3.5" />
                             <span>Quiz ({lesson.quiz.length})</span>
@@ -364,7 +364,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                         {/* Ask Coach Question Button */}
                         <button
                           onClick={() => onAskCoachAboutLesson(lesson.title)}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-300 text-xs font-medium transition-colors"
                           title="Poser une question au coach sur cette leçon"
                         >
                           <MessageSquare className="w-3.5 h-3.5 text-amber-400" />
@@ -376,13 +376,13 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                           onClick={() => onToggleLessonCompletion(module.id, lesson.id)}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                             lesson.isCompleted
-                              ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-                              : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
+                              ? "bg-[#00E676]/20 text-[#00E676] border border-[#00E676]/40"
+                              : "bg-[#1B2320] text-slate-400 hover:text-white hover:bg-[#232D29]"
                           }`}
                         >
                           {lesson.isCompleted ? (
                             <>
-                              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                              <CheckCircle2 className="w-4 h-4 text-[#00E676]" />
                               <span>Terminée</span>
                             </>
                           ) : (
@@ -404,10 +404,10 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
 
       {/* Video Player Modal */}
       {activeLessonModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
             {/* Modal Header */}
-            <div className="p-4 sm:p-6 border-b border-slate-800 flex items-center justify-between">
+            <div className="p-4 sm:p-6 border-b border-[#1B2320] flex items-center justify-between">
               <div>
                 <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
                   {activeLessonModal.module.title}
@@ -418,14 +418,14 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
               </div>
               <button
                 onClick={() => setActiveLessonModal(null)}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                className="p-2 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-400 hover:text-white"
               >
                 ✕
               </button>
             </div>
 
             {/* Video Frame */}
-            <div className="relative bg-black aspect-video w-full flex items-center justify-center border-b border-slate-800">
+            <div className="relative bg-black aspect-video w-full flex items-center justify-center border-b border-[#1B2320]">
               <video
                 src={activeLessonModal.lesson.videoUrl}
                 controls
@@ -452,7 +452,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                       onAskCoachAboutLesson(activeLessonModal.lesson.title);
                       setActiveLessonModal(null);
                     }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-200 text-xs font-semibold"
                   >
                     <MessageSquare className="w-4 h-4 text-amber-400" />
                     Question au Coach
@@ -478,7 +478,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                     }}
                     className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
                       activeLessonModal.lesson.isCompleted
-                        ? "bg-emerald-500 text-slate-950"
+                        ? "bg-[#00E676] text-slate-950"
                         : "bg-amber-500 text-slate-950 hover:bg-amber-400"
                     }`}
                   >
@@ -496,9 +496,9 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
 
       {/* Module Quiz Modal */}
       {activeModuleQuizModal && activeModuleQuizModal.quiz && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
               <div>
                 <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
                   <GraduationCap className="w-4 h-4" /> Quiz du Module
@@ -507,7 +507,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
               </div>
               <button
                 onClick={() => setActiveModuleQuizModal(null)}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                className="p-2 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-400 hover:text-white"
               >
                 ✕
               </button>
@@ -519,20 +519,20 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                 const isCorrect = selected === q.correctAnswerIndex;
 
                 return (
-                  <div key={q.id} className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
+                  <div key={q.id} className="bg-[#0D1110]/60 p-4 rounded-xl border border-[#1B2320] space-y-3">
                     <p className="text-sm font-bold text-slate-200">
                       {idx + 1}. {q.question}
                     </p>
 
                     <div className="space-y-2">
                       {q.options.map((opt, optIdx) => {
-                        let btnStyle = "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700";
+                        let btnStyle = "bg-[#111615] border-[#1B2320] text-slate-300 hover:border-[#232D29]";
                         if (selected === optIdx) {
-                          btnStyle = "bg-indigo-600/20 border-indigo-500 text-indigo-200 font-semibold";
+                          btnStyle = "bg-purple-600/20 border-purple-500 text-purple-200 font-semibold";
                         }
                         if (quizSubmitted) {
                           if (optIdx === q.correctAnswerIndex) {
-                            btnStyle = "bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold";
+                            btnStyle = "bg-[#00E676]/20 border-[#00E676] text-[#00E676] font-bold";
                           } else if (selected === optIdx && !isCorrect) {
                             btnStyle = "bg-rose-500/20 border-rose-500 text-rose-300";
                           }
@@ -546,7 +546,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                           >
                             <span>{opt}</span>
                             {quizSubmitted && optIdx === q.correctAnswerIndex && (
-                              <Check className="w-4 h-4 text-emerald-400" />
+                              <Check className="w-4 h-4 text-[#00E676]" />
                             )}
                           </button>
                         );
@@ -554,7 +554,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                     </div>
 
                     {quizSubmitted && (
-                      <div className="p-3 rounded-lg bg-slate-900 text-xs text-slate-300 border-l-2 border-amber-400">
+                      <div className="p-3 rounded-lg bg-[#111615] text-xs text-slate-300 border-l-2 border-amber-400">
                         <span className="font-bold text-amber-400">Explication: </span>
                         {q.explanation}
                       </div>
@@ -566,7 +566,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
 
             {/* Quiz Result Banner if Submitted */}
             {quizSubmitted && (
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-center space-y-2">
+              <div className="p-4 rounded-xl bg-[#0D1110] border border-[#1B2320] text-center space-y-2">
                 {(() => {
                   const correctCount = activeModuleQuizModal.quiz!.filter(
                     (q) => quizAnswers[q.id] === q.correctAnswerIndex
@@ -579,7 +579,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                     <div>
                       <div className="text-xl font-extrabold text-white">
                         Score final :{" "}
-                        <span className={isPassed ? "text-emerald-400" : "text-amber-400"}>
+                        <span className={isPassed ? "text-[#00E676]" : "text-amber-400"}>
                           {scorePct}% ({correctCount}/{total} bonnes réponses)
                         </span>
                       </div>
@@ -595,7 +595,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
             )}
 
             {/* Quiz Footer Actions */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+            <div className="flex items-center justify-between pt-4 border-t border-[#1B2320]">
               {quizSubmitted ? (
                 <div className="flex items-center gap-3 w-full justify-between">
                   <button
@@ -603,14 +603,14 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                       setQuizAnswers({});
                       setQuizSubmitted(false);
                     }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-medium"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1B2320] text-slate-300 text-xs font-medium"
                   >
                     <RotateCcw className="w-4 h-4" /> Recommencer le Quiz
                   </button>
 
                   <button
                     onClick={() => setActiveModuleQuizModal(null)}
-                    className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20"
+                    className="px-5 py-2.5 rounded-xl bg-[#00E676] hover:bg-[#00E676] text-slate-950 font-bold text-xs shadow-lg shadow-[#00E676]/20"
                   >
                     Terminer & Enregistrer
                   </button>
@@ -653,18 +653,18 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
 
       {/* Lesson Quiz Modal */}
       {activeLessonQuizModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
               <div>
-                <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">
                   Quiz Rapide de Leçon
                 </span>
                 <h3 className="text-lg font-bold text-white">{activeLessonQuizModal.lessonTitle}</h3>
               </div>
               <button
                 onClick={() => setActiveLessonQuizModal(null)}
-                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+                className="p-2 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-400 hover:text-white"
               >
                 ✕
               </button>
@@ -676,20 +676,20 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                 const isCorrect = selected === q.correctAnswerIndex;
 
                 return (
-                  <div key={q.id} className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
+                  <div key={q.id} className="bg-[#0D1110]/60 p-4 rounded-xl border border-[#1B2320] space-y-3">
                     <p className="text-sm font-bold text-slate-200">
                       {idx + 1}. {q.question}
                     </p>
 
                     <div className="space-y-2">
                       {q.options.map((opt, optIdx) => {
-                        let btnStyle = "bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700";
+                        let btnStyle = "bg-[#111615] border-[#1B2320] text-slate-300 hover:border-[#232D29]";
                         if (selected === optIdx) {
-                          btnStyle = "bg-indigo-600/20 border-indigo-500 text-indigo-200 font-semibold";
+                          btnStyle = "bg-purple-600/20 border-purple-500 text-purple-200 font-semibold";
                         }
                         if (quizSubmitted) {
                           if (optIdx === q.correctAnswerIndex) {
-                            btnStyle = "bg-emerald-500/20 border-emerald-500 text-emerald-300 font-bold";
+                            btnStyle = "bg-[#00E676]/20 border-[#00E676] text-[#00E676] font-bold";
                           } else if (selected === optIdx && !isCorrect) {
                             btnStyle = "bg-rose-500/20 border-rose-500 text-rose-300";
                           }
@@ -703,7 +703,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                           >
                             <span>{opt}</span>
                             {quizSubmitted && optIdx === q.correctAnswerIndex && (
-                              <Check className="w-4 h-4 text-emerald-400" />
+                              <Check className="w-4 h-4 text-[#00E676]" />
                             )}
                           </button>
                         );
@@ -711,8 +711,8 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                     </div>
 
                     {quizSubmitted && (
-                      <div className="p-3 rounded-lg bg-slate-900 text-xs text-slate-300 border-l-2 border-indigo-400">
-                        <span className="font-bold text-indigo-400">Explication: </span>
+                      <div className="p-3 rounded-lg bg-[#111615] text-xs text-slate-300 border-l-2 border-purple-400">
+                        <span className="font-bold text-purple-400">Explication: </span>
                         {q.explanation}
                       </div>
                     )}
@@ -721,14 +721,14 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
               })}
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+            <div className="flex items-center justify-between pt-4 border-t border-[#1B2320]">
               {quizSubmitted ? (
                 <button
                   onClick={() => {
                     setQuizAnswers({});
                     setQuizSubmitted(false);
                   }}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-medium"
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#1B2320] text-slate-300 text-xs font-medium"
                 >
                   <RotateCcw className="w-4 h-4" /> Recommencer
                 </button>
@@ -742,7 +742,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                 <button
                   onClick={() => setQuizSubmitted(true)}
                   disabled={Object.keys(quizAnswers).length === 0}
-                  className="px-5 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-bold text-xs shadow-lg shadow-indigo-500/20"
+                  className="px-5 py-2.5 rounded-xl bg-purple-500 hover:bg-purple-400 disabled:opacity-50 text-white font-bold text-xs shadow-lg shadow-purple-500/20"
                 >
                   Valider mes réponses
                 </button>
