@@ -187,7 +187,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           {/* Module 1: Journal de trading */}
           <div
             onClick={() => setActiveTab("journal")}
-            className="bg-[#111615] border border-[#1B2320] hover:border-[#00E676]/40 p-5 rounded-2xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between"
+            className="bg-[#111615] bg-[radial-gradient(circle_at_0%_0%,rgba(0,230,118,0.20),transparent_65%)] border border-[#1B2320] hover:border-[#00E676]/40 p-5 rounded-2xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between"
           >
             <div className="w-8 h-8 rounded-xl bg-[#00E676]/15 text-[#00E676] border border-[#00E676]/30 flex items-center justify-center font-bold text-sm">
               J
@@ -205,7 +205,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           {/* Module 2: Examen */}
           <div
             onClick={() => setActiveTab("analytics")}
-            className="bg-[#111615] border border-[#1B2320] hover:border-blue-500/40 p-5 rounded-2xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between"
+            className="bg-[#111615] bg-[radial-gradient(circle_at_0%_0%,rgba(59,130,246,0.20),transparent_65%)] border border-[#1B2320] hover:border-blue-500/40 p-5 rounded-2xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between"
           >
             <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-sm">
               E
@@ -223,7 +223,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           {/* Module 3: Replay */}
           <div
             onClick={() => setActiveTab("simulator")}
-            className="bg-[#111615] border border-[#1B2320] hover:border-purple-500/40 p-5 rounded-2xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between"
+            className="bg-[#111615] bg-[radial-gradient(circle_at_0%_0%,rgba(168,85,247,0.20),transparent_65%)] border border-[#1B2320] hover:border-purple-500/40 p-5 rounded-2xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between"
           >
             <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center justify-center font-bold text-sm">
               R
@@ -241,7 +241,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           {/* Module 4: Module vidéo */}
           <div
             onClick={() => setActiveTab("academy")}
-            className="bg-[#111615] border border-[#1B2320] hover:border-amber-500/40 p-5 rounded-2xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between"
+            className="bg-[#111615] bg-[radial-gradient(circle_at_0%_0%,rgba(245,158,11,0.20),transparent_65%)] border border-[#1B2320] hover:border-amber-500/40 p-5 rounded-2xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between"
           >
             <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold text-sm">
               V
