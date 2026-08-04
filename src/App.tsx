@@ -53,6 +53,7 @@ import {
   TradeDraft,
 } from "./types";
 import { TabType as SidebarTabType } from "./components/Sidebar";
+import { usePersistentState } from "./hooks/usePersistentState";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
@@ -60,10 +61,10 @@ export default function App() {
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
 
   // Sidebar Collapsed State (Fullscreen optimization)
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
-    const saved = localStorage.getItem("horizon_sidebar_collapsed");
-    return saved ? JSON.parse(saved) : false;
-  });
+  const [isCollapsed, setIsCollapsed] = usePersistentState<boolean>(
+    "horizon_sidebar_collapsed",
+    false
+  );
 
   // Modals States
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -74,62 +75,60 @@ export default function App() {
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
-  // Local Storage Persistent State or Defaults
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
-    const saved = localStorage.getItem("horizon_notifications");
-    return saved ? JSON.parse(saved) : initialNotifications;
-  });
+  // Collections persistées localement (clés horizon_*), seed = mockData
+  const [notifications, setNotifications] = usePersistentState<AppNotification[]>(
+    "horizon_notifications",
+    initialNotifications
+  );
 
-  // Local Storage Persistent State or Defaults
-  const [student, setStudent] = useState<StudentProfile>(() => {
-    const saved = localStorage.getItem("horizon_student");
-    return saved ? JSON.parse(saved) : initialStudentProfile;
-  });
+  const [student, setStudent] = usePersistentState<StudentProfile>(
+    "horizon_student",
+    initialStudentProfile
+  );
 
-  const [enrolledStudents, setEnrolledStudents] = useState<EnrolledStudent[]>(() => {
-    const saved = localStorage.getItem("horizon_enrolled_students");
-    return saved ? JSON.parse(saved) : initialEnrolledStudents;
-  });
+  const [enrolledStudents, setEnrolledStudents] = usePersistentState<EnrolledStudent[]>(
+    "horizon_enrolled_students",
+    initialEnrolledStudents
+  );
 
-  const [accounts, setAccounts] = useState<TradingAccount[]>(() => {
-    const saved = localStorage.getItem("horizon_accounts");
-    return saved ? JSON.parse(saved) : initialTradingAccounts;
-  });
+  const [accounts, setAccounts] = usePersistentState<TradingAccount[]>(
+    "horizon_accounts",
+    initialTradingAccounts
+  );
 
-  const [signals, setSignals] = useState<CoachSignal[]>(() => {
-    const saved = localStorage.getItem("horizon_signals");
-    return saved ? JSON.parse(saved) : initialCoachSignals;
-  });
+  const [signals, setSignals] = usePersistentState<CoachSignal[]>(
+    "horizon_signals",
+    initialCoachSignals
+  );
 
-  const [modules, setModules] = useState<Module[]>(() => {
-    const saved = localStorage.getItem("horizon_modules");
-    return saved ? JSON.parse(saved) : initialModules;
-  });
+  const [modules, setModules] = usePersistentState<Module[]>(
+    "horizon_modules",
+    initialModules
+  );
 
-  const [trades, setTrades] = useState<Trade[]>(() => {
-    const saved = localStorage.getItem("horizon_trades");
-    return saved ? JSON.parse(saved) : initialTrades;
-  });
+  const [trades, setTrades] = usePersistentState<Trade[]>(
+    "horizon_trades",
+    initialTrades
+  );
 
-  const [messages, setMessages] = useState<CoachMessage[]>(() => {
-    const saved = localStorage.getItem("horizon_messages");
-    return saved ? JSON.parse(saved) : initialMessages;
-  });
+  const [messages, setMessages] = usePersistentState<CoachMessage[]>(
+    "horizon_messages",
+    initialMessages
+  );
 
-  const [forumTopics, setForumTopics] = useState<ForumTopic[]>(() => {
-    const saved = localStorage.getItem("horizon_forum_topics");
-    return saved ? JSON.parse(saved) : initialForumTopics;
-  });
+  const [forumTopics, setForumTopics] = usePersistentState<ForumTopic[]>(
+    "horizon_forum_topics",
+    initialForumTopics
+  );
 
-  const [quizResults, setQuizResults] = useState<Record<string, ModuleQuizResult>>(() => {
-    const saved = localStorage.getItem("horizon_quiz_results");
-    return saved ? JSON.parse(saved) : {};
-  });
+  const [quizResults, setQuizResults] = usePersistentState<
+    Record<string, ModuleQuizResult>
+  >("horizon_quiz_results", {});
 
-  const [badges, setBadges] = useState<TraderBadge[]>(() => {
-    const saved = localStorage.getItem("horizon_badges");
-    return saved ? JSON.parse(saved) : initialTraderBadges;
-  });
+  const [badges, setBadges] = usePersistentState<TraderBadge[]>(
+    "horizon_badges",
+    initialTraderBadges
+  );
 
   // Modal & Pre-filled Messaging Navigation state
   const [selectedTradeForAudit, setSelectedTradeForAudit] = useState<Trade | null>(
@@ -149,53 +148,7 @@ export default function App() {
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState<boolean>(false);
   const [isAISetupAnalyzerOpen, setIsAISetupAnalyzerOpen] = useState<boolean>(false);
 
-  // Persistence Effects
-  useEffect(() => {
-    localStorage.setItem("horizon_badges", JSON.stringify(badges));
-  }, [badges]);
-  useEffect(() => {
-    localStorage.setItem("horizon_student", JSON.stringify(student));
-  }, [student]);
-
-  useEffect(() => {
-    localStorage.setItem("horizon_notifications", JSON.stringify(notifications));
-  }, [notifications]);
-
-  useEffect(() => {
-    localStorage.setItem("horizon_sidebar_collapsed", JSON.stringify(isCollapsed));
-  }, [isCollapsed]);
-
-  useEffect(() => {
-    localStorage.setItem("horizon_enrolled_students", JSON.stringify(enrolledStudents));
-  }, [enrolledStudents]);
-
-  useEffect(() => {
-    localStorage.setItem("horizon_accounts", JSON.stringify(accounts));
-  }, [accounts]);
-
-  useEffect(() => {
-    localStorage.setItem("horizon_signals", JSON.stringify(signals));
-  }, [signals]);
-
-  useEffect(() => {
-    localStorage.setItem("horizon_modules", JSON.stringify(modules));
-  }, [modules]);
-
-  useEffect(() => {
-    localStorage.setItem("horizon_trades", JSON.stringify(trades));
-  }, [trades]);
-
-  useEffect(() => {
-    localStorage.setItem("horizon_messages", JSON.stringify(messages));
-  }, [messages]);
-
-  useEffect(() => {
-    localStorage.setItem("horizon_forum_topics", JSON.stringify(forumTopics));
-  }, [forumTopics]);
-
-  useEffect(() => {
-    localStorage.setItem("horizon_quiz_results", JSON.stringify(quizResults));
-  }, [quizResults]);
+  // L'écriture dans localStorage est désormais assurée par usePersistentState.
 
   // Recalculate Student Capital from Trades PnL
   useEffect(() => {

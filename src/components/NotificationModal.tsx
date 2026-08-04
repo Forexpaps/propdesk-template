@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Bell, CheckCheck, Trash2, Zap, ArrowRight, ShieldAlert, Sparkles, BookOpen, Volume2, VolumeX, X, AlertCircle } from "lucide-react";
 import { AppNotification } from "../types";
+import { usePersistentState } from "../hooks/usePersistentState";
 
 interface NotificationModalProps {
   isOpen: boolean;
@@ -24,18 +25,14 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   onAddTestNotification,
 }) => {
   const [filter, setFilter] = useState<"all" | "unread" | "signal" | "risk" | "academy">("all");
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
-    const saved = localStorage.getItem("horizon_sound_alerts");
-    return saved !== null ? JSON.parse(saved) : true;
-  });
+  const [soundEnabled, setSoundEnabled] = usePersistentState<boolean>(
+    "horizon_sound_alerts",
+    true
+  );
 
   if (!isOpen) return null;
 
-  const toggleSound = () => {
-    const next = !soundEnabled;
-    setSoundEnabled(next);
-    localStorage.setItem("horizon_sound_alerts", JSON.stringify(next));
-  };
+  const toggleSound = () => setSoundEnabled((prev) => !prev);
 
   const filteredNotifications = notifications.filter((n) => {
     if (filter === "unread") return !n.read;
