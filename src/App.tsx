@@ -54,8 +54,44 @@ import {
 } from "./types";
 import { TabType as SidebarTabType } from "./components/Sidebar";
 import { usePersistentState } from "./hooks/usePersistentState";
+import { useBootstrap, useSyncedState } from "./hooks/useServerSync";
+import { api, type ServerState } from "./lib/api";
 
+/**
+ * Coquille de démarrage : récupère l'état auprès du serveur avant de monter
+ * l'application, pour que celle-ci parte d'une source de vérité unique.
+ *
+ * Si le serveur ne répond pas, on démarre quand même en mode dégradé sur le
+ * cache localStorage — l'académie reste utilisable hors ligne.
+ */
 export default function App() {
+  const { status, state } = useBootstrap();
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-[#0B0F0E] text-slate-300 flex flex-col items-center justify-center gap-4 font-sans">
+        <div className="w-10 h-10 rounded-xl bg-[#00E676] text-slate-950 font-extrabold flex items-center justify-center animate-pulse">
+          P
+        </div>
+        <p className="text-xs font-mono text-slate-500">
+          Chargement de votre espace PropDesk…
+        </p>
+      </div>
+    );
+  }
+
+  return <AcademyApp initialState={state} syncEnabled={status === "online"} />;
+}
+
+interface AcademyAppProps {
+  /** État renvoyé par le serveur, ou null si celui-ci est injoignable. */
+  initialState: ServerState | null;
+  /** false quand on tourne sur le cache local : on n'essaie pas de pousser. */
+  syncEnabled: boolean;
+}
+
+function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
+  const server = initialState?.collections;
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
 
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
@@ -75,59 +111,95 @@ export default function App() {
   const [isCertificateOpen, setIsCertificateOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
-  // Collections persistées localement (clés horizon_*), seed = mockData
-  const [notifications, setNotifications] = usePersistentState<AppNotification[]>(
+  // Valeur de départ d'une collection : le serveur fait autorité quand il a
+  // répondu ; sinon on repart du cache local, et en dernier recours du seed.
+  function seed<T>(fromServer: T | undefined, localKey: string, fallback: T): T {
+    if (initialState) return fromServer ?? fallback;
+    try {
+      const cached = localStorage.getItem(localKey);
+      if (cached !== null) return JSON.parse(cached) as T;
+    } catch {
+      // Cache illisible : on retombe sur le seed.
+    }
+    return fallback;
+  }
+
+  // Collections synchronisées avec le serveur, avec miroir localStorage
+  const [notifications, setNotifications] = useSyncedState<AppNotification[]>(
     "horizon_notifications",
-    initialNotifications
+    seed(server?.notifications, "horizon_notifications", initialNotifications),
+    (v) => api.saveCollection("notifications", v),
+    syncEnabled
   );
 
-  const [student, setStudent] = usePersistentState<StudentProfile>(
+  const [student, setStudent] = useSyncedState<StudentProfile>(
     "horizon_student",
-    initialStudentProfile
+    seed(initialState?.student ?? undefined, "horizon_student", initialStudentProfile),
+    (v) => api.saveProfile(v),
+    syncEnabled
   );
 
-  const [enrolledStudents, setEnrolledStudents] = usePersistentState<EnrolledStudent[]>(
+  const [enrolledStudents, setEnrolledStudents] = useSyncedState<EnrolledStudent[]>(
     "horizon_enrolled_students",
-    initialEnrolledStudents
+    seed(server?.enrolledStudents, "horizon_enrolled_students", initialEnrolledStudents),
+    (v) => api.saveCollection("enrolledStudents", v),
+    syncEnabled
   );
 
-  const [accounts, setAccounts] = usePersistentState<TradingAccount[]>(
+  const [accounts, setAccounts] = useSyncedState<TradingAccount[]>(
     "horizon_accounts",
-    initialTradingAccounts
+    seed(server?.accounts, "horizon_accounts", initialTradingAccounts),
+    (v) => api.saveCollection("accounts", v),
+    syncEnabled
   );
 
-  const [signals, setSignals] = usePersistentState<CoachSignal[]>(
+  const [signals, setSignals] = useSyncedState<CoachSignal[]>(
     "horizon_signals",
-    initialCoachSignals
+    seed(server?.signals, "horizon_signals", initialCoachSignals),
+    (v) => api.saveCollection("signals", v),
+    syncEnabled
   );
 
-  const [modules, setModules] = usePersistentState<Module[]>(
+  const [modules, setModules] = useSyncedState<Module[]>(
     "horizon_modules",
-    initialModules
+    seed(server?.modules, "horizon_modules", initialModules),
+    (v) => api.saveCollection("modules", v),
+    syncEnabled
   );
 
-  const [trades, setTrades] = usePersistentState<Trade[]>(
+  const [trades, setTrades] = useSyncedState<Trade[]>(
     "horizon_trades",
-    initialTrades
+    seed(server?.trades, "horizon_trades", initialTrades),
+    (v) => api.saveCollection("trades", v),
+    syncEnabled
   );
 
-  const [messages, setMessages] = usePersistentState<CoachMessage[]>(
+  const [messages, setMessages] = useSyncedState<CoachMessage[]>(
     "horizon_messages",
-    initialMessages
+    seed(server?.messages, "horizon_messages", initialMessages),
+    (v) => api.saveCollection("messages", v),
+    syncEnabled
   );
 
-  const [forumTopics, setForumTopics] = usePersistentState<ForumTopic[]>(
+  const [forumTopics, setForumTopics] = useSyncedState<ForumTopic[]>(
     "horizon_forum_topics",
-    initialForumTopics
+    seed(server?.forumTopics, "horizon_forum_topics", initialForumTopics),
+    (v) => api.saveCollection("forumTopics", v),
+    syncEnabled
   );
 
-  const [quizResults, setQuizResults] = usePersistentState<
-    Record<string, ModuleQuizResult>
-  >("horizon_quiz_results", {});
+  const [quizResults, setQuizResults] = useSyncedState<Record<string, ModuleQuizResult>>(
+    "horizon_quiz_results",
+    seed(initialState?.quizResults, "horizon_quiz_results", {}),
+    (v) => api.saveQuizResults(v),
+    syncEnabled
+  );
 
-  const [badges, setBadges] = usePersistentState<TraderBadge[]>(
+  const [badges, setBadges] = useSyncedState<TraderBadge[]>(
     "horizon_badges",
-    initialTraderBadges
+    seed(server?.badges, "horizon_badges", initialTraderBadges),
+    (v) => api.saveCollection("badges", v),
+    syncEnabled
   );
 
   // Modal & Pre-filled Messaging Navigation state
