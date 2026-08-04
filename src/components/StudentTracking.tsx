@@ -144,11 +144,11 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-[#111615] via-amber-950/20 to-[#111615] border border-[#1B2320] rounded-2xl p-6 relative overflow-hidden shadow-xl">
+      <div className="bg-gradient-to-r from-[#111615] via-[#00E676]/5 to-[#111615] border border-[#1B2320] rounded-2xl p-6 relative overflow-hidden shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold font-mono flex items-center gap-1">
+              <span className="px-2.5 py-1 rounded-full bg-[#00E676]/20 text-[#00E676] border border-[#00E676]/30 text-xs font-bold font-mono flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5" /> Espace Admin & Coach
               </span>
               <span className="text-xs text-slate-400">• Suivi & Contrôle des Élèves</span>
@@ -174,7 +174,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               });
               setIsCreatingStudent(true);
             }}
-            className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 self-start md:self-auto shrink-0"
+            className="px-4 py-2.5 bg-[#00E676] hover:bg-[#00c865] text-slate-950 rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-[#00E676]/20 self-start md:self-auto shrink-0"
           >
             <Plus className="w-4 h-4" /> Inscrire un Nouvel Élève
           </button>
@@ -190,7 +190,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
             placeholder="Rechercher un élève, un email, un coach..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+            className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-[#00E676]"
           />
         </div>
 
@@ -202,7 +202,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               onClick={() => setSelectedTagFilter(tag)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium border whitespace-nowrap transition-all ${
                 selectedTagFilter === tag
-                  ? "bg-amber-500/20 text-amber-300 border-amber-500/40 font-bold"
+                  ? "bg-[#00E676]/20 text-[#00E676] border-[#00E676]/40 font-bold"
                   : "bg-[#0D1110] text-slate-400 border-[#1B2320] hover:text-white"
               }`}
             >
@@ -238,7 +238,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                       </span>
                     </div>
                     <p className="text-xs text-slate-400">{st.email} • {st.level}</p>
-                    <p className="text-[11px] text-slate-500">Coach attribué : <span className="text-amber-400">{st.assignedCoach}</span></p>
+                    <p className="text-[11px] text-slate-500">Coach attribué : <span className="text-[#00E676]">{st.assignedCoach}</span></p>
                   </div>
                 </div>
 
@@ -253,7 +253,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   <button
                     onClick={() => handleOpenEdit(st)}
                     title="Modifier la Fiche Élève"
-                    className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs font-semibold flex items-center gap-1"
+                    className="px-2.5 py-1.5 rounded-lg bg-[#00E676]/10 hover:bg-[#00E676]/20 text-[#00E676] border border-[#00E676]/20 text-xs font-semibold flex items-center gap-1"
                   >
                     <Edit className="w-3.5 h-3.5" /> Éditer Fiche
                   </button>
@@ -273,15 +273,15 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-500 block">Win Rate & Trades</span>
-                  <span className="font-mono font-bold text-amber-400 text-sm">{st.winRate}%</span>
+                  <span className="font-mono font-bold text-[#00E676] text-sm">{st.winRate}%</span>
                   <span className="text-[10px] text-slate-400 block">{st.totalTrades} positions</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-500 block">Progression Cours</span>
-                  <span className="font-mono font-bold text-blue-400 text-sm">{st.courseCompletionPercentage}%</span>
+                  <span className="font-mono font-bold text-[#00E676] text-sm">{st.courseCompletionPercentage}%</span>
                   <div className="w-full bg-[#1B2320] h-1.5 rounded-full mt-1 overflow-hidden">
                     <div
-                      className="bg-blue-500 h-full rounded-full"
+                      className="bg-[#00E676] h-full rounded-full"
                       style={{ width: `${st.courseCompletionPercentage}%` }}
                     />
                   </div>
@@ -321,14 +321,14 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 <img
                   src={selectedStudent.avatar}
                   alt={selectedStudent.name}
-                  className="w-10 h-10 rounded-full object-cover border border-amber-500/50"
+                  className="w-10 h-10 rounded-full object-cover border border-[#00E676]/50"
                 />
                 <div>
                   <h3 className="text-lg font-bold text-white flex items-center gap-2">
                     Fiche Édition : {selectedStudent.name}
                     <span className="text-xs font-normal text-slate-400">({selectedStudent.id})</span>
                   </h3>
-                  <p className="text-xs text-amber-400">Modification des métriques, capital, notes coach & comptes</p>
+                  <p className="text-xs text-[#00E676]">Modification des métriques, capital, notes coach & comptes</p>
                 </div>
               </div>
               <button
@@ -442,7 +442,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     step="0.1"
                     value={editForm.winRate || 0}
                     onChange={(e) => setEditForm({ ...editForm, winRate: Number(e.target.value) })}
-                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-amber-400 font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-[#00E676] font-mono"
                   />
                 </div>
 
@@ -452,7 +452,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     type="number"
                     value={editForm.courseCompletionPercentage || 0}
                     onChange={(e) => setEditForm({ ...editForm, courseCompletionPercentage: Number(e.target.value) })}
-                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-blue-400 font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-[#00E676] font-mono"
                   />
                 </div>
               </div>
@@ -492,7 +492,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold flex items-center gap-1.5"
+                    className="px-5 py-2 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-bold flex items-center gap-1.5"
                   >
                     <CheckCircle2 className="w-4 h-4" /> Sauvegarder la Fiche
                   </button>
@@ -509,7 +509,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
           <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-xl w-full p-6 space-y-5 shadow-2xl relative my-8">
             <div className="flex items-center justify-between border-b border-[#1B2320] pb-3">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Plus className="w-5 h-5 text-amber-400" /> Inscrire un Nouvel Élève
+                <Plus className="w-5 h-5 text-[#00E676]" /> Inscrire un Nouvel Élève
               </h3>
               <button onClick={() => setIsCreatingStudent(false)} className="text-slate-400 hover:text-white">✕</button>
             </div>
@@ -583,7 +583,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-amber-500 font-bold text-slate-950"
+                  className="px-5 py-2 rounded-xl bg-[#00E676] font-bold text-slate-950"
                 >
                   Valider l'Inscription
                 </button>
@@ -596,18 +596,18 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
       {/* READ ONLY PREVIEW MODAL / MODE LECTURE ÉLÈVE */}
       {isReadOnlyPreview && selectedStudent && (
         <div className="fixed inset-0 z-50 bg-[#0D1110]/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#111615] border border-amber-500/40 rounded-2xl max-w-4xl w-full p-6 space-y-6 shadow-2xl relative my-8">
+          <div className="bg-[#111615] border border-[#00E676]/40 rounded-2xl max-w-4xl w-full p-6 space-y-6 shadow-2xl relative my-8">
             {/* Top Banner indicating Read-Only Inspection Mode */}
-            <div className="bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2 text-amber-300 font-medium">
-                <Lock className="w-4 h-4 text-amber-400" />
+            <div className="bg-[#00E676]/10 border border-[#00E676]/30 p-3 rounded-xl flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 text-[#00E676] font-medium">
+                <Lock className="w-4 h-4 text-[#00E676]" />
                 <span>
                   <strong>MODE LECTURE ADMIN :</strong> Vous visualisez le tableau de bord et les comptes réels de <strong>{selectedStudent.name}</strong> en consultation seule.
                 </span>
               </div>
               <button
                 onClick={() => setIsReadOnlyPreview(false)}
-                className="px-3 py-1 rounded-lg bg-amber-500 text-slate-950 font-bold text-[11px]"
+                className="px-3 py-1 rounded-lg bg-[#00E676] text-slate-950 font-bold text-[11px]"
               >
                 Fermer l'Inspection
               </button>
@@ -619,7 +619,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 <img
                   src={selectedStudent.avatar}
                   alt={selectedStudent.name}
-                  className="w-16 h-16 rounded-full object-cover border-2 border-amber-400 shadow-md"
+                  className="w-16 h-16 rounded-full object-cover border-2 border-[#00E676] shadow-md"
                 />
                 <div>
                   <div className="flex items-center gap-2">
@@ -629,7 +629,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     </span>
                   </div>
                   <p className="text-xs text-slate-400">{selectedStudent.email} • Inscrit le {selectedStudent.joinedDate}</p>
-                  <p className="text-xs text-amber-400">Coach Référent : {selectedStudent.assignedCoach}</p>
+                  <p className="text-xs text-[#00E676]">Coach Référent : {selectedStudent.assignedCoach}</p>
                 </div>
               </div>
 
@@ -646,7 +646,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
             {/* Accounts Section in Read-Only */}
             <div className="space-y-3">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                <Wallet className="w-4 h-4 text-amber-400" /> Portefeuilles & Comptes Attribués ({selectedStudent.accounts.length})
+                <Wallet className="w-4 h-4 text-[#00E676]" /> Portefeuilles & Comptes Attribués ({selectedStudent.accounts.length})
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {selectedStudent.accounts.map((acc) => (
@@ -670,7 +670,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
             {/* Recent Trades Journal in Read-Only */}
             <div className="space-y-3">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                <Activity className="w-4 h-4 text-amber-400" /> Historique Récent des Trades
+                <Activity className="w-4 h-4 text-[#00E676]" /> Historique Récent des Trades
               </h4>
               {selectedStudent.recentTrades.length === 0 ? (
                 <div className="bg-[#0D1110] p-4 rounded-xl text-center text-slate-500 text-xs italic">
@@ -705,7 +705,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
 
             {/* Private Coach Notes */}
             <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] text-xs space-y-1">
-              <span className="text-amber-400 font-bold block flex items-center gap-1.5">
+              <span className="text-[#00E676] font-bold block flex items-center gap-1.5">
                 <MessageSquare className="w-3.5 h-3.5" /> Notes Confidentielles du Coach :
               </span>
               <p className="text-slate-300 italic">{selectedStudent.privateCoachNotes}</p>

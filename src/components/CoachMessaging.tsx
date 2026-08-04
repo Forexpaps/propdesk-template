@@ -85,7 +85,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
       {/* Top Banner */}
       <div className="bg-gradient-to-r from-[#111615] via-[#151D1A] to-[#111615] p-6 rounded-2xl border border-[#1B2320] shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-400 text-xs font-semibold border border-amber-500/20">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00E676]/10 text-[#00E676] text-xs font-semibold border border-[#00E676]/20">
             <MessageSquare className="w-3.5 h-3.5" />
             Messagerie Privée Directe & Asynchrone
           </div>
@@ -99,7 +99,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
 
         {/* AI Quick Response Toggle */}
         <div className="bg-[#0D1110]/80 p-3 rounded-xl border border-[#1B2320] flex items-center gap-3 shrink-0">
-          <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+          <div className="p-2 rounded-lg bg-[#00E676]/10 text-[#00E676]">
             <Sparkles className="w-5 h-5 animate-pulse" />
           </div>
           <div className="text-xs">
@@ -112,7 +112,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
             type="checkbox"
             checked={isAiCoachMode}
             onChange={(e) => setIsAiCoachMode(e.target.checked)}
-            className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+            className="w-4 h-4 accent-[#00E676] rounded cursor-pointer"
           />
         </div>
       </div>
@@ -134,7 +134,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
                   onClick={() => setSelectedCoachId(coach.id)}
                   className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
                     isSelected
-                      ? "bg-[#1B2320]/90 border-amber-500/50 shadow-md"
+                      ? "bg-[#1B2320]/90 border-[#00E676]/50 shadow-md"
                       : "bg-[#0D1110]/40 border-[#151D1A] hover:bg-[#151D1A]/50"
                   }`}
                 >
@@ -155,12 +155,12 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
                     <div className="space-y-0.5 overflow-hidden">
                       <div className="flex items-center justify-between">
                         <h3 className="text-xs font-bold text-white truncate">{coach.name}</h3>
-                        <span className="text-[10px] text-amber-400 font-bold flex items-center gap-0.5">
-                          <Star className="w-2.5 h-2.5 fill-amber-400" />
+                        <span className="text-[10px] text-[#00E676] font-bold flex items-center gap-0.5">
+                          <Star className="w-2.5 h-2.5 fill-[#00E676]" />
                           {coach.rating}
                         </span>
                       </div>
-                      <p className="text-[11px] text-amber-300 font-medium truncate">{coach.role}</p>
+                      <p className="text-[11px] text-[#00E676] font-medium truncate">{coach.role}</p>
                       <p className="text-[10px] text-slate-400 line-clamp-1">{coach.specialty}</p>
                     </div>
                   </div>
@@ -178,11 +178,11 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
               <img
                 src={selectedCoach.avatar}
                 alt={selectedCoach.name}
-                className="w-10 h-10 rounded-full object-cover border border-amber-500/40"
+                className="w-10 h-10 rounded-full object-cover border border-[#00E676]/40"
               />
               <div>
                 <h3 className="text-sm font-bold text-white">{selectedCoach.name}</h3>
-                <div className="text-xs text-amber-400 font-medium flex items-center gap-2">
+                <div className="text-xs text-[#00E676] font-medium flex items-center gap-2">
                   <span>{selectedCoach.specialty}</span>
                   <span className="text-slate-600">•</span>
                   <span className="text-[#00E676] flex items-center gap-1 text-[11px]">
@@ -221,7 +221,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
                     <div
                       className={`max-w-xl p-4 rounded-2xl space-y-3 shadow-md ${
                         isStudent
-                          ? "bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 rounded-br-none"
+                          ? "bg-[#00E676] text-slate-950 rounded-br-none"
                           : "bg-[#1B2320] text-slate-200 border border-[#232D29]/60 rounded-bl-none"
                       }`}
                     >
@@ -236,7 +236,9 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
                         >
                           <div className="flex items-center justify-between font-bold">
                             <span>📌 Trade rattaché : {attachedTrade.pair} ({attachedTrade.direction})</span>
-                            <span className={attachedTrade.pnl >= 0 ? "text-emerald-700 font-bold" : "text-rose-700 font-bold"}>
+                            {/* La bulle de l'élève est verte : un PnL positif en
+                                vert y serait illisible, il passe en quasi-noir. */}
+                            <span className={attachedTrade.pnl >= 0 ? "text-[#0A2E1A] font-bold" : "text-rose-700 font-bold"}>
                               {attachedTrade.pnl} €
                             </span>
                           </div>
@@ -276,7 +278,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
             )}
 
             {isSending && (
-              <div className="flex items-center gap-2 text-xs text-amber-400 animate-pulse py-2">
+              <div className="flex items-center gap-2 text-xs text-[#00E676] animate-pulse py-2">
                 <Sparkles className="w-4 h-4" />
                 <span>Le Coach réfléchit et rédige sa réponse...</span>
               </div>
@@ -309,13 +311,13 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 placeholder={`Rédigez votre message à ${selectedCoach.name}...`}
-                className="flex-1 bg-[#111615] border border-[#1B2320] rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
+                className="flex-1 bg-[#111615] border border-[#1B2320] rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00E676] transition-colors"
               />
 
               <button
                 type="submit"
                 disabled={isSending || (!inputText.trim() && !selectedTradeAttachment)}
-                className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
+                className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#00E676] hover:bg-[#00c865] disabled:opacity-50 text-slate-950 font-bold text-xs shadow-lg shadow-[#00E676]/20 transition-all cursor-pointer"
               >
                 <Send className="w-4 h-4" />
                 <span className="hidden sm:inline">Envoyer</span>
