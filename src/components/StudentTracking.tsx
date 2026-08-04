@@ -38,7 +38,7 @@ interface StudentTrackingProps {
 const STATUS_TAG_STYLES: Record<StudentStatusTag, string> = {
   "En Évaluation FTMO": "bg-purple-500/10 text-purple-400 border-purple-500/30",
   "Prop Firm Financé": "bg-[#00E676]/20 text-[#00E676] border-[#00E676]/40 font-bold",
-  "Accompagnement VIP": "bg-amber-500/20 text-amber-300 border-amber-500/40",
+  "Accompagnement VIP": "bg-[#00E676]/20 text-[#00E676] border-[#00E676]/40",
   "Besoin Coaching": "bg-blue-500/10 text-blue-400 border-blue-500/30",
   "Alerte Tilt": "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse font-bold",
 };
@@ -246,7 +246,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   <button
                     onClick={() => handleOpenReadOnly(st)}
                     title="Voir en Mode Lecture (Vue Élève)"
-                    className="px-2.5 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 text-xs font-semibold flex items-center gap-1"
+                    className="px-2.5 py-1.5 rounded-lg bg-[#00E676]/10 hover:bg-[#00E676]/20 text-[#00E676] border border-[#00E676]/20 text-xs font-semibold flex items-center gap-1"
                   >
                     <Eye className="w-3.5 h-3.5" /> Lecture
                   </button>
