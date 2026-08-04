@@ -105,6 +105,28 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           </button>
         )}
 
+        {onOpenCalendar && (
+          <button
+            onClick={onOpenCalendar}
+            className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#111615] hover:bg-[#1B2320] border border-[#1B2320] hover:border-cyan-500/40 text-slate-300 hover:text-cyan-300 transition-all text-[11px] font-mono"
+            title="Calendrier économique & news à haut impact"
+          >
+            <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="font-bold">Calendrier</span>
+          </button>
+        )}
+
+        {onOpenCertificate && (
+          <button
+            onClick={onOpenCertificate}
+            className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#111615] hover:bg-[#1B2320] border border-[#1B2320] hover:border-amber-500/40 text-slate-300 hover:text-amber-300 transition-all text-[11px] font-mono"
+            title="Certificat officiel de réussite SMC Pro"
+          >
+            <Award className="w-3.5 h-3.5 text-amber-400" />
+            <span className="font-bold">Certificat</span>
+          </button>
+        )}
+
         {onOpenAISetupAnalyzer && (
           <button
             onClick={onOpenAISetupAnalyzer}

@@ -1432,7 +1432,7 @@ export const initialNotifications: AppNotification[] = [
     time: "Il y a 2 jours",
     type: "system",
     read: true,
-    targetTab: "coaching",
+    targetTab: "messaging",
   },
 ];
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   User,
   ShieldCheck,
@@ -71,6 +71,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     student.currentCapital.toString()
   );
   const [isAdmin, setIsAdmin] = useState(student.isAdmin ?? true);
+
+  // La modale reste montée entre deux ouvertures : sans cela, `initialTab`
+  // ne serait pris en compte qu'au tout premier rendu.
+  useEffect(() => {
+    if (isOpen) setActiveSubTab(initialTab);
+  }, [isOpen, initialTab]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 

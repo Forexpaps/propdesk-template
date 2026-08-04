@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Plus,
   Search,
@@ -26,7 +26,7 @@ import {
   Eye,
   X
 } from "lucide-react";
-import { Trade, TradeDirection, TradeResult, EmotionState, MarketCategory } from "../types";
+import { Trade, TradeDirection, TradeResult, EmotionState, MarketCategory, TradeDraft } from "../types";
 
 interface TradingJournalProps {
   trades: Trade[];
@@ -35,6 +35,10 @@ interface TradingJournalProps {
   onSelectTradeForAudit: (trade: Trade) => void;
   onSendTradeToCoach: (trade: Trade) => void;
   onOpenCalculator?: () => void;
+  /** Ébauche envoyée par le calculateur de position ou l'analyseur de setup IA. */
+  prefillDraft?: TradeDraft | null;
+  /** Appelé une fois l'ébauche appliquée, pour que le parent la remette à null. */
+  onPrefillConsumed?: () => void;
 }
 
 export const TradingJournal: React.FC<TradingJournalProps> = ({
@@ -44,6 +48,8 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   onSelectTradeForAudit,
   onSendTradeToCoach,
   onOpenCalculator,
+  prefillDraft,
+  onPrefillConsumed,
 }) => {
   const [searchPair, setSearchPair] = useState("");
   const [selectedMarket, setSelectedMarket] = useState<string>("Tous");
@@ -122,6 +128,24 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     notes: "Validation FVG H1 + Chasse de liquidité.",
     chartUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=800",
   });
+
+  // Applique une ébauche venue du calculateur / de l'analyseur IA, puis ouvre le formulaire.
+  // Seules les clés fournies écrasent les valeurs par défaut ci-dessus.
+  useEffect(() => {
+    if (!prefillDraft) return;
+    setFormData((prev) => {
+      const next = { ...prev };
+      (Object.keys(prefillDraft) as (keyof TradeDraft)[]).forEach((key) => {
+        const value = prefillDraft[key];
+        if (value !== undefined) {
+          (next as Record<string, unknown>)[key] = value;
+        }
+      });
+      return next;
+    });
+    setIsAddModalOpen(true);
+    onPrefillConsumed?.();
+  }, [prefillDraft, onPrefillConsumed]);
 
   // Calculate Summary Statistics
   const totalTrades = trades.length;

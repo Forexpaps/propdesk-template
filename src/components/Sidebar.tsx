@@ -50,6 +50,8 @@ interface SidebarProps {
   setIsCollapsed: (collapsed: boolean) => void;
   onOpenProfileModal: () => void;
   onOpenChecklist?: () => void;
+  /** Ouvre le profil directement sur l'onglet Badges. */
+  onOpenBadges?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -64,6 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsCollapsed,
   onOpenProfileModal,
   onOpenChecklist,
+  onOpenBadges,
 }) => {
   const capitalDiff = student.currentCapital - student.startingCapital;
   const capitalDiffPercent = ((capitalDiff / student.startingCapital) * 100).toFixed(1);
@@ -224,6 +227,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onClick={() => {
                       if (item.label === "Exercice du jour" && onOpenChecklist) {
                         onOpenChecklist();
+                      } else if (item.label === "Badges & paliers" && onOpenBadges) {
+                        onOpenBadges();
                       } else {
                         setActiveTab(item.id as TabType);
                       }

@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Base de données locale (Phase 3)
+data/

@@ -50,7 +50,9 @@ import {
   EnrolledStudent,
   AppNotification,
   TraderBadge,
+  TradeDraft,
 } from "./types";
+import { TabType as SidebarTabType } from "./components/Sidebar";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
@@ -65,6 +67,7 @@ export default function App() {
 
   // Modals States
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileModalTab, setProfileModalTab] = useState<"profile" | "badges">("profile");
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
@@ -139,6 +142,9 @@ export default function App() {
     undefined
   );
 
+  // Ébauche de trade poussée vers le Journal par le calculateur ou l'analyseur IA
+  const [journalDraft, setJournalDraft] = useState<TradeDraft | null>(null);
+
   const [isPropFirmRulesOpen, setIsPropFirmRulesOpen] = useState<boolean>(false);
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState<boolean>(false);
   const [isAISetupAnalyzerOpen, setIsAISetupAnalyzerOpen] = useState<boolean>(false);
@@ -199,6 +205,41 @@ export default function App() {
       currentCapital: prev.startingCapital + totalPnL,
     }));
   }, [trades]);
+
+  // Notifications Handlers
+  const handleMarkNotificationAsRead = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  };
+
+  const handleMarkAllNotificationsAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const handleClearAllNotifications = () => {
+    setNotifications([]);
+  };
+
+  // Le centre d'alertes renvoie un targetTab en texte libre : on ne navigue
+  // que si c'est un onglet réellement existant.
+  const handleNavigateFromNotification = (tab: string) => {
+    const knownTabs: SidebarTabType[] = [
+      "dashboard",
+      "students",
+      "wallets",
+      "academy",
+      "journal",
+      "simulator",
+      "signals",
+      "forum",
+      "messaging",
+      "analytics",
+    ];
+    if (knownTabs.includes(tab as SidebarTabType)) {
+      setActiveTab(tab as SidebarTabType);
+    }
+  };
 
   // Student Admin Handlers
   const handleUpdateStudent = (updatedStudent: EnrolledStudent) => {
@@ -520,6 +561,11 @@ export default function App() {
   const courseCompletionPercentage =
     totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
+  // Messages du coach pas encore marqués comme lus
+  const totalUnreadMessages = messages.filter(
+    (m) => m.sender === "coach" && m.status !== "read"
+  ).length;
+
   return (
     <div className="min-h-screen bg-[#0B0F0E] text-slate-100 font-sans antialiased selection:bg-[#00E676] selection:text-slate-950 flex">
       {/* Left Sidebar Navigation */}
@@ -528,13 +574,20 @@ export default function App() {
         setActiveTab={setActiveTab}
         student={student}
         courseCompletionPercentage={courseCompletionPercentage}
-        totalUnreadMessages={1}
+        totalUnreadMessages={totalUnreadMessages}
         mobileOpen={mobileOpen}
         setMobileOpen={setMobileOpen}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
-        onOpenProfileModal={() => setIsProfileModalOpen(true)}
+        onOpenProfileModal={() => {
+          setProfileModalTab("profile");
+          setIsProfileModalOpen(true);
+        }}
         onOpenChecklist={() => setIsChecklistOpen(true)}
+        onOpenBadges={() => {
+          setProfileModalTab("badges");
+          setIsProfileModalOpen(true);
+        }}
       />
 
       {/* Main Content Area (offset by sidebar width on large screens) */}
@@ -548,7 +601,10 @@ export default function App() {
           onOpenChecklist={() => setIsChecklistOpen(true)}
           onOpenCalendar={() => setIsCalendarOpen(true)}
           onOpenCertificate={() => setIsCertificateOpen(true)}
-          onOpenProfileModal={() => setIsProfileModalOpen(true)}
+          onOpenProfileModal={() => {
+            setProfileModalTab("profile");
+            setIsProfileModalOpen(true);
+          }}
           onOpenNotifications={() => setIsNotificationsModalOpen(true)}
           onOpenPropFirmRules={() => setIsPropFirmRulesOpen(true)}
           onOpenMindsetModal={() => setIsMindsetModalOpen(true)}
@@ -621,6 +677,8 @@ export default function App() {
               onSelectTradeForAudit={(trade) => setSelectedTradeForAudit(trade)}
               onSendTradeToCoach={handleSendTradeToCoach}
               onOpenCalculator={() => setIsCalculatorOpen(true)}
+              prefillDraft={journalDraft}
+              onPrefillConsumed={() => setJournalDraft(null)}
             />
           )}
 
@@ -670,6 +728,7 @@ export default function App() {
         badges={badges}
         onSaveProfile={handleSaveProfile}
         onClaimBadge={handleClaimBadge}
+        initialTab={profileModalTab}
       />
 
       {/* AI Trade Audit Modal */}
@@ -685,7 +744,21 @@ export default function App() {
       <PositionCalculatorModal
         isOpen={isCalculatorOpen}
         onClose={() => setIsCalculatorOpen(false)}
-        studentCapital={student.currentCapital}
+        defaultCapital={student.currentCapital}
+        onApplyToJournal={(calc) => {
+          setJournalDraft({
+            pair: calc.pair,
+            entryPrice: calc.entryPrice,
+            stopLoss: calc.stopLoss,
+            takeProfit: calc.takeProfit,
+            lotSize: calc.lotSize,
+            notes: `Position dimensionnée avec le calculateur : risque ${calc.riskAmount.toFixed(
+              2
+            )} € pour un R:R de ${calc.riskRewardRatio}.`,
+          });
+          setIsCalculatorOpen(false);
+          setActiveTab("journal");
+        }}
       />
 
       {/* Trading Plan Checklist Modal */}
@@ -698,7 +771,7 @@ export default function App() {
       <CertificateModal
         isOpen={isCertificateOpen}
         onClose={() => setIsCertificateOpen(false)}
-        studentName={student.name}
+        student={student}
         completionPercentage={courseCompletionPercentage}
       />
 
@@ -721,13 +794,30 @@ export default function App() {
         onClose={() => setIsMindsetModalOpen(false)}
       />
 
+      {/* Notifications Center Modal */}
+      <NotificationModal
+        isOpen={isNotificationsModalOpen}
+        onClose={() => setIsNotificationsModalOpen(false)}
+        notifications={notifications}
+        onMarkAsRead={handleMarkNotificationAsRead}
+        onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+        onClearAll={handleClearAllNotifications}
+        onNavigateToTab={handleNavigateFromNotification}
+      />
+
       {/* AI Setup & Confluence Matrix Modal */}
       <AISetupAnalyzerModal
         isOpen={isAISetupAnalyzerOpen}
         onClose={() => setIsAISetupAnalyzerOpen(false)}
         onApplyToJournal={(setup) => {
-          setActiveTab("journal");
+          setJournalDraft({
+            pair: setup.pair,
+            direction: setup.direction,
+            strategy: `Setup SMC ${setup.verdict} (${setup.score}/100)`,
+            notes: setup.notes,
+          });
           setIsAISetupAnalyzerOpen(false);
+          setActiveTab("journal");
         }}
       />
     </div>

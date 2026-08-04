@@ -82,6 +82,24 @@ export interface Trade {
   };
 }
 
+/**
+ * Ébauche de trade envoyée au Journal depuis un autre outil
+ * (calculateur de position, analyseur de setup IA).
+ * Tous les champs sont optionnels : seuls ceux fournis écrasent
+ * les valeurs par défaut du formulaire d'ajout.
+ */
+export interface TradeDraft {
+  pair?: string;
+  marketCategory?: MarketCategory;
+  direction?: TradeDirection;
+  entryPrice?: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  lotSize?: number;
+  strategy?: string;
+  notes?: string;
+}
+
 export interface Coach {
   id: string;
   name: string;

@@ -9,6 +9,8 @@
       "DOM",
       "DOM.Iterable"
     ],
+    "strict": true,
+    "noUnusedLocals": false,
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "isolatedModules": true,
