@@ -96,7 +96,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const formationItems = [
     { id: "academy" as const, label: "Module vidéo", icon: BookOpen, badge: `${courseCompletionPercentage}%` },
-    { id: "signals" as const, label: "Signaux & Analyses", icon: Radio, badge: "Live 🔴" },
     { id: "messaging" as const, label: "Messagerie Coach", icon: MessageSquare, badge: totalUnreadMessages > 0 ? "1" : null },
   ];
 
