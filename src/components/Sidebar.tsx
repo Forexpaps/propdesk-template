@@ -36,7 +36,8 @@ export type TabType =
   | "signals"
   | "forum"
   | "messaging"
-  | "analytics";
+  | "analytics"
+  | "exam";
 
 interface SidebarProps {
   activeTab: TabType;
@@ -87,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const pratiqueItems = [
-    { id: "analytics" as const, label: "Examen", icon: Award },
+    { id: "exam" as const, label: "Examen", icon: Award },
     { id: "checklist" as const, label: "Exercice du jour", icon: Sliders },
     { id: "simulator" as const, label: "Replay", icon: Zap },
     { id: "forum" as const, label: "Badges & paliers", icon: Users },

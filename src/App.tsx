@@ -737,6 +737,15 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
               courseCompletionPercentage={courseCompletionPercentage}
             />
           )}
+
+          {activeTab === "exam" && (
+            <div className="space-y-6">
+              <h1 className="text-2xl font-bold text-white">Examen</h1>
+              <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-8 min-h-96 flex items-center justify-center">
+                <p className="text-slate-400">Contenu à venir</p>
+              </div>
+            </div>
+          )}
         </main>
       </div>
 
