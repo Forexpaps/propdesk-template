@@ -48,17 +48,28 @@ export type TabType =
  *
  * L'`id` d'onglet ne peut pas servir de clé : « Replay » et « Sim propfirm »
  * pointent tous deux sur `simulator`.
+ *
+ * « Tableau de bord » en est volontairement absent : c'est la destination de
+ * repli quand l'onglet courant devient inatteignable, le masquer créerait le
+ * cul-de-sac qu'on cherche à éviter.
  */
 export const SIDEBAR_TOGGLEABLE_KEYS = [
+  "journal",
+  "wallets",
+  "analytics",
+  "students",
   "exam",
   "checklist",
   "replay",
   "badges",
   "propfirm",
   "academy",
+  "messaging",
 ] as const;
 
 export type SidebarItemKey = (typeof SIDEBAR_TOGGLEABLE_KEYS)[number];
+
+type SectionName = "suivi" | "pratique" | "formation";
 
 /**
  * Onglet atteint par chaque entrée masquable, `null` pour celles qui ouvrent
@@ -67,12 +78,17 @@ export type SidebarItemKey = (typeof SIDEBAR_TOGGLEABLE_KEYS)[number];
  * Sert à détecter qu'on vient de masquer le dernier accès à l'onglet courant.
  */
 export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
+  journal: "journal",
+  wallets: "wallets",
+  analytics: "analytics",
+  students: "students",
   exam: "exam",
   checklist: null,
   replay: "simulator",
   badges: null,
   propfirm: "simulator",
   academy: "academy",
+  messaging: "messaging",
 };
 
 interface SidebarProps {
@@ -112,9 +128,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const capitalDiffPercent = ((capitalDiff / student.startingCapital) * 100).toFixed(1);
 
   // Section dont l'administrateur règle actuellement la visibilité.
-  const [editingSection, setEditingSection] = React.useState<
-    "pratique" | "formation" | null
-  >(null);
+  const [editingSection, setEditingSection] = React.useState<SectionName | null>(
+    null
+  );
 
   const hiddenItems = student.hiddenSidebarItems ?? [];
   const canManage = Boolean(student.isAdmin && onToggleSidebarItem);
@@ -126,11 +142,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const suiviItems = [
-    { id: "journal" as const, label: "Journal de trading", icon: BookMarked },
-    { id: "wallets" as const, label: "Portefeuille", icon: Wallet },
-    { id: "analytics" as const, label: "Rentabilité", icon: LineChart },
+    { key: "journal" as const, id: "journal" as const, label: "Journal de trading", icon: BookMarked },
+    { key: "wallets" as const, id: "wallets" as const, label: "Portefeuille", icon: Wallet },
+    { key: "analytics" as const, id: "analytics" as const, label: "Rentabilité", icon: LineChart },
     ...(student.isAdmin
-      ? [{ id: "students" as const, label: "Suivi des Élèves", icon: UserCheck, badge: "Admin" }]
+      ? [{ key: "students" as const, id: "students" as const, label: "Suivi des Élèves", icon: UserCheck, badge: "Admin" }]
       : []),
   ];
 
@@ -144,18 +160,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const formationItems = [
     { key: "academy" as const, id: "academy" as const, label: "Module vidéo", icon: BookOpen, badge: `${courseCompletionPercentage}%` },
-    // Non masquable : la messagerie reste le lien direct avec le coach.
-    { key: null, id: "messaging" as const, label: "Messagerie Coach", icon: MessageSquare, badge: totalUnreadMessages > 0 ? "1" : null },
+    { key: "messaging" as const, id: "messaging" as const, label: "Messagerie Coach", icon: MessageSquare, badge: totalUnreadMessages > 0 ? "1" : null },
   ];
 
   /**
    * En-tête de section. Pour l'administrateur, le chevron décoratif laisse la
    * place à l'interrupteur qui ouvre le réglage de visibilité de la section.
    */
-  const renderSectionHeader = (
-    label: string,
-    section: "pratique" | "formation"
-  ) => {
+  const renderSectionHeader = (label: string, section: SectionName) => {
     const isEditing = editingSection === section;
     return (
       <div className="px-3 py-1 text-[10px] font-bold text-slate-500 tracking-wider flex items-center justify-between uppercase">
@@ -191,7 +203,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
    * Le réglage n'a de sens qu'en sidebar dépliée : repliée, les en-têtes de
    * section — donc l'interrupteur — ne sont pas rendus.
    */
-  const isEditingSection = (section: "pratique" | "formation") =>
+  const isEditingSection = (section: SectionName) =>
     !isCollapsed && editingSection === section;
 
   /**
@@ -225,20 +237,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <Eye className="w-3.5 h-3.5 shrink-0 text-[#00E676]" />
       )}
     </button>
-  );
-
-  /** Ligne inerte en mode réglage, pour une entrée qu'on ne peut pas masquer. */
-  const renderStaticRow = (
-    label: string,
-    Icon: React.ComponentType<{ className?: string }>
-  ) => (
-    <div
-      key={label}
-      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600"
-    >
-      <Icon className="w-4 h-4" />
-      <span>{label}</span>
-    </div>
   );
 
   return (
@@ -321,13 +319,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* SUIVI Category */}
             <div className="space-y-1">
               {!isCollapsed && (
-                <div className="px-3 py-1 text-[10px] font-bold text-slate-500 tracking-wider flex items-center justify-between uppercase">
-                  <span>SUIVI</span>
-                  <span className="text-[9px] text-slate-600">▾</span>
-                </div>
+                renderSectionHeader("SUIVI", "suivi")
               )}
               {suiviItems.map((item) => {
                 const Icon = item.icon;
+                const isHidden = hiddenItems.includes(item.key);
+
+                if (isEditingSection("suivi")) {
+                  return renderVisibilityRow(item.key, item.label, Icon, isHidden);
+                }
+                if (isHidden) return null;
+
                 const isActive = activeTab === item.id;
                 return (
                   <button
@@ -397,13 +399,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {!isCollapsed && renderSectionHeader("FORMATION", "formation")}
               {formationItems.map((item) => {
                 const Icon = item.icon;
-                const isHidden = item.key !== null && hiddenItems.includes(item.key);
+                const isHidden = hiddenItems.includes(item.key);
 
                 if (isEditingSection("formation")) {
-                  // Une entrée non masquable reste affichée telle quelle.
-                  return item.key === null
-                    ? renderStaticRow(item.label, Icon)
-                    : renderVisibilityRow(item.key, item.label, Icon, isHidden);
+                  return renderVisibilityRow(item.key, item.label, Icon, isHidden);
                 }
                 if (isHidden) return null;
 
