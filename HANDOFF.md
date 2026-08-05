@@ -1,7 +1,11 @@
 # HANDOFF — Académie de Trading Horizon / PropDesk
 
 Document de reprise. Il suppose que tu n'as accès ni à la conversation
-précédente, ni à autre chose que ce dépôt. Dernier commit couvert : `6f2547c`.
+précédente, ni à autre chose que ce dépôt. Dernier commit couvert : `5a5c54d`.
+
+> **À lire en premier :** le §6.1 décrit un bug qui rend **1 270 lignes
+> d'interface déjà écrites** inatteignables. C'est le point le plus rentable du
+> projet : la réparation est décrite en §7, tâche 2.
 
 ---
 
@@ -83,10 +87,10 @@ src/
     usePersistentState.ts   état miroité dans localStorage
     useServerSync.ts        bootstrap serveur + synchronisation optimiste
   lib/api.ts           client HTTP typé
-  components/          12 vues d'onglet + 10 modales
+  components/          10 vues d'onglet + 10 modales + Sidebar et TopHeader
 public/
   icon.png             icône 512x512 — sidebar et favicon
-  logo.png             logo complet 1536x1024 — pas encore utilisé (voir §7)
+  logo.png             logo complet 1536x1024 — réservé à l'écran de connexion (§6 bis)
   Fonctionnalites_Horizon_SMC.pdf
 scripts/generate_pdf.js  génération hors ligne du PDF
 ```
@@ -124,7 +128,7 @@ Chaque modification suit ce chemin :
 3. après **400 ms de regroupement**, elle part vers le serveur.
 
 Si le serveur est injoignable, l'application démarre sur le cache local et
-reste utilisable — voir la limite en §6.
+reste utilisable — voir la limite en §6.2.
 
 Au tout premier lancement sur une base vide, les données présentes dans
 `localStorage` (version antérieure sans serveur) sont importées
@@ -176,7 +180,7 @@ recomposées dans les sujets à la lecture.
 
 - `@types/react` installé et **`strict` activé** dans `tsconfig.json`.
 - `npm run lint` et `npm run build` passent sans erreur ni avertissement.
-- Dépôt git initialisé, 20 commits, historique propre.
+- Dépôt git initialisé, 21 commits, historique propre.
 - `README.md` réécrit (documentation utilisateur ; ce HANDOFF est la
   documentation de reprise).
 
@@ -224,7 +228,8 @@ hors ligne, migration automatique depuis `localStorage`.
 
 - Logo PropDesk intégré : `public/icon.png` (recadrage 512×512 de l'icône) dans
   la sidebar, en favicon et en icône iOS.
-- **Palette unifiée** sur les 12 vues (voir §8 pour les jetons).
+- **Palette unifiée** sur les 10 vues et le centre d'alertes (jetons en §8).
+  Les 9 autres modales ne sont pas encore migrées — voir §6.4.
 
 ---
 
@@ -274,21 +279,71 @@ hors ligne, migration automatique depuis `localStorage`.
 
 Classés du plus au moins gênant.
 
-### 1. Les modifications hors ligne ne sont pas rejouées
+### 1. Cinq modales sont inatteignables — 1 270 lignes perdues
+
+**C'est le bug le plus rentable à corriger.** Le commit `eabb9cf` a retiré 5
+boutons du header à la demande de l'utilisateur. Les modales sont **toujours
+rendues** dans `App.tsx` et toujours fonctionnelles, mais **plus rien ne peut
+les ouvrir**.
+
+| Modale | Lignes | Déclencheur `setIs…Open(true)` |
+|---|---|---|
+| `PropFirmRulesModal` | 324 | **aucun** |
+| `MindsetJournalModal` | 316 | **aucun** |
+| `AISetupAnalyzerModal` | 296 | **aucun** |
+| `EconomicCalendarModal` | 194 | 1, mais mort — voir ci-dessous |
+| `CertificateModal` | 140 | 1, mais mort |
+| | **1 270** | |
+
+Pour le constater sans lire le code :
+
+```bash
+for s in setIsPropFirmRulesOpen setIsMindsetModalOpen setIsAISetupAnalyzerOpen; do
+  echo "$s -> $(grep -c "$s(true)" src/App.tsx) déclencheur(s)"
+done
+```
+
+Les trois renvoient `0`. Dans le navigateur : aucun clic, nulle part, n'ouvre
+l'analyseur de setup.
+
+Le piège des deux dernières : un déclencheur existe bien, à
+[`App.tsx:678`](src/App.tsx:678) et [`679`](src/App.tsx:679), passé à
+`MainDashboard` via `onOpenCalendar` / `onOpenCertificate`. Mais
+**`MainDashboard` ne les appelle jamais** : la prop est déclarée dans
+l'interface et déstructurée, sans aucun `onClick`. Le résultat est le même que
+zéro déclencheur. Un `grep` sur le nom de la prop donne donc l'illusion que
+c'est branché — vérifie toujours qu'il existe une invocation, pas juste une
+mention.
+
+La plus coûteuse à laisser perdue est `AISetupAnalyzerModal` : c'est l'une des
+**deux seules fonctions Gemini** du projet, et son `onApplyToJournal`
+pré-remplit un trade dans le journal.
+
+Réparation décrite en §7, tâche 2. L'utilisateur a déjà choisi l'approche :
+les remettre dans la **sidebar**, pas dans le header.
+
+Même motif de prop morte, sans perte de fonctionnalité cette fois :
+`TopHeader` déclare et déstructure `onOpenCalculator` et `onOpenChecklist`
+**sans rendre aucun bouton** pour elles, et `MainDashboard` reçoit
+`onOpenCalculator` sans l'appeler. Le calculateur et la checklist restent
+atteignables ailleurs (3 déclencheurs chacun) : ce sont des props à nettoyer,
+pas des écrans perdus.
+
+### 2. Les modifications hors ligne ne sont pas rejouées
 
 Elles restent dans le cache local, mais **le rechargement suivant reprend
 l'état du serveur** et les perd. Implémenter le rejeu demande une gestion de
 conflits (quelle version gagne ?) — c'est une décision produit, pas seulement
 technique.
 
-### 2. Aucune authentification
+### 3. Aucune authentification
 
 Un utilisateur unique implicite est utilisé. C'est le plus gros manque
 fonctionnel. Voir §7, tâche 1.
 
-### 3. Les 9 modales n'ont pas la palette du site
+### 4. Les 9 modales n'ont pas la palette du site
 
-L'harmonisation visuelle a couvert les 12 vues d'onglet et le centre d'alertes,
+L'harmonisation visuelle a couvert les 10 vues d'onglet et le centre d'alertes,
 **pas les autres modales**. Elles utilisent encore `slate-*` et l'ambre comme
 accent :
 
@@ -306,42 +361,95 @@ accent :
 
 La recette est décrite en §8. C'est mécanique et sans risque.
 
-### 4. `onSelectAccountForJournal` est mort
+### 5. `onSelectAccountForJournal` est mort
 
 Dans [`WalletManagement.tsx:29`](src/components/WalletManagement.tsx:29), la
 prop est **déclarée et déstructurée mais jamais appelée dans le composant**. La
 câbler depuis `App.tsx` ne produirait rien. Il faut d'abord décider quel
 élément d'interface doit la déclencher.
 
-### 5. Données existantes sans les nouveaux champs
+### 6. Données existantes sans les nouveaux champs
 
 Les trades et élèves déjà en base ont été créés avant l'ajout de `exitDate`,
 `exitTime` et `tradingStyle`. Les vues gèrent l'absence proprement (mention
 *sortie non renseignée*, pastille masquée), mais **les valeurs mises dans
 `mockData.ts` ne s'appliquent qu'à une base neuve**.
 
-Pour repartir de zéro : `rm -rf data/` puis relancer.
+> **`rm -rf data/` détruit désormais de vraies données.** Les styles de trading
+> des 4 élèves ont été saisis **à la main via l'interface**, ils ne sont pas
+> amorcés. Une remise à zéro les perd. Sauvegarde d'abord :
+>
+> ```bash
+> cp data/horizon.db data/horizon.db.bak
+> ```
 
-### 6. Aucun test automatisé
+### 7. Aucun test automatisé
 
 Le projet n'a pas de *runner*. En ajouter un est une décision à part entière.
+Voir §9 pour ce qui a réellement été vérifié, et comment.
 
-### 7. SQLite sur disque éphémère
+### 8. SQLite sur disque éphémère
 
 Sur Cloud Run (cible naturelle vu l'origine AI Studio), le disque est éphémère
 et **les données seraient perdues à chaque redémarrage d'instance**. Monter un
 volume sur `DATA_DIR`, ou passer à Postgres. Seul `server/repositories.ts` est
 à réécrire : les routes n'y touchent pas.
 
-### 8. Bundle client de 924 Ko
+### 9. Bundle client de 906 Ko
 
 Au-delà du seuil d'avertissement de Vite. Aucun découpage de code n'est en
 place. Non bloquant, mais à traiter avant une mise en production sérieuse.
 
-### 9. `.env.example` encore rédigé pour AI Studio
+### 10. `.env.example` encore rédigé pour AI Studio
 
 Il mentionne l'injection automatique par AI Studio et une variable `APP_URL`
 qui n'est utilisée nulle part. À nettoyer.
+
+---
+
+## 6 bis. Ce qui ressemble à du code mort, mais ne l'est pas
+
+Trois pièges où un repreneur pressé supprimerait du code encore utile.
+
+### La vue `CoachSignals` n'a plus d'entrée de sidebar
+
+Elle a été retirée de la section FORMATION (`84e5e33`) à la demande de
+l'utilisateur. Mais l'onglet `signals` **reste atteignable** par la
+notification « Signal Coach SMC Actif » du centre d'alertes, dont le
+`targetTab` pointe dessus
+([`mockData.ts:1415`](src/data/mockData.ts:1415)). Le composant, l'onglet et la
+collection `signals` sont donc bien vivants.
+
+### L'onglet `exam` est vide volontairement
+
+Il affiche « Contenu à venir », rendu **en ligne dans `App.tsx`** — il n'a pas
+de composant dédié. L'utilisateur a explicitement demandé une page vierge en
+attendant de définir le contenu. Ne pas la supprimer ni la remplir sans lui
+demander.
+
+### `public/logo.png` n'est utilisé nulle part
+
+Ce fichier de 1,1 Mo est **réservé à l'écran de connexion** à venir
+(§7, tâche 1). Seul `public/icon.png` est utilisé aujourd'hui — sidebar,
+favicon, icône iOS. Ne pas supprimer `logo.png`, et ne pas l'optimiser avant de
+connaître sa taille d'affichage.
+
+---
+
+## 6 ter. Arbitrages déjà rendus
+
+Ces débats ont eu lieu et sont tranchés. Ne pas les rouvrir sans que
+l'utilisateur le demande.
+
+| Sujet | Décision |
+|---|---|
+| Statut « Accompagnement VIP » | **supprimé** — devenu indistinguable de « Prop Firm Financé » une fois la vue passée au vert |
+| Bouton « Lecture » du suivi élèves | **passé au vert** en connaissance de cause : il ne se distingue plus d'« Éditer Fiche » par la couleur |
+| Les 5 modales orphelines | **à remettre dans la sidebar**, pas dans le header — le header doit rester épuré |
+| Harmonisation des 9 modales restantes | **non tranchée** — signalée à l'utilisateur, jamais demandée |
+| `onSelectAccountForJournal` | **non tranché** — demande une décision produit |
+| Optimisation de `logo.png` | **reportée** à l'écran de connexion, où la taille d'affichage sera connue |
+| Rejeu des modifications hors ligne | **non tranché** — coût élevé, à ne faire que sur demande |
 
 ---
 
@@ -369,27 +477,76 @@ faites : 768 px → 332 Ko, 600 px → 208 Ko, 768 px en JPEG q88 → 40 Ko. Le 
 risque un léger halo sur les bords nets du D blanc et de la flèche verte : à
 comparer à l'œil. L'original reste dans git (`6f2547c`).
 
-### 2. Harmoniser les 9 modales restantes
+### 2. Rebrancher les 5 modales orphelines — *approche déjà validée*
+
+Répare le §6.1. **À faire avant la tâche 3** : il ne sert à rien d'harmoniser
+visuellement des écrans qu'on ne peut pas ouvrir.
+
+L'utilisateur a choisi de les remettre dans la **sidebar**, où elles seront
+masquables par l'engrenage comme les autres entrées. Nouvelle section
+**OUTILS**, ces 5 entrées ouvrant des modales et non des onglets.
+
+| Libellé | Clé | Icône | Ouvre |
+|---|---|---|---|
+| Audit Setup | `audit` | `Sparkles` | `AISetupAnalyzerModal` |
+| Prop Firm | `propfirmrules` | `Trophy` | `PropFirmRulesModal` |
+| Mindset | `mindset` | `Brain` | `MindsetJournalModal` |
+| Calendrier | `calendar` | `Calendar` | `EconomicCalendarModal` |
+| Certificat | `certificate` | `ScrollText` | `CertificateModal` |
+
+Pièges déjà repérés, à ne pas redécouvrir :
+
+- la clé `propfirm` est **déjà prise** par « Sim propfirm » → d'où
+  `propfirmrules` ;
+- l'icône `Award` est **déjà utilisée** par « Examen » → `ScrollText` évite deux
+  entrées visuellement jumelles ;
+- dans `SIDEBAR_ITEM_TABS`, ces 5 clés valent **`null`** : elles ne changent pas
+  d'onglet. Le repli automatique vers le tableau de bord (§4) les ignore alors
+  **sans aucune modification**, puisqu'il compare à `activeTab` et que `null`
+  n'égale jamais un onglet ;
+- les états `setIsAISetupAnalyzerOpen`, `setIsMindsetModalOpen`,
+  `setIsPropFirmRulesOpen`, `setIsCalendarOpen`, `setIsCertificateOpen`
+  **existent déjà** dans `App.tsx`. Seul le déclencheur manque : aucun état à
+  créer.
+
+Deux améliorations à faire au passage, sinon la sidebar devient fragile :
+
+- le clic est routé par **comparaison de libellé**
+  (`item.label === "Exercice du jour"`). Avec 6 entrées ouvrant des modales,
+  renommer un libellé casserait silencieusement la navigation. Remplacer par un
+  champ optionnel `onOpen?: () => void` sur l'entrée ;
+- les 3 blocs de section sont **quasi identiques** (~37 lignes chacun). En
+  copier un quatrième donnerait 4 redites à maintenir. Extraire un
+  `renderSection(label, section, items)`.
+
+Nettoyage lié : une fois la sidebar branchée, retirer `onOpenCalendar`,
+`onOpenCertificate` et `onOpenCalculator` de `MainDashboard` (jamais appelées),
+ainsi que `onOpenCalculator` / `onOpenChecklist` de `TopHeader` (aucun bouton).
+
+À vérifier en priorité : **Audit Setup**, puis « Appliquer au journal » — c'est
+le chemin le plus long et le rebranchement le plus utile.
+
+### 3. Harmoniser les 9 modales restantes
 
 Mécanique, sans risque, gros gain visuel. Recette en §8.
 
-### 3. Remplir le module « Examen »
+### 4. Remplir le module « Examen »
 
 L'onglet `exam` existe mais **affiche une page vierge** avec le texte « Contenu
 à venir » ([`App.tsx`](src/App.tsx), bloc `activeTab === "exam"`). L'utilisateur
 a demandé cette page vierge en attendant de définir le contenu. Lui demander ce
 qu'il veut y mettre avant de coder.
 
-### 4. Découper le bundle
+### 5. Découper le bundle
 
 `build.rollupOptions.output.manualChunks` ou imports dynamiques sur les vues
 les plus lourdes (`recharts` est le principal contributeur).
 
-### 5. Décider du sort de `onSelectAccountForJournal`
+### 6. Décider du sort de `onSelectAccountForJournal`
 
 Câbler ou supprimer. Demander d'abord.
 
-### 6. Rejeu des modifications hors ligne
+### 7. Rejeu des modifications hors ligne
 
 Seulement si l'utilisateur le demande : coût élevé, gestion de conflits.
 
@@ -553,16 +710,45 @@ utilisé jusqu'ici, à reprendre :
 Nettoie derrière toi : les données de test créées pendant la vérification
 doivent être supprimées avant de rendre la main.
 
+### Ce qui a réellement été vérifié — et ce qui ne l'a pas été
+
+Le projet n'a aucun test automatisé (§6.7). Tout a été vérifié à la main, et
+**pas au même degré selon les zones**. Ne suppose pas une couverture uniforme.
+
+| Degré | Zones |
+|---|---|
+| **Exercé de bout en bout** — mutation, base, redémarrage | persistance SQLite, masquage de sidebar, horodatages du journal, style de trading, validation et quotas de l'API (`400`/`404`/`409`/`429`), migration `localStorage` → base, repli hors ligne |
+| **Contrôlé visuellement seulement** — la vue s'affiche, rien de plus | forum, académie vidéo, quiz, portefeuilles, messagerie coach, badges, certificat |
+| **Jamais exécuté** | la route Gemini **avec une vraie clé** |
+
+Le dernier point mérite d'être explicite : `/api/coach/ai-review` n'a été testée
+que sur sa **validation d'entrée** et sa **limitation de débit**. Aucun appel
+réel à Gemini n'a abouti pendant le développement. **Ne suppose pas que l'audit
+IA fonctionne** — c'est la première chose à vérifier si tu y touches, et le
+modèle déclaré (`gemini-3.6-flash`) est à confirmer.
+
 ---
 
 ## 10. État à la reprise
 
-- **Arbre de travail propre**, 20 commits, branche `main`.
+- **Arbre de travail propre**, 21 commits, branche `main`.
 - `npm run lint` et `npm run build` passent.
 - Aucune erreur console.
 - Base `data/horizon.db` peuplée : 4 élèves (avec style de trading), 7 trades,
   4 portefeuilles, modules, badges, forum, messages, notifications.
 
-Le point de départ naturel est la **tâche 1 du §7** — l'écran de connexion —
-mais commence par lui demander les décisions listées, elles conditionnent tout
-le reste.
+### Par où commencer
+
+Deux points d'entrée légitimes, selon ce que veut l'utilisateur :
+
+- **§7 tâche 1 — l'écran de connexion.** C'est ce qu'il a explicitement annoncé
+  vouloir faire ensuite. Mais commence par lui poser les décisions listées :
+  elles conditionnent tout le reste, et coder avant serait à refaire.
+- **§7 tâche 2 — rebrancher les 5 modales.** Si tu veux un gain immédiat sans
+  décision produit à prendre : l'approche est déjà validée, le code existe, il
+  ne manque que les déclencheurs. C'est la tâche la plus rentable du projet.
+
+> Ce document est la **seule** source de reprise. Des plans de travail ont pu
+> être écrits dans `~/.claude/plans/`, **hors du dépôt** : un nouveau Claude ne
+> les verra pas. Tout ce qui compte a été replié ici. Si tu produis un plan
+> important, reporte-en la substance dans ce fichier.
