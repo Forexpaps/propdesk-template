@@ -262,9 +262,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 setMobileOpen(false);
               }}
             >
-              <div className="w-9 h-9 rounded-xl bg-[#00E676]/15 border border-[#00E676]/30 flex items-center justify-center text-[#00E676] font-extrabold text-lg shadow-sm group-hover:scale-105 transition-transform shrink-0">
-                P
-              </div>
+              <img
+                src="/icon.png"
+                alt="PropDesk"
+                className="w-9 h-9 rounded-xl shadow-sm group-hover:scale-105 transition-transform shrink-0"
+              />
               {!isCollapsed && (
                 <div>
                   <div className="flex items-center gap-1.5">
