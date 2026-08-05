@@ -22,12 +22,22 @@ import {
 } from "lucide-react";
 import { BacktestScenario, TradeDirection } from "../types";
 
+export type SimulatorMode = "REPLAY" | "MONTE_CARLO";
+
 interface SMCSimulatorProps {
   scenarios: BacktestScenario[];
+  /**
+   * Vue ouverte à l'arrivée. « Replay » et « Sim propfirm » rendent ce même
+   * composant, chacun sur sa vue.
+   */
+  initialMode?: SimulatorMode;
 }
 
-export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ scenarios }) => {
-  const [activeTab, setActiveTab] = useState<"REPLAY" | "MONTE_CARLO">("REPLAY");
+export const SMCSimulator: React.FC<SMCSimulatorProps> = ({
+  scenarios,
+  initialMode = "REPLAY",
+}) => {
+  const [activeTab, setActiveTab] = useState<SimulatorMode>(initialMode);
 
   const [activeScenarioId, setActiveScenarioId] = useState<string>(
     scenarios[0]?.id || ""

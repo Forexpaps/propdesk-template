@@ -41,7 +41,8 @@ export type TabType =
   | "forum"
   | "messaging"
   | "analytics"
-  | "exam";
+  | "exam"
+  | "propfirm";
 
 /**
  * Entrées que l'administrateur peut masquer, identifiées par une clé stable.
@@ -84,7 +85,7 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   exam: "exam",
   checklist: null,
   replay: "simulator",
-  propfirm: "simulator",
+  propfirm: "propfirm",
   academy: "academy",
   messaging: "messaging",
 };
@@ -151,7 +152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { key: "exam" as const, id: "exam" as const, label: "Examen", icon: Award },
     { key: "checklist" as const, id: "checklist" as const, label: "Exercice du jour", icon: Sliders },
     { key: "replay" as const, id: "simulator" as const, label: "Replay", icon: Zap },
-    { key: "propfirm" as const, id: "simulator" as const, label: "Sim propfirm", icon: Radio },
+    { key: "propfirm" as const, id: "propfirm" as const, label: "Sim propfirm", icon: Radio },
   ];
 
   const formationItems = [
@@ -352,7 +353,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* PRATIQUE Category */}
             <div className="space-y-1">
               {!isCollapsed && renderSectionHeader("PRATIQUE", "pratique")}
-              {pratiqueItems.map((item, idx) => {
+              {pratiqueItems.map((item) => {
                 const Icon = item.icon;
                 const isHidden = hiddenItems.includes(item.key);
 
@@ -361,7 +362,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }
                 if (isHidden) return null;
 
-                const isActive = activeTab === item.id && idx === 0;
+                const isActive = activeTab === item.id;
                 return (
                   <button
                     key={item.label}

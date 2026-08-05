@@ -39,6 +39,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         return "Journal de trading";
       case "simulator":
         return "Replay & Backtest";
+      case "propfirm":
+        return "Sim Prop Firm";
       case "signals":
         return "Signaux & Analyses";
       case "forum":

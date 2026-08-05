@@ -697,8 +697,14 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
             />
           )}
 
-          {activeTab === "simulator" && (
-            <SMCSimulator scenarios={initialBacktestScenarios} />
+          {/* « Replay » et « Sim propfirm » partagent ce composant : la clé
+              force le remontage pour que chacun s'ouvre sur sa vue. */}
+          {(activeTab === "simulator" || activeTab === "propfirm") && (
+            <SMCSimulator
+              key={activeTab}
+              scenarios={initialBacktestScenarios}
+              initialMode={activeTab === "propfirm" ? "MONTE_CARLO" : "REPLAY"}
+            />
           )}
 
           {activeTab === "signals" && (
