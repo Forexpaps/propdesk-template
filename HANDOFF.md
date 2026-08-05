@@ -4,17 +4,16 @@ Document de reprise. Il suppose que tu n'as accès ni à la conversation
 précédente, ni à autre chose que ce dépôt.
 
 > **État à la dernière mise à jour de ce document**
-> Branche `main`, arbre de travail **propre**, dernier commit `f5fbe4c`.
-> `npm run lint` et `npm run build` passent. L'application démarre sans erreur
-> console. La base `data/horizon.db` contient les **vraies données de
+> Branche `main`, dernier commit `69567d7`. `npm run lint` et `npm run build`
+> passent. La base `data/horizon.db` contient les **vraies données de
 > l'utilisateur**, plus le jeu de démonstration.
 >
-> **Prochaine tâche annoncée : l'écran de connexion** (§7, tâche 1). Elle
-> demande des décisions produit **avant** d'écrire du code.
+> Le problème d'avatar qui bloquait tout est **corrigé** : les images
+> téléversées sont désormais réduites à 256×256 avant stockage, et l'avatar
+> déjà en base a été recompressé (§4, « Poids des images »).
 >
-> **À traiter en priorité avant toute nouvelle fonctionnalité :** l'avatar du
-> profil pèse 4 Mo en base64 et sature le stockage local (§6.1). C'est le seul
-> problème réellement urgent du projet.
+> **Prochaine tâche : l'écran de connexion** (§7, tâche 1). Elle demande des
+> décisions produit **avant** d'écrire du code.
 
 ---
 
@@ -198,7 +197,7 @@ Chaque modification suit ce chemin :
 3. après **400 ms de regroupement**, elle part vers le serveur.
 
 Si le serveur est injoignable, l'application démarre sur le cache local et
-reste utilisable — voir les limites en §6.1 et §6.2.
+reste utilisable — voir les limites en §6.1.
 
 Au tout premier lancement sur une base vide, les données présentes dans
 `localStorage` (version antérieure sans serveur) sont importées
@@ -319,6 +318,40 @@ hors ligne, migration automatique depuis `localStorage`.
   (violet), Prop Firm Financé (vert), Besoin Coaching (bleu), Alerte Tilt
   (rose).
 
+### Poids des images
+
+Les avatars téléversés sont **réduits à 256×256 avant d'entrer dans l'état
+applicatif** ([`src/lib/image.ts`](src/lib/image.ts)). C'est indispensable :
+`StudentProfile.avatar` est sérialisé en JSON, donc une image brute pèserait
+son poids majoré d'un tiers (base64) **à trois endroits à la fois** — la base,
+chaque réponse de `/api/state`, et le cache `localStorage`.
+
+Le recadrage est centré et carré, ce qui reproduit exactement l'affichage
+(`object-cover` dans un cercle) : recadrer ici ne retire donc rien qui aurait
+été visible. La sortie est du **WebP** quand le navigateur sait en produire,
+du **JPEG** sinon — avec dans ce cas un fond `#111615` peint sous l'image, car
+le JPEG n'a pas de canal alpha et les zones transparentes viraient au noir.
+
+`createImageBitmap(file, { imageOrientation: "from-image" })` est préféré
+quand il existe : il **redresse l'image selon son orientation EXIF**, ce que
+les photos prises au téléphone exigent.
+
+**Mesuré de bout en bout :**
+
+| | Avant | Après |
+|---|---|---|
+| Avatar en base | 4 031 890 car. | **42 879 car.** |
+| Réponse `GET /api/state` | 4 073 590 o | **84 579 o** |
+| Total `localStorage` | 4 072 905 car. | **83 894 car.** |
+| Fichier `horizon.db` | 8,2 Mo | **200 ko** |
+
+Téléversement testé avec `public/logo.png` (1,19 Mo, 1536×1024) → **4 839
+caractères** en WebP 256×256, soit une réduction de 327×.
+
+Le garde-fou de `handleFileUpload` est passé de 5 à **20 Mo** et porte
+désormais sur le **décodage**, plus sur le stockage : après réduction, la
+taille du fichier d'origine n'a plus d'incidence.
+
 ### Identité visuelle
 
 - Logo PropDesk intégré : `public/icon.png` (recadrage 512×512 de l'icône) dans
@@ -348,6 +381,7 @@ survols sur des surfaces neutres de la sidebar et du header. Le texte
 | `server/schemas.ts` | validation zod |
 | `server/seed.ts` | amorçage et import |
 | `src/lib/api.ts` | client HTTP typé |
+| `src/lib/image.ts` | réduction des images téléversées avant stockage |
 | `src/hooks/usePersistentState.ts` | état miroité dans localStorage |
 | `src/hooks/useServerSync.ts` | bootstrap + synchronisation optimiste |
 | `public/icon.png` | icône 512×512 |
@@ -372,7 +406,7 @@ survols sur des surfaces neutres de la sidebar et du header. Le texte
 | `src/components/StudentTracking.tsx` | style de trading, palette, statuts |
 | `src/components/TopHeader.tsx` | 5 boutons retirés, fil d'ariane, props mortes retirées |
 | `src/components/MainDashboard.tsx` | props mortes retirées (`onOpenCalculator`, `onOpenCalendar`) |
-| `src/components/UserProfileModal.tsx` | `useEffect` sur `isOpen`, palette |
+| `src/components/UserProfileModal.tsx` | `useEffect` sur `isOpen`, palette, réduction des avatars téléversés |
 | `src/types.ts` | `exitDate`, `exitTime`, `TradingStyle`, `hiddenSidebarItems`, `TradeDraft` |
 | `src/data/mockData.ts` | horodatages de sortie, styles de trading |
 | `server.ts` | simplifié, chemins via `process.cwd()`, limite JSON à 8 Mo |
@@ -412,61 +446,19 @@ La **seule** fonction Gemini réellement branchée est `TradeAuditModal`, via
 
 Classés du plus au moins gênant.
 
-### 1. L'avatar du profil pèse 4 Mo et sature le stockage local — *urgent*
-
-C'est le problème le plus concret du projet aujourd'hui, et il est **actif en
-base**, pas théorique.
-
-`UserProfileModal` accepte un fichier image et le convertit en **data URI
-base64** stocké directement dans `StudentProfile.avatar`
-([`UserProfileModal.tsx:85`](src/components/UserProfileModal.tsx:85)). Le
-garde-fou porte sur la **taille du fichier** (5 Mo), mais le base64 gonfle de
-~33 % : une image de 3 Mo produit une chaîne de 4 Mo.
-
-Mesures réelles sur la base actuelle :
-
-| Grandeur | Valeur |
-|---|---|
-| Chaîne `avatar` du profil | **4 031 890 caractères** |
-| Payload complet du profil | 4 032 392 caractères |
-| Réponse de `GET /api/state` | **4 073 590 octets** |
-| Total `localStorage` | **4 072 905 caractères** dont 4 032 357 pour `horizon_student` |
-
-Conséquences :
-
-- **Le quota `localStorage` (~5 Mo) est presque atteint.** Un second avatar, ou
-  simplement quelques trades de plus, le fera dépasser. L'échec est
-  *silencieux* : `usePersistentState` et `useSyncedState` avalent
-  l'exception (`catch` volontaire, pour ne pas casser l'interaction en cours).
-  Le repli hors ligne cesserait alors de fonctionner **sans aucun signe
-  visible**.
-- **Chaque modification du profil repousse 4 Mo** vers `PUT /api/profile` — y
-  compris une simple bascule de visibilité de sidebar, qui écrit dans
-  `hiddenSidebarItems`, donc dans le profil.
-- **Chaque démarrage télécharge 4 Mo** avant le premier rendu.
-- La base fait 4 Mo, dont 99 % d'avatar.
-
-**Correction recommandée** (à valider avec l'utilisateur avant de coder) :
-redimensionner l'image côté client dans un `<canvas>` (256×256 suffit pour
-l'affichage réel, qui ne dépasse jamais 96 px) et l'exporter en JPEG ou WebP
-avant de la stocker. Cela ramène l'avatar à quelques dizaines de kilo-octets.
-Alternative plus lourde : une route d'upload et un stockage fichier, l'avatar
-ne portant plus qu'une URL. **Ne pas se contenter d'abaisser le seuil de 5 Mo** :
-le problème n'est pas le fichier, c'est l'encodage inline.
-
-### 2. Les modifications hors ligne ne sont pas rejouées
+### 1. Les modifications hors ligne ne sont pas rejouées
 
 Elles restent dans le cache local, mais **le rechargement suivant reprend
 l'état du serveur** et les perd. Implémenter le rejeu demande une gestion de
 conflits (quelle version gagne ?) — c'est une décision produit, pas seulement
 technique.
 
-### 3. Aucune authentification
+### 2. Aucune authentification
 
 Un utilisateur unique implicite (`user-local`) est utilisé. C'est le plus gros
 manque fonctionnel. Voir §7, tâche 1.
 
-### 4. Deux onglets du centre d'alertes sont injoignables
+### 3. Deux onglets du centre d'alertes sont injoignables
 
 `handleNavigateFromNotification` ([`App.tsx:254`](src/App.tsx:254)) filtre le
 `targetTab` d'une notification contre une **liste blanche écrite à la main**,
@@ -478,14 +470,14 @@ serait silencieusement ignorée.
 notification ajoutée vers ces deux onglets ne fonctionnera pas, sans message
 d'erreur. La liste devrait être dérivée de `TabType` plutôt que recopiée.
 
-### 5. `onSelectAccountForJournal` est mort
+### 4. `onSelectAccountForJournal` est mort
 
 Dans [`WalletManagement.tsx:29`](src/components/WalletManagement.tsx:29), la
 prop est **déclarée et déstructurée mais jamais appelée dans le composant**. La
 câbler depuis `App.tsx` ne produirait rien. Il faut d'abord décider quel
 élément d'interface doit la déclencher.
 
-### 6. Résidus de session dans `data/`
+### 5. Résidus de session dans `data/`
 
 - Un **trade de test est toujours en base** : `MARQUEUR/TEST`, id
   `trade-marqueur-migration`, PnL `1234 €`, note « Doit se retrouver en base ».
@@ -498,7 +490,7 @@ câbler depuis `App.tsx` ne produirait rien. Il faut d'abord décider quel
   lit** : `db.ts` ouvre exclusivement `horizon.db`. Supprimables sans risque,
   mais demander avant.
 
-### 7. Données existantes sans les nouveaux champs
+### 6. Données existantes sans les nouveaux champs
 
 Les trades et élèves déjà en base ont été créés avant l'ajout de `exitDate`,
 `exitTime` et `tradingStyle`. Les vues gèrent l'absence proprement (mention
@@ -515,31 +507,31 @@ Les trades et élèves déjà en base ont été créés avant l'ajout de `exitDa
 > cp data/horizon.db data/horizon.db.bak
 > ```
 
-### 8. Aucun test automatisé
+### 7. Aucun test automatisé
 
 Le projet n'a pas de *runner*. En ajouter un est une décision à part entière.
 Voir §9 pour ce qui a réellement été vérifié, et comment.
 
-### 9. SQLite sur disque éphémère
+### 8. SQLite sur disque éphémère
 
 Sur Cloud Run (cible naturelle vu l'origine AI Studio), le disque est éphémère
 et **les données seraient perdues à chaque redémarrage d'instance**. Monter un
 volume sur `DATA_DIR`, ou passer à Postgres. Seul `server/repositories.ts` est
 à réécrire : les routes n'y touchent pas.
 
-### 10. Bundle client de 921 Ko
+### 9. Bundle client de 921 Ko
 
 `dist/assets/index-*.js` fait **921,32 ko** (249,51 ko gzippé), au-delà du
 seuil d'avertissement de 500 ko de Vite. Aucun découpage de code n'est en
 place. Non bloquant, mais à traiter avant une mise en production sérieuse.
 `recharts` est le principal contributeur.
 
-### 11. `.env.example` encore rédigé pour AI Studio
+### 10. `.env.example` encore rédigé pour AI Studio
 
 Il mentionne l'injection automatique par AI Studio et une variable `APP_URL`
 qui n'est utilisée **nulle part** dans le code. À nettoyer.
 
-### 12. `vite.config.ts` porte encore des béquilles AI Studio
+### 11. `vite.config.ts` porte encore des béquilles AI Studio
 
 Le bloc `server.hmr` / `server.watch` est piloté par une variable
 `DISABLE_HMR` propre à l'environnement AI Studio, avec un commentaire
@@ -592,6 +584,8 @@ l'utilisateur le demande.
 | Les 5 modales orphelines | **remises dans la sidebar** (section OUTILS + « Exercice du jour ») |
 | Harmonisation des 9 modales | **faite** |
 | « Audit Setup » présenté comme IA | **corrigé** — c'est une matrice de confluences déterministe |
+| Stockage des avatars | **redimensionnement côté client**, pas de route d'upload — l'avatar reste dans le profil, ce qui préserve le repli hors ligne (une URL ne résoudrait plus sans serveur) |
+| Avatar de 4 Mo déjà en base | **recompressé sur place**, la photo de l'utilisateur est conservée |
 | `onSelectAccountForJournal` | **non tranché** — demande une décision produit |
 | Optimisation de `logo.png` | **reportée** à l'écran de connexion, où la taille d'affichage sera connue |
 | Rejeu des modifications hors ligne | **non tranché** — coût élevé, à ne faire que sur demande |
@@ -599,17 +593,6 @@ l'utilisateur le demande.
 ---
 
 ## 7. Prochaines tâches, dans l'ordre
-
-### 0. Réparer le stockage de l'avatar — *nouveau, à faire avant le reste*
-
-Voir §6.1 pour les mesures et les options. Cette tâche passe devant l'écran de
-connexion pour une raison simple : l'écran de connexion ajoutera des comptes,
-donc des profils, donc **autant d'avatars de 4 Mo**. Corriger après coup
-demanderait une migration des données déjà écrites.
-
-Petite tâche, gros effet. Demander à l'utilisateur son arbitrage entre
-redimensionnement client (simple, suffisant) et route d'upload (plus propre,
-plus long).
 
 ### 1. Écran de connexion et authentification — *demandé par l'utilisateur*
 
@@ -633,6 +616,11 @@ faites : 768 px → 332 Ko, 600 px → 208 Ko, 768 px en JPEG q88 → 40 Ko. Le 
 risque un léger halo sur les bords nets du D blanc et de la flèche verte : à
 comparer à l'œil. L'original reste dans git (`6f2547c`).
 
+Note de conception : les comptes créés porteront chacun un avatar. Le
+redimensionnement de `src/lib/image.ts` est déjà en place et **doit être
+réutilisé** pour tout nouveau champ image — c'est exactement le scénario qui
+avait produit un profil de 4 Mo.
+
 ### 2. Remplir le module « Examen »
 
 L'onglet `exam` existe mais **affiche une page vierge** avec le texte « Contenu
@@ -642,12 +630,12 @@ mettre avant de coder.
 
 ### 3. Nettoyer les résidus
 
-Le trade `MARQUEUR/TEST` et les fichiers `data/horizon 2.db*` (§6.6). Rapide,
+Le trade `MARQUEUR/TEST` et les fichiers `data/horizon 2.db*` (§6.5). Rapide,
 mais demander avant de toucher à des données.
 
 ### 4. Dériver la liste blanche des onglets de notification
 
-Corriger §6.4 : remplacer le tableau écrit à la main dans
+Corriger §6.3 : remplacer le tableau écrit à la main dans
 `handleNavigateFromNotification` par une constante dérivée de `TabType`, pour
 qu'ajouter un onglet ne puisse plus créer un trou silencieux.
 
@@ -662,8 +650,8 @@ Câbler ou supprimer. Demander d'abord.
 
 ### 7. Nettoyer `.env.example` et `vite.config.ts`
 
-Retirer les mentions AI Studio et la variable `APP_URL` inutilisée (§6.11,
-§6.12).
+Retirer les mentions AI Studio et la variable `APP_URL` inutilisée (§6.10,
+§6.11).
 
 ### 8. Rejeu des modifications hors ligne
 
@@ -835,6 +823,20 @@ Le `409` renvoyé quand la base est déjà amorcée n'est pas une erreur à
 remonter : il signifie qu'un autre onglet a gagné la course. Le client
 l'avale et relit simplement l'état.
 
+### Tout ce qui entre dans l'état applicatif est sérialisé trois fois
+
+C'est la leçon du profil de 4 Mo, et elle vaut au-delà des images.
+
+Une valeur placée dans un état synchronisé se retrouve **dans la base, dans
+chaque réponse de `/api/state`, et dans `localStorage`**. Le coût est donc
+triplé, et le plafond de `localStorage` (~5 Mo, tout confondu) est le premier
+atteint — en échouant **silencieusement**, puisque `usePersistentState` et
+`useSyncedState` avalent l'exception pour ne pas casser l'interaction en cours.
+
+Avant d'ajouter un champ volumineux (image, fichier, historique long), réduis-le
+à la source ou sors-le de l'état synchronisé. Ne compte pas sur un
+avertissement : il n'y en aura pas.
+
 ### Le nom des fichiers d'assets doit être en minuscules
 
 macOS ignore la casse, **un serveur Linux non**. Le logo fourni s'appelait
@@ -883,11 +885,11 @@ reprendre :
 
 Nettoie derrière toi : les données de test créées pendant la vérification
 doivent être supprimées avant de rendre la main. **Cette règle a déjà été
-enfreinte une fois** — voir le trade `MARQUEUR/TEST` en §6.6.
+enfreinte une fois** — voir le trade `MARQUEUR/TEST` en §6.5.
 
 ### Ce qui a réellement été vérifié — et ce qui ne l'a pas été
 
-Le projet n'a aucun test automatisé (§6.8). Tout a été vérifié à la main, et
+Le projet n'a aucun test automatisé (§6.7). Tout a été vérifié à la main, et
 **pas au même degré selon les zones**. Ne suppose pas une couverture uniforme.
 
 | Degré | Zones |
@@ -896,6 +898,16 @@ Le projet n'a aucun test automatisé (§6.8). Tout a été vérifié à la main,
 | **Contrôlé visuellement seulement** — la vue s'affiche, rien de plus | forum, académie vidéo, quiz, portefeuilles, messagerie coach, badges, simulateur |
 | **Ouverture exercée** — la modale s'ouvre depuis la sidebar | les 4 entrées OUTILS + « Exercice du jour » ; « Audit Setup → Appliquer au journal » exercé jusqu'au formulaire pré-rempli |
 | **Jamais exécuté** | la route Gemini **avec une vraie clé** |
+
+Le redimensionnement d'avatar a été exercé **de bout en bout** : téléversement
+d'un PNG de 1,19 Mo → data URI WebP de 4 839 caractères en 256×256, rendu
+vérifié dans la modale, puis `localStorage.clear()` + rechargement pour prouver
+que l'avatar recompressé vient bien de SQLite. Deux limites à connaître :
+
+- le format de sortie **dépend du navigateur** (WebP ici, JPEG ailleurs) ; seul
+  le chemin WebP a été observé en conditions réelles ;
+- le redressement EXIF est demandé via `createImageBitmap`, mais **aucune photo
+  réellement orientée par EXIF n'a été testée**.
 
 Le dernier point mérite d'être explicite : `/api/coach/ai-review` n'a été testée
 que sur sa **validation d'entrée** et sa **limitation de débit**. Aucun appel
@@ -908,18 +920,29 @@ modèle déclaré (`gemini-3.6-flash`,
 
 ## 10. État à la reprise
 
-- Branche `main`, **arbre de travail propre**, dernier commit `f5fbe4c`
-  (« Harmonise les 8 modales et retire l'IA de l'audit de setup »).
+- Branche `main`, dernier commit documenté `69567d7`, plus le correctif
+  d'avatar (§4, « Poids des images »).
 - `npm run lint` : sans erreur. `npm run build` : réussi, avec le seul
-  avertissement de taille de bundle (§6.10).
-- Application démarrée et rendue : **aucune erreur console**.
+  avertissement de taille de bundle (§6.9).
+- Application démarrée et rendue, avatar affiché correctement.
+- **Une erreur console subsiste**, sans rapport avec le code applicatif :
+  `WebSocket connection to 'ws://localhost:24678/' failed`, en boucle. C'est le
+  socket HMR de Vite, qui écoute sur son propre port alors que Vite tourne en
+  middleware derrière Express — ce port n'est pas exposé. Sans effet sur le
+  fonctionnement, mais le rechargement à chaud ne marche pas : **recharge la
+  page à la main** après une modification.
+- Une sauvegarde `data/horizon.db.bak` (8,2 Mo, avec l'avatar d'origine non
+  compressé) a été laissée à côté de la base. Supprimable une fois le
+  correctif jugé bon.
 
 ### Contenu de `data/horizon.db`
 
+Fichier : **200 ko** (8,2 Mo avant recompression de l'avatar et `VACUUM`).
+
 | Table | Lignes |
 |---|---|
-| `users` | 1 (profil « ForexPaps », admin) |
-| `trades` | 7 — **dont 1 trade de test à supprimer** (§6.6) |
+| `users` | 1 (profil « ForexPaps », admin, avatar JPEG 256×256 de 42 879 car.) |
+| `trades` | 7 — **dont 1 trade de test à supprimer** (§6.5) |
 | `trading_accounts` | 4 |
 | `coach_signals` | 4 |
 | `coach_messages` | 5 |
@@ -937,17 +960,17 @@ Sophie Bernard (Intraday, Besoin Coaching).
 
 ### Par où commencer
 
-Trois points d'entrée légitimes, selon ce que veut l'utilisateur :
+Plus rien n'est cassé : les points d'entrée sont tous des choix, pas des
+urgences.
 
-- **§7 tâche 0 — l'avatar de 4 Mo.** C'est la seule chose franchement cassée,
-  et elle grossit avec le temps. Petite tâche, gros effet. À proposer en
-  premier, mais lui laisser l'arbitrage entre les deux corrections possibles.
-- **§7 tâche 1 — l'écran de connexion.** C'est ce qu'il a explicitement annoncé
-  vouloir faire ensuite. Mais commence par lui poser les décisions listées :
-  elles conditionnent tout le reste, et coder avant serait à refaire. Note que
-  la tâche 0 devrait passer avant, pour ne pas avoir à migrer des avatars.
+- **§7 tâche 1 — l'écran de connexion.** C'est ce que l'utilisateur a
+  explicitement annoncé vouloir faire ensuite, et le blocage qui la précédait
+  (l'avatar) est levé. Mais commence par lui poser les décisions listées :
+  elles conditionnent tout le reste, et coder avant serait à refaire.
 - **§7 tâche 2 — remplir le module « Examen ».** À ne pas coder avant de lui
   avoir demandé ce qu'il veut y mettre : la page vierge est volontaire.
+- **§7 tâche 3 — nettoyer les résidus.** Quelques minutes, et cela retire le
+  trade de test qui fausse les statistiques du tableau de bord.
 
 > Ce document est la **seule** source de reprise. Des plans de travail ont pu
 > être écrits dans `~/.claude/plans/`, **hors du dépôt** : un nouveau Claude ne

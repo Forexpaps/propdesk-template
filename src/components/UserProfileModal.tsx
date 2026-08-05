@@ -20,6 +20,7 @@ import {
   Check,
 } from "lucide-react";
 import { StudentProfile, TraderBadge } from "../types";
+import { resizeAvatar, AVATAR_SIZE } from "../lib/image";
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -71,6 +72,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     student.currentCapital.toString()
   );
   const [isAdmin, setIsAdmin] = useState(student.isAdmin ?? true);
+  /** Le décodage puis le rendu d'une grande image ne sont pas instantanés. */
+  const [isResizing, setIsResizing] = useState(false);
+
+  /** Photo téléversée (data URI) plutôt qu'une URL distante. */
+  const isImported = avatar.startsWith("data:");
 
   // La modale reste montée entre deux ouvertures : sans cela, `initialTab`
   // ne serait pris en compte qu'au tout premier rendu.
@@ -82,20 +88,33 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  /**
+   * L'image est réduite avant d'entrer dans l'état : le profil est sérialisé
+   * en base, dans `/api/state` et dans le cache localStorage, une image brute
+   * y pèserait donc son poids trois fois (voir `lib/image.ts`).
+   */
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert("L'image choisie est trop volumineuse (max 5 Mo). Veuillez en choisir une autre.");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setAvatar(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+    // Le champ garde le fichier sélectionné : sans cela, re-choisir la même
+    // image après une erreur n'émettrait aucun évènement.
+    e.target.value = "";
+    if (!file) return;
+
+    // Garde-fou sur le décodage, pas sur le stockage : après réduction, la
+    // taille du fichier d'origine n'a plus d'incidence.
+    if (file.size > 20 * 1024 * 1024) {
+      alert("L'image choisie est trop volumineuse (max 20 Mo). Veuillez en choisir une autre.");
+      return;
+    }
+
+    setIsResizing(true);
+    try {
+      setAvatar(await resizeAvatar(file));
+    } catch (err) {
+      console.error("[horizon] Redimensionnement de l'avatar échoué.", err);
+      alert("Cette image n'a pas pu être lue. Essayez un autre fichier (JPEG, PNG ou WebP).");
+    } finally {
+      setIsResizing(false);
     }
   };
 
@@ -247,21 +266,44 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full py-2 px-3 rounded-xl bg-[#1B2320] hover:bg-[#232D29] border border-[#1B2320] text-slate-200 font-bold flex items-center justify-center gap-2 transition-all"
+                    disabled={isResizing}
+                    className="w-full py-2 px-3 rounded-xl bg-[#1B2320] hover:bg-[#232D29] border border-[#1B2320] text-slate-200 font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-60"
                   >
                     <Upload className="w-4 h-4 text-[#00E676]" />
-                    <span>Importer une photo perso (.PNG, .JPG)</span>
+                    <span>
+                      {isResizing
+                        ? "Optimisation de l'image…"
+                        : "Importer une photo perso (.PNG, .JPG)"}
+                    </span>
                   </button>
 
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] text-slate-500 shrink-0">Ou URL:</span>
-                    <input
-                      type="text"
-                      value={avatar}
-                      onChange={(e) => setAvatar(e.target.value)}
-                      placeholder="https://..."
-                      className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-1 text-white text-[11px] focus:outline-none focus:border-[#00E676] font-mono"
-                    />
+                    {/* Une image importée est un data URI de plusieurs dizaines de
+                        milliers de caractères : l'afficher ici n'apprendrait rien
+                        et rendrait le champ inutilisable. */}
+                    {isImported ? (
+                      <div className="w-full flex items-center justify-between gap-2 bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-1">
+                        <span className="text-[11px] text-slate-400 truncate">
+                          Photo importée · optimisée en {AVATAR_SIZE}×{AVATAR_SIZE}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setAvatar(AVATAR_PRESETS[0])}
+                          className="text-[10px] font-bold text-slate-500 hover:text-[#00E676] shrink-0"
+                        >
+                          Effacer
+                        </button>
+                      </div>
+                    ) : (
+                      <input
+                        type="text"
+                        value={avatar}
+                        onChange={(e) => setAvatar(e.target.value)}
+                        placeholder="https://..."
+                        className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-1 text-white text-[11px] focus:outline-none focus:border-[#00E676] font-mono"
+                      />
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
