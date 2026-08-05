@@ -15,7 +15,6 @@ import { PerformanceDashboard } from "./components/PerformanceDashboard";
 import { TradeAuditModal } from "./components/TradeAuditModal";
 import { PositionCalculatorModal } from "./components/PositionCalculatorModal";
 import { TradingPlanModal } from "./components/TradingPlanModal";
-import { CertificateModal } from "./components/CertificateModal";
 import { EconomicCalendarModal } from "./components/EconomicCalendarModal";
 import { WalletManagement } from "./components/WalletManagement";
 import { SMCSimulator } from "./components/SMCSimulator";
@@ -113,7 +112,6 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
-  const [isCertificateOpen, setIsCertificateOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   // Valeur de départ d'une collection : le serveur fait autorité quand il a
@@ -614,6 +612,10 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
           setIsProfileModalOpen(true);
         }}
         onOpenChecklist={() => setIsChecklistOpen(true)}
+        onOpenAISetupAnalyzer={() => setIsAISetupAnalyzerOpen(true)}
+        onOpenPropFirmRules={() => setIsPropFirmRulesOpen(true)}
+        onOpenMindset={() => setIsMindsetModalOpen(true)}
+        onOpenCalendar={() => setIsCalendarOpen(true)}
         onToggleSidebarItem={(key) => {
           // Forme fonctionnelle obligatoire : deux bascules dans le même lot de
           // rendu liraient sinon le même `student`, et la seconde écraserait la
@@ -651,8 +653,6 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
           activeTab={activeTab}
           student={student}
           setMobileOpen={setMobileOpen}
-          onOpenCalculator={() => setIsCalculatorOpen(true)}
-          onOpenChecklist={() => setIsChecklistOpen(true)}
           onOpenProfileModal={() => {
             setProfileModalTab("profile");
             setIsProfileModalOpen(true);
@@ -673,10 +673,7 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
               courseCompletionPercentage={courseCompletionPercentage}
               setActiveTab={setActiveTab}
               onSelectTradeForAudit={(trade) => setSelectedTradeForAudit(trade)}
-              onOpenCalculator={() => setIsCalculatorOpen(true)}
               onOpenChecklist={() => setIsChecklistOpen(true)}
-              onOpenCalendar={() => setIsCalendarOpen(true)}
-              onOpenCertificate={() => setIsCertificateOpen(true)}
             />
           )}
 
@@ -829,14 +826,6 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
       <TradingPlanModal
         isOpen={isChecklistOpen}
         onClose={() => setIsChecklistOpen(false)}
-      />
-
-      {/* Certificate Modal */}
-      <CertificateModal
-        isOpen={isCertificateOpen}
-        onClose={() => setIsCertificateOpen(false)}
-        student={student}
-        completionPercentage={courseCompletionPercentage}
       />
 
       {/* Economic Calendar Modal */}

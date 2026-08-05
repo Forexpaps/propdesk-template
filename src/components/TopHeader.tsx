@@ -8,8 +8,6 @@ interface TopHeaderProps {
   activeTab: TabType;
   student: StudentProfile;
   setMobileOpen: (open: boolean) => void;
-  onOpenCalculator?: () => void;
-  onOpenChecklist?: () => void;
   onOpenProfileModal?: () => void;
   onOpenNotifications?: () => void;
   unreadNotificationsCount?: number;
@@ -19,8 +17,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   activeTab,
   student,
   setMobileOpen,
-  onOpenCalculator,
-  onOpenChecklist,
   onOpenProfileModal,
   onOpenNotifications,
   unreadNotificationsCount = 0,

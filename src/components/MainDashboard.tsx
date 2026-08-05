@@ -42,10 +42,7 @@ interface MainDashboardProps {
     tab: "dashboard" | "students" | "wallets" | "academy" | "journal" | "simulator" | "signals" | "forum" | "messaging" | "analytics"
   ) => void;
   onSelectTradeForAudit: (trade: Trade) => void;
-  onOpenCalculator?: () => void;
   onOpenChecklist?: () => void;
-  onOpenCalendar?: () => void;
-  onOpenCertificate?: () => void;
 }
 
 export const MainDashboard: React.FC<MainDashboardProps> = ({
@@ -57,10 +54,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   courseCompletionPercentage,
   setActiveTab,
   onSelectTradeForAudit,
-  onOpenCalculator,
   onOpenChecklist,
-  onOpenCalendar,
-  onOpenCertificate,
 }) => {
   // Calculate Metrics
   const capitalDiff = student.currentCapital - student.startingCapital;
