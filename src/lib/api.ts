@@ -40,12 +40,23 @@ export interface AuthUser {
   name: string;
   email: string;
   isAdmin: boolean;
+  /** Vrai après une invitation, tant que le mot de passe temporaire est actif. */
+  mustChangePassword: boolean;
 }
 
 export type AuthState =
   | { state: "no-account" }
   | { state: "unauthenticated" }
   | { state: "authenticated"; user: AuthUser };
+
+/** Compte staff tel que listé dans l'écran de gestion de l'équipe. */
+export interface StaffAccountSummary {
+  id: string;
+  name: string;
+  email: string;
+  mustChangePassword: boolean;
+  createdAt: string;
+}
 
 /**
  * Événement émis dès qu'une requête revient en 401.
@@ -146,4 +157,23 @@ export const api = {
     }),
 
   logout: () => request<void>("/api/auth/logout", { method: "POST" }),
+
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<Extract<AuthState, { state: "authenticated" }>>("/api/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+
+  listStaff: () =>
+    request<{ accounts: StaffAccountSummary[] }>("/api/auth/staff"),
+
+  /** Invite un nouveau compte staff. Le mot de passe temporaire n'est renvoyé qu'ici. */
+  inviteStaff: (name: string, email: string) =>
+    request<StaffAccountSummary & { temporaryPassword: string }>("/api/auth/staff", {
+      method: "POST",
+      body: JSON.stringify({ name, email }),
+    }),
+
+  removeStaff: (id: string) =>
+    request<void>(`/api/auth/staff/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };

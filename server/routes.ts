@@ -21,7 +21,7 @@ import {
   coachReviewSchema,
 } from "./schemas";
 import { createRateLimit } from "./middleware/rateLimit";
-import { authRouter } from "./auth/routes";
+import { authRouter, staffRouter } from "./auth/routes";
 import { requireAuth } from "./auth/middleware";
 
 export const api = Router();
@@ -51,6 +51,13 @@ api.use("/auth", authRouter);
  * rechargement à chaud.
  */
 api.use(requireAuth);
+
+// Monté ici et non avec `authRouter` plus haut : ces routes (invitation,
+// liste, suppression, changement de mot de passe) exigent une session
+// valide, donc doivent passer APRÈS la barrière. `req.path` y vaut
+// "/auth/staff" et "/auth/change-password", cohérent avec les chemins
+// écrits en dur dans `server/auth/middleware.ts`.
+api.use("/auth", staffRouter);
 
 /**
  * Payload de démarrage : toutes les collections en un aller-retour, dans les

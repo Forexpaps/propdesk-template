@@ -30,6 +30,8 @@ interface UserProfileModalProps {
   onSaveProfile: (updatedProfile: StudentProfile) => void;
   onClaimBadge?: (badgeId: string) => void;
   initialTab?: "profile" | "badges";
+  /** Ouvre la gestion des comptes staff. Absent : replié sur l'ancien badge statique. */
+  onOpenStaffAccounts?: () => void;
 }
 
 const AVATAR_PRESETS = [
@@ -49,6 +51,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onSaveProfile,
   onClaimBadge,
   initialTab = "profile",
+  onOpenStaffAccounts,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<"profile" | "badges">(initialTab);
   const [badgeFilter, setBadgeFilter] = useState<string>("ALL");
@@ -355,12 +358,24 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </div>
               </div>
 
-              {/* Statut en lecture seule : il est défini côté serveur. Un
-                  interrupteur ici permettait de s'auto-promouvoir, et le serveur
-                  ignore désormais ce champ dans le corps de PUT /api/profile. */}
-              <span className="px-3 py-2 rounded-xl text-[11px] font-medium text-slate-400 bg-[#0D1110] border border-[#1B2320] shrink-0 text-center">
-                Défini côté serveur
-              </span>
+              {/* Ce statut n'est plus un interrupteur : un interrupteur ici
+                  permettait de s'auto-promouvoir, et le serveur ignore
+                  désormais ce champ dans le corps de PUT /api/profile. Tous
+                  les comptes staff ont les mêmes droits — ce bouton mène à
+                  leur gestion (inviter, révoquer), pas à un réglage de rôle. */}
+              {onOpenStaffAccounts ? (
+                <button
+                  type="button"
+                  onClick={onOpenStaffAccounts}
+                  className="px-3 py-2 rounded-xl text-[11px] font-bold text-slate-950 bg-[#00E676] hover:bg-[#00c865] shrink-0 transition-colors"
+                >
+                  Gérer l'équipe
+                </button>
+              ) : (
+                <span className="px-3 py-2 rounded-xl text-[11px] font-medium text-slate-400 bg-[#0D1110] border border-[#1B2320] shrink-0 text-center">
+                  Défini côté serveur
+                </span>
+              )}
             </div>
 
             {/* Inputs Grid */}

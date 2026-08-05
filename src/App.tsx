@@ -21,6 +21,7 @@ import { SMCSimulator } from "./components/SMCSimulator";
 import { CoachSignals } from "./components/CoachSignals";
 import { StudentTracking } from "./components/StudentTracking";
 import { UserProfileModal } from "./components/UserProfileModal";
+import { StaffAccountsModal } from "./components/StaffAccountsModal";
 import { NotificationModal } from "./components/NotificationModal";
 import { PropFirmRulesModal } from "./components/PropFirmRulesModal";
 import { MindsetJournalModal } from "./components/MindsetJournalModal";
@@ -62,6 +63,7 @@ import { useBootstrap, useSyncedState } from "./hooks/useServerSync";
 import { useAuth } from "./hooks/useAuth";
 import { LoginScreen } from "./components/auth/LoginScreen";
 import { SetupScreen } from "./components/auth/SetupScreen";
+import { ChangePasswordScreen } from "./components/auth/ChangePasswordScreen";
 import { api, type ServerState } from "./lib/api";
 
 /** Écran d'attente partagé par les deux étapes de démarrage. */
@@ -91,7 +93,8 @@ function LoadingScreen({ message }: { message: string }) {
  * nécessairement ici, à partir de `/api/auth/me`.
  */
 export default function App() {
-  const { status, expired, login, setup, markLoggedOut, refresh } = useAuth();
+  const { status, user, expired, login, setup, changePassword, markLoggedOut, refresh } =
+    useAuth();
 
   if (status === "loading") {
     return <LoadingScreen message="Vérification de ta session…" />;
@@ -105,11 +108,19 @@ export default function App() {
     return <LoginScreen onLogin={login} expired={expired} />;
   }
 
+  // Un mot de passe temporaire (compte invité) bloque l'accès à l'application
+  // jusqu'à son remplacement — la session est valide, seul le mot de passe ne
+  // l'est plus. Le serveur refuse par ailleurs toute autre route tant que
+  // cette étape n'est pas franchie (filet de sécurité, voir requireAuth).
+  if (status === "authenticated" && user?.mustChangePassword) {
+    return <ChangePasswordScreen onChangePassword={changePassword} />;
+  }
+
   // `authenticated` et `offline` mènent tous deux à l'application. Hors ligne,
   // aucune vérification n'est possible : on démarre sur le cache local, comme
   // avant l'authentification. C'est un choix assumé — le verrou n'est donc pas
   // une barrière d'accès aux données déjà présentes sur la machine (voir README).
-  return <AuthenticatedApp onLoggedOut={markLoggedOut} />;
+  return <AuthenticatedApp onLoggedOut={markLoggedOut} currentStaffId={user?.id ?? null} />;
 }
 
 /**
@@ -119,7 +130,13 @@ export default function App() {
  * `useBootstrap` — et son import depuis l'ancien localStorage — ne s'exécute
  * jamais sans session.
  */
-function AuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
+function AuthenticatedApp({
+  onLoggedOut,
+  currentStaffId,
+}: {
+  onLoggedOut: () => void;
+  currentStaffId: string | null;
+}) {
   const { status, state } = useBootstrap();
 
   if (status === "loading") {
@@ -131,6 +148,7 @@ function AuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       initialState={state}
       syncEnabled={status === "online"}
       onLoggedOut={onLoggedOut}
+      currentStaffId={currentStaffId}
     />
   );
 }
@@ -142,9 +160,11 @@ interface AcademyAppProps {
   syncEnabled: boolean;
   /** Remonte la déconnexion pour afficher l'écran de connexion. */
   onLoggedOut: () => void;
+  /** Identité du compte staff connecté. `null` hors ligne (pas de session vérifiée). */
+  currentStaffId: string | null;
 }
 
-function AcademyApp({ initialState, syncEnabled, onLoggedOut }: AcademyAppProps) {
+function AcademyApp({ initialState, syncEnabled, onLoggedOut, currentStaffId }: AcademyAppProps) {
   const server = initialState?.collections;
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
 
@@ -163,6 +183,7 @@ function AcademyApp({ initialState, syncEnabled, onLoggedOut }: AcademyAppProps)
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isStaffAccountsOpen, setIsStaffAccountsOpen] = useState(false);
 
   // Valeur de départ d'une collection : le serveur fait autorité quand il a
   // répondu ; sinon on repart du cache local, et en dernier recours du seed.
@@ -929,7 +950,25 @@ function AcademyApp({ initialState, syncEnabled, onLoggedOut }: AcademyAppProps)
         onSaveProfile={handleSaveProfile}
         onClaimBadge={handleClaimBadge}
         initialTab={profileModalTab}
+        onOpenStaffAccounts={
+          currentStaffId
+            ? () => {
+                setIsProfileModalOpen(false);
+                setIsStaffAccountsOpen(true);
+              }
+            : undefined
+        }
       />
+
+      {/* Gestion des comptes staff — nécessite une identité vérifiée, absente
+          hors ligne (aucune session à interroger sans serveur). */}
+      {currentStaffId && (
+        <StaffAccountsModal
+          isOpen={isStaffAccountsOpen}
+          onClose={() => setIsStaffAccountsOpen(false)}
+          currentUserId={currentStaffId}
+        />
+      )}
 
       {/* AI Trade Audit Modal */}
       {selectedTradeForAudit && (

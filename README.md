@@ -85,6 +85,10 @@ La base vit dans `DATA_DIR` (`./data` par défaut), hors du dépôt.
 | POST | `/api/auth/setup` | première installation, refusée si un compte existe |
 | POST | `/api/auth/login` | connexion |
 | POST | `/api/auth/logout` | déconnexion |
+| GET | `/api/auth/staff` | liste des comptes staff |
+| POST | `/api/auth/staff` | invite un compte, renvoie un mot de passe temporaire |
+| DELETE | `/api/auth/staff/:id` | révoque un compte (refusé sur le dernier) |
+| POST | `/api/auth/change-password` | remplace son propre mot de passe |
 | GET | `/api/state` | état complet de démarrage |
 | PUT | `/api/collections/:name` | remplace une collection |
 | PUT | `/api/profile` | profil de l'élève |
@@ -94,22 +98,41 @@ La base vit dans `DATA_DIR` (`./data` par défaut), hors du dépôt.
 | POST | `/api/coach/ai-review` | audit IA d'un trade ou réponse à une question |
 | GET | `/api/download-features-pdf` | catalogue PDF des fonctionnalités |
 
-Toutes les routes exigent une session valide, **sauf** `/api/health` et les
-quatre routes `/api/auth/*`. Toutes les entrées sont validées (zod).
+Toutes les routes exigent une session valide, **sauf** `/api/health`,
+`/api/auth/me`, `/api/auth/setup`, `/api/auth/login` et `/api/auth/logout`.
+Toutes les entrées sont validées (zod).
 
-Trois limitations de débit par IP : `/api/coach/ai-review` 10 par minute (seule
-route facturée à l'appel), `/api/auth/login` 10 par quart d'heure, et
-`/api/auth/setup` 5 par quart d'heure.
+Quatre limitations de débit par IP : `/api/coach/ai-review` 10 par minute
+(seule route facturée à l'appel), `/api/auth/login` 10 par quart d'heure,
+`/api/auth/setup` 5 par quart d'heure, `/api/auth/staff` (invitation) 10 par
+quart d'heure.
 
 Le PDF est généré hors ligne par `node scripts/generate_pdf.js`.
 
 ## Authentification
 
-Un seul compte, protégé par mot de passe.
+Plusieurs comptes staff peuvent se connecter, chacun avec son propre email et
+mot de passe. **Tous ont les mêmes droits et travaillent sur les mêmes
+données** : il n'y a qu'un seul bureau (journal, élèves, portefeuilles), pas un
+par compte. Se connecter avec un identifiant différent ne change donc rien à
+ce que vous voyez — seulement qui est actuellement aux commandes.
 
-Au premier démarrage, l'application détecte qu'aucun identifiant n'existe et
+Au premier démarrage, l'application détecte qu'aucun compte n'existe et
 affiche un écran d'installation : vous y choisissez une adresse et un mot de
-passe (10 caractères minimum). **Les données déjà présentes sont conservées.**
+passe (10 caractères minimum) pour le premier compte. **Les données déjà
+présentes sont conservées.**
+
+### Ajouter un membre de l'équipe
+
+Depuis le profil (bouton **Gérer l'équipe**), un compte déjà connecté peut en
+inviter un autre : nom et email suffisent, un mot de passe temporaire est
+généré et affiché **une seule fois** — à transmettre de la main à la main. La
+personne invitée devra le remplacer par le sien avant de pouvoir utiliser
+l'application ; jusque-là, aucune autre action ne lui est accessible.
+
+Un compte peut être révoqué depuis le même écran. **Le dernier compte restant
+ne peut pas être supprimé** : sans lui, personne ne pourrait plus jamais se
+reconnecter, et il n'existe aucune procédure de récupération pour ce cas.
 
 Les mots de passe sont hachés avec `scrypt` (`node:crypto`, aucune dépendance
 ajoutée), sel aléatoire par compte, comparaison à temps constant. Les sessions
@@ -119,14 +142,17 @@ parallèle ; se déconnecter ne ferme que la session courante.
 
 ### Mot de passe oublié
 
-Il n'y a pas de récupération par e-mail. La seule issue est de supprimer les
-identifiants, ce qui ramène l'écran d'installation au prochain chargement :
+Il n'y a pas de récupération par e-mail. Si **au moins un autre compte**
+existe, il peut révoquer le vôtre depuis « Gérer l'équipe » et vous en créer un
+nouveau. Si vous êtes le **seul** compte, la seule issue est de supprimer
+directement les identifiants, ce qui ramène l'écran d'installation au
+prochain chargement :
 
 ```bash
-sqlite3 data/horizon.db "delete from user_credentials; delete from sessions;"
+sqlite3 data/horizon.db "delete from staff_accounts; delete from sessions;"
 ```
 
-Vos données ne sont pas touchées : seul le mot de passe est à redéfinir.
+Vos données ne sont pas touchées : seuls les comptes sont à recréer.
 
 ## Limites connues
 
