@@ -65,12 +65,12 @@ export const TradingPlanModal: React.FC<TradingPlanModalProps> = ({ isOpen, onCl
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
+    <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
       <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-xl w-full p-6 space-y-6 shadow-2xl relative text-slate-100">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <div className="p-2 rounded-xl bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20">
               <CheckSquare className="w-5 h-5" />
             </div>
             <div>
@@ -80,7 +80,7 @@ export const TradingPlanModal: React.FC<TradingPlanModalProps> = ({ isOpen, onCl
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-[#1B2320] hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-400 hover:text-white transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -118,14 +118,14 @@ export const TradingPlanModal: React.FC<TradingPlanModalProps> = ({ isOpen, onCl
                 className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
                   checked
                     ? "bg-[#00E676]/10 border-[#00E676]/30 text-white"
-                    : "bg-[#0D1110]/60 border-[#1B2320] text-slate-400 hover:border-slate-700"
+                    : "bg-[#0D1110]/60 border-[#1B2320] text-slate-400 hover:border-[#232D29]"
                 }`}
               >
                 <div
                   className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
                     checked
                       ? "bg-[#00E676] border-[#00E676] text-slate-950 font-bold"
-                      : "border-slate-700 bg-[#111615]"
+                      : "border-[#232D29] bg-[#111615]"
                   }`}
                 >
                   {checked && <Check className="w-3.5 h-3.5" />}

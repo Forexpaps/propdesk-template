@@ -24,7 +24,7 @@ import { UserProfileModal } from "./components/UserProfileModal";
 import { NotificationModal } from "./components/NotificationModal";
 import { PropFirmRulesModal } from "./components/PropFirmRulesModal";
 import { MindsetJournalModal } from "./components/MindsetJournalModal";
-import { AISetupAnalyzerModal } from "./components/AISetupAnalyzerModal";
+import { SetupAnalyzerModal } from "./components/SetupAnalyzerModal";
 
 import {
   initialStudentProfile,
@@ -221,7 +221,7 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
 
   const [isPropFirmRulesOpen, setIsPropFirmRulesOpen] = useState<boolean>(false);
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState<boolean>(false);
-  const [isAISetupAnalyzerOpen, setIsAISetupAnalyzerOpen] = useState<boolean>(false);
+  const [isSetupAnalyzerOpen, setIsSetupAnalyzerOpen] = useState<boolean>(false);
 
   // L'écriture dans localStorage est désormais assurée par usePersistentState.
 
@@ -612,7 +612,7 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
           setIsProfileModalOpen(true);
         }}
         onOpenChecklist={() => setIsChecklistOpen(true)}
-        onOpenAISetupAnalyzer={() => setIsAISetupAnalyzerOpen(true)}
+        onOpenSetupAnalyzer={() => setIsSetupAnalyzerOpen(true)}
         onOpenPropFirmRules={() => setIsPropFirmRulesOpen(true)}
         onOpenMindset={() => setIsMindsetModalOpen(true)}
         onOpenCalendar={() => setIsCalendarOpen(true)}
@@ -858,10 +858,10 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
         onNavigateToTab={handleNavigateFromNotification}
       />
 
-      {/* AI Setup & Confluence Matrix Modal */}
-      <AISetupAnalyzerModal
-        isOpen={isAISetupAnalyzerOpen}
-        onClose={() => setIsAISetupAnalyzerOpen(false)}
+      {/* Setup & Confluence Matrix Modal */}
+      <SetupAnalyzerModal
+        isOpen={isSetupAnalyzerOpen}
+        onClose={() => setIsSetupAnalyzerOpen(false)}
         onApplyToJournal={(setup) => {
           setJournalDraft({
             pair: setup.pair,
@@ -869,7 +869,7 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
             strategy: `Setup SMC ${setup.verdict} (${setup.score}/100)`,
             notes: setup.notes,
           });
-          setIsAISetupAnalyzerOpen(false);
+          setIsSetupAnalyzerOpen(false);
           setActiveTab("journal");
         }}
       />

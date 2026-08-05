@@ -76,7 +76,7 @@ export const EconomicCalendarModal: React.FC<EconomicCalendarModalProps> = ({
     filterImpact === "HIGH" ? events.filter((e) => e.impact === "HIGH") : events;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
+    <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
       <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl relative text-slate-100">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
@@ -91,7 +91,7 @@ export const EconomicCalendarModal: React.FC<EconomicCalendarModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-[#1B2320] hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-400 hover:text-white transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -183,7 +183,7 @@ export const EconomicCalendarModal: React.FC<EconomicCalendarModalProps> = ({
 
           <button
             onClick={onClose}
-            className="px-5 py-2.5 rounded-xl bg-[#1B2320] hover:bg-slate-800 text-white font-bold text-xs"
+            className="px-5 py-2.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-white font-bold text-xs"
           >
             Fermer
           </button>

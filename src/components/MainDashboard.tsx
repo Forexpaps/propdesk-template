@@ -263,7 +263,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             </div>
             <button
               onClick={() => setActiveTab("journal")}
-              className="px-3 py-1.5 rounded-xl bg-[#1B2320] hover:bg-slate-800 text-slate-300 text-xs font-medium border border-slate-700/60 transition-colors self-start sm:self-auto"
+              className="px-3 py-1.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 text-xs font-medium border border-[#232D29]/60 transition-colors self-start sm:self-auto"
             >
               Ouvrir le journal
             </button>

@@ -43,16 +43,16 @@ export const TradeAuditModal: React.FC<TradeAuditModalProps> = ({
   const audit = trade.aiAudit;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
+    <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
       <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto text-slate-100">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+            <div className="p-2 rounded-xl bg-[#00E676]/10 text-[#00E676]">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+              <span className="text-xs font-bold text-[#00E676] uppercase tracking-wider">
                 Audit Clinique par IA Gemini
               </span>
               <h3 className="text-lg font-bold text-white">
@@ -62,7 +62,7 @@ export const TradeAuditModal: React.FC<TradeAuditModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg bg-[#1B2320] hover:bg-slate-800 text-slate-400 hover:text-white"
+            className="p-2 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-400 hover:text-white"
           >
             ✕
           </button>
@@ -80,7 +80,7 @@ export const TradeAuditModal: React.FC<TradeAuditModalProps> = ({
           </div>
           <div>
             <div className="text-slate-500 text-[10px]">R:R / Stratégie</div>
-            <div className="text-emerald-400 font-bold">1:{trade.riskRewardRatio} ({trade.strategy})</div>
+            <div className="text-[#00E676] font-bold">1:{trade.riskRewardRatio} ({trade.strategy})</div>
           </div>
           <div>
             <div className="text-slate-500 text-[10px]">PnL Net</div>
@@ -98,7 +98,7 @@ export const TradeAuditModal: React.FC<TradeAuditModalProps> = ({
             </p>
             <button
               onClick={runAiAudit}
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 hover:brightness-110 cursor-pointer"
+              className="px-6 py-3 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-bold text-xs shadow-lg shadow-[#00E676]/20 cursor-pointer transition-colors"
             >
               Lancer l'Audit IA Gemini
             </button>
@@ -107,8 +107,8 @@ export const TradeAuditModal: React.FC<TradeAuditModalProps> = ({
 
         {loading && (
           <div className="text-center py-12 space-y-3">
-            <Sparkles className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
-            <p className="text-xs font-bold text-amber-300">Analyse du Price Action & du Management du Risque en cours...</p>
+            <Sparkles className="w-8 h-8 text-[#00E676] animate-spin mx-auto" />
+            <p className="text-xs font-bold text-[#69F0AE]">Analyse du Price Action & du Management du Risque en cours...</p>
           </div>
         )}
 
@@ -122,36 +122,36 @@ export const TradeAuditModal: React.FC<TradeAuditModalProps> = ({
           <div className="space-y-6">
             {/* Score Badges */}
             <div className="grid grid-cols-3 gap-3">
-              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+              <div className="bg-[#0D1110] p-3 rounded-xl border border-[#1B2320] text-center">
                 <div className="text-[10px] text-slate-400 font-semibold">Technique</div>
                 <div className="text-xl font-extrabold text-amber-400 font-mono">
                   {audit.technicalScore} <span className="text-xs text-slate-500">/10</span>
                 </div>
               </div>
-              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+              <div className="bg-[#0D1110] p-3 rounded-xl border border-[#1B2320] text-center">
                 <div className="text-[10px] text-slate-400 font-semibold">Risk Management</div>
-                <div className="text-xl font-extrabold text-emerald-400 font-mono">
+                <div className="text-xl font-extrabold text-[#00E676] font-mono">
                   {audit.riskScore} <span className="text-xs text-slate-500">/10</span>
                 </div>
               </div>
-              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+              <div className="bg-[#0D1110] p-3 rounded-xl border border-[#1B2320] text-center">
                 <div className="text-[10px] text-slate-400 font-semibold">Discipline</div>
-                <div className="text-xl font-extrabold text-indigo-400 font-mono">
+                <div className="text-xl font-extrabold text-purple-400 font-mono">
                   {audit.disciplineScore} <span className="text-xs text-slate-500">/10</span>
                 </div>
               </div>
             </div>
 
             {/* Diagnosis Banner */}
-            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 font-semibold flex items-center gap-2">
-              <Award className="w-4 h-4 shrink-0 text-amber-400" />
+            <div className="p-3.5 rounded-xl bg-[#00E676]/10 border border-[#00E676]/20 text-xs text-[#69F0AE] font-semibold flex items-center gap-2">
+              <Award className="w-4 h-4 shrink-0 text-[#00E676]" />
               <span>{audit.diagnosis}</span>
             </div>
 
             {/* Strengths & Improvements */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-              <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
-                <h4 className="font-bold text-emerald-400 flex items-center gap-1.5">
+              <div className="bg-[#0D1110]/60 p-4 rounded-xl border border-[#1B2320] space-y-2">
+                <h4 className="font-bold text-[#00E676] flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4" /> Points Forts
                 </h4>
                 <ul className="space-y-1 text-slate-300 list-disc list-inside">
@@ -161,7 +161,7 @@ export const TradeAuditModal: React.FC<TradeAuditModalProps> = ({
                 </ul>
               </div>
 
-              <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">
+              <div className="bg-[#0D1110]/60 p-4 rounded-xl border border-[#1B2320] space-y-2">
                 <h4 className="font-bold text-amber-400 flex items-center gap-1.5">
                   <AlertTriangle className="w-4 h-4" /> Axes d'Amélioration
                 </h4>
@@ -174,8 +174,8 @@ export const TradeAuditModal: React.FC<TradeAuditModalProps> = ({
             </div>
 
             {/* Coach Detailed Feedback */}
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-              <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+            <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] space-y-2">
+              <h4 className="text-xs font-bold text-[#00E676] uppercase tracking-wider flex items-center gap-1.5">
                 <MessageSquare className="w-3.5 h-3.5" />
                 Conseil Pédagogique du Master Coach
               </h4>
@@ -187,7 +187,7 @@ export const TradeAuditModal: React.FC<TradeAuditModalProps> = ({
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+        <div className="flex items-center justify-between pt-4 border-t border-[#1B2320]">
           <button
             onClick={runAiAudit}
             className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white"
@@ -198,7 +198,7 @@ export const TradeAuditModal: React.FC<TradeAuditModalProps> = ({
 
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold"
+            className="px-5 py-2 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-200 text-xs font-bold"
           >
             Fermer
           </button>

@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  Sparkles,
   ShieldCheck,
   Zap,
   CheckCircle2,
@@ -13,13 +12,13 @@ import {
   Layers,
 } from "lucide-react";
 
-interface AISetupAnalyzerModalProps {
+interface SetupAnalyzerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onApplyToJournal?: (setupData: any) => void;
 }
 
-export const AISetupAnalyzerModal: React.FC<AISetupAnalyzerModalProps> = ({
+export const SetupAnalyzerModal: React.FC<SetupAnalyzerModalProps> = ({
   isOpen,
   onClose,
   onApplyToJournal,
@@ -75,17 +74,17 @@ export const AISetupAnalyzerModal: React.FC<AISetupAnalyzerModalProps> = ({
   const verdict = getVerdict();
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
+    <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
       <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl relative text-slate-100 my-6 max-h-[92vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20">
-              <Sparkles className="w-6 h-6" />
+              <Target className="w-6 h-6" />
             </div>
             <div>
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                Audit & Scoring de Trade SMC IA
+                Audit & Scoring de Setup SMC
                 <span className="px-2 py-0.5 rounded bg-[#00E676]/15 text-[#00E676] text-[10px] font-mono font-bold border border-[#00E676]/30">
                   CONFLUENCE MATRIX
                 </span>
@@ -97,7 +96,7 @@ export const AISetupAnalyzerModal: React.FC<AISetupAnalyzerModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-[#1B2320] hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-400 hover:text-white transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -265,7 +264,7 @@ export const AISetupAnalyzerModal: React.FC<AISetupAnalyzerModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl bg-[#1B2320] hover:bg-slate-800 text-slate-300 font-bold text-xs"
+            className="px-4 py-2.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 font-bold text-xs"
           >
             Fermer
           </button>
@@ -279,7 +278,7 @@ export const AISetupAnalyzerModal: React.FC<AISetupAnalyzerModalProps> = ({
                   direction: direction === "BUY" ? "LONG" : "SHORT",
                   score: totalScore,
                   verdict: verdict.label,
-                  notes: `Setup validé par AI Confluence Matrix (${totalScore}/100 PTS). TF: ${timeframe}. ${verdict.desc}`
+                  notes: `Setup validé par la matrice de confluences (${totalScore}/100 PTS). TF: ${timeframe}. ${verdict.desc}`
                 });
               } else {
                 onClose();

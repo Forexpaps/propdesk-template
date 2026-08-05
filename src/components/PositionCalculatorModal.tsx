@@ -85,7 +85,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
+    <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
       <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-xl w-full p-6 space-y-6 shadow-2xl relative text-slate-100">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
@@ -100,7 +100,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-[#1B2320] hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-400 hover:text-white transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -182,7 +182,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
                   onClick={() => setRiskPercent(r)}
                   className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all ${
                     riskPercent === r
-                      ? "bg-amber-500/20 border-amber-500 text-amber-400"
+                      ? "bg-[#00E676]/15 border-[#00E676] text-[#00E676]"
                       : "bg-[#0D1110] border-[#1B2320] text-slate-400"
                   }`}
                 >
@@ -249,7 +249,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
 
             <div className="bg-[#111615] p-3 rounded-lg border border-[#1B2320]">
               <span className="text-[10px] text-slate-400 block uppercase font-sans">Ratio R:R & Gain Potentiel</span>
-              <span className="text-xl font-black text-amber-400">1 : {riskRewardRatio}</span>
+              <span className="text-xl font-black text-[#00E676]">1 : {riskRewardRatio}</span>
               <span className="text-[10px] text-[#00E676] block font-bold">+{potentialReward.toFixed(2)} €</span>
             </div>
           </div>
@@ -273,7 +273,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl bg-[#1B2320] hover:bg-slate-800 text-slate-300 text-xs font-semibold"
+              className="px-4 py-2.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 text-xs font-semibold"
             >
               Fermer
             </button>
