@@ -1,12 +1,20 @@
-# HANDOFF — Académie de Trading Horizon / PropDesk
+# HANDOFF — PropDesk (Académie de Trading)
 
 Document de reprise. Il suppose que tu n'as accès ni à la conversation
-précédente, ni à autre chose que ce dépôt. Dernier commit couvert : `4530542`,
-plus le rebranchement des 5 modales, non committé.
+précédente, ni à autre chose que ce dépôt.
 
-> **État :** les 5 modales orphelines ont été rebranchées (section OUTILS de la
-> sidebar). La prochaine tâche est l'**écran de connexion** (§7, tâche 1), qui
-> demande des décisions produit avant de coder.
+> **État à la dernière mise à jour de ce document**
+> Branche `main`, arbre de travail **propre**, dernier commit `f5fbe4c`.
+> `npm run lint` et `npm run build` passent. L'application démarre sans erreur
+> console. La base `data/horizon.db` contient les **vraies données de
+> l'utilisateur**, plus le jeu de démonstration.
+>
+> **Prochaine tâche annoncée : l'écran de connexion** (§7, tâche 1). Elle
+> demande des décisions produit **avant** d'écrire du code.
+>
+> **À traiter en priorité avant toute nouvelle fonctionnalité :** l'avatar du
+> profil pèse 4 Mo en base64 et sature le stockage local (§6.1). C'est le seul
+> problème réellement urgent du projet.
 
 ---
 
@@ -21,13 +29,18 @@ interface :
 - des **modules vidéo** avec quiz et progression ;
 - un **simulateur** (replay de setups historiques + Monte Carlo) ;
 - un **forum**, une **messagerie coach**, un **centre d'alertes** ;
-- un **espace admin** de suivi des élèves.
+- un **espace admin** de suivi des élèves ;
+- quatre **outils** en modale : audit de setup, règles prop firm, mindset,
+  calendrier économique.
 
 L'interface est **entièrement en français**. Le ton des libellés est direct et
 tutoie l'utilisateur. Conserve cette langue et ce registre.
 
 Le projet vient de **Google AI Studio** : c'est important, plusieurs choix
 initiaux en découlent (voir §8).
+
+**Ordres de grandeur** : ~12 400 lignes de TypeScript dans `src/` + `server/`,
+26 fichiers `.ts`/`.tsx`, 25 commits.
 
 ---
 
@@ -52,15 +65,23 @@ explicite.
 | `npm run dev` | serveur de développement sur http://localhost:3000 |
 | `npm run lint` | `tsc --noEmit` — **doit toujours sortir sans erreur** |
 | `npm run build` | bundle client (`dist/`) + serveur (`dist/server.cjs`) |
-| `npm start` | sert le build de production |
+| `npm start` | sert le build de production (`NODE_ENV=production` requis) |
 | `npm run clean` | supprime `dist/` |
+| `node scripts/generate_pdf.js` | régénère le catalogue PDF des fonctionnalités |
 
 Il n'y a **qu'un seul port**. Pas de proxy à configurer.
+
+Un `.claude/launch.json` est présent : l'outil de prévisualisation démarre le
+serveur sous le nom **`horizon-dev`** (port 3000, `autoPort` activé).
 
 Inspecter la base :
 
 ```bash
-sqlite3 data/horizon.db "select id, pair, pnl from trades order by rowid desc limit 5"
+sqlite3 data/horizon.db "select id, pair, pnl from trades order by position"
+```
+
+```bash
+curl -s localhost:3000/api/state | head -c 400
 ```
 
 ---
@@ -73,22 +94,24 @@ Un serveur **Express unique** sert l'API **et** l'application. En
 développement il monte Vite en middleware ; en production il sert `dist/`.
 
 ```
-server.ts              point d'entrée : Express + Vite/statique
+server.ts              point d'entrée : Express + Vite/statique (46 l.)
 server/
-  db.ts                connexion SQLite (better-sqlite3, WAL) et schéma
-  repositories.ts      accès aux données — SEUL module qui parle à SQLite
-  routes.ts            routes /api/*
-  schemas.ts           validation zod des entrées
-  seed.ts              amorçage et import d'un état complet
+  db.ts                connexion SQLite (better-sqlite3, WAL) et schéma (146 l.)
+  repositories.ts      accès aux données — SEUL module qui parle à SQLite (173 l.)
+  routes.ts            routes /api/* (261 l.)
+  schemas.ts           validation zod des entrées (51 l.)
+  seed.ts              amorçage et import d'un état complet (81 l.)
 src/
-  App.tsx              état applicatif et câblage de toutes les vues (890 l.)
-  types.ts             source de vérité des formes de données
+  main.tsx             point de montage React (10 l.)
+  App.tsx              état applicatif et câblage de toutes les vues (879 l.)
+  types.ts             source de vérité des formes de données (300 l.)
+  index.css            Tailwind 4 + styles globaux
   data/mockData.ts     jeu de données d'amorçage (1455 l.)
   hooks/
-    usePersistentState.ts   état miroité dans localStorage
-    useServerSync.ts        bootstrap serveur + synchronisation optimiste
-  lib/api.ts           client HTTP typé
-  components/          10 vues d'onglet + 10 modales + Sidebar et TopHeader
+    usePersistentState.ts   état miroité dans localStorage (41 l.)
+    useServerSync.ts        bootstrap serveur + synchronisation optimiste (183 l.)
+  lib/api.ts           client HTTP typé (86 l.)
+  components/          10 vues d'onglet + 9 modales + Sidebar et TopHeader
 public/
   icon.png             icône 512x512 — sidebar et favicon
   logo.png             logo complet 1536x1024 — réservé à l'écran de connexion (§6 bis)
@@ -96,11 +119,29 @@ public/
 scripts/generate_pdf.js  génération hors ligne du PDF
 ```
 
+### Inventaire des composants
+
+**Vues d'onglet (10)** — `MainDashboard`, `StudentTracking`, `WalletManagement`,
+`VideoAcademy`, `TradingJournal`, `SMCSimulator`, `CoachSignals`,
+`ForumSection`, `CoachMessaging`, `PerformanceDashboard`. L'onglet `exam` n'a
+pas de composant : il est rendu en ligne dans `App.tsx` (§6 bis).
+
+**Modales (9)** — `UserProfileModal`, `TradeAuditModal`,
+`PositionCalculatorModal`, `TradingPlanModal`, `EconomicCalendarModal`,
+`PropFirmRulesModal`, `MindsetJournalModal`, `SetupAnalyzerModal`,
+`NotificationModal`.
+
+**Chrome** — `Sidebar` (494 l.), `TopHeader` (133 l.).
+
+Les plus gros fichiers, si tu cherches où le poids se concentre :
+`mockData.ts` (1455), `App.tsx` (879), `TradingJournal.tsx` (848),
+`ForumSection.tsx` (764), `VideoAcademy.tsx` (756), `StudentTracking.tsx` (746).
+
 ### Navigation
 
 **Pas de routeur.** `App.tsx` tient un `activeTab` et rend la vue
 correspondante. L'union `TabType` est définie dans
-[`src/components/Sidebar.tsx`](src/components/Sidebar.tsx) :
+[`src/components/Sidebar.tsx:36`](src/components/Sidebar.tsx:36) :
 
 ```
 dashboard · students · wallets · academy · journal · simulator
@@ -117,6 +158,34 @@ Deux onglets partagent un composant :
   `initialMode` (`"REPLAY"` / `"MONTE_CARLO"`). Une `key={activeTab}` force le
   remontage, sans quoi l'état interne survivrait et ignorerait `initialMode`.
 
+### Structure de la sidebar
+
+Un item principal (Tableau de bord) puis **quatre sections**, toutes rendues
+par la même fonction `renderSection` :
+
+| Section | Entrées |
+|---|---|
+| **SUIVI** | Journal de trading, Portefeuille, Rentabilité, Suivi des Élèves *(admin seul)* |
+| **PRATIQUE** | Examen, Exercice du jour *(modale)*, Replay, Sim propfirm |
+| **FORMATION** | Module vidéo *(badge %)*, Messagerie Coach *(badge non-lus)* |
+| **OUTILS** | Audit Setup, Prop Firm, Mindset, Calendrier — **les 4 sont des modales** |
+
+Une entrée porte soit un `id` d'onglet, soit un `onOpen?: () => void` qui ouvre
+une modale (`id: null`). Le routage passe par `onOpen`, **jamais** par une
+comparaison de libellé : avec cinq entrées-modales, renommer un libellé aurait
+silencieusement cassé la navigation.
+
+**14 entrées masquables** au total (`SIDEBAR_TOGGLEABLE_KEYS`,
+[`Sidebar.tsx:60`](src/components/Sidebar.tsx:60)) :
+
+```
+journal · wallets · analytics · students · exam · checklist · replay
+propfirm · academy · messaging · audit · propfirmrules · mindset · calendar
+```
+
+« Tableau de bord » en est volontairement absent : c'est la destination de
+repli, le masquer créerait le cul-de-sac qu'on cherche à éviter.
+
 ### Persistance
 
 Le **serveur est la source de vérité**. Au démarrage, le client appelle
@@ -129,7 +198,7 @@ Chaque modification suit ce chemin :
 3. après **400 ms de regroupement**, elle part vers le serveur.
 
 Si le serveur est injoignable, l'application démarre sur le cache local et
-reste utilisable — voir la limite en §6.1.
+reste utilisable — voir les limites en §6.1 et §6.2.
 
 Au tout premier lancement sur une base vide, les données présentes dans
 `localStorage` (version antérieure sans serveur) sont importées
@@ -137,6 +206,13 @@ automatiquement. À défaut, la base est amorcée depuis `mockData.ts`.
 
 La base vit dans `DATA_DIR` (`./data` par défaut), **hors du dépôt**
 (`.gitignore`).
+
+**Clés `localStorage` utilisées** — les neuf collections
+(`horizon_trades`, `horizon_accounts`, `horizon_signals`, `horizon_messages`,
+`horizon_forum_topics`, `horizon_notifications`, `horizon_enrolled_students`,
+`horizon_badges`, `horizon_modules`), plus `horizon_student`,
+`horizon_quiz_results`, `horizon_sidebar_collapsed` et `horizon_sound_alerts`
+(préférence locale du centre d'alertes, jamais synchronisée).
 
 ### API
 
@@ -153,11 +229,15 @@ La base vit dans `DATA_DIR` (`./data` par défaut), **hors du dépôt**
 | GET | `/api/download-features-pdf` | catalogue PDF des fonctionnalités |
 
 Toutes les entrées sont validées par **zod**. `/api/coach/ai-review` est
-limitée à **10 appels par minute et par IP** : c'est la seule route facturée à
-l'appel (Gemini, modèle `gemini-3.6-flash`).
+limitée à **10 appels par minute et par IP** (fenêtre glissante en mémoire) :
+c'est la seule route facturée à l'appel (Gemini, modèle `gemini-3.6-flash`).
 
 Codes de retour à connaître : `400` entrée invalide, `404` collection inconnue,
-`409` base déjà amorcée (import ou seed refusé), `429` quota IA dépassé.
+`409` base déjà amorcée (import ou seed refusé), `429` quota IA dépassé,
+`500` exception non prévue (via `apiErrorHandler`).
+
+Le corps JSON est plafonné à **8 Mo** (`express.json({ limit: "8mb" })`) — la
+limite par défaut de 100 ko était trop basse pour une collection complète.
 
 ### Schéma SQLite
 
@@ -165,13 +245,22 @@ Codes de retour à connaître : `400` entrée invalide, `404` collection inconnu
 `coach_messages`, `forum_topics`, `forum_replies`, `notifications`,
 `enrolled_students`, `badges`, `modules`, `quiz_results`.
 
-Chaque ligne porte un `user_id`, **même sans authentification** : cela évite
-une migration douloureuse le jour où elle arrivera. Les objets sont stockés en
-**colonne JSON** (`payload`), ce qui rend le schéma tolérant à l'ajout de
-champs — voir §8.
+Chaque ligne porte un `user_id` (`DEFAULT_USER_ID = "user-local"`), **même sans
+authentification** : cela évite une migration douloureuse le jour où elle
+arrivera. Les objets sont stockés en **colonne JSON** (`payload`), ce qui rend
+le schéma tolérant à l'ajout de champs — voir §8.
 
-Les réponses du forum sont stockées séparément (`forum_replies`) mais
-recomposées dans les sujets à la lecture.
+Chaque ligne porte aussi une colonne `position` : **l'ordre des listes est
+significatif dans l'UI** et doit être conservé.
+
+Seule la table `trades` **promeut des colonnes** hors du payload
+(`date`, `pair`, `direction`, `result`, `pnl`), avec deux index — c'est la
+seule collection sur laquelle on voudra requêter. Les autres ne sont jamais
+lues autrement qu'en entier.
+
+Les réponses du forum sont stockées séparément (`forum_replies`, en cascade sur
+`forum_topics`) et **retirées du payload du sujet** à l'écriture, puis
+recomposées à la lecture. La même donnée n'existe donc jamais à deux endroits.
 
 ---
 
@@ -180,8 +269,8 @@ recomposées dans les sujets à la lecture.
 ### Socle technique
 
 - `@types/react` installé et **`strict` activé** dans `tsconfig.json`.
-- `npm run lint` et `npm run build` passent sans erreur ni avertissement.
-- Dépôt git initialisé, 21 commits, historique propre.
+- `npm run lint` et `npm run build` passent sans erreur (**vérifié**).
+- Dépôt git initialisé, 25 commits, historique propre.
 - `README.md` réécrit (documentation utilisateur ; ce HANDOFF est la
   documentation de reprise).
 
@@ -196,21 +285,19 @@ hors ligne, migration automatique depuis `localStorage`.
 ### Navigation et sidebar
 
 - **Masquage de modules par l'admin.** Un engrenage apparaît à droite des
-  titres de section (SUIVI, PRATIQUE, FORMATION) pour l'administrateur seul. Il
-  bascule la section en mode réglage : chaque entrée se masque ou se réaffiche
-  d'un clic. Hors de ce mode, une entrée masquée disparaît pour tout le monde.
-  **10 entrées masquables** ; « Tableau de bord » ne l'est pas, c'est la
-  destination de repli.
+  titres des 4 sections pour l'administrateur seul. Il bascule la section en
+  mode réglage : chaque entrée se masque ou se réaffiche d'un clic. Hors de ce
+  mode, une entrée masquée disparaît pour tout le monde. **14 entrées
+  masquables** ; « Tableau de bord » ne l'est pas.
 - **Repli automatique** : masquer le dernier accès à l'onglet courant renvoie
   au tableau de bord. « Replay » et « Sim propfirm » menant au même onglet, la
   bascule n'a lieu que si plus aucune entrée visible n'y conduit.
 - La configuration vit dans `StudentProfile.hiddenSidebarItems` et transite par
   `/api/profile` — **aucune migration de base**.
 - **Section OUTILS** : 4 entrées qui ouvrent une modale au lieu de changer
-  d'onglet (Audit Setup, Prop Firm, Mindset, Calendrier). Elles sont
-  masquables comme les autres. Le routage du clic passe par un champ
-  `onOpen?: () => void` porté par l'entrée, plus par une comparaison de libellé.
-  Les 4 sections sont rendues par une fonction unique `renderSection`.
+  d'onglet. Masquables comme les autres.
+- Le réglage de visibilité n'est proposé qu'en sidebar **dépliée** : repliée,
+  les en-têtes de section — donc l'interrupteur — ne sont pas rendus.
 
 ### Journal de trading
 
@@ -220,6 +307,8 @@ hors ligne, migration automatique depuis `localStorage`.
   *position ouverte* (pas de prix de sortie), *sortie non renseignée* (trade
   clôturé saisi avant l'existence du champ).
 - Export CSV à 20 colonnes, en-têtes et champs alignés.
+- Reçoit des **ébauches de trade** (`TradeDraft`) depuis le calculateur de
+  position et l'audit de setup, via `journalDraft` dans `App.tsx`.
 
 ### Suivi des élèves
 
@@ -234,10 +323,16 @@ hors ligne, migration automatique depuis `localStorage`.
 
 - Logo PropDesk intégré : `public/icon.png` (recadrage 512×512 de l'icône) dans
   la sidebar, en favicon et en icône iOS.
-- **Palette unifiée** sur les 10 vues, le centre d'alertes **et les 8 modales
-  restantes** (jetons et règle de conservation en §8). Plus aucune surface
-  `bg-slate-*` / `border-slate-*` dans `src/`, à l'exception du gris du coach
-  hors ligne, volontaire.
+- **Palette unifiée** sur les 10 vues, le centre d'alertes **et les 9 modales**
+  (jetons et règle de conservation en §8). **Vérifié** : les 9 modales
+  n'utilisent plus que les jetons `#0D1110`, `#111615`, `#1B2320`, `#232D29`,
+  `#00E676`, `#00c865`.
+
+Il reste **8 occurrences de `bg-slate-*` / `border-slate-*`** dans `src/`,
+toutes délibérées ou anodines : le gris du coach hors ligne
+([`CoachMessaging.tsx:150`](src/components/CoachMessaging.tsx:150)), et des
+survols sur des surfaces neutres de la sidebar et du header. Le texte
+(`text-slate-*`) n'a jamais été concerné par la migration.
 
 ---
 
@@ -257,8 +352,15 @@ hors ligne, migration automatique depuis `localStorage`.
 | `src/hooks/useServerSync.ts` | bootstrap + synchronisation optimiste |
 | `public/icon.png` | icône 512×512 |
 | `public/logo.png` | logo complet (fourni par l'utilisateur) |
+| `.claude/launch.json` | configuration du serveur de prévisualisation |
 | `README.md` | réécrit intégralement |
 | `HANDOFF.md` | ce document |
+
+### Renommé
+
+| Avant | Après |
+|---|---|
+| `src/components/AISetupAnalyzerModal.tsx` | `src/components/SetupAnalyzerModal.tsx` |
 
 ### Modifiés en profondeur
 
@@ -270,11 +372,12 @@ hors ligne, migration automatique depuis `localStorage`.
 | `src/components/StudentTracking.tsx` | style de trading, palette, statuts |
 | `src/components/TopHeader.tsx` | 5 boutons retirés, fil d'ariane, props mortes retirées |
 | `src/components/MainDashboard.tsx` | props mortes retirées (`onOpenCalculator`, `onOpenCalendar`) |
-| `src/types.ts` | `exitDate`, `exitTime`, `TradingStyle`, `hiddenSidebarItems` |
+| `src/components/UserProfileModal.tsx` | `useEffect` sur `isOpen`, palette |
+| `src/types.ts` | `exitDate`, `exitTime`, `TradingStyle`, `hiddenSidebarItems`, `TradeDraft` |
 | `src/data/mockData.ts` | horodatages de sortie, styles de trading |
-| `server.ts` | simplifié, chemins via `process.cwd()` |
+| `server.ts` | simplifié, chemins via `process.cwd()`, limite JSON à 8 Mo |
 | `index.html` | favicon et icône iOS |
-| les 9 autres vues | migration de palette (slate → jetons du tableau de bord) |
+| les 8 autres modales et 9 autres vues | migration de palette (slate → jetons du tableau de bord) |
 
 ### « Audit Setup » n'est pas une fonction IA
 
@@ -288,7 +391,8 @@ dans cette application), et la note transférée au journal parle de « matrice 
 confluences ».
 
 La **seule** fonction Gemini réellement branchée est `TradeAuditModal`, via
-`/api/coach/ai-review` — plus la réponse du coach dans la messagerie.
+`/api/coach/ai-review` — plus la réponse du coach dans la messagerie
+(`handleSendMessage` dans [`App.tsx:426`](src/App.tsx:426)).
 
 ### Supprimé
 
@@ -308,61 +412,140 @@ La **seule** fonction Gemini réellement branchée est `TradeAuditModal`, via
 
 Classés du plus au moins gênant.
 
-### 1. Les modifications hors ligne ne sont pas rejouées
+### 1. L'avatar du profil pèse 4 Mo et sature le stockage local — *urgent*
+
+C'est le problème le plus concret du projet aujourd'hui, et il est **actif en
+base**, pas théorique.
+
+`UserProfileModal` accepte un fichier image et le convertit en **data URI
+base64** stocké directement dans `StudentProfile.avatar`
+([`UserProfileModal.tsx:85`](src/components/UserProfileModal.tsx:85)). Le
+garde-fou porte sur la **taille du fichier** (5 Mo), mais le base64 gonfle de
+~33 % : une image de 3 Mo produit une chaîne de 4 Mo.
+
+Mesures réelles sur la base actuelle :
+
+| Grandeur | Valeur |
+|---|---|
+| Chaîne `avatar` du profil | **4 031 890 caractères** |
+| Payload complet du profil | 4 032 392 caractères |
+| Réponse de `GET /api/state` | **4 073 590 octets** |
+| Total `localStorage` | **4 072 905 caractères** dont 4 032 357 pour `horizon_student` |
+
+Conséquences :
+
+- **Le quota `localStorage` (~5 Mo) est presque atteint.** Un second avatar, ou
+  simplement quelques trades de plus, le fera dépasser. L'échec est
+  *silencieux* : `usePersistentState` et `useSyncedState` avalent
+  l'exception (`catch` volontaire, pour ne pas casser l'interaction en cours).
+  Le repli hors ligne cesserait alors de fonctionner **sans aucun signe
+  visible**.
+- **Chaque modification du profil repousse 4 Mo** vers `PUT /api/profile` — y
+  compris une simple bascule de visibilité de sidebar, qui écrit dans
+  `hiddenSidebarItems`, donc dans le profil.
+- **Chaque démarrage télécharge 4 Mo** avant le premier rendu.
+- La base fait 4 Mo, dont 99 % d'avatar.
+
+**Correction recommandée** (à valider avec l'utilisateur avant de coder) :
+redimensionner l'image côté client dans un `<canvas>` (256×256 suffit pour
+l'affichage réel, qui ne dépasse jamais 96 px) et l'exporter en JPEG ou WebP
+avant de la stocker. Cela ramène l'avatar à quelques dizaines de kilo-octets.
+Alternative plus lourde : une route d'upload et un stockage fichier, l'avatar
+ne portant plus qu'une URL. **Ne pas se contenter d'abaisser le seuil de 5 Mo** :
+le problème n'est pas le fichier, c'est l'encodage inline.
+
+### 2. Les modifications hors ligne ne sont pas rejouées
 
 Elles restent dans le cache local, mais **le rechargement suivant reprend
 l'état du serveur** et les perd. Implémenter le rejeu demande une gestion de
 conflits (quelle version gagne ?) — c'est une décision produit, pas seulement
 technique.
 
-### 2. Aucune authentification
+### 3. Aucune authentification
 
-Un utilisateur unique implicite est utilisé. C'est le plus gros manque
-fonctionnel. Voir §7, tâche 1.
+Un utilisateur unique implicite (`user-local`) est utilisé. C'est le plus gros
+manque fonctionnel. Voir §7, tâche 1.
 
-### 3. `onSelectAccountForJournal` est mort
+### 4. Deux onglets du centre d'alertes sont injoignables
+
+`handleNavigateFromNotification` ([`App.tsx:254`](src/App.tsx:254)) filtre le
+`targetTab` d'une notification contre une **liste blanche écrite à la main**,
+qui omet `exam` et `propfirm`. Une notification pointant vers l'un des deux
+serait silencieusement ignorée.
+
+**Latent aujourd'hui** : les 5 notifications de `mockData.ts` visent
+`signals`, `dashboard`, `wallets`, `academy` et `messaging`. Mais toute
+notification ajoutée vers ces deux onglets ne fonctionnera pas, sans message
+d'erreur. La liste devrait être dérivée de `TabType` plutôt que recopiée.
+
+### 5. `onSelectAccountForJournal` est mort
 
 Dans [`WalletManagement.tsx:29`](src/components/WalletManagement.tsx:29), la
 prop est **déclarée et déstructurée mais jamais appelée dans le composant**. La
 câbler depuis `App.tsx` ne produirait rien. Il faut d'abord décider quel
 élément d'interface doit la déclencher.
 
-### 4. Données existantes sans les nouveaux champs
+### 6. Résidus de session dans `data/`
+
+- Un **trade de test est toujours en base** : `MARQUEUR/TEST`, id
+  `trade-marqueur-migration`, PnL `1234 €`, note « Doit se retrouver en base ».
+  Il vient d'une vérification de persistance qui n'a pas été nettoyée, et il
+  **fausse les statistiques du tableau de bord** (win rate, capital, R cumulé).
+  À supprimer depuis l'interface du journal — c'est le plus sûr, la
+  suppression repassera par la synchronisation normale.
+- Trois fichiers **`data/horizon 2.db*`** (une base de 4 ko et 1,8 Mo de WAL)
+  traînent à côté de la vraie base. C'est un doublon Finder, **rien ne les
+  lit** : `db.ts` ouvre exclusivement `horizon.db`. Supprimables sans risque,
+  mais demander avant.
+
+### 7. Données existantes sans les nouveaux champs
 
 Les trades et élèves déjà en base ont été créés avant l'ajout de `exitDate`,
 `exitTime` et `tradingStyle`. Les vues gèrent l'absence proprement (mention
 *sortie non renseignée*, pastille masquée), mais **les valeurs mises dans
 `mockData.ts` ne s'appliquent qu'à une base neuve**.
 
-> **`rm -rf data/` détruit désormais de vraies données.** Les styles de trading
-> des 4 élèves ont été saisis **à la main via l'interface**, ils ne sont pas
-> amorcés. Une remise à zéro les perd. Sauvegarde d'abord :
+> **`rm -rf data/` détruit de vraies données.** Le profil en base est celui de
+> l'utilisateur (« ForexPaps », capital 100 000 € / 103 684 €), pas le profil
+> de démonstration de `mockData.ts` (« Alexandre Vance »). Les styles de
+> trading des 4 élèves ont été saisis **à la main via l'interface**, ils ne
+> sont pas amorcés. Une remise à zéro perd tout cela. Sauvegarde d'abord :
 >
 > ```bash
 > cp data/horizon.db data/horizon.db.bak
 > ```
 
-### 5. Aucun test automatisé
+### 8. Aucun test automatisé
 
 Le projet n'a pas de *runner*. En ajouter un est une décision à part entière.
 Voir §9 pour ce qui a réellement été vérifié, et comment.
 
-### 6. SQLite sur disque éphémère
+### 9. SQLite sur disque éphémère
 
 Sur Cloud Run (cible naturelle vu l'origine AI Studio), le disque est éphémère
 et **les données seraient perdues à chaque redémarrage d'instance**. Monter un
 volume sur `DATA_DIR`, ou passer à Postgres. Seul `server/repositories.ts` est
 à réécrire : les routes n'y touchent pas.
 
-### 7. Bundle client de 906 Ko
+### 10. Bundle client de 921 Ko
 
-Au-delà du seuil d'avertissement de Vite. Aucun découpage de code n'est en
+`dist/assets/index-*.js` fait **921,32 ko** (249,51 ko gzippé), au-delà du
+seuil d'avertissement de 500 ko de Vite. Aucun découpage de code n'est en
 place. Non bloquant, mais à traiter avant une mise en production sérieuse.
+`recharts` est le principal contributeur.
 
-### 8. `.env.example` encore rédigé pour AI Studio
+### 11. `.env.example` encore rédigé pour AI Studio
 
 Il mentionne l'injection automatique par AI Studio et une variable `APP_URL`
-qui n'est utilisée nulle part. À nettoyer.
+qui n'est utilisée **nulle part** dans le code. À nettoyer.
+
+### 12. `vite.config.ts` porte encore des béquilles AI Studio
+
+Le bloc `server.hmr` / `server.watch` est piloté par une variable
+`DISABLE_HMR` propre à l'environnement AI Studio, avec un commentaire
+« Do not modify ». Hors AI Studio, cette variable n'est jamais définie : le
+comportement est donc le défaut de Vite. L'alias `@` pointe sur la racine du
+projet et n'est utilisé par aucun import.
 
 ---
 
@@ -377,14 +560,14 @@ l'utilisateur. Mais l'onglet `signals` **reste atteignable** par la
 notification « Signal Coach SMC Actif » du centre d'alertes, dont le
 `targetTab` pointe dessus
 ([`mockData.ts:1415`](src/data/mockData.ts:1415)). Le composant, l'onglet et la
-collection `signals` sont donc bien vivants.
+collection `signals` (4 signaux en base) sont donc bien vivants.
 
 ### L'onglet `exam` est vide volontairement
 
-Il affiche « Contenu à venir », rendu **en ligne dans `App.tsx`** — il n'a pas
-de composant dédié. L'utilisateur a explicitement demandé une page vierge en
-attendant de définir le contenu. Ne pas la supprimer ni la remplir sans lui
-demander.
+Il affiche « Contenu à venir », rendu **en ligne dans `App.tsx`**
+([`App.tsx:773`](src/App.tsx:773)) — il n'a pas de composant dédié.
+L'utilisateur a explicitement demandé une page vierge en attendant de définir
+le contenu. Ne pas la supprimer ni la remplir sans lui demander.
 
 ### `public/logo.png` n'est utilisé nulle part
 
@@ -404,8 +587,11 @@ l'utilisateur le demande.
 |---|---|
 | Statut « Accompagnement VIP » | **supprimé** — devenu indistinguable de « Prop Firm Financé » une fois la vue passée au vert |
 | Bouton « Lecture » du suivi élèves | **passé au vert** en connaissance de cause : il ne se distingue plus d'« Éditer Fiche » par la couleur |
-| Les 5 modales orphelines | **remises dans la sidebar** (section OUTILS), pas dans le header — fait |
-| Harmonisation des 8 modales restantes | **faite** — demandée explicitement |
+| Modale « Certificat » | **supprimée** — sans valeur juridique, donc sans utilité |
+| « Badges & paliers » en sidebar | **retiré** — les badges restent dans le profil, onglet Badges |
+| Les 5 modales orphelines | **remises dans la sidebar** (section OUTILS + « Exercice du jour ») |
+| Harmonisation des 9 modales | **faite** |
+| « Audit Setup » présenté comme IA | **corrigé** — c'est une matrice de confluences déterministe |
 | `onSelectAccountForJournal` | **non tranché** — demande une décision produit |
 | Optimisation de `logo.png` | **reportée** à l'écran de connexion, où la taille d'affichage sera connue |
 | Rejeu des modifications hors ligne | **non tranché** — coût élevé, à ne faire que sur demande |
@@ -414,10 +600,21 @@ l'utilisateur le demande.
 
 ## 7. Prochaines tâches, dans l'ordre
 
+### 0. Réparer le stockage de l'avatar — *nouveau, à faire avant le reste*
+
+Voir §6.1 pour les mesures et les options. Cette tâche passe devant l'écran de
+connexion pour une raison simple : l'écran de connexion ajoutera des comptes,
+donc des profils, donc **autant d'avatars de 4 Mo**. Corriger après coup
+demanderait une migration des données déjà écrites.
+
+Petite tâche, gros effet. Demander à l'utilisateur son arbitrage entre
+redimensionnement client (simple, suffisant) et route d'upload (plus propre,
+plus long).
+
 ### 1. Écran de connexion et authentification — *demandé par l'utilisateur*
 
-C'est la prochaine tâche explicitement souhaitée. L'utilisateur veut y placer
-`public/logo.png` (le logo complet avec le mot-symbole).
+C'est la prochaine tâche fonctionnelle explicitement souhaitée. L'utilisateur
+veut y placer `public/logo.png` (le logo complet avec le mot-symbole).
 
 **Ce n'est pas qu'une page.** Il faut trancher, avec lui, avant de coder :
 
@@ -439,20 +636,36 @@ comparer à l'œil. L'original reste dans git (`6f2547c`).
 ### 2. Remplir le module « Examen »
 
 L'onglet `exam` existe mais **affiche une page vierge** avec le texte « Contenu
-à venir » ([`App.tsx`](src/App.tsx), bloc `activeTab === "exam"`). L'utilisateur
-a demandé cette page vierge en attendant de définir le contenu. Lui demander ce
-qu'il veut y mettre avant de coder.
+à venir » ([`App.tsx:773`](src/App.tsx:773)). L'utilisateur a demandé cette
+page vierge en attendant de définir le contenu. Lui demander ce qu'il veut y
+mettre avant de coder.
 
-### 3. Découper le bundle
+### 3. Nettoyer les résidus
+
+Le trade `MARQUEUR/TEST` et les fichiers `data/horizon 2.db*` (§6.6). Rapide,
+mais demander avant de toucher à des données.
+
+### 4. Dériver la liste blanche des onglets de notification
+
+Corriger §6.4 : remplacer le tableau écrit à la main dans
+`handleNavigateFromNotification` par une constante dérivée de `TabType`, pour
+qu'ajouter un onglet ne puisse plus créer un trou silencieux.
+
+### 5. Découper le bundle
 
 `build.rollupOptions.output.manualChunks` ou imports dynamiques sur les vues
 les plus lourdes (`recharts` est le principal contributeur).
 
-### 4. Décider du sort de `onSelectAccountForJournal`
+### 6. Décider du sort de `onSelectAccountForJournal`
 
 Câbler ou supprimer. Demander d'abord.
 
-### 5. Rejeu des modifications hors ligne
+### 7. Nettoyer `.env.example` et `vite.config.ts`
+
+Retirer les mentions AI Studio et la variable `APP_URL` inutilisée (§6.11,
+§6.12).
+
+### 8. Rejeu des modifications hors ligne
 
 Seulement si l'utilisateur le demande : coût élevé, gestion de conflits.
 
@@ -481,12 +694,13 @@ Le tableau de bord fait référence. Les autres vues utilisaient une palette
 
 | Rôle | Jeton |
 |---|---|
-| Fond de page | `#0A0E0D` |
+| Fond de page | `#0A0E0D` (sidebar) / `#0B0F0E` (corps) |
 | Fond en creux | `#0D1110` |
 | Surface de carte | `#111615` |
 | Bordure de carte / pastille | `#1B2320` |
 | Pastille haute | `#232D29` |
 | Bordure de section | `#151D1A` |
+| Fond d'entrée active | `#131B18` |
 | **Vert de marque** | `#00E676` |
 | Survol de bouton vert | `#00c865` |
 | Survol de lien vert | `#69F0AE` |
@@ -530,6 +744,14 @@ ce genre de nuance avant de la migrer.
   violet (Replay), ambre (Module vidéo) — reprises dans chaque vue
   correspondante.
 
+### Tailwind 4, sans fichier de configuration
+
+Le projet utilise `@tailwindcss/vite` et **n'a pas de `tailwind.config.js`**.
+Toutes les couleurs de marque sont écrites en notation arbitraire
+(`bg-[#111615]`). Il n'y a donc **aucun nom de jeton à étendre** : si tu veux
+en introduire, c'est un choix d'architecture à proposer, pas à faire en
+passant.
+
 ### Ajouter un champ ne demande pas de migration
 
 `profileSchema` et `collectionItem` sont en **`.passthrough()`** (zod), et les
@@ -540,6 +762,20 @@ serveur ni migration SQL**.
 C'est ainsi qu'ont été ajoutés `exitDate`, `exitTime`, `tradingStyle` et
 `hiddenSidebarItems`. Rends les nouveaux champs **optionnels** : les données
 existantes ne les auront pas.
+
+La contrepartie : le serveur ne valide que ce qui lui est indispensable
+(un `id` non vide, des bornes de taille, l'unicité des identifiants). Le
+contrat de forme réel reste `src/types.ts`. **Ne redéclare pas les types métier
+dans `schemas.ts`** : cela créerait deux sources de vérité à garder
+synchronisées.
+
+### Remplacement de collection entière, pas de mutation partielle
+
+`PUT /api/collections/:name` **remplace** tout, dans une transaction. Ce n'est
+pas de la paresse : le client détient toujours le tableau complet en mémoire et
+chaque action produit un nouveau tableau complet. Remplacer correspond donc
+exactement à sa sémantique, et l'opération est idempotente — un renvoi après
+échec réseau ne peut pas dupliquer.
 
 ### Toujours la forme fonctionnelle de `setState`
 
@@ -579,9 +815,25 @@ sur `isOpen`.
 et « Sim propfirm » pointaient tous deux sur `simulator`**. Les distinguer par
 `id` aurait masqué les deux ensemble.
 
+Pour la même raison, la clé de l'entrée « Prop Firm » de la section OUTILS est
+`propfirmrules` et non `propfirm` : cette dernière est déjà prise par « Sim
+propfirm ».
+
 Le contournement historique `isActive = activeTab === item.id && idx === 0`,
 qui limitait la surbrillance à la première entrée, a été retiré une fois les
 `id` rendus uniques.
+
+### Le seed est déclenché par le client, pas au démarrage du serveur
+
+Volontaire. Si le serveur amorçait la base à son démarrage, elle serait
+**toujours déjà amorcée** à l'arrivée du premier navigateur, et les données que
+celui-ci détient encore dans son `localStorage` ne pourraient jamais être
+reprises. Le client décide : il voit `bootstrapped: false`, regarde ce qu'il a
+en local, et appelle soit `/api/state/import`, soit `/api/state/seed`.
+
+Le `409` renvoyé quand la base est déjà amorcée n'est pas une erreur à
+remonter : il signifie qu'un autre onglet a gagné la course. Le client
+l'avale et relit simplement l'état.
 
 ### Le nom des fichiers d'assets doit être en minuscules
 
@@ -594,6 +846,9 @@ La machine n'a **ni ImageMagick, ni PIL, ni sharp** — seulement `sips`, qui ne
 recadre qu'au centre. Pour un recadrage décalé, passer par un BMP intermédiaire
 et le manipuler en Python pur (`struct`), puis reconvertir avec `sips`. C'est la
 méthode qui a produit `public/icon.png`.
+
+À noter pour la tâche §7.0 : le redimensionnement de l'avatar se fera **dans le
+navigateur** (`<canvas>`), ces limites de la machine ne s'y appliquent donc pas.
 
 ---
 
@@ -613,57 +868,84 @@ méthode qui a produit `public/icon.png`.
 
 ### Méthode de vérification attendue
 
-Le serveur de développement est piloté par les outils navigateur. Le cycle
-utilisé jusqu'ici, à reprendre :
+Le serveur de développement est piloté par les outils navigateur
+(`preview_start` avec le nom `horizon-dev`). Le cycle utilisé jusqu'ici, à
+reprendre :
 
 1. `npm run lint` et `npm run build` après chaque changement ;
 2. contrôle visuel de la vue touchée par capture d'écran ;
 3. pour tout ce qui touche aux données : mutation dans l'UI → vérification via
-   `curl -s localhost:3000/api/state` ;
+   `curl -s localhost:3000/api/state` ou une requête `sqlite3` ;
 4. **preuve de persistance réelle** : `localStorage.clear()` puis rechargement,
    et si possible redémarrage du serveur — c'est le seul test qui prouve que la
    donnée vient bien de SQLite et non du cache ;
 5. `read_console_messages` pour confirmer l'absence d'erreur.
 
 Nettoie derrière toi : les données de test créées pendant la vérification
-doivent être supprimées avant de rendre la main.
+doivent être supprimées avant de rendre la main. **Cette règle a déjà été
+enfreinte une fois** — voir le trade `MARQUEUR/TEST` en §6.6.
 
 ### Ce qui a réellement été vérifié — et ce qui ne l'a pas été
 
-Le projet n'a aucun test automatisé (§6.5). Tout a été vérifié à la main, et
+Le projet n'a aucun test automatisé (§6.8). Tout a été vérifié à la main, et
 **pas au même degré selon les zones**. Ne suppose pas une couverture uniforme.
 
 | Degré | Zones |
 |---|---|
 | **Exercé de bout en bout** — mutation, base, redémarrage | persistance SQLite, masquage de sidebar, horodatages du journal, style de trading, validation et quotas de l'API (`400`/`404`/`409`/`429`), migration `localStorage` → base, repli hors ligne |
-| **Contrôlé visuellement seulement** — la vue s'affiche, rien de plus | forum, académie vidéo, quiz, portefeuilles, messagerie coach, badges |
-| **Ouverture exercée** — la modale s'ouvre depuis la sidebar | les 5 entrées OUTILS ; « Audit Setup → Appliquer au journal » exercé jusqu'au formulaire pré-rempli |
+| **Contrôlé visuellement seulement** — la vue s'affiche, rien de plus | forum, académie vidéo, quiz, portefeuilles, messagerie coach, badges, simulateur |
+| **Ouverture exercée** — la modale s'ouvre depuis la sidebar | les 4 entrées OUTILS + « Exercice du jour » ; « Audit Setup → Appliquer au journal » exercé jusqu'au formulaire pré-rempli |
 | **Jamais exécuté** | la route Gemini **avec une vraie clé** |
 
 Le dernier point mérite d'être explicite : `/api/coach/ai-review` n'a été testée
 que sur sa **validation d'entrée** et sa **limitation de débit**. Aucun appel
 réel à Gemini n'a abouti pendant le développement. **Ne suppose pas que l'audit
 IA fonctionne** — c'est la première chose à vérifier si tu y touches, et le
-modèle déclaré (`gemini-3.6-flash`) est à confirmer.
+modèle déclaré (`gemini-3.6-flash`,
+[`routes.ts:243`](server/routes.ts:243)) est à confirmer.
 
 ---
 
 ## 10. État à la reprise
 
-- Branche `main`. Section OUTILS rebranchée, **non committée** à la rédaction
-  de cette ligne.
-- `npm run lint` et `npm run build` passent.
-- Aucune erreur console.
-- Base `data/horizon.db` peuplée : 4 élèves (avec style de trading), 7 trades,
-  4 portefeuilles, modules, badges, forum, messages, notifications.
+- Branche `main`, **arbre de travail propre**, dernier commit `f5fbe4c`
+  (« Harmonise les 8 modales et retire l'IA de l'audit de setup »).
+- `npm run lint` : sans erreur. `npm run build` : réussi, avec le seul
+  avertissement de taille de bundle (§6.10).
+- Application démarrée et rendue : **aucune erreur console**.
+
+### Contenu de `data/horizon.db`
+
+| Table | Lignes |
+|---|---|
+| `users` | 1 (profil « ForexPaps », admin) |
+| `trades` | 7 — **dont 1 trade de test à supprimer** (§6.6) |
+| `trading_accounts` | 4 |
+| `coach_signals` | 4 |
+| `coach_messages` | 5 |
+| `forum_topics` / `forum_replies` | 4 / 6 |
+| `notifications` | 5 |
+| `enrolled_students` | 4 (tous avec `tradingStyle`) |
+| `badges` | 9 |
+| `modules` | 5 |
+| `quiz_results` | 0 |
+| `meta` | `bootstrapped_at = 2026-08-04T15:25:28.717Z` |
+
+Les 4 élèves : Julien Moreau (Intraday, En Évaluation FTMO), Camille Dupont
+(Swing Trading, Prop Firm Financé), Lucas Martin (Scalping, Alerte Tilt),
+Sophie Bernard (Intraday, Besoin Coaching).
 
 ### Par où commencer
 
-Deux points d'entrée légitimes, selon ce que veut l'utilisateur :
+Trois points d'entrée légitimes, selon ce que veut l'utilisateur :
 
+- **§7 tâche 0 — l'avatar de 4 Mo.** C'est la seule chose franchement cassée,
+  et elle grossit avec le temps. Petite tâche, gros effet. À proposer en
+  premier, mais lui laisser l'arbitrage entre les deux corrections possibles.
 - **§7 tâche 1 — l'écran de connexion.** C'est ce qu'il a explicitement annoncé
   vouloir faire ensuite. Mais commence par lui poser les décisions listées :
-  elles conditionnent tout le reste, et coder avant serait à refaire.
+  elles conditionnent tout le reste, et coder avant serait à refaire. Note que
+  la tâche 0 devrait passer avant, pour ne pas avoir à migrer des avatars.
 - **§7 tâche 2 — remplir le module « Examen ».** À ne pas coder avant de lui
   avoir demandé ce qu'il veut y mettre : la page vierge est volontaire.
 
