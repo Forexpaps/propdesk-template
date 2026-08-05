@@ -204,7 +204,6 @@ const modules = [
       { name: "4 Niveaux de Progression", desc: "Débutant (Bases & Money Management), Intermédiaire (Structure & Liquinité), Avancé (Order Blocks & FVG) et Master (Killzones & Algorithme IPDA)." },
       { name: "Leçons Riches & Schémas Techniques", desc: "Contenus théoriques illustrés de graphiques et cas pratiques." },
       { name: "Quiz de Validation", desc: "Système de questions-réponses interactif pour valider l'acquisition des compétences de chaque chapitre." },
-      { name: "Attestation & Certificat Officiel", desc: "Génération automatique d'un certificat d'accomplissement signé avec vérification." },
     ],
   },
   {

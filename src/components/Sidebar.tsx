@@ -26,7 +26,10 @@ import {
   Eye,
   EyeOff,
   Settings2,
-  Check
+  Check,
+  Trophy,
+  Brain,
+  Calendar
 } from "lucide-react";
 import { StudentProfile } from "../types";
 
@@ -65,11 +68,15 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
   "propfirm",
   "academy",
   "messaging",
+  "audit",
+  "propfirmrules",
+  "mindset",
+  "calendar",
 ] as const;
 
 export type SidebarItemKey = (typeof SIDEBAR_TOGGLEABLE_KEYS)[number];
 
-type SectionName = "suivi" | "pratique" | "formation";
+type SectionName = "suivi" | "pratique" | "formation" | "outils";
 
 /**
  * Onglet atteint par chaque entrée masquable, `null` pour celles qui ouvrent
@@ -88,7 +95,30 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   propfirm: "propfirm",
   academy: "academy",
   messaging: "messaging",
+  audit: null,
+  propfirmrules: null,
+  mindset: null,
+  calendar: null,
 };
+
+/**
+ * Entrée de navigation.
+ *
+ * `id` vaut `null` et `onOpen` est renseigné pour les entrées qui ouvrent une
+ * modale : elles ne changent pas d'onglet et ne sont jamais « actives ».
+ *
+ * Le routage passe par `onOpen` et non par une comparaison de libellé : avec
+ * six entrées-modales, renommer un libellé aurait silencieusement cassé la
+ * navigation.
+ */
+interface SidebarEntry {
+  key: SidebarItemKey;
+  id: TabType | null;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string | null;
+  onOpen?: () => void;
+}
 
 interface SidebarProps {
   activeTab: TabType;
@@ -102,6 +132,11 @@ interface SidebarProps {
   setIsCollapsed: (collapsed: boolean) => void;
   onOpenProfileModal: () => void;
   onOpenChecklist?: () => void;
+  // Section OUTILS : chaque entrée ouvre une modale.
+  onOpenAISetupAnalyzer?: () => void;
+  onOpenPropFirmRules?: () => void;
+  onOpenMindset?: () => void;
+  onOpenCalendar?: () => void;
   /** Masque ou réaffiche une entrée. Réservé à l'administrateur. */
   onToggleSidebarItem?: (key: SidebarItemKey) => void;
 }
@@ -118,6 +153,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsCollapsed,
   onOpenProfileModal,
   onOpenChecklist,
+  onOpenAISetupAnalyzer,
+  onOpenPropFirmRules,
+  onOpenMindset,
+  onOpenCalendar,
   onToggleSidebarItem,
 }) => {
   const capitalDiff = student.currentCapital - student.startingCapital;
@@ -137,27 +176,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
     icon: LayoutDashboard,
   };
 
-  const suiviItems = [
-    { key: "journal" as const, id: "journal" as const, label: "Journal de trading", icon: BookMarked },
-    { key: "wallets" as const, id: "wallets" as const, label: "Portefeuille", icon: Wallet },
-    { key: "analytics" as const, id: "analytics" as const, label: "Rentabilité", icon: LineChart },
+  const suiviItems: SidebarEntry[] = [
+    { key: "journal", id: "journal", label: "Journal de trading", icon: BookMarked },
+    { key: "wallets", id: "wallets", label: "Portefeuille", icon: Wallet },
+    { key: "analytics", id: "analytics", label: "Rentabilité", icon: LineChart },
     ...(student.isAdmin
-      ? [{ key: "students" as const, id: "students" as const, label: "Suivi des Élèves", icon: UserCheck, badge: "Admin" }]
+      ? [{ key: "students" as const, id: "students" as const, label: "Suivi des Élèves", icon: UserCheck }]
       : []),
   ];
 
   // « Badges & paliers » ne figure plus ici : les badges restent accessibles par
   // le profil (UserProfileModal, onglet Badges).
-  const pratiqueItems = [
-    { key: "exam" as const, id: "exam" as const, label: "Examen", icon: Award },
-    { key: "checklist" as const, id: "checklist" as const, label: "Exercice du jour", icon: Sliders },
-    { key: "replay" as const, id: "simulator" as const, label: "Replay", icon: Zap },
-    { key: "propfirm" as const, id: "propfirm" as const, label: "Sim propfirm", icon: Radio },
+  const pratiqueItems: SidebarEntry[] = [
+    { key: "exam", id: "exam", label: "Examen", icon: Award },
+    { key: "checklist", id: null, label: "Exercice du jour", icon: Sliders, onOpen: onOpenChecklist },
+    { key: "replay", id: "simulator", label: "Replay", icon: Zap },
+    { key: "propfirm", id: "propfirm", label: "Sim propfirm", icon: Radio },
   ];
 
-  const formationItems = [
-    { key: "academy" as const, id: "academy" as const, label: "Module vidéo", icon: BookOpen, badge: `${courseCompletionPercentage}%` },
-    { key: "messaging" as const, id: "messaging" as const, label: "Messagerie Coach", icon: MessageSquare, badge: totalUnreadMessages > 0 ? "1" : null },
+  const formationItems: SidebarEntry[] = [
+    { key: "academy", id: "academy", label: "Module vidéo", icon: BookOpen, badge: `${courseCompletionPercentage}%` },
+    { key: "messaging", id: "messaging", label: "Messagerie Coach", icon: MessageSquare, badge: totalUnreadMessages > 0 ? "1" : null },
+  ];
+
+  /**
+   * Section OUTILS : quatre modales, sans onglet associé.
+   *
+   * `propfirmrules` et non `propfirm` : cette dernière clé est déjà prise par
+   * « Sim propfirm ».
+   */
+  const outilsItems: SidebarEntry[] = [
+    { key: "audit", id: null, label: "Audit Setup", icon: Sparkles, onOpen: onOpenAISetupAnalyzer },
+    { key: "propfirmrules", id: null, label: "Prop Firm", icon: Trophy, onOpen: onOpenPropFirmRules },
+    { key: "mindset", id: null, label: "Mindset", icon: Brain, onOpen: onOpenMindset },
+    { key: "calendar", id: null, label: "Calendrier", icon: Calendar, onOpen: onOpenCalendar },
   ];
 
   /**
@@ -215,7 +267,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     isHidden: boolean
   ) => (
     <button
-      key={label}
+      key={key}
       onClick={() => onToggleSidebarItem?.(key)}
       className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border border-dashed transition-all ${
         isHidden
@@ -234,6 +286,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <Eye className="w-3.5 h-3.5 shrink-0 text-[#00E676]" />
       )}
     </button>
+  );
+
+  /**
+   * Rendu d'une section complète. Les quatre sections étaient auparavant quatre
+   * blocs quasi identiques ; une seule fonction évite d'avoir à répercuter
+   * chaque correction quatre fois.
+   */
+  const renderSection = (
+    label: string,
+    section: SectionName,
+    items: SidebarEntry[]
+  ) => (
+    <div className="space-y-1">
+      {!isCollapsed && renderSectionHeader(label, section)}
+      {items.map((item) => {
+        const Icon = item.icon;
+        const isHidden = hiddenItems.includes(item.key);
+
+        if (isEditingSection(section)) {
+          return renderVisibilityRow(item.key, item.label, Icon, isHidden);
+        }
+        if (isHidden) return null;
+
+        // Les entrées-modales n'ont pas d'onglet : jamais actives.
+        const isActive = item.id !== null && activeTab === item.id;
+        return (
+          <button
+            key={item.key}
+            onClick={() => {
+              if (item.onOpen) {
+                item.onOpen();
+              } else if (item.id) {
+                setActiveTab(item.id);
+              }
+              setMobileOpen(false);
+            }}
+            title={isCollapsed ? item.label : undefined}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${
+              isActive
+                ? "bg-[#131B18] text-white border border-[#00E676]/30 font-semibold"
+                : "text-slate-400 hover:text-slate-100 hover:bg-[#131816]"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <Icon className="w-4 h-4 text-slate-400" />
+              {!isCollapsed && <span>{item.label}</span>}
+            </div>
+            {!isCollapsed && item.badge && (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                {item.badge}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 
   return (
@@ -315,121 +423,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
 
-            {/* SUIVI Category */}
-            <div className="space-y-1">
-              {!isCollapsed && (
-                renderSectionHeader("SUIVI", "suivi")
-              )}
-              {suiviItems.map((item) => {
-                const Icon = item.icon;
-                const isHidden = hiddenItems.includes(item.key);
-
-                if (isEditingSection("suivi")) {
-                  return renderVisibilityRow(item.key, item.label, Icon, isHidden);
-                }
-                if (isHidden) return null;
-
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.label}
-                    onClick={() => {
-                      setActiveTab(item.id as TabType);
-                      setMobileOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${
-                      isActive
-                        ? "bg-[#131B18] text-white border border-[#00E676]/30 font-semibold"
-                        : "text-slate-400 hover:text-slate-100 hover:bg-[#131816]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Icon className="w-4 h-4 text-slate-400 group-hover:text-white" />
-                      {!isCollapsed && <span>{item.label}</span>}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* PRATIQUE Category */}
-            <div className="space-y-1">
-              {!isCollapsed && renderSectionHeader("PRATIQUE", "pratique")}
-              {pratiqueItems.map((item) => {
-                const Icon = item.icon;
-                const isHidden = hiddenItems.includes(item.key);
-
-                if (isEditingSection("pratique")) {
-                  return renderVisibilityRow(item.key, item.label, Icon, isHidden);
-                }
-                if (isHidden) return null;
-
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.label}
-                    onClick={() => {
-                      if (item.label === "Exercice du jour" && onOpenChecklist) {
-                        onOpenChecklist();
-                      } else {
-                        setActiveTab(item.id as TabType);
-                      }
-                      setMobileOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${
-                      isActive
-                        ? "bg-[#131B18] text-white border border-[#00E676]/30 font-semibold"
-                        : "text-slate-400 hover:text-slate-100 hover:bg-[#131816]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Icon className="w-4 h-4 text-slate-400" />
-                      {!isCollapsed && <span>{item.label}</span>}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* FORMATION Category */}
-            <div className="space-y-1">
-              {!isCollapsed && renderSectionHeader("FORMATION", "formation")}
-              {formationItems.map((item) => {
-                const Icon = item.icon;
-                const isHidden = hiddenItems.includes(item.key);
-
-                if (isEditingSection("formation")) {
-                  return renderVisibilityRow(item.key, item.label, Icon, isHidden);
-                }
-                if (isHidden) return null;
-
-                const isActive = activeTab === item.id;
-                return (
-                  <button
-                    key={item.label}
-                    onClick={() => {
-                      setActiveTab(item.id as TabType);
-                      setMobileOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${
-                      isActive
-                        ? "bg-[#131B18] text-white border border-[#00E676]/30 font-semibold"
-                        : "text-slate-400 hover:text-slate-100 hover:bg-[#131816]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Icon className="w-4 h-4 text-slate-400" />
-                      {!isCollapsed && <span>{item.label}</span>}
-                    </div>
-                    {!isCollapsed && item.badge && (
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
-                        {item.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            {renderSection("SUIVI", "suivi", suiviItems)}
+            {renderSection("PRATIQUE", "pratique", pratiqueItems)}
+            {renderSection("FORMATION", "formation", formationItems)}
+            {renderSection("OUTILS", "outils", outilsItems)}
           </nav>
 
           {/* Reduce Sidebar Button */}
