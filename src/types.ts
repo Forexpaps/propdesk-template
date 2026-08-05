@@ -53,8 +53,14 @@ export type MarketCategory = "Forex" | "Crypto" | "Indices" | "Matières Premiè
 
 export interface Trade {
   id: string;
-  date: string; // YYYY-MM-DD
+  /** Date d'entrée en position, au format YYYY-MM-DD. */
+  date: string;
+  /** Heure d'entrée, au format HH:MM. */
   time?: string;
+  /** Date de sortie. Absente tant que la position est ouverte. */
+  exitDate?: string;
+  /** Heure de sortie, au format HH:MM. */
+  exitTime?: string;
   pair: string; // e.g. "EUR/USD", "BTC/USDT"
   marketCategory: MarketCategory;
   direction: TradeDirection;

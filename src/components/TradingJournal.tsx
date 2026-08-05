@@ -62,8 +62,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     if (trades.length === 0) return;
     const headers = [
       "ID",
-      "Date",
-      "Heure",
+      "Date Entree",
+      "Heure Entree",
+      "Date Sortie",
+      "Heure Sortie",
       "Paire",
       "Marche",
       "Direction",
@@ -84,6 +86,8 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       t.id,
       t.date,
       t.time || "",
+      t.exitDate || "",
+      t.exitTime || "",
       t.pair,
       t.marketCategory,
       t.direction,
@@ -115,6 +119,8 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
     time: "14:30",
+    exitDate: new Date().toISOString().split("T")[0],
+    exitTime: "16:00",
     pair: "EUR/USD",
     marketCategory: "Forex" as MarketCategory,
     direction: "LONG" as TradeDirection,
@@ -219,6 +225,8 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     onAddTrade({
       date: formData.date,
       time: formData.time,
+      exitDate: formData.exitDate || undefined,
+      exitTime: formData.exitTime || undefined,
       pair: formData.pair,
       marketCategory: formData.marketCategory,
       direction: formData.direction,
@@ -384,7 +392,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-[#0D1110]/80 text-slate-400 font-semibold border-b border-[#1B2320]">
               <tr>
-                <th className="py-3.5 px-4">Date & Heure</th>
+                <th className="py-3.5 px-4">Entrée / Sortie</th>
                 <th className="py-3.5 px-4">Actif / Paire</th>
                 <th className="py-3.5 px-4">Direction</th>
                 <th className="py-3.5 px-4">Entrée → TP / SL</th>
@@ -404,10 +412,34 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               ) : (
                 filteredTrades.map((trade) => (
                   <tr key={trade.id} className="hover:bg-[#151D1A]/80 transition-colors">
-                    {/* Date */}
-                    <td className="py-4 px-4 whitespace-nowrap">
-                      <div className="font-semibold text-slate-200">{trade.date}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">{trade.time || "--:--"}</div>
+                    {/* Horodatage d'entrée puis de sortie. Sans date de sortie,
+                        la position est considérée encore ouverte. */}
+                    <td className="py-4 px-4 whitespace-nowrap space-y-1">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-[#00E676] text-[10px] font-bold">↓</span>
+                        <span className="font-semibold text-slate-200">{trade.date}</span>
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {trade.time || "--:--"}
+                        </span>
+                      </div>
+                      {trade.exitDate ? (
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-rose-400 text-[10px] font-bold">↑</span>
+                          <span className="font-semibold text-slate-400">{trade.exitDate}</span>
+                          <span className="text-[10px] text-slate-500 font-mono">
+                            {trade.exitTime || "--:--"}
+                          </span>
+                        </div>
+                      ) : trade.exitPrice ? (
+                        // Trade clôturé mais saisi avant l'ajout de ces champs.
+                        <div className="text-[10px] text-slate-600 font-mono pl-4">
+                          sortie non renseignée
+                        </div>
+                      ) : (
+                        <div className="text-[10px] text-amber-400 font-mono pl-4">
+                          Position ouverte
+                        </div>
+                      )}
                     </td>
 
                     {/* Pair & Category */}
@@ -553,9 +585,11 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             </div>
 
             <form onSubmit={handleFormSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Horodatage : entrée obligatoire, sortie laissée vide tant que
+                  la position est ouverte. */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">Date</label>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Date d'entrée</label>
                   <input
                     type="date"
                     value={formData.date}
@@ -565,6 +599,40 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   />
                 </div>
 
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Heure d'entrée</label>
+                  <input
+                    type="time"
+                    value={formData.time}
+                    onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Date de sortie</label>
+                  <input
+                    type="date"
+                    value={formData.exitDate}
+                    min={formData.date}
+                    onChange={(e) => setFormData({ ...formData, exitDate: e.target.value })}
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">Heure de sortie</label>
+                  <input
+                    type="time"
+                    value={formData.exitTime}
+                    onChange={(e) => setFormData({ ...formData, exitTime: e.target.value })}
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Paire / Actif</label>
                   <input
