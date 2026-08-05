@@ -81,6 +81,10 @@ La base vit dans `DATA_DIR` (`./data` par défaut), hors du dépôt.
 | Méthode | Route | Rôle |
 |---|---|---|
 | GET | `/api/health` | sonde de vie |
+| GET | `/api/auth/me` | état d'authentification (répond toujours 200) |
+| POST | `/api/auth/setup` | première installation, refusée si un compte existe |
+| POST | `/api/auth/login` | connexion |
+| POST | `/api/auth/logout` | déconnexion |
 | GET | `/api/state` | état complet de démarrage |
 | PUT | `/api/collections/:name` | remplace une collection |
 | PUT | `/api/profile` | profil de l'élève |
@@ -90,16 +94,52 @@ La base vit dans `DATA_DIR` (`./data` par défaut), hors du dépôt.
 | POST | `/api/coach/ai-review` | audit IA d'un trade ou réponse à une question |
 | GET | `/api/download-features-pdf` | catalogue PDF des fonctionnalités |
 
-Toutes les entrées sont validées (zod). `/api/coach/ai-review` est limitée à
-10 appels par minute et par IP : c'est la seule route facturée à l'appel.
+Toutes les routes exigent une session valide, **sauf** `/api/health` et les
+quatre routes `/api/auth/*`. Toutes les entrées sont validées (zod).
+
+Trois limitations de débit par IP : `/api/coach/ai-review` 10 par minute (seule
+route facturée à l'appel), `/api/auth/login` 10 par quart d'heure, et
+`/api/auth/setup` 5 par quart d'heure.
 
 Le PDF est généré hors ligne par `node scripts/generate_pdf.js`.
 
+## Authentification
+
+Un seul compte, protégé par mot de passe.
+
+Au premier démarrage, l'application détecte qu'aucun identifiant n'existe et
+affiche un écran d'installation : vous y choisissez une adresse et un mot de
+passe (10 caractères minimum). **Les données déjà présentes sont conservées.**
+
+Les mots de passe sont hachés avec `scrypt` (`node:crypto`, aucune dépendance
+ajoutée), sel aléatoire par compte, comparaison à temps constant. Les sessions
+sont des jetons de 256 bits portés par un cookie `HttpOnly`, valables 30 jours
+et prolongés à l'usage. Plusieurs appareils peuvent rester connectés en
+parallèle ; se déconnecter ne ferme que la session courante.
+
+### Mot de passe oublié
+
+Il n'y a pas de récupération par e-mail. La seule issue est de supprimer les
+identifiants, ce qui ramène l'écran d'installation au prochain chargement :
+
+```bash
+sqlite3 data/horizon.db "delete from user_credentials; delete from sessions;"
+```
+
+Vos données ne sont pas touchées : seul le mot de passe est à redéfinir.
+
 ## Limites connues
 
-- **Pas d'authentification.** Un utilisateur unique implicite est utilisé.
-  Chaque ligne porte déjà un `user_id`, donc l'ajout d'un écran de connexion ne
-  demandera pas de migration du schéma.
+- **Le verrou ne protège pas les données déjà en cache.** Si le serveur est
+  injoignable, l'application démarre sur le cache `localStorage` sans écran de
+  connexion — aucune vérification n'est possible sans serveur. C'est un choix
+  assumé : il préserve le filet anti-perte de données. Le cache est effacé à la
+  déconnexion volontaire, mais quelqu'un ayant accès physique à la machine et
+  coupant le serveur verrait les données. Ce n'est donc pas une protection
+  contre un tiers présent devant l'écran.
+- **Un seul compte.** Chaque ligne porte déjà un `user_id` et l'unicité des
+  emails est en place, donc l'ajout de comptes multiples sera additif — mais le
+  cloisonnement des données par utilisateur reste à faire.
 - **Les modifications faites hors ligne ne sont pas rejouées** à la reconnexion.
   Elles restent dans le cache local, mais le rechargement suivant reprend l'état
   du serveur.

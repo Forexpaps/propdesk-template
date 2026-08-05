@@ -71,7 +71,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [currentCapital, setCurrentCapital] = useState(
     student.currentCapital.toString()
   );
-  const [isAdmin, setIsAdmin] = useState(student.isAdmin ?? true);
+  /**
+   * Statut d'administrateur, en lecture seule.
+   *
+   * Ce n'est plus un état local éditable : le serveur retire `isAdmin` du corps
+   * de PUT /api/profile et réinjecte la valeur qu'il détient. Un état local
+   * laisserait croire que le basculer a un effet.
+   */
+  const isAdmin = student.isAdmin === true;
   /** Le décodage puis le rendu d'une grande image ne sont pas instantanés. */
   const [isResizing, setIsResizing] = useState(false);
 
@@ -132,7 +139,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       preferredPairs,
       startingCapital: parseFloat(startingCapital) || 10000,
       currentCapital: parseFloat(currentCapital) || 10000,
-      isAdmin,
+      // `isAdmin` n'est volontairement pas renvoyé : le serveur l'ignore dans le
+      // corps et réinjecte sa propre valeur. Le `...student` initial le conserve
+      // pour que l'état local reste cohérent d'ici au prochain rechargement.
     });
     onClose();
   };
@@ -346,17 +355,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsAdmin(!isAdmin)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
-                  isAdmin
-                    ? "bg-[#00E676] text-slate-950 font-extrabold"
-                    : "bg-[#1B2320] text-slate-300 hover:text-white"
-                }`}
-              >
-                {isAdmin ? "Admin Activé ✅" : "Activer Admin 👑"}
-              </button>
+              {/* Statut en lecture seule : il est défini côté serveur. Un
+                  interrupteur ici permettait de s'auto-promouvoir, et le serveur
+                  ignore désormais ce champ dans le corps de PUT /api/profile. */}
+              <span className="px-3 py-2 rounded-xl text-[11px] font-medium text-slate-400 bg-[#0D1110] border border-[#1B2320] shrink-0 text-center">
+                Défini côté serveur
+              </span>
             </div>
 
             {/* Inputs Grid */}

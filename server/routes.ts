@@ -20,6 +20,9 @@ import {
   importStateSchema,
   coachReviewSchema,
 } from "./schemas";
+import { createRateLimit } from "./middleware/rateLimit";
+import { authRouter } from "./auth/routes";
+import { requireAuth } from "./auth/middleware";
 
 export const api = Router();
 
@@ -33,6 +36,21 @@ const wrap =
 api.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+api.use("/auth", authRouter);
+
+/**
+ * Barrière d'authentification.
+ *
+ * Tout ce qui est déclaré APRÈS cette ligne exige une session valide ; ce qui
+ * précède reste public. L'ordre de déclaration rend donc l'exclusion
+ * structurelle, ce qui vaut mieux qu'une liste à maintenir.
+ *
+ * Elle est ici, sur le routeur, et non en `app.use` : Vite est monté après l'API
+ * dans `startServer()`, un middleware au niveau application casserait le
+ * rechargement à chaud.
+ */
+api.use(requireAuth);
 
 /**
  * Payload de démarrage : toutes les collections en un aller-retour, dans les
@@ -49,10 +67,20 @@ api.get("/state", (_req, res) => {
   });
 });
 
+/** Collections que seul un administrateur peut écrire. */
+const ADMIN_ONLY_COLLECTIONS = new Set<CollectionName>(["enrolledStudents"]);
+
 api.put("/collections/:name", (req, res) => {
   const name = req.params.name as CollectionName;
   if (!COLLECTION_NAMES.includes(name)) {
     res.status(404).json({ error: `Collection inconnue : ${req.params.name}` });
+    return;
+  }
+
+  // Les fiches élèves contiennent les notes privées du coach : sans ce contrôle,
+  // la protection de la vue côté client ne serait que cosmétique.
+  if (ADMIN_ONLY_COLLECTIONS.has(name) && req.auth?.isAdmin !== true) {
+    res.status(403).json({ error: "Action réservée à l'administrateur." });
     return;
   }
 
@@ -73,7 +101,14 @@ api.put("/profile", (req, res) => {
     return;
   }
 
-  saveProfile(parsed.data);
+  // Second verrou sur `isAdmin`. Le schéma a déjà retiré la clé du corps ; ici on
+  // réinjecte la valeur autoritative lue en base. Les deux sont utiles : le
+  // schéma protège cette route, cette ligne protège l'invariant même si une
+  // future route oublie le schéma — et elle empêche aussi qu'un client qui ne
+  // renvoie pas le champ ne l'effface.
+  const current = getProfile<{ isAdmin?: boolean }>();
+
+  saveProfile({ ...parsed.data, isAdmin: current?.isAdmin === true });
   res.json({ success: true });
 });
 
@@ -157,33 +192,19 @@ const getAiClient = () => {
 };
 
 /**
- * Limitation de débit en mémoire : c'est la seule route qui appelle un service
- * facturé à l'appel, elle ne doit pas pouvoir être martelée.
+ * C'est la seule route qui appelle un service facturé à l'appel : elle ne doit
+ * pas pouvoir être martelée. Comportement identique à avant l'extraction du
+ * limiteur dans son propre module.
  */
-const RATE_LIMIT_WINDOW_MS = 60_000;
-const RATE_LIMIT_MAX = 10;
-const hits = new Map<string, number[]>();
-
-const rateLimit = (req: Request, res: Response, next: NextFunction) => {
-  const key = req.ip ?? "inconnu";
-  const now = Date.now();
-  const recent = (hits.get(key) ?? []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
-
-  if (recent.length >= RATE_LIMIT_MAX) {
-    res.status(429).json({
-      error: "Trop de demandes d'audit IA. Réessayez dans une minute.",
-    });
-    return;
-  }
-
-  recent.push(now);
-  hits.set(key, recent);
-  next();
-};
+const aiRateLimit = createRateLimit({
+  windowMs: 60_000,
+  max: 10,
+  message: "Trop de demandes d'audit IA. Réessayez dans une minute.",
+});
 
 api.post(
   "/coach/ai-review",
-  rateLimit,
+  aiRateLimit,
   wrap(async (req, res) => {
     const parsed = coachReviewSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -249,7 +270,13 @@ Fournissez le résultat au format JSON strict:
   })
 );
 
-/** Gestionnaire d'erreurs : une exception non prévue renvoie un 500 propre. */
+/**
+ * Gestionnaire d'erreurs : une exception non prévue renvoie un 500 propre.
+ *
+ * Le détail ne part au client qu'en développement. En production, `err.message`
+ * exposerait des informations internes — noms de tables et de colonnes via les
+ * contraintes SQLite, chemins de fichiers, paramètres cryptographiques.
+ */
 export const apiErrorHandler = (
   err: Error,
   _req: Request,
@@ -257,5 +284,9 @@ export const apiErrorHandler = (
   _next: NextFunction
 ) => {
   console.error("Erreur API:", err);
-  res.status(500).json({ error: "Erreur serveur.", details: err.message });
+
+  const body: { error: string; details?: string } = { error: "Erreur serveur." };
+  if (process.env.NODE_ENV !== "production") body.details = err.message;
+
+  res.status(500).json(body);
 };

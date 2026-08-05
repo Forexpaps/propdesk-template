@@ -327,6 +327,123 @@ hors ligne, migration automatique depuis `localStorage`.
   (violet), Prop Firm Financé (vert), Besoin Coaching (bleu), Alerte Tilt
   (rose).
 
+### Authentification
+
+Socle à **un seul compte** : la mécanique est réelle, les données ne sont pas
+encore cloisonnées (limites en §6.2 et §6.3).
+
+**Schéma** — deux tables purement additives dans `server/db.ts`, aucun `ALTER`,
+aucun moteur de migration :
+
+- `user_credentials` — `user_id` (clé primaire), `email`, `email_lower`
+  (**`UNIQUE`**, l'identifiant de connexion), `password_hash`, horodatages.
+- `sessions` — `id` (**SHA-256 du jeton**, jamais le jeton), `user_id`,
+  `created_at`, `expires_at`, `last_seen_at`, `user_agent`, plus deux index.
+
+Table séparée et non `ALTER TABLE users` pour une raison précise :
+`GET /api/state` renvoie `getProfile()` **tel quel au navigateur**. Un hash qui
+vivrait dans `users.payload` partirait au client à chaque démarrage. Ne
+réintroduis pas de secret dans ce payload.
+
+**Mots de passe** ([`server/auth/password.ts`](server/auth/password.ts)) —
+`scrypt` de `node:crypto`, **aucune dépendance ajoutée**. `N = 32768`, `r = 8`,
+`p = 1`, `keylen = 64`, sel de 16 octets, `maxmem` relevé explicitement (32 Mio
+requis, soit exactement le défaut de Node — sans quoi scrypt échoue sur
+`ERR_CRYPTO_INVALID_SCRYPT_PARAMS`).
+
+Format de stockage **auto-descriptif** : `scrypt$N$r$p$sel$clé` en base64url.
+Les paramètres voyagent avec le hash, donc durcir `N` plus tard **n'invalide pas**
+les mots de passe existants — `needsRehash()` déclenche un ré-hachage transparent
+à la connexion suivante.
+
+`N = 32768` et non `16384` parce que `16384` ne coûtait que ~40 ms sur cette
+machine. À 32768 le coût mesuré est de ~80 ms, ce qui est l'objectif : ralentir
+une attaque hors ligne si la base fuit.
+
+**Sessions** ([`server/auth/sessions.ts`](server/auth/sessions.ts)) — jeton
+`randomBytes(32)` en base64url (256 bits). **Aucune signature HMAC** : signer un
+secret aléatoire de 256 bits n'apporterait rien, et cela évite
+`cookie-signature`, qui n'existe qu'en transitif d'Express alors que le build
+est en `--packages=external`. Cela évite aussi un secret à gérer dans `.env`.
+
+Cookie `pd_session` : `HttpOnly`, `SameSite=Lax`, `Path=/`, TTL 30 jours,
+prolongation glissante au-delà de 24 h depuis la dernière vue (le seuil évite un
+`UPDATE` par requête — `useSyncedState` en produit plusieurs par seconde).
+`secure` est **conditionné à la production** : le dev est en HTTP clair, un
+`secure: true` inconditionnel ferait disparaître le cookie sans message
+compréhensible.
+
+**Plusieurs appareils en parallèle** (décision utilisateur) : la connexion ne
+révoque pas les sessions existantes, et la déconnexion ne ferme que la session
+présentée.
+
+Le cookie est lu à la main depuis `req.headers.cookie` — `cookie-parser` n'est
+pas installé et la contrainte était de ne rien ajouter. Le découpage se fait sur
+le **premier** `=` seulement.
+
+**Routes** — `/auth/me` (répond **toujours 200**, union discriminée
+`no-account` / `unauthenticated` / `authenticated` : « pas encore connecté » est
+l'état normal au démarrage, un 401 pousserait à traiter un état comme une
+erreur), `/auth/setup` (**409 si un compte existe** — c'est la protection
+critique, sans elle n'importe qui réinitialiserait le mot de passe à distance),
+`/auth/login`, `/auth/logout` (**204, idempotente, hors de `requireAuth`** :
+une session expirée doit pouvoir se déconnecter).
+
+Deux protections anti-énumération sur `/auth/login` : le **même message** pour
+email inconnu et mot de passe faux, et un **hachage contre un hash factice**
+quand le compte est absent — sinon l'écart de temps de réponse (immédiat contre
+80 ms) révélerait quels comptes existent.
+
+**La barrière** — `api.use(requireAuth)` dans `server/routes.ts`, placée **après**
+`/health` et le routeur d'auth, **avant** tout le reste : l'ordre de déclaration
+rend l'exclusion structurelle. Elle est sur le **routeur**, jamais en `app.use` :
+Vite est monté après l'API dans `startServer()`, un middleware au niveau
+application intercepterait `/@vite/client` et le WebSocket HMR et casserait le
+développement. Une liste d'exclusions explicite sert de filet, avec des chemins
+**relatifs au routeur** (`/state`, pas `/api/state`).
+
+`/state/seed` et `/state/import` sont **protégés**. Le flux le permet : sur base
+neuve, `me` → `no-account` → `setup` crée la ligne `users` *et* la session →
+le client est authentifié → *ensuite* `useBootstrap` déclenche le seed.
+
+**Durcissement des privilèges**, indissociable de l'auth — sans lui elle serait
+décorative :
+
+- `isAdmin` n'est plus écrivable par le client. Deux verrous : `profileSchema`
+  **retire** la clé du corps (retirer et non rejeter — le client renvoie l'objet
+  qu'il a reçu, un 400 casserait toute sauvegarde), et `PUT /api/profile`
+  réinjecte la valeur autoritative lue en base.
+- Le bouton « Activer Admin 👑 » de `UserProfileModal` est **retiré** ; le statut
+  s'affiche en lecture seule.
+- La vue `students` est gardée **au rendu**, plus seulement masquée dans la
+  sidebar, avec un message explicite. `"students"` ne figure dans
+  `knownTabs` que pour un admin, et un `useEffect` renvoie au tableau de bord si
+  le statut est révoqué en cours de session.
+- `PUT /api/collections/enrolledStudents` exige l'admin côté serveur — sans quoi
+  la protection resterait cosmétique.
+- `profileSchema.email` valide enfin une vraie adresse (ou la chaîne vide).
+- `apiErrorHandler` ne renvoie plus `err.message` en production : il exposait les
+  contraintes SQLite, donc des noms de tables et de colonnes.
+
+**Rate limit** — extrait en fabrique `createRateLimit` dans
+`server/middleware/rateLimit.ts`. L'ancienne version tenait une `Map` au niveau
+du module ; une fabrique donne une `Map` par instance, donc l'isolation devient
+structurelle. La fuite mémoire de cette `Map` est corrigée par un balayage
+périodique. Trois instances : `ai-review` 60 s/10 (**comportement préservé**),
+`login` 15 min/10, `setup` 15 min/5.
+
+**Flux client** — `App` ne fait plus que `useAuth()` et choisit l'écran ;
+`AuthenticatedApp`, monté conditionnellement, porte `useBootstrap()`. Les hooks
+ne pouvant être conditionnels, c'est ce découpage qui garantit qu'aucun appel à
+`/api/state` ne part sans session. **La structure d'`AcademyApp` n'est pas
+touchée** — 800 lignes, la surface de modification devait rester minimale.
+
+Un 401 sur n'importe quelle requête émet un `CustomEvent`
+(`propdesk:unauthenticated`) écouté par `useAuth`, qui ramène à l'écran de
+connexion avec « Ta session a expiré ». Sans cela, `useSyncedState` avalerait le
+401 en `console.warn` et l'utilisateur continuerait de travailler en croyant que
+ses données se sauvegardent.
+
 ### Poids des images
 
 Les avatars téléversés sont **réduits à 256×256 avant d'entrer dans l'état
@@ -391,6 +508,17 @@ survols sur des surfaces neutres de la sidebar et du header. Le texte
 | `server/seed.ts` | amorçage et import |
 | `src/lib/api.ts` | client HTTP typé |
 | `src/lib/image.ts` | réduction des images téléversées avant stockage |
+| `server/auth/password.ts` | hachage scrypt, vérification, re-hachage |
+| `server/auth/sessions.ts` | jetons, cookie, purge, lecture du cookie |
+| `server/auth/credentials.ts` | accès à `user_credentials` |
+| `server/auth/routes.ts` | `/api/auth/*` |
+| `server/auth/middleware.ts` | `requireAuth`, `requireAdmin` |
+| `server/middleware/rateLimit.ts` | fabrique de limiteur, extraite de `routes.ts` |
+| `src/hooks/useAuth.ts` | état d'authentification côté client |
+| `src/components/auth/AuthShell.tsx` | coque et primitives des écrans d'auth |
+| `src/components/auth/LoginScreen.tsx` | écran de connexion |
+| `src/components/auth/SetupScreen.tsx` | écran de première installation |
+| `public/logo-auth.jpg` | logo optimisé pour les écrans d'auth |
 | `src/hooks/usePersistentState.ts` | état miroité dans localStorage |
 | `src/hooks/useServerSync.ts` | bootstrap + synchronisation optimiste |
 | `public/icon.png` | icône 512×512 |
@@ -480,36 +608,53 @@ l'état du serveur** et les perd. Implémenter le rejeu demande une gestion de
 conflits (quelle version gagne ?) — c'est une décision produit, pas seulement
 technique.
 
-### 2. Aucune authentification
+### 2. Le verrou ne protège pas le cache local
 
-Un utilisateur unique implicite (`user-local`) est utilisé. C'est le plus gros
-manque fonctionnel. Voir §7, tâche 1.
+L'authentification existe désormais (§4, « Authentification »), mais **le mode
+hors ligne la contourne** : si le serveur ne répond pas, l'application démarre
+sur le cache `localStorage` sans écran de connexion, faute de pouvoir vérifier
+quoi que ce soit.
 
-Le pied de la sidebar affiche un **bouton « Déconnexion »**, mais il ne ferme
-aucune session — il n'y en a pas. Il ramène l'application à un démarrage
-propre. C'est assumé et documenté en §4 ; ne le prends pas pour la preuve
-qu'une authentification existe.
+**C'est une décision de l'utilisateur**, prise en connaissance de cause : elle
+préserve le filet anti-perte de données. Le cache est effacé à la déconnexion
+volontaire, mais quelqu'un ayant accès physique à la machine et coupant le
+serveur verrait les données. Ne présente donc pas cet écran comme une barrière
+d'accès — ce n'en est pas une contre un tiers présent devant l'écran.
 
-### 3. Deux onglets du centre d'alertes sont injoignables
+Les deux alternatives ont été écartées : bloquer hors ligne ferait perdre les
+modifications non synchronisées le jour où le serveur ne redémarre pas, et le
+mode lecture seule demandait de désactiver les actions d'écriture dans les dix
+vues.
 
-`handleNavigateFromNotification` ([`App.tsx:254`](src/App.tsx:254)) filtre le
-`targetTab` d'une notification contre une **liste blanche écrite à la main**,
-qui omet `exam` et `propfirm`. Une notification pointant vers l'un des deux
-serait silencieusement ignorée.
+### 3. Un seul compte, données non cloisonnées
 
-**Latent aujourd'hui** : les 5 notifications de `mockData.ts` visent
-`signals`, `dashboard`, `wallets`, `academy` et `messaging`. Mais toute
-notification ajoutée vers ces deux onglets ne fonctionnera pas, sans message
-d'erreur. La liste devrait être dérivée de `TabType` plutôt que recopiée.
+L'authentification est un **socle** : un compte unique, et toutes les données
+restent sur `user-local`. Le multi-compte est conçu pour être **additif** —
+`email_lower` est déjà `UNIQUE`, chaque ligne porte déjà un `user_id`, et les six
+fonctions de `repositories.ts` acceptent déjà un `userId`.
 
-### 4. `onSelectAccountForJournal` est mort
+Ce qui reste à faire pour de vrais comptes multiples, et qui n'est **pas** fait :
+
+- aucun appelant ne passe de `userId` aux repositories (le défaut implicite
+  s'applique partout) ;
+- `forum_replies` n'a **pas** de `user_id` (rattachement indirect par `topic_id`) ;
+- `isBootstrapped()` est un drapeau **global** dans `meta` : un second
+  utilisateur trouverait la base « déjà amorcée » et n'obtiendrait jamais de seed ;
+- le forum identifie les auteurs par **chaîne de nom**, sans `authorId` ;
+- les clés `localStorage` sont **globales**, sans namespace : un second compte
+  sur le même navigateur hériterait du cache du premier ;
+- il faudrait trancher quelles collections sont partagées (modules, signaux) et
+  lesquelles sont privées, et le lien entre `EnrolledStudent` et un compte
+  (aujourd'hui inexistant, voir §3 « Inventaire »).
+
+### 3. `onSelectAccountForJournal` est mort
 
 Dans [`WalletManagement.tsx:29`](src/components/WalletManagement.tsx:29), la
 prop est **déclarée et déstructurée mais jamais appelée dans le composant**. La
 câbler depuis `App.tsx` ne produirait rien. Il faut d'abord décider quel
 élément d'interface doit la déclencher.
 
-### 5. Résidus de session dans `data/`
+### 4. Résidus de session dans `data/`
 
 - Un **trade de test est toujours en base** : `MARQUEUR/TEST`, id
   `trade-marqueur-migration`, PnL `1234 €`, note « Doit se retrouver en base ».
@@ -522,7 +667,7 @@ câbler depuis `App.tsx` ne produirait rien. Il faut d'abord décider quel
   lit** : `db.ts` ouvre exclusivement `horizon.db`. Supprimables sans risque,
   mais demander avant.
 
-### 6. Données existantes sans les nouveaux champs
+### 5. Données existantes sans les nouveaux champs
 
 Les trades et élèves déjà en base ont été créés avant l'ajout de `exitDate`,
 `exitTime` et `tradingStyle`. Les vues gèrent l'absence proprement (mention
@@ -539,31 +684,31 @@ Les trades et élèves déjà en base ont été créés avant l'ajout de `exitDa
 > cp data/horizon.db data/horizon.db.bak
 > ```
 
-### 7. Aucun test automatisé
+### 6. Aucun test automatisé
 
 Le projet n'a pas de *runner*. En ajouter un est une décision à part entière.
 Voir §9 pour ce qui a réellement été vérifié, et comment.
 
-### 8. SQLite sur disque éphémère
+### 7. SQLite sur disque éphémère
 
 Sur Cloud Run (cible naturelle vu l'origine AI Studio), le disque est éphémère
 et **les données seraient perdues à chaque redémarrage d'instance**. Monter un
 volume sur `DATA_DIR`, ou passer à Postgres. Seul `server/repositories.ts` est
 à réécrire : les routes n'y touchent pas.
 
-### 9. Bundle client de 921 Ko
+### 8. Bundle client de ~925 Ko
 
-`dist/assets/index-*.js` fait **921,32 ko** (249,51 ko gzippé), au-delà du
+`dist/assets/index-*.js` dépasse **920 ko** (~250 ko gzippé), au-delà du
 seuil d'avertissement de 500 ko de Vite. Aucun découpage de code n'est en
 place. Non bloquant, mais à traiter avant une mise en production sérieuse.
 `recharts` est le principal contributeur.
 
-### 10. `.env.example` encore rédigé pour AI Studio
+### 9. `.env.example` encore rédigé pour AI Studio
 
 Il mentionne l'injection automatique par AI Studio et une variable `APP_URL`
 qui n'est utilisée **nulle part** dans le code. À nettoyer.
 
-### 11. `vite.config.ts` porte encore des béquilles AI Studio
+### 10. `vite.config.ts` porte encore des béquilles AI Studio
 
 Le bloc `server.hmr` / `server.watch` est piloté par une variable
 `DISABLE_HMR` propre à l'environnement AI Studio, avec un commentaire
@@ -595,10 +740,15 @@ le contenu. Ne pas la supprimer ni la remplir sans lui demander.
 
 ### `public/logo.png` n'est utilisé nulle part
 
-Ce fichier de 1,1 Mo est **réservé à l'écran de connexion** à venir
-(§7, tâche 1). Seul `public/icon.png` est utilisé aujourd'hui — sidebar,
-favicon, icône iOS. Ne pas supprimer `logo.png`, et ne pas l'optimiser avant de
-connaître sa taille d'affichage.
+Ce fichier de 1,1 Mo est la **source haute résolution** du logo. Les écrans
+d'authentification utilisent `public/logo-auth.jpg` (768 px, ~39 ko), généré
+depuis lui. `public/icon.png` (512×512) sert dans la sidebar, en favicon et en
+icône iOS. Ne supprime pas `logo.png` : c'est l'original dont dérivent les deux
+autres.
+
+Note d'outillage : `sips` **liste** WebP dans ses formats mais échoue
+silencieusement à en écrire — d'où le JPEG. L'original n'a pas de canal alpha
+(`sips -g hasAlpha` → `no`), le JPEG ne perd donc rien.
 
 ---
 
@@ -618,64 +768,39 @@ l'utilisateur le demande.
 | « Audit Setup » présenté comme IA | **corrigé** — c'est une matrice de confluences déterministe |
 | Stockage des avatars | **redimensionnement côté client**, pas de route d'upload — l'avatar reste dans le profil, ce qui préserve le repli hors ligne (une URL ne résoudrait plus sans serveur) |
 | Avatar de 4 Mo déjà en base | **recompressé sur place**, la photo de l'utilisateur est conservée |
+| Périmètre de l'authentification | **socle à un seul compte**, extensible sans refonte — le multi-compte n'est pas fait (§6.3) |
+| Hachage des mots de passe | **scrypt de `node:crypto`**, aucune dépendance ajoutée — argon2 et bcrypt écartés (compilation native, aucun gain réel à cette échelle) |
+| Premier mot de passe | **écran de première installation**, pas de variable d'environnement ni de script — aucun mot de passe par défaut dans le dépôt |
+| Sessions multi-appareils | **autorisées** — la connexion ne révoque pas les autres sessions, la déconnexion ne ferme que la session courante |
+| Accès hors ligne | **conservé** — le verrou n'est donc pas une barrière physique (§6.2). Bloquer ou passer en lecture seule ont été écartés |
+| Devenir administrateur | **premier compte admin d'office**. Sans effet sur la base actuelle, dont le profil a déjà `isAdmin: true`. À revoir au multi-compte |
+| Longueur minimale du mot de passe | **10 caractères**, sans contrainte de composition |
 | `onSelectAccountForJournal` | **non tranché** — demande une décision produit |
-| Optimisation de `logo.png` | **reportée** à l'écran de connexion, où la taille d'affichage sera connue |
 | Rejeu des modifications hors ligne | **non tranché** — coût élevé, à ne faire que sur demande |
 
 ---
 
 ## 7. Prochaines tâches, dans l'ordre
 
-### 1. Écran de connexion et authentification — *demandé par l'utilisateur*
-
-C'est la prochaine tâche fonctionnelle explicitement souhaitée. L'utilisateur
-veut y placer `public/logo.png` (le logo complet avec le mot-symbole).
-
-**Ce n'est pas qu'une page.** Il faut trancher, avec lui, avant de coder :
-
-- où vivent les comptes (table `users` existe déjà, avec `user_id` partout) ;
-- comment les sessions sont gérées (cookie signé ? JWT ?) ;
-- ce qui reste visible sans être connecté ;
-- s'il y a une inscription libre ou seulement des comptes créés par l'admin ;
-- comment `student.isAdmin` se relie aux comptes réels.
-
-**Ne jamais** implémenter la saisie de mot de passe côté agent sans validation
-explicite de l'utilisateur sur l'approche de stockage (hachage, sel).
-
-Note d'intégration : `logo.png` pèse **1,1 Mo** pour 1536×1024. Le calibrer à
-2× la taille d'affichage réelle au moment de construire l'écran. Mesures déjà
-faites : 768 px → 332 Ko, 600 px → 208 Ko, 768 px en JPEG q88 → 40 Ko. Le JPEG
-risque un léger halo sur les bords nets du D blanc et de la flèche verte : à
-comparer à l'œil. L'original reste dans git (`6f2547c`).
-
-Notes de conception, déjà en place :
-
-- **Le bouton de déconnexion existe** dans le pied de la sidebar, câblé à
-  `handleLogout` dans `App.tsx`. Il ne reste qu'à remplacer le corps de cette
-  fonction par une véritable invalidation de session. Ne réimplémente pas le
-  bouton.
-- Les comptes créés porteront chacun un avatar. Le redimensionnement de
-  `src/lib/image.ts` est déjà en place et **doit être réutilisé** pour tout
-  nouveau champ image — c'est exactement le scénario qui avait produit un
-  profil de 4 Mo.
-
-### 2. Remplir le module « Examen »
+### 1. Remplir le module « Examen »
 
 L'onglet `exam` existe mais **affiche une page vierge** avec le texte « Contenu
 à venir » ([`App.tsx:773`](src/App.tsx:773)). L'utilisateur a demandé cette
 page vierge en attendant de définir le contenu. Lui demander ce qu'il veut y
 mettre avant de coder.
 
-### 3. Nettoyer les résidus
+### 2. Nettoyer les résidus
 
-Le trade `MARQUEUR/TEST` et les fichiers `data/horizon 2.db*` (§6.5). Rapide,
-mais demander avant de toucher à des données.
+Le trade `MARQUEUR/TEST` et les fichiers `data/horizon 2.db*` (§6.4). Rapide,
+mais demander avant de toucher à des données. S'y ajoutent désormais deux
+sauvegardes de base laissées par les chantiers précédents :
+`data/horizon.db.bak` et `data/horizon.db.avant-auth`.
 
-### 4. Dériver la liste blanche des onglets de notification
+### 3. Dériver la liste blanche des onglets de notification
 
-Corriger §6.3 : remplacer le tableau écrit à la main dans
-`handleNavigateFromNotification` par une constante dérivée de `TabType`, pour
-qu'ajouter un onglet ne puisse plus créer un trou silencieux.
+`handleNavigateFromNotification` a été complété (`exam`, `propfirm`, et
+`students` réservé à l'admin), mais la liste reste **recopiée à la main**. La
+dériver de `TabType` éviterait qu'un futur onglet crée un trou silencieux.
 
 ### 5. Découper le bundle
 
@@ -861,6 +986,51 @@ Le `409` renvoyé quand la base est déjà amorcée n'est pas une erreur à
 remonter : il signifie qu'un autre onglet a gagné la course. Le client
 l'avale et relit simplement l'état.
 
+### Pièges de l'authentification, à ne pas redécouvrir
+
+Rencontrés ou anticipés pendant l'implémentation du socle. Le premier a
+réellement coûté du temps.
+
+**Les commentaires SQL vivent dans un template literal.** Le schéma de
+`server/db.ts` est une chaîne entre backticks. Un backtick dans un commentaire
+`--` **ferme la chaîne** et produit des erreurs de syntaxe TypeScript
+incompréhensibles à des dizaines de lignes de là. N'utilise pas de backtick dans
+ce bloc.
+
+**`sips` ne sait pas écrire le WebP** bien qu'il le liste dans ses formats : la
+commande échoue sans message et ne crée pas le fichier. Vérifie l'existence du
+fichier de sortie, pas le code de retour.
+
+**`secure: true` inconditionnel sur le cookie** rend la connexion impossible en
+développement (HTTP clair) sans aucun message compréhensible. Conditionner à
+`NODE_ENV === "production"`.
+
+**Un middleware d'auth en `app.use`** intercepterait `/@vite/client`,
+`/@react-refresh` et le WebSocket HMR, puisque Vite est monté après l'API. Il
+doit aller sur le routeur `api`.
+
+**`req.path` est relatif au routeur** : dans un middleware monté sur `/api`,
+c'est `/state`, pas `/api/state`.
+
+**`timingSafeEqual` lève** `RangeError` sur des longueurs différentes — comparer
+les longueurs d'abord.
+
+**`scrypt` avec `N ≥ 2^15` exige `maxmem` explicite** : 32 Mio requis, soit
+exactement le défaut de Node, d'où un `ERR_CRYPTO_INVALID_SCRYPT_PARAMS`.
+
+**`clearCookie` sans les mêmes attributs** que l'émission ne supprime rien.
+
+**`express.json` global s'applique aussi aux routes d'auth** : un parseur borné
+à 16 ko déclaré **avant** lui les protège, `body-parser` marquant la requête
+comme déjà lue.
+
+**`setInterval` sans `.unref()`** empêche le processus de se terminer.
+
+**`z.string().email()` est déprécié en Zod 4** au profit de `z.email()`.
+
+**Un timing différent entre « email inconnu » et « mot de passe faux »** offre
+une énumération des comptes : hacher contre un hash factice dans le premier cas.
+
 ### Tout ce qui entre dans l'état applicatif est sérialisé trois fois
 
 C'est la leçon du profil de 4 Mo, et elle vaut au-delà des images.
@@ -954,7 +1124,40 @@ explicite, aucune confirmation demandée, cache intact). La branche hors ligne
 n'étant pas atteignable en arrêtant le serveur — c'est lui qui sert
 l'application — elle a été exercée en forçant temporairement `setStatus`
 dans `useServerSync.ts`, modification ensuite annulée (`git diff` vérifié
-vide).
+vide). **Attention : son corps a depuis été réécrit pour appeler
+`api.logout()`, et cette nouvelle version n'a jamais été exécutée.**
+
+### L'authentification a été exercée de bout en bout
+
+| Zone | Ce qui a été prouvé |
+|---|---|
+| `password.ts` | 24 contrôles : bon/mauvais mot de passe, 9 formats corrompus renvoyant `false` **sans lever**, sel aléatoire, `needsRehash`, borne de longueur. Coût mesuré **81 ms**, hash factice **79 ms** — l'écart de timing est éliminé |
+| `sessions.ts` / `credentials.ts` | 37 contrôles sur base jetable : `readCookie` sur 9 cas (valeur percent-encodée mal formée, nom partiellement homonyme, en-tête absent), non-écrasement d'un profil existant, normalisation d'email, unicité de `email_lower`, empreinte SHA-256 ≠ jeton, sessions parallèles, expiration, purge, renouvellement glissant, **absence d'écriture quand la session vient d'être vue** |
+| Les 4 routes | 20 contrôles `curl` : `no-account` → `setup` 201 → `409` au second → `login` → `logout` 204 idempotent. Cookie `HttpOnly; SameSite=Lax; Path=/` **sans `Secure`** en dev. Rate limit `429` au 11ᵉ essai. **Timing identique** (80-83 ms) entre email inconnu et mot de passe faux |
+| La barrière | `/health` 200 sans cookie ; `/state`, `/collections/*`, `/download-features-pdf`, `/coach/ai-review` en **401** sans session. **Le HMR de Vite continue de fonctionner** — c'est le test qui prouve que la barrière est sur le routeur et non sur l'application |
+| Le flux client | Installation → application chargée avec les vraies données → rechargement, **session persistée** → cookie **invisible en JS** → révocation serveur puis écriture réelle → **retour à l'écran de connexion avec « Ta session a expiré »** → déconnexion, **`localStorage` vidé à 0 clé** |
+| Le durcissement | `PUT /profile` avec `isAdmin` : **valeur en base inchangée**. Email invalide `400`, vide `200`. Non-admin sur `enrolledStudents` : **403 et les 4 fiches survivent**. Sidebar dégradée (entrée, engrenages et badge absents). Bouton « Activer Admin » remplacé par « Défini côté serveur » |
+| Installation neuve | Sur `DATA_DIR=/tmp/propdesk-neuf` : `no-account` → `setup` → session → **seed derrière la barrière** → 6 trades et 4 élèves amorcés. L'ordre `users` avant `user_credentials` (contrainte de clé étrangère) tient |
+| Production | `npm run build` puis `NODE_ENV=production node dist/server.cjs` : `/logo-auth.jpg` servi (38 830 o), SPA servie, `/api/auth/me` répond |
+
+**Deux réserves honnêtes.**
+
+La **garde au rendu de la vue `students`** pour un non-admin n'a pas pu être
+déclenchée : l'entrée de sidebar disparaît et `knownTabs` exclut l'onglet, donc
+l'état n'est plus atteignable par l'interface — ce qui est le but, mais ce qui
+empêche aussi d'exercer la branche. Les deux autres couches (masquage et `403`
+serveur) sont, elles, vérifiées.
+
+Le **clic automatisé ne soumet pas un formulaire** dans cet outillage : la
+soumission n'a pu être déclenchée que par `requestSubmit()`. Le chemin de
+soumission lui-même est donc prouvé (erreur affichée, `aria-invalid`,
+`aria-describedby`), mais pas le clic humain sur le bouton — comportement
+standard du navigateur, hors de portée d'ici.
+
+**Piège si tu écris un script de test** : poser `process.env.DATA_DIR` sur une
+base jetable **avant** d'importer `server/db.ts` — ce module ouvre la connexion
+au chargement, un import statique en tête de fichier écrirait donc dans la vraie
+base. Utiliser un `await import()` après avoir posé la variable.
 
 Le dernier point mérite d'être explicite : `/api/coach/ai-review` n'a été testée
 que sur sa **validation d'entrée** et sa **limitation de débit**. Aucun appel
@@ -967,11 +1170,23 @@ modèle déclaré (`gemini-3.6-flash`,
 
 ## 10. État à la reprise
 
-- Branche `main`, dernier commit documenté `69567d7`, plus le correctif
-  d'avatar (§4, « Poids des images »).
+> ### La base attend son mot de passe
+>
+> `user_credentials` est **vide** : au prochain démarrage, l'application affiche
+> l'écran de **première installation**. C'est voulu — le mot de passe doit être
+> choisi par l'utilisateur, aucun mot de passe de test n'a été laissé derrière.
+>
+> Les données sont intactes et vérifiées champ par champ contre la sauvegarde
+> `data/horizon.db.avant-auth` : profil identique, 7 trades, 4 élèves,
+> 4 portefeuilles, 5 messages, 4 sujets, 5 notifications, 9 badges, 5 modules.
+
+- Branche `main`, dernier commit `2f9bb7a`, plus le socle d'authentification
+  **non committé**.
 - `npm run lint` : sans erreur. `npm run build` : réussi, avec le seul
-  avertissement de taille de bundle (§6.9).
-- Application démarrée et rendue, avatar affiché correctement.
+  avertissement de taille de bundle (§6.8, désormais ~933 ko).
+- Vérifié **aussi en production** (`npm run build && NODE_ENV=production node
+  dist/server.cjs`) : `/logo-auth.jpg` servi en 38 830 octets, SPA servie,
+  `/api/auth/me` répond `no-account`.
 - **Une erreur console subsiste**, sans rapport avec le code applicatif :
   `WebSocket connection to 'ws://localhost:24678/' failed`, en boucle. C'est le
   socket HMR de Vite, qui écoute sur son propre port alors que Vite tourne en
@@ -989,7 +1204,9 @@ Fichier : **200 ko** (8,2 Mo avant recompression de l'avatar et `VACUUM`).
 | Table | Lignes |
 |---|---|
 | `users` | 1 (profil « ForexPaps », admin, avatar JPEG 256×256 de 42 879 car.) |
-| `trades` | 7 — **dont 1 trade de test à supprimer** (§6.5) |
+| `user_credentials` | **0** — d'où l'écran de première installation au prochain démarrage |
+| `sessions` | 0 |
+| `trades` | 7 — **dont 1 trade de test à supprimer** (§6.4) |
 | `trading_accounts` | 4 |
 | `coach_signals` | 4 |
 | `coach_messages` | 5 |
@@ -1007,17 +1224,16 @@ Sophie Bernard (Intraday, Besoin Coaching).
 
 ### Par où commencer
 
-Plus rien n'est cassé : les points d'entrée sont tous des choix, pas des
-urgences.
+Le socle d'authentification est terminé et vérifié. Plus rien n'est cassé : les
+points d'entrée sont des choix, pas des urgences.
 
-- **§7 tâche 1 — l'écran de connexion.** C'est ce que l'utilisateur a
-  explicitement annoncé vouloir faire ensuite, et le blocage qui la précédait
-  (l'avatar) est levé. Mais commence par lui poser les décisions listées :
-  elles conditionnent tout le reste, et coder avant serait à refaire.
-- **§7 tâche 2 — remplir le module « Examen ».** À ne pas coder avant de lui
-  avoir demandé ce qu'il veut y mettre : la page vierge est volontaire.
-- **§7 tâche 3 — nettoyer les résidus.** Quelques minutes, et cela retire le
-  trade de test qui fausse les statistiques du tableau de bord.
+- **§7 tâche 1 — remplir le module « Examen ».** À ne pas coder avant d'avoir
+  demandé à l'utilisateur ce qu'il veut y mettre : la page vierge est volontaire.
+- **§7 tâche 2 — nettoyer les résidus.** Quelques minutes, et cela retire le
+  trade de test qui fausse les statistiques du tableau de bord, ainsi que trois
+  sauvegardes de base devenues inutiles.
+- **§6.3 — les comptes multiples**, si l'utilisateur le demande. La liste
+  exhaustive de ce qui reste à faire y figure ; tout est additif.
 
 > Ce document est la **seule** source de reprise. Des plans de travail ont pu
 > être écrits dans `~/.claude/plans/`, **hors du dépôt** : un nouveau Claude ne
