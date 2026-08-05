@@ -234,8 +234,10 @@ hors ligne, migration automatique depuis `localStorage`.
 
 - Logo PropDesk intégré : `public/icon.png` (recadrage 512×512 de l'icône) dans
   la sidebar, en favicon et en icône iOS.
-- **Palette unifiée** sur les 10 vues et le centre d'alertes (jetons en §8).
-  Les 8 autres modales ne sont pas encore migrées — voir §6.3.
+- **Palette unifiée** sur les 10 vues, le centre d'alertes **et les 8 modales
+  restantes** (jetons et règle de conservation en §8). Plus aucune surface
+  `bg-slate-*` / `border-slate-*` dans `src/`, à l'exception du gris du coach
+  hors ligne, volontaire.
 
 ---
 
@@ -274,6 +276,20 @@ hors ligne, migration automatique depuis `localStorage`.
 | `index.html` | favicon et icône iOS |
 | les 9 autres vues | migration de palette (slate → jetons du tableau de bord) |
 
+### « Audit Setup » n'est pas une fonction IA
+
+Le module note un setup à partir de **six cases à cocher pondérées**, en local
+et de façon déterministe : aucun appel réseau, aucun modèle. Il s'appelait
+`AISetupAnalyzerModal` et s'annonçait « Audit & Scoring de Trade SMC IA », ce
+qui était faux. **Décision de l'utilisateur : ce module ne doit pas se
+présenter comme boosté à l'IA.** Renommé `SetupAnalyzerModal`, titré « Audit &
+Scoring de Setup SMC », icône `Target` au lieu de `Sparkles` (réservée à l'IA
+dans cette application), et la note transférée au journal parle de « matrice de
+confluences ».
+
+La **seule** fonction Gemini réellement branchée est `TradeAuditModal`, via
+`/api/coach/ai-review` — plus la réponse du coach dans la messagerie.
+
 ### Supprimé
 
 - `src/components/CertificateModal.tsx` (140 lignes) et toutes ses traces —
@@ -304,33 +320,14 @@ technique.
 Un utilisateur unique implicite est utilisé. C'est le plus gros manque
 fonctionnel. Voir §7, tâche 1.
 
-### 3. Les 8 modales n'ont pas la palette du site
-
-L'harmonisation visuelle a couvert les 10 vues d'onglet et le centre d'alertes,
-**pas les autres modales**. Elles utilisent encore `slate-*` et l'ambre comme
-accent :
-
-| Modale | slate | amber |
-|---|---|---|
-| `TradeAuditModal` | 17 | 12 |
-| `UserProfileModal` | 4 | 18 |
-| `TradingPlanModal` | 4 | 8 |
-| `PropFirmRulesModal` | 2 | 9 |
-| `PositionCalculatorModal` | 3 | 4 |
-| `MindsetJournalModal` | 2 | 5 |
-| `EconomicCalendarModal` | 3 | 5 |
-| `AISetupAnalyzerModal` | 3 | 3 |
-
-La recette est décrite en §8. C'est mécanique et sans risque.
-
-### 4. `onSelectAccountForJournal` est mort
+### 3. `onSelectAccountForJournal` est mort
 
 Dans [`WalletManagement.tsx:29`](src/components/WalletManagement.tsx:29), la
 prop est **déclarée et déstructurée mais jamais appelée dans le composant**. La
 câbler depuis `App.tsx` ne produirait rien. Il faut d'abord décider quel
 élément d'interface doit la déclencher.
 
-### 5. Données existantes sans les nouveaux champs
+### 4. Données existantes sans les nouveaux champs
 
 Les trades et élèves déjà en base ont été créés avant l'ajout de `exitDate`,
 `exitTime` et `tradingStyle`. Les vues gèrent l'absence proprement (mention
@@ -345,24 +342,24 @@ Les trades et élèves déjà en base ont été créés avant l'ajout de `exitDa
 > cp data/horizon.db data/horizon.db.bak
 > ```
 
-### 6. Aucun test automatisé
+### 5. Aucun test automatisé
 
 Le projet n'a pas de *runner*. En ajouter un est une décision à part entière.
 Voir §9 pour ce qui a réellement été vérifié, et comment.
 
-### 7. SQLite sur disque éphémère
+### 6. SQLite sur disque éphémère
 
 Sur Cloud Run (cible naturelle vu l'origine AI Studio), le disque est éphémère
 et **les données seraient perdues à chaque redémarrage d'instance**. Monter un
 volume sur `DATA_DIR`, ou passer à Postgres. Seul `server/repositories.ts` est
 à réécrire : les routes n'y touchent pas.
 
-### 8. Bundle client de 906 Ko
+### 7. Bundle client de 906 Ko
 
 Au-delà du seuil d'avertissement de Vite. Aucun découpage de code n'est en
 place. Non bloquant, mais à traiter avant une mise en production sérieuse.
 
-### 9. `.env.example` encore rédigé pour AI Studio
+### 8. `.env.example` encore rédigé pour AI Studio
 
 Il mentionne l'injection automatique par AI Studio et une variable `APP_URL`
 qui n'est utilisée nulle part. À nettoyer.
@@ -408,7 +405,7 @@ l'utilisateur le demande.
 | Statut « Accompagnement VIP » | **supprimé** — devenu indistinguable de « Prop Firm Financé » une fois la vue passée au vert |
 | Bouton « Lecture » du suivi élèves | **passé au vert** en connaissance de cause : il ne se distingue plus d'« Éditer Fiche » par la couleur |
 | Les 5 modales orphelines | **remises dans la sidebar** (section OUTILS), pas dans le header — fait |
-| Harmonisation des 8 modales restantes | **non tranchée** — signalée à l'utilisateur, jamais demandée |
+| Harmonisation des 8 modales restantes | **faite** — demandée explicitement |
 | `onSelectAccountForJournal` | **non tranché** — demande une décision produit |
 | Optimisation de `logo.png` | **reportée** à l'écran de connexion, où la taille d'affichage sera connue |
 | Rejeu des modifications hors ligne | **non tranché** — coût élevé, à ne faire que sur demande |
@@ -439,27 +436,23 @@ faites : 768 px → 332 Ko, 600 px → 208 Ko, 768 px en JPEG q88 → 40 Ko. Le 
 risque un léger halo sur les bords nets du D blanc et de la flèche verte : à
 comparer à l'œil. L'original reste dans git (`6f2547c`).
 
-### 2. Harmoniser les 8 modales restantes
-
-Mécanique, sans risque, gros gain visuel. Recette en §8.
-
-### 3. Remplir le module « Examen »
+### 2. Remplir le module « Examen »
 
 L'onglet `exam` existe mais **affiche une page vierge** avec le texte « Contenu
 à venir » ([`App.tsx`](src/App.tsx), bloc `activeTab === "exam"`). L'utilisateur
 a demandé cette page vierge en attendant de définir le contenu. Lui demander ce
 qu'il veut y mettre avant de coder.
 
-### 4. Découper le bundle
+### 3. Découper le bundle
 
 `build.rollupOptions.output.manualChunks` ou imports dynamiques sur les vues
 les plus lourdes (`recharts` est le principal contributeur).
 
-### 5. Décider du sort de `onSelectAccountForJournal`
+### 4. Décider du sort de `onSelectAccountForJournal`
 
 Câbler ou supprimer. Demander d'abord.
 
-### 6. Rejeu des modifications hors ligne
+### 5. Rejeu des modifications hors ligne
 
 Seulement si l'utilisateur le demande : coût élevé, gestion de conflits.
 
@@ -500,7 +493,8 @@ Le tableau de bord fait référence. Les autres vues utilisaient une palette
 
 Rayons : `rounded-2xl` pour les cartes, `rounded-xl` pour les éléments internes.
 
-Correspondance utilisée lors de la migration, à réappliquer aux modales :
+Correspondance utilisée lors de la migration — elle a été appliquée partout,
+elle sert désormais de référence pour tout nouvel écran :
 
 ```
 bg-slate-950 → bg-[#0D1110]     border-slate-800 → border-[#1B2320]
@@ -509,6 +503,17 @@ bg-slate-800 → bg-[#1B2320]     border-slate-900 → border-[#151D1A]
 bg-slate-700 → bg-[#232D29]
 emerald-300/400/500 → [#00E676]     indigo-* → purple-*
 ```
+
+**`hover:bg-slate-800` ne suit pas la table.** Il est toujours posé sur une base
+`bg-[#1B2320]` : le traduire en `hover:bg-[#1B2320]` rendrait le survol
+invisible. Il devient `hover:bg-[#232D29]`, la pastille haute.
+
+Ambre conservé partout où il **porte un sens** : avertissement (« Axes
+d'Amélioration », alerte de checklist, note du calendrier), palier de jauge
+(drawdown > 50 %, conformité incomplète), état dans une échelle (badge « à
+réclamer » face à débloqué/verrouillé, verdict B+ face à A+/non conforme,
+phase de respiration), et le thème doré des récompenses (rang, XP, couronne).
+Ailleurs il n'était qu'un accent : il est passé au vert de marque.
 
 **Piège trouvé** : `slate-850` et `slate-750` étaient utilisés à 13 endroits.
 **Ces nuances n'existent pas en Tailwind 4** et le projet n'a pas de
@@ -625,7 +630,7 @@ doivent être supprimées avant de rendre la main.
 
 ### Ce qui a réellement été vérifié — et ce qui ne l'a pas été
 
-Le projet n'a aucun test automatisé (§6.6). Tout a été vérifié à la main, et
+Le projet n'a aucun test automatisé (§6.5). Tout a été vérifié à la main, et
 **pas au même degré selon les zones**. Ne suppose pas une couverture uniforme.
 
 | Degré | Zones |
@@ -659,8 +664,8 @@ Deux points d'entrée légitimes, selon ce que veut l'utilisateur :
 - **§7 tâche 1 — l'écran de connexion.** C'est ce qu'il a explicitement annoncé
   vouloir faire ensuite. Mais commence par lui poser les décisions listées :
   elles conditionnent tout le reste, et coder avant serait à refaire.
-- **§7 tâche 2 — harmoniser les 8 modales.** Si tu veux un gain immédiat sans
-  décision produit à prendre : mécanique, sans risque, recette en §8.
+- **§7 tâche 2 — remplir le module « Examen ».** À ne pas coder avant de lui
+  avoir demandé ce qu'il veut y mettre : la page vierge est volontaire.
 
 > Ce document est la **seule** source de reprise. Des plans de travail ont pu
 > être écrits dans `~/.claude/plans/`, **hors du dépôt** : un nouveau Claude ne

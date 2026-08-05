@@ -158,7 +158,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   });
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto font-sans">
+    <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto font-sans">
       <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-3xl w-full p-6 space-y-6 shadow-2xl relative my-8 text-slate-100">
         {/* Modal Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1B2320] pb-4">
@@ -228,7 +228,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute inset-0 rounded-full bg-slate-950/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-[#00E676] text-[10px] font-bold gap-0.5"
+                    className="absolute inset-0 rounded-full bg-[#0D1110]/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-[#00E676] text-[10px] font-bold gap-0.5"
                   >
                     <Camera className="w-4 h-4" />
                     <span>Changer</span>
@@ -288,12 +288,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             {/* Admin Toggle */}
             <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <Crown className="w-6 h-6 text-amber-400 shrink-0" />
+                <Crown className="w-6 h-6 text-[#00E676] shrink-0" />
                 <div>
                   <div className="text-sm font-bold text-white flex items-center gap-2">
                     Mode Administrateur / Staff
                     {isAdmin && (
-                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-mono font-bold">
+                      <span className="px-2 py-0.5 rounded bg-[#00E676]/15 text-[#00E676] border border-[#00E676]/30 text-[10px] font-mono font-bold">
                         ACTIF 👑
                       </span>
                     )}
@@ -396,7 +396,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-xl bg-[#1B2320] hover:bg-slate-800 text-slate-300 font-bold"
+                className="px-4 py-2.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 font-bold"
               >
                 Annuler
               </button>
@@ -510,7 +510,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                                 ? "bg-[#00E676]/15 border-[#00E676]/40"
                                 : canClaim
                                 ? "bg-amber-500/20 border-amber-500/50"
-                                : "bg-[#1B2320] border-slate-800"
+                                : "bg-[#1B2320] border-[#1B2320]"
                             }`}
                           >
                             {getBadgeIcon(badge.iconName, badge.unlocked || canClaim)}

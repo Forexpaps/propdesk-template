@@ -145,7 +145,7 @@ export const MindsetJournalModal: React.FC<MindsetJournalModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
+    <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
       <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl relative text-slate-100 my-6 max-h-[92vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
@@ -167,7 +167,7 @@ export const MindsetJournalModal: React.FC<MindsetJournalModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg bg-[#1B2320] hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-400 hover:text-white transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -226,7 +226,7 @@ export const MindsetJournalModal: React.FC<MindsetJournalModalProps> = ({
                   ? "bg-rose-500"
                   : computedTilt > 35
                   ? "bg-amber-400"
-                  : "bg-gradient-to-r from-[#00E676] to-emerald-400"
+                  : "bg-gradient-to-r from-[#00E676] to-[#00E676]"
               }`}
               style={{ width: `${computedTilt}%` }}
             />

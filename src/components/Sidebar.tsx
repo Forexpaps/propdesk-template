@@ -10,7 +10,6 @@ import {
   Users,
   Menu,
   X,
-  Sparkles,
   ChevronRight,
   TrendingUp,
   Activity,
@@ -29,7 +28,8 @@ import {
   Check,
   Trophy,
   Brain,
-  Calendar
+  Calendar,
+  Target
 } from "lucide-react";
 import { StudentProfile } from "../types";
 
@@ -133,7 +133,7 @@ interface SidebarProps {
   onOpenProfileModal: () => void;
   onOpenChecklist?: () => void;
   // Section OUTILS : chaque entrée ouvre une modale.
-  onOpenAISetupAnalyzer?: () => void;
+  onOpenSetupAnalyzer?: () => void;
   onOpenPropFirmRules?: () => void;
   onOpenMindset?: () => void;
   onOpenCalendar?: () => void;
@@ -153,7 +153,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsCollapsed,
   onOpenProfileModal,
   onOpenChecklist,
-  onOpenAISetupAnalyzer,
+  onOpenSetupAnalyzer,
   onOpenPropFirmRules,
   onOpenMindset,
   onOpenCalendar,
@@ -206,7 +206,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
    * « Sim propfirm ».
    */
   const outilsItems: SidebarEntry[] = [
-    { key: "audit", id: null, label: "Audit Setup", icon: Sparkles, onOpen: onOpenAISetupAnalyzer },
+    { key: "audit", id: null, label: "Audit Setup", icon: Target, onOpen: onOpenSetupAnalyzer },
     { key: "propfirmrules", id: null, label: "Prop Firm", icon: Trophy, onOpen: onOpenPropFirmRules },
     { key: "mindset", id: null, label: "Mindset", icon: Brain, onOpen: onOpenMindset },
     { key: "calendar", id: null, label: "Calendrier", icon: Calendar, onOpen: onOpenCalendar },
@@ -349,7 +349,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Backdrop */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-[#0D1110]/80 backdrop-blur-sm lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
