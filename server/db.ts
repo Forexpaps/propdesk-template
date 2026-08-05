@@ -123,6 +123,41 @@ db.exec(`
     payload   TEXT NOT NULL,
     PRIMARY KEY (module_id, user_id)
   );
+
+  -- Identifiants de connexion, volontairement HORS de users.payload.
+  --
+  -- GET /api/state renvoie le payload du profil tel quel au navigateur : un hash
+  -- de mot de passe qui y vivrait partirait au client à chaque démarrage. Une
+  -- table séparée rend cette fuite structurellement impossible.
+  --
+  -- email_lower porte enfin la contrainte d'unicité qui manquait, et elle est
+  -- déjà correcte pour le jour où plusieurs comptes existeront.
+  CREATE TABLE IF NOT EXISTS user_credentials (
+    user_id       TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    email         TEXT NOT NULL,
+    email_lower   TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
+  );
+
+  -- Sessions actives. La colonne id est le SHA-256 du jeton, jamais le jeton
+  -- lui-même : le fichier de base vit en clair sur le disque (et dans le WAL, et
+  -- dans les sauvegardes), une fuite ne doit pas permettre de rejouer les
+  -- sessions.
+  --
+  -- Les dates sont en ISO 8601 UTC : la comparaison lexicographique vaut alors
+  -- comparaison chronologique, ce dont dépend le filtre sur expires_at.
+  CREATE TABLE IF NOT EXISTS sessions (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at   TEXT NOT NULL,
+    expires_at   TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    user_agent   TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions(user_id);
+  CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 `);
 
 export function getMeta(key: string): string | null {

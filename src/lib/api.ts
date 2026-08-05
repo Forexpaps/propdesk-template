@@ -34,11 +34,51 @@ export interface ServerState {
   collections: ServerCollections;
 }
 
+/** État d'authentification renvoyé par `/api/auth/me`. */
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  isAdmin: boolean;
+}
+
+export type AuthState =
+  | { state: "no-account" }
+  | { state: "unauthenticated" }
+  | { state: "authenticated"; user: AuthUser };
+
+/**
+ * Événement émis dès qu'une requête revient en 401.
+ *
+ * Sans cela, une session expirée en cours d'usage se traduirait par des
+ * `console.warn` silencieux dans `useSyncedState` : l'utilisateur continuerait de
+ * travailler en croyant que ses données se sauvegardent. Un événement du
+ * document évite un contexte React et un import circulaire entre ce module et
+ * les hooks.
+ */
+export const UNAUTHENTICATED_EVENT = "propdesk:unauthenticated";
+
+/** Levée sur 401, pour que les appelants puissent la distinguer. */
+export class UnauthenticatedError extends Error {
+  constructor(message = "Session expirée ou absente.") {
+    super(message);
+    this.name = "UnauthenticatedError";
+  }
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     headers: { "Content-Type": "application/json" },
+    // Déjà le défaut pour une URL relative, mais explicite : l'intention est
+    // lisible et le comportement survit à un passage en URL absolue.
+    credentials: "same-origin",
     ...init,
   });
+
+  if (response.status === 401) {
+    window.dispatchEvent(new CustomEvent(UNAUTHENTICATED_EVENT));
+    throw new UnauthenticatedError();
+  }
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
@@ -46,6 +86,9 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
       (body as { error?: string }).error ?? `Requête ${url} échouée (${response.status})`
     );
   }
+
+  // 204 sans corps : `response.json()` lèverait.
+  if (response.status === 204) return undefined as unknown as T;
 
   return response.json() as Promise<T>;
 }
@@ -83,4 +126,24 @@ export const api = {
       method: "POST",
       body: JSON.stringify(state),
     }),
+
+  // --- Authentification ---
+
+  /** Sonde d'état du démarrage. Répond toujours 200. */
+  fetchMe: () => request<AuthState>("/api/auth/me"),
+
+  login: (email: string, password: string) =>
+    request<Extract<AuthState, { state: "authenticated" }>>("/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+
+  /** Première installation : rattache des identifiants au profil existant. */
+  setup: (email: string, password: string) =>
+    request<Extract<AuthState, { state: "authenticated" }>>("/api/auth/setup", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+
+  logout: () => request<void>("/api/auth/logout", { method: "POST" }),
 };

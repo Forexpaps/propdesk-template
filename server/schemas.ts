@@ -23,14 +23,36 @@ export const collectionPayloadSchema = z
     { message: "Identifiants dupliqués dans la collection." }
   );
 
+/**
+ * Champs du profil dont le serveur est seul maître.
+ *
+ * Ils sont **retirés** du corps reçu, pas rejetés : le client renvoie fidèlement
+ * l'objet qu'il a reçu, `isAdmin` inclus, donc un 400 casserait toute sauvegarde
+ * de profil pour un compte administrateur.
+ */
+const SERVER_OWNED_PROFILE_FIELDS = ["isAdmin"] as const;
+
 export const profileSchema = z
   .object({
     name: z.string().min(1).max(200),
-    email: z.string().max(320),
+    // Une adresse réelle, ou vide — mais plus n'importe quelle chaîne. Le champ
+    // sert d'identité affichée ; l'email de connexion, lui, vit dans
+    // `user_credentials` et est validé strictement à part.
+    email: z
+      .string()
+      .max(320)
+      .refine((v) => v === "" || z.email().safeParse(v).success, {
+        message: "Adresse e-mail invalide.",
+      }),
     startingCapital: z.number().finite(),
     currentCapital: z.number().finite(),
   })
-  .passthrough();
+  .passthrough()
+  .transform((profile) => {
+    const cleaned = { ...profile } as Record<string, unknown>;
+    for (const field of SERVER_OWNED_PROFILE_FIELDS) delete cleaned[field];
+    return cleaned;
+  });
 
 export const quizResultsSchema = z.record(z.string().min(1), z.unknown());
 
@@ -39,6 +61,54 @@ export const importStateSchema = z.object({
   collections: z.record(z.string(), collectionPayloadSchema).optional(),
   quizResults: quizResultsSchema.optional(),
 });
+
+// --- Authentification ----------------------------------------------------
+
+/**
+ * Les identifiants ne suivent PAS la philosophie de tolérance du reste de ce
+ * fichier. Ici on connaît exactement le contrat, et `.strict()` fait qu'un champ
+ * inattendu est traité comme une erreur plutôt que stocké en silence.
+ */
+
+/** Longueur minimale d'un mot de passe, sans contrainte de composition. */
+const PASSWORD_MIN = 10;
+
+/** `z.email()` plutôt que `.email()` sur ZodString, déprécié en Zod 4. */
+const emailField = z
+  .string()
+  .trim()
+  .min(3)
+  .max(320)
+  .refine((v) => z.email().safeParse(v).success, {
+    message: "Adresse e-mail invalide.",
+  });
+
+/**
+ * Première installation.
+ *
+ * C'est le seul endroit où la longueur minimale est imposée : l'appliquer à la
+ * connexion ferait échouer un mot de passe existant le jour où la règle change.
+ */
+export const setupSchema = z
+  .object({
+    email: emailField,
+    password: z.string().min(PASSWORD_MIN).max(200),
+  })
+  .strict();
+
+/**
+ * Connexion.
+ *
+ * Volontairement sans `min(PASSWORD_MIN)` : une connexion légitime ne doit
+ * jamais échouer sur une règle de force. Un mot de passe trop court sera de
+ * toute façon refusé faute de correspondre au hash.
+ */
+export const loginSchema = z
+  .object({
+    email: z.string().trim().min(1).max(320),
+    password: z.string().min(1).max(200),
+  })
+  .strict();
 
 /** Corps accepté par la route d'audit IA du coach. */
 export const coachReviewSchema = z

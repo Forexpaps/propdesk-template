@@ -59,32 +59,80 @@ import {
 import { TabType as SidebarTabType } from "./components/Sidebar";
 import { usePersistentState } from "./hooks/usePersistentState";
 import { useBootstrap, useSyncedState } from "./hooks/useServerSync";
+import { useAuth } from "./hooks/useAuth";
+import { LoginScreen } from "./components/auth/LoginScreen";
+import { SetupScreen } from "./components/auth/SetupScreen";
 import { api, type ServerState } from "./lib/api";
 
+/** Écran d'attente partagé par les deux étapes de démarrage. */
+function LoadingScreen({ message }: { message: string }) {
+  return (
+    <div className="min-h-screen bg-[#0B0F0E] text-slate-300 flex flex-col items-center justify-center gap-4 font-sans">
+      <img
+        src="/icon.png"
+        alt=""
+        className="w-10 h-10 rounded-xl animate-pulse"
+      />
+      <p className="text-xs font-mono text-slate-500">{message}</p>
+    </div>
+  );
+}
+
 /**
- * Coquille de démarrage : récupère l'état auprès du serveur avant de monter
- * l'application, pour que celle-ci parte d'une source de vérité unique.
+ * Porte d'entrée : décide quel écran monter selon l'état d'authentification.
  *
- * Si le serveur ne répond pas, on démarre quand même en mode dégradé sur le
- * cache localStorage — l'académie reste utilisable hors ligne.
+ * Ce composant ne fait *que* `useAuth()`. Le chargement des données vit dans
+ * `AuthenticatedApp`, monté conditionnellement — les hooks ne pouvant pas être
+ * conditionnels, c'est ce découpage qui garantit qu'aucun appel à `/api/state`
+ * ne part avant qu'une session existe.
+ *
+ * Le serveur ne peut pas rediriger vers un écran de connexion : le catch-all
+ * renvoie `index.html` pour toute URL non-API. Le filtrage est donc
+ * nécessairement ici, à partir de `/api/auth/me`.
  */
 export default function App() {
+  const { status, expired, login, setup, markLoggedOut, refresh } = useAuth();
+
+  if (status === "loading") {
+    return <LoadingScreen message="Vérification de ta session…" />;
+  }
+
+  if (status === "no-account") {
+    return <SetupScreen onSetup={setup} onRefresh={() => void refresh()} />;
+  }
+
+  if (status === "unauthenticated") {
+    return <LoginScreen onLogin={login} expired={expired} />;
+  }
+
+  // `authenticated` et `offline` mènent tous deux à l'application. Hors ligne,
+  // aucune vérification n'est possible : on démarre sur le cache local, comme
+  // avant l'authentification. C'est un choix assumé — le verrou n'est donc pas
+  // une barrière d'accès aux données déjà présentes sur la machine (voir README).
+  return <AuthenticatedApp onLoggedOut={markLoggedOut} />;
+}
+
+/**
+ * Charge l'état applicatif, puis monte l'académie.
+ *
+ * Monté seulement une fois l'authentification résolue, si bien que
+ * `useBootstrap` — et son import depuis l'ancien localStorage — ne s'exécute
+ * jamais sans session.
+ */
+function AuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const { status, state } = useBootstrap();
 
   if (status === "loading") {
-    return (
-      <div className="min-h-screen bg-[#0B0F0E] text-slate-300 flex flex-col items-center justify-center gap-4 font-sans">
-        <div className="w-10 h-10 rounded-xl bg-[#00E676] text-slate-950 font-extrabold flex items-center justify-center animate-pulse">
-          P
-        </div>
-        <p className="text-xs font-mono text-slate-500">
-          Chargement de votre espace PropDesk…
-        </p>
-      </div>
-    );
+    return <LoadingScreen message="Chargement de ton espace PropDesk…" />;
   }
 
-  return <AcademyApp initialState={state} syncEnabled={status === "online"} />;
+  return (
+    <AcademyApp
+      initialState={state}
+      syncEnabled={status === "online"}
+      onLoggedOut={onLoggedOut}
+    />
+  );
 }
 
 interface AcademyAppProps {
@@ -92,9 +140,11 @@ interface AcademyAppProps {
   initialState: ServerState | null;
   /** false quand on tourne sur le cache local : on n'essaie pas de pousser. */
   syncEnabled: boolean;
+  /** Remonte la déconnexion pour afficher l'écran de connexion. */
+  onLoggedOut: () => void;
 }
 
-function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
+function AcademyApp({ initialState, syncEnabled, onLoggedOut }: AcademyAppProps) {
   const server = initialState?.collections;
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
 
@@ -235,33 +285,42 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
   }, [trades]);
 
   /**
-   * Ferme la session.
+   * Ferme la session : invalide le jeton côté serveur, oublie le cache local, et
+   * ramène à l'écran de connexion.
    *
-   * L'application n'a pas encore d'authentification : il n'y a donc aucune
-   * session à invalider, et rien à masquer puisque le serveur ne connaît qu'un
-   * utilisateur. Ce que ce bouton peut faire de sensible aujourd'hui, c'est
-   * ramener l'application à un démarrage propre : on oublie le cache local et
-   * on relit tout depuis le serveur.
+   * Le cache est effacé délibérément. Hors ligne, l'application démarre sur ce
+   * cache sans pouvoir vérifier d'identité (voir README) : le laisser en place
+   * après une déconnexion volontaire rendrait le verrou contournable sur la
+   * machine.
    *
-   * Quand l'écran de connexion arrivera, seul le corps de cette fonction
-   * change — l'appel de la sidebar reste le même.
+   * Note : `useSyncedState` regroupe ses écritures sur 400 ms. Une déconnexion
+   * confirmée en moins de 400 ms perdrait la dernière modification — théorique
+   * avec un `confirm()` bloquant, à revoir si on le remplace par une modale.
    */
-  const handleLogout = () => {
+  const handleLogout = async () => {
     // Hors ligne, le cache local est la SEULE copie des données : le vider
     // serait une perte sèche. On refuse plutôt que de détruire en silence.
     if (!syncEnabled) {
       alert(
-        "Déconnexion impossible hors ligne : les données de cette session ne sont pas encore enregistrées sur le serveur."
+        "Déconnexion impossible hors ligne : les modifications de cette session ne sont pas encore enregistrées sur le serveur. Reconnecte-toi au serveur avant de te déconnecter."
       );
       return;
     }
 
     if (
       !confirm(
-        "Se déconnecter ? Tes données restent enregistrées sur le serveur, l'application repartira d'un démarrage propre."
+        "Se déconnecter ? Tes données restent enregistrées sur le serveur. Le cache de cet appareil sera effacé."
       )
     ) {
       return;
+    }
+
+    try {
+      await api.logout();
+    } catch (err) {
+      // Serveur devenu injoignable : on nettoie quand même l'appareil. Le pire
+      // cas est une session orpheline côté serveur, qui expirera d'elle-même.
+      console.warn("[propdesk] Déconnexion serveur échouée.", err);
     }
 
     try {
@@ -269,7 +328,8 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
     } catch {
       // Stockage indisponible : il n'y avait alors rien à oublier.
     }
-    window.location.reload();
+
+    onLoggedOut();
   };
 
   // Notifications Handlers
@@ -289,23 +349,34 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
 
   // Le centre d'alertes renvoie un targetTab en texte libre : on ne navigue
   // que si c'est un onglet réellement existant.
+  //
+  // « students » n'y figure que pour un administrateur : sans cela, une
+  // notification suffirait à contourner le masquage de la vue de suivi.
   const handleNavigateFromNotification = (tab: string) => {
     const knownTabs: SidebarTabType[] = [
       "dashboard",
-      "students",
       "wallets",
       "academy",
       "journal",
       "simulator",
+      "propfirm",
       "signals",
       "forum",
       "messaging",
       "analytics",
+      "exam",
+      ...(student.isAdmin ? (["students"] as SidebarTabType[]) : []),
     ];
     if (knownTabs.includes(tab as SidebarTabType)) {
       setActiveTab(tab as SidebarTabType);
     }
   };
+
+  // Filet de sécurité : si le statut d'administrateur est révoqué pendant la
+  // session, l'onglet de suivi des élèves ne doit pas rester affiché.
+  useEffect(() => {
+    if (activeTab === "students" && !student.isAdmin) setActiveTab("dashboard");
+  }, [activeTab, student.isAdmin]);
 
   // Student Admin Handlers
   const handleUpdateStudent = (updatedStudent: EnrolledStudent) => {
@@ -716,14 +787,30 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
             />
           )}
 
-          {activeTab === "students" && (
-            <StudentTracking
-              students={enrolledStudents}
-              onUpdateStudent={handleUpdateStudent}
-              onAddStudent={handleAddStudent}
-              onDeleteStudent={handleDeleteStudent}
-            />
-          )}
+          {/* Le masquage dans la sidebar ne suffit pas : cette vue expose les
+              notes privées du coach, elle doit être gardée au rendu. Le serveur
+              refuse par ailleurs l'écriture de cette collection à un non-admin. */}
+          {activeTab === "students" &&
+            (student.isAdmin ? (
+              <StudentTracking
+                students={enrolledStudents}
+                onUpdateStudent={handleUpdateStudent}
+                onAddStudent={handleAddStudent}
+                onDeleteStudent={handleDeleteStudent}
+              />
+            ) : (
+              <div className="space-y-6">
+                <h1 className="text-2xl font-bold text-white">Suivi des Élèves</h1>
+                <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-8 min-h-96 flex flex-col items-center justify-center gap-2 text-center">
+                  <p className="text-slate-300 font-semibold">
+                    Cette section est réservée au staff.
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Contacte ton coach si tu penses devoir y accéder.
+                  </p>
+                </div>
+              </div>
+            ))}
 
           {activeTab === "wallets" && (
             <WalletManagement
