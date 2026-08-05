@@ -329,21 +329,48 @@ hors ligne, migration automatique depuis `localStorage`.
 
 ### Authentification
 
-Socle à **un seul compte** : la mécanique est réelle, les données ne sont pas
-encore cloisonnées (limites en §6.2 et §6.3).
+**Plusieurs comptes staff, un seul bureau.** N'importe quel nombre de comptes
+peut se connecter séparément (email + mot de passe propres), mais tous
+travaillent sur les **mêmes** données — trades, élèves, portefeuilles. Il n'y a
+**aucun cloisonnement** : ce n'est pas du multi-tenant, c'est un bureau partagé
+avec plusieurs badges d'accès. Décision explicite de l'utilisateur : « le staff
+seulement », « tous égaux » (pas de rôles différenciés), invitation depuis
+l'interface avec mot de passe temporaire.
 
-**Schéma** — deux tables purement additives dans `server/db.ts`, aucun `ALTER`,
-aucun moteur de migration :
+**L'identité est découplée de la donnée.** C'est la clé de voûte du design :
+aucun repository n'a jamais utilisé l'identité de session pour filtrer quoi que
+ce soit (tout retombe sur `DEFAULT_USER_ID` par défaut) — ça a permis d'ajouter
+plusieurs comptes **sans toucher à une seule ligne de `server/repositories.ts`
+ni des routes de collections**. `requireAuth` accorde `isAdmin: true` à toute
+session valide, sans consulter le profil partagé : avoir un compte, c'est être
+du staff, il n'y a rien d'autre à vérifier.
 
-- `user_credentials` — `user_id` (clé primaire), `email`, `email_lower`
-  (**`UNIQUE`**, l'identifiant de connexion), `password_hash`, horodatages.
-- `sessions` — `id` (**SHA-256 du jeton**, jamais le jeton), `user_id`,
-  `created_at`, `expires_at`, `last_seen_at`, `user_agent`, plus deux index.
+**Schéma** — `server/db.ts`. Une seule table d'identité,
+**`staff_accounts`** : `id`, `name`, `email`, `email_lower` (**`UNIQUE`**),
+`password_hash`, `must_change_password`, `invited_by`, horodatages.
+**Délibérément sans clé étrangère vers `users`** : un compte staff n'est pas
+propriétaire d'un bureau, il y accède. `sessions` référence `staff_accounts(id)`,
+plus `id` (**SHA-256 du jeton**, jamais le jeton), `created_at`, `expires_at`,
+`last_seen_at`, `user_agent`.
 
-Table séparée et non `ALTER TABLE users` pour une raison précise :
-`GET /api/state` renvoie `getProfile()` **tel quel au navigateur**. Un hash qui
-vivrait dans `users.payload` partirait au client à chaque démarrage. Ne
-réintroduis pas de secret dans ce payload.
+Aucun champ de ces tables n'atteint jamais le client : `GET /api/state` renvoie
+`getProfile()` (le bureau partagé) **tel quel au navigateur**, jamais
+`staff_accounts`. Ne réintroduis pas de secret dans le payload du profil.
+
+**Migration** (`migrateToStaffAccounts()` dans `server/db.ts`, marqueur
+`migrated_staff_accounts_v1` en `meta`) — le projet est passé par un modèle
+antérieur à un seul compte (`user_credentials`, lié 1:1 au bureau par une clé
+étrangère qui interdisait tout second compte). La migration :
+1. copie chaque ligne de `user_credentials` vers `staff_accounts`, **en
+   conservant exactement le même `id`** — les sessions déjà émises restent
+   valides, personne n'est déconnecté ;
+2. recrée `sessions` avec la nouvelle contrainte (`CREATE TABLE IF NOT EXISTS`
+   ne modifie **jamais** une table existante, un piège réel rencontré ici : sur
+   une base déjà créée, l'ancienne contrainte vers `users` serait restée sans
+   ce recréage explicite) ;
+3. supprime `user_credentials`.
+Idempotente (marqueur en `meta`), testée d'abord sur une **copie** de la vraie
+base avant d'être appliquée (redémarrage du serveur de dev) — voir §9.
 
 **Mots de passe** ([`server/auth/password.ts`](server/auth/password.ts)) —
 `scrypt` de `node:crypto`, **aucune dépendance ajoutée**. `N = 32768`, `r = 8`,
@@ -381,11 +408,12 @@ Le cookie est lu à la main depuis `req.headers.cookie` — `cookie-parser` n'es
 pas installé et la contrainte était de ne rien ajouter. Le découpage se fait sur
 le **premier** `=` seulement.
 
-**Routes** — `/auth/me` (répond **toujours 200**, union discriminée
-`no-account` / `unauthenticated` / `authenticated` : « pas encore connecté » est
-l'état normal au démarrage, un 401 pousserait à traiter un état comme une
-erreur), `/auth/setup` (**409 si un compte existe** — c'est la protection
-critique, sans elle n'importe qui réinitialiserait le mot de passe à distance),
+**Routes publiques** (`authRouter`, avant la barrière) — `/auth/me` (répond
+**toujours 200**, union discriminée `no-account` / `unauthenticated` /
+`authenticated`, ce dernier portant `mustChangePassword` : « pas encore
+connecté » est l'état normal au démarrage, un 401 pousserait à traiter un état
+comme une erreur), `/auth/setup` (**409 si un compte existe** — protection
+critique, crée le **premier** compte et amorce le bureau partagé),
 `/auth/login`, `/auth/logout` (**204, idempotente, hors de `requireAuth`** :
 une session expirée doit pouvoir se déconnecter).
 
@@ -394,16 +422,38 @@ email inconnu et mot de passe faux, et un **hachage contre un hash factice**
 quand le compte est absent — sinon l'écart de temps de réponse (immédiat contre
 80 ms) révélerait quels comptes existent.
 
+**Routes staff** (`staffRouter`, **après** la barrière — piège réel : elles ne
+peuvent pas vivre dans `authRouter`, monté avant `requireAuth`, sinon
+l'invitation et le changement de mot de passe seraient publics) —
+`GET /auth/staff` (liste, accessible à tout compte : tous égaux), `POST
+/auth/staff` (invite, génère un mot de passe temporaire de 12 caractères
+**renvoyé une seule fois**, jamais stocké en clair, jamais journalisé),
+`DELETE /auth/staff/:id` (**refuse de supprimer le dernier compte** —
+`deleteStaffAccount()` compte les lignes avant d'agir, sans quoi la base
+deviendrait irrécupérable), `POST /auth/change-password` (exige le mot de passe
+**actuel**, même sous un mot de passe temporaire — sinon voler un jeton de
+session suffirait à changer le mot de passe sans le connaître).
+
+`POST /auth/change-password` répond **403 et non 401** sur un mauvais mot de
+passe actuel : un 401 aurait déclenché l'interception générique de
+`src/lib/api.ts` (`UNAUTHENTICATED_EVENT`) qui traite tout 401 comme une
+session expirée — alors que la session y est parfaitement valide.
+
 **La barrière** — `api.use(requireAuth)` dans `server/routes.ts`, placée **après**
-`/health` et le routeur d'auth, **avant** tout le reste : l'ordre de déclaration
-rend l'exclusion structurelle. Elle est sur le **routeur**, jamais en `app.use` :
-Vite est monté après l'API dans `startServer()`, un middleware au niveau
-application intercepterait `/@vite/client` et le WebSocket HMR et casserait le
-développement. Une liste d'exclusions explicite sert de filet, avec des chemins
-**relatifs au routeur** (`/state`, pas `/api/state`).
+`/health` et `authRouter`, **avant** `staffRouter` et tout le reste : l'ordre de
+déclaration rend l'exclusion structurelle. Elle est sur le **routeur**, jamais en
+`app.use` : Vite est monté après l'API dans `startServer()`, un middleware au
+niveau application intercepterait `/@vite/client` et le WebSocket HMR et
+casserait le développement. Une liste d'exclusions explicite sert de filet,
+avec des chemins **relatifs au routeur** (`/state`, pas `/api/state`).
+
+`requireAuth` relit le compte staff **en base à chaque requête** (jamais depuis
+le cookie) et bloque tout sauf `/auth/change-password` si
+`mustChangePassword` est vrai — filet de sécurité, le client se gouverne déjà
+sur ce champ sans jamais appeler d'autre route dans cet état.
 
 `/state/seed` et `/state/import` sont **protégés**. Le flux le permet : sur base
-neuve, `me` → `no-account` → `setup` crée la ligne `users` *et* la session →
+neuve, `me` → `no-account` → `setup` crée le bureau *et* la session →
 le client est authentifié → *ensuite* `useBootstrap` déclenche le seed.
 
 **Durcissement des privilèges**, indissociable de l'auth — sans lui elle serait
@@ -412,18 +462,20 @@ décorative :
 - `isAdmin` n'est plus écrivable par le client. Deux verrous : `profileSchema`
   **retire** la clé du corps (retirer et non rejeter — le client renvoie l'objet
   qu'il a reçu, un 400 casserait toute sauvegarde), et `PUT /api/profile`
-  réinjecte la valeur autoritative lue en base.
-- Le bouton « Activer Admin 👑 » de `UserProfileModal` est **retiré** ; le statut
-  s'affiche en lecture seule.
+  réinjecte la valeur autoritative lue en base. **Devenu partiellement
+  vestigial** depuis les comptes staff : `isAdmin` du profil partagé n'a plus
+  de rôle de contrôle d'accès réel (`requireAuth` accorde déjà `isAdmin: true`
+  à tout compte staff) ; il reste lu par `Sidebar.tsx` et le rendu de la vue
+  `students` dans `App.tsx`, où il fonctionne toujours (`isAdmin` vaut
+  toujours `true` en pratique) mais n'a plus de rôle discriminant entre
+  utilisateurs — un compte staff n'est jamais différent d'un autre.
+- Le bouton « Activer Admin 👑 » de `UserProfileModal` est **retiré**, remplacé
+  par « Gérer l'équipe » qui ouvre `StaffAccountsModal`.
 - La vue `students` est gardée **au rendu**, plus seulement masquée dans la
-  sidebar, avec un message explicite. `"students"` ne figure dans
-  `knownTabs` que pour un admin, et un `useEffect` renvoie au tableau de bord si
-  le statut est révoqué en cours de session.
-- `PUT /api/collections/enrolledStudents` exige l'admin côté serveur — sans quoi
-  la protection resterait cosmétique.
+  sidebar, avec un message explicite.
+- `PUT /api/collections/enrolledStudents` exige l'admin côté serveur.
 - `profileSchema.email` valide enfin une vraie adresse (ou la chaîne vide).
-- `apiErrorHandler` ne renvoie plus `err.message` en production : il exposait les
-  contraintes SQLite, donc des noms de tables et de colonnes.
+- `apiErrorHandler` ne renvoie plus `err.message` en production.
 
 **Rate limit** — extrait en fabrique `createRateLimit` dans
 `server/middleware/rateLimit.ts`. L'ancienne version tenait une `Map` au niveau
@@ -443,6 +495,21 @@ Un 401 sur n'importe quelle requête émet un `CustomEvent`
 connexion avec « Ta session a expiré ». Sans cela, `useSyncedState` avalerait le
 401 en `console.warn` et l'utilisateur continuerait de travailler en croyant que
 ses données se sauvegardent.
+
+**Changement de mot de passe forcé** — `App()` intercale un troisième écran
+entre la connexion et l'application : si `status === "authenticated"` et
+`user.mustChangePassword`, `ChangePasswordScreen` s'affiche et **rien d'autre
+ne se monte**, notamment pas `AuthenticatedApp`/`useBootstrap` — cohérent avec
+le blocage serveur qui refuserait `/api/state` de toute façon.
+
+**Gestion de l'équipe** — `StaffAccountsModal.tsx`, ouverte depuis le bouton
+« Gérer l'équipe » de `UserProfileModal`. Nécessite `currentStaffId`
+(`user.id` de `useAuth`), fourni en filetant une nouvelle prop `currentStaffId`
+de `App` → `AuthenticatedApp` → `AcademyApp` — **`null` hors ligne**, aucune
+session à interroger sans serveur ; la modale n'est alors pas rendue. Le mot de
+passe temporaire d'une invitation est tenu dans un état local **volatil**
+(effacé à la fermeture de la modale) : il n'est jamais récupérable après coup,
+y compris par cette modale elle-même.
 
 ### Poids des images
 
@@ -510,14 +577,16 @@ survols sur des surfaces neutres de la sidebar et du header. Le texte
 | `src/lib/image.ts` | réduction des images téléversées avant stockage |
 | `server/auth/password.ts` | hachage scrypt, vérification, re-hachage |
 | `server/auth/sessions.ts` | jetons, cookie, purge, lecture du cookie |
-| `server/auth/credentials.ts` | accès à `user_credentials` |
-| `server/auth/routes.ts` | `/api/auth/*` |
+| `server/auth/credentials.ts` | accès à `staff_accounts` (identité, invitation, révocation) |
+| `server/auth/routes.ts` | `authRouter` (public) + `staffRouter` (protégé) |
 | `server/auth/middleware.ts` | `requireAuth`, `requireAdmin` |
 | `server/middleware/rateLimit.ts` | fabrique de limiteur, extraite de `routes.ts` |
-| `src/hooks/useAuth.ts` | état d'authentification côté client |
+| `src/hooks/useAuth.ts` | état d'authentification côté client, `changePassword` |
 | `src/components/auth/AuthShell.tsx` | coque et primitives des écrans d'auth |
 | `src/components/auth/LoginScreen.tsx` | écran de connexion |
 | `src/components/auth/SetupScreen.tsx` | écran de première installation |
+| `src/components/auth/ChangePasswordScreen.tsx` | changement forcé (mot de passe temporaire) |
+| `src/components/StaffAccountsModal.tsx` | invitation, liste, révocation des comptes staff |
 | `public/logo-auth.jpg` | logo optimisé pour les écrans d'auth |
 | `src/hooks/usePersistentState.ts` | état miroité dans localStorage |
 | `src/hooks/useServerSync.ts` | bootstrap + synchronisation optimiste |
@@ -626,46 +695,40 @@ modifications non synchronisées le jour où le serveur ne redémarre pas, et le
 mode lecture seule demandait de désactiver les actions d'écriture dans les dix
 vues.
 
-### 3. Un seul compte, données non cloisonnées
+### 3. Plusieurs comptes, mais aucun cloisonnement de données
 
-L'authentification est un **socle** : un compte unique, et toutes les données
-restent sur `user-local`. Le multi-compte est conçu pour être **additif** —
-`email_lower` est déjà `UNIQUE`, chaque ligne porte déjà un `user_id`, et les six
-fonctions de `repositories.ts` acceptent déjà un `userId`.
+**Les comptes multiples sont faits** (§4 « Authentification ») : n'importe
+quel nombre de comptes staff peut se connecter séparément. Mais c'est un
+**bureau partagé**, pas du multi-tenant — décision explicite de l'utilisateur
+(« le staff seulement », « tous égaux »). Personne n'a de données privées :
+tous les comptes voient et modifient les mêmes trades, élèves, portefeuilles.
 
-Ce qui reste à faire pour de vrais comptes multiples, et qui n'est **pas** fait :
+Ce que ce choix laisse délibérément non fait, si le besoin change un jour vers
+des bureaux réellement séparés par personne :
 
-- aucun appelant ne passe de `userId` aux repositories (le défaut implicite
-  s'applique partout) ;
+- aucun repository ne filtre par identité de session — tout retombe sur
+  `DEFAULT_USER_ID`, quel que soit le compte connecté (c'est précisément ce qui
+  a permis d'ajouter les comptes staff sans toucher aux repositories) ;
 - `forum_replies` n'a **pas** de `user_id` (rattachement indirect par `topic_id`) ;
-- `isBootstrapped()` est un drapeau **global** dans `meta` : un second
-  utilisateur trouverait la base « déjà amorcée » et n'obtiendrait jamais de seed ;
+- `isBootstrapped()` reste un drapeau **global** dans `meta` ;
 - le forum identifie les auteurs par **chaîne de nom**, sans `authorId` ;
-- les clés `localStorage` sont **globales**, sans namespace : un second compte
-  sur le même navigateur hériterait du cache du premier ;
-- il faudrait trancher quelles collections sont partagées (modules, signaux) et
-  lesquelles sont privées, et le lien entre `EnrolledStudent` et un compte
-  (aujourd'hui inexistant, voir §3 « Inventaire »).
+- les clés `localStorage` sont **globales**, sans namespace par compte ;
+- `EnrolledStudent` n'a toujours aucun lien avec un compte staff — ce sont des
+  fiches de suivi, pas des comptes (voir §3 « Inventaire »).
 
-### 3. `onSelectAccountForJournal` est mort
+Faire cela demanderait de reprendre chaque repository pour accepter un
+`userId` réel (la signature existe déjà mais n'est jamais alimentée), de
+trancher quelles collections resteraient partagées (modules vidéo, signaux
+coach ?) contre lesquelles deviendraient privées par bureau, et de décider du
+lien entre `EnrolledStudent` et un compte réel. Chantier bien plus grand que
+l'ajout de comptes staff — ne pas le confondre avec lui.
+
+### 4. `onSelectAccountForJournal` est mort
 
 Dans [`WalletManagement.tsx:29`](src/components/WalletManagement.tsx:29), la
 prop est **déclarée et déstructurée mais jamais appelée dans le composant**. La
 câbler depuis `App.tsx` ne produirait rien. Il faut d'abord décider quel
 élément d'interface doit la déclencher.
-
-### 4. Résidus de session dans `data/`
-
-- Un **trade de test est toujours en base** : `MARQUEUR/TEST`, id
-  `trade-marqueur-migration`, PnL `1234 €`, note « Doit se retrouver en base ».
-  Il vient d'une vérification de persistance qui n'a pas été nettoyée, et il
-  **fausse les statistiques du tableau de bord** (win rate, capital, R cumulé).
-  À supprimer depuis l'interface du journal — c'est le plus sûr, la
-  suppression repassera par la synchronisation normale.
-- Trois fichiers **`data/horizon 2.db*`** (une base de 4 ko et 1,8 Mo de WAL)
-  traînent à côté de la vraie base. C'est un doublon Finder, **rien ne les
-  lit** : `db.ts` ouvre exclusivement `horizon.db`. Supprimables sans risque,
-  mais demander avant.
 
 ### 5. Données existantes sans les nouveaux champs
 
@@ -675,7 +738,7 @@ Les trades et élèves déjà en base ont été créés avant l'ajout de `exitDa
 `mockData.ts` ne s'appliquent qu'à une base neuve**.
 
 > **`rm -rf data/` détruit de vraies données.** Le profil en base est celui de
-> l'utilisateur (« ForexPaps », capital 100 000 € / 103 684 €), pas le profil
+> l'utilisateur (« ForexPaps », capital 100 000 € / 102 450 €), pas le profil
 > de démonstration de `mockData.ts` (« Alexandre Vance »). Les styles de
 > trading des 4 élèves ont été saisis **à la main via l'interface**, ils ne
 > sont pas amorcés. Une remise à zéro perd tout cela. Sauvegarde d'abord :
@@ -683,6 +746,11 @@ Les trades et élèves déjà en base ont été créés avant l'ajout de `exitDa
 > ```bash
 > cp data/horizon.db data/horizon.db.bak
 > ```
+>
+> Ne laisse pas cette sauvegarde derrière toi une fois la tâche terminée : le
+> répertoire `data/` a déjà accumulé plusieurs bases orphelines au fil des
+> sessions passées (`horizon 2.db`, `horizon.db.bak`, `horizon.db.avant-auth`),
+> toutes nettoyées depuis.
 
 ### 6. Aucun test automatisé
 
@@ -696,9 +764,9 @@ et **les données seraient perdues à chaque redémarrage d'instance**. Monter u
 volume sur `DATA_DIR`, ou passer à Postgres. Seul `server/repositories.ts` est
 à réécrire : les routes n'y touchent pas.
 
-### 8. Bundle client de ~925 Ko
+### 8. Bundle client de ~944 Ko
 
-`dist/assets/index-*.js` dépasse **920 ko** (~250 ko gzippé), au-delà du
+`dist/assets/index-*.js` dépasse **940 ko** (~255 ko gzippé), au-delà du
 seuil d'avertissement de 500 ko de Vite. Aucun découpage de code n'est en
 place. Non bloquant, mais à traiter avant une mise en production sérieuse.
 `recharts` est le principal contributeur.
@@ -768,13 +836,16 @@ l'utilisateur le demande.
 | « Audit Setup » présenté comme IA | **corrigé** — c'est une matrice de confluences déterministe |
 | Stockage des avatars | **redimensionnement côté client**, pas de route d'upload — l'avatar reste dans le profil, ce qui préserve le repli hors ligne (une URL ne résoudrait plus sans serveur) |
 | Avatar de 4 Mo déjà en base | **recompressé sur place**, la photo de l'utilisateur est conservée |
-| Périmètre de l'authentification | **socle à un seul compte**, extensible sans refonte — le multi-compte n'est pas fait (§6.3) |
+| Périmètre de l'authentification | **comptes staff multiples, bureau unique partagé** — pas de multi-tenant, aucune donnée privée par compte (§6.3) |
+| Qui peut avoir un compte | **le staff seulement** — les fiches élèves (`EnrolledStudent`) restent des dossiers de suivi, jamais des comptes |
+| Droits par compte | **tous égaux** — aucun rôle différencié, avoir un compte staff suffit à tout faire |
+| Créer un nouveau compte | **invitation depuis l'interface** (`StaffAccountsModal`), mot de passe temporaire généré côté serveur, jamais choisi par l'inviteur |
 | Hachage des mots de passe | **scrypt de `node:crypto`**, aucune dépendance ajoutée — argon2 et bcrypt écartés (compilation native, aucun gain réel à cette échelle) |
 | Premier mot de passe | **écran de première installation**, pas de variable d'environnement ni de script — aucun mot de passe par défaut dans le dépôt |
 | Sessions multi-appareils | **autorisées** — la connexion ne révoque pas les autres sessions, la déconnexion ne ferme que la session courante |
 | Accès hors ligne | **conservé** — le verrou n'est donc pas une barrière physique (§6.2). Bloquer ou passer en lecture seule ont été écartés |
-| Devenir administrateur | **premier compte admin d'office**. Sans effet sur la base actuelle, dont le profil a déjà `isAdmin: true`. À revoir au multi-compte |
 | Longueur minimale du mot de passe | **10 caractères**, sans contrainte de composition |
+| Suppression du dernier compte | **refusée par le serveur** — aucune procédure de récupération n'existe si plus aucun compte ne peut se connecter |
 | `onSelectAccountForJournal` | **non tranché** — demande une décision produit |
 | Rejeu des modifications hors ligne | **non tranché** — coût élevé, à ne faire que sur demande |
 
@@ -789,34 +860,27 @@ L'onglet `exam` existe mais **affiche une page vierge** avec le texte « Contenu
 page vierge en attendant de définir le contenu. Lui demander ce qu'il veut y
 mettre avant de coder.
 
-### 2. Nettoyer les résidus
-
-Le trade `MARQUEUR/TEST` et les fichiers `data/horizon 2.db*` (§6.4). Rapide,
-mais demander avant de toucher à des données. S'y ajoutent désormais deux
-sauvegardes de base laissées par les chantiers précédents :
-`data/horizon.db.bak` et `data/horizon.db.avant-auth`.
-
-### 3. Dériver la liste blanche des onglets de notification
+### 2. Dériver la liste blanche des onglets de notification
 
 `handleNavigateFromNotification` a été complété (`exam`, `propfirm`, et
 `students` réservé à l'admin), mais la liste reste **recopiée à la main**. La
 dériver de `TabType` éviterait qu'un futur onglet crée un trou silencieux.
 
-### 5. Découper le bundle
+### 3. Découper le bundle
 
 `build.rollupOptions.output.manualChunks` ou imports dynamiques sur les vues
 les plus lourdes (`recharts` est le principal contributeur).
 
-### 6. Décider du sort de `onSelectAccountForJournal`
+### 4. Décider du sort de `onSelectAccountForJournal`
 
 Câbler ou supprimer. Demander d'abord.
 
-### 7. Nettoyer `.env.example` et `vite.config.ts`
+### 5. Nettoyer `.env.example` et `vite.config.ts`
 
-Retirer les mentions AI Studio et la variable `APP_URL` inutilisée (§6.10,
-§6.11).
+Retirer les mentions AI Studio et la variable `APP_URL` inutilisée (§6.9,
+§6.10).
 
-### 8. Rejeu des modifications hors ligne
+### 6. Rejeu des modifications hors ligne
 
 Seulement si l'utilisateur le demande : coût élevé, gestion de conflits.
 
@@ -1093,11 +1157,15 @@ reprendre :
 
 Nettoie derrière toi : les données de test créées pendant la vérification
 doivent être supprimées avant de rendre la main. **Cette règle a déjà été
-enfreinte une fois** — voir le trade `MARQUEUR/TEST` en §6.5.
+enfreinte une fois** — un trade de test (`MARQUEUR/TEST`) et plusieurs bases de
+sauvegarde sont restés dans `data/` pendant plusieurs sessions avant d'être
+retirés. Pour l'authentification, la vérification du flux d'installation a été
+faite sur une base jetable (`DATA_DIR=/tmp/...`) séparée : aucun identifiant de
+test n'a jamais atteint `data/horizon.db`.
 
 ### Ce qui a réellement été vérifié — et ce qui ne l'a pas été
 
-Le projet n'a aucun test automatisé (§6.7). Tout a été vérifié à la main, et
+Le projet n'a aucun test automatisé (§6.6). Tout a été vérifié à la main, et
 **pas au même degré selon les zones**. Ne suppose pas une couverture uniforme.
 
 | Degré | Zones |
@@ -1170,43 +1238,41 @@ modèle déclaré (`gemini-3.6-flash`,
 
 ## 10. État à la reprise
 
-> ### La base attend son mot de passe
+> ### Votre compte a migré, votre session aussi
 >
-> `user_credentials` est **vide** : au prochain démarrage, l'application affiche
-> l'écran de **première installation**. C'est voulu — le mot de passe doit être
-> choisi par l'utilisateur, aucun mot de passe de test n'a été laissé derrière.
+> La migration `staff_accounts` (§4) a été **appliquée à la vraie base** —
+> pas seulement testée sur une copie. Votre compte (`th.gauthey99@gmail.com`)
+> a conservé son `id` d'origine et **votre session active n'a pas été
+> invalidée** : si vous rechargez l'onglet où vous étiez déjà connecté, vous
+> resterez connecté sans ressaisir de mot de passe.
 >
-> Les données sont intactes et vérifiées champ par champ contre la sauvegarde
-> `data/horizon.db.avant-auth` : profil identique, 7 trades, 4 élèves,
-> 4 portefeuilles, 5 messages, 4 sujets, 5 notifications, 9 badges, 5 modules.
+> Une sauvegarde d'avant migration existe : `data/horizon.db.avant-staff-accounts`.
+> Supprimable une fois le fonctionnement confirmé de votre côté.
 
-- Branche `main`, dernier commit `2f9bb7a`, plus le socle d'authentification
-  **non committé**.
-- `npm run lint` : sans erreur. `npm run build` : réussi, avec le seul
-  avertissement de taille de bundle (§6.8, désormais ~933 ko).
-- Vérifié **aussi en production** (`npm run build && NODE_ENV=production node
-  dist/server.cjs`) : `/logo-auth.jpg` servi en 38 830 octets, SPA servie,
-  `/api/auth/me` répond `no-account`.
-- **Une erreur console subsiste**, sans rapport avec le code applicatif :
-  `WebSocket connection to 'ws://localhost:24678/' failed`, en boucle. C'est le
-  socket HMR de Vite, qui écoute sur son propre port alors que Vite tourne en
-  middleware derrière Express — ce port n'est pas exposé. Sans effet sur le
-  fonctionnement, mais le rechargement à chaud ne marche pas : **recharge la
-  page à la main** après une modification.
-- Une sauvegarde `data/horizon.db.bak` (8,2 Mo, avec l'avatar d'origine non
-  compressé) a été laissée à côté de la base. Supprimable une fois le
-  correctif jugé bon.
+- Branche `main`, dernier commit `28d6787`, plus le nettoyage des résidus et le
+  socle de comptes staff, **non committés**.
+- `npm run lint` et `npm run build` : sans erreur (bundle ~944 ko, §6.8).
+- Migration vérifiée **trois fois** : sur une copie isolée (`/tmp/test-migration`),
+  sur une base neuve pour le flux staff complet (`/tmp/staff-neuf`), puis
+  appliquée à la vraie base par redémarrage du serveur de dev — données
+  comparées champ par champ à une sauvegarde d'avant migration, aucun écart.
+- Flux staff exercé de bout en bout, au `curl` et dans le navigateur : invitation,
+  connexion avec mot de passe temporaire, blocage sur toute route hors
+  `/auth/change-password` tant que `mustChangePassword` est vrai, déblocage
+  après changement, bureau partagé confirmé identique entre deux comptes,
+  suppression avec purge immédiate des sessions, garde-fou du dernier compte.
+- **Une erreur console subsiste**, sans rapport avec ce chantier : le socket
+  HMR de Vite (`ws://localhost:24678`) échoue en boucle. **Recharge la page à
+  la main** après une modification — déjà documenté, toujours vrai.
 
 ### Contenu de `data/horizon.db`
 
-Fichier : **200 ko** (8,2 Mo avant recompression de l'avatar et `VACUUM`).
-
 | Table | Lignes |
 |---|---|
-| `users` | 1 (profil « ForexPaps », admin, avatar JPEG 256×256 de 42 879 car.) |
-| `user_credentials` | **0** — d'où l'écran de première installation au prochain démarrage |
-| `sessions` | 0 |
-| `trades` | 7 — **dont 1 trade de test à supprimer** (§6.4) |
+| `users` | 1 (profil « ForexPaps », `isAdmin: true`, capital 102 450 €) |
+| `staff_accounts` | 1 (votre compte, migré, `must_change_password: 0`) |
+| `sessions` | 1 (la vôtre, valable jusqu'au 4 septembre 2026) |
+| `trades` | 6 (le trade de test a été retiré cette session) |
 | `trading_accounts` | 4 |
 | `coach_signals` | 4 |
 | `coach_messages` | 5 |
@@ -1215,8 +1281,7 @@ Fichier : **200 ko** (8,2 Mo avant recompression de l'avatar et `VACUUM`).
 | `enrolled_students` | 4 (tous avec `tradingStyle`) |
 | `badges` | 9 |
 | `modules` | 5 |
-| `quiz_results` | 0 |
-| `meta` | `bootstrapped_at = 2026-08-04T15:25:28.717Z` |
+| `meta` | `bootstrapped_at`, `migrated_staff_accounts_v1` |
 
 Les 4 élèves : Julien Moreau (Intraday, En Évaluation FTMO), Camille Dupont
 (Swing Trading, Prop Firm Financé), Lucas Martin (Scalping, Alerte Tilt),
@@ -1224,16 +1289,17 @@ Sophie Bernard (Intraday, Besoin Coaching).
 
 ### Par où commencer
 
-Le socle d'authentification est terminé et vérifié. Plus rien n'est cassé : les
-points d'entrée sont des choix, pas des urgences.
+Plus rien n'est cassé ni en cours. Les points d'entrée restants sont des
+choix, pas des urgences :
 
 - **§7 tâche 1 — remplir le module « Examen ».** À ne pas coder avant d'avoir
   demandé à l'utilisateur ce qu'il veut y mettre : la page vierge est volontaire.
-- **§7 tâche 2 — nettoyer les résidus.** Quelques minutes, et cela retire le
-  trade de test qui fausse les statistiques du tableau de bord, ainsi que trois
-  sauvegardes de base devenues inutiles.
-- **§6.3 — les comptes multiples**, si l'utilisateur le demande. La liste
-  exhaustive de ce qui reste à faire y figure ; tout est additif.
+- **Inviter un second compte**, si l'utilisateur le souhaite — le bouton
+  « Gérer l'équipe » dans le profil est prêt, jamais utilisé sur la vraie base.
+- **§6.3 — un vrai cloisonnement des données par compte**, seulement si le
+  besoin dépasse un jour le bureau partagé actuel. Chantier nettement plus
+  grand que les comptes staff ; la liste de ce qu'il faudrait reprendre y
+  figure.
 
 > Ce document est la **seule** source de reprise. Des plans de travail ont pu
 > être écrits dans `~/.claude/plans/`, **hors du dépôt** : un nouveau Claude ne

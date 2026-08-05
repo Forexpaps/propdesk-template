@@ -110,6 +110,28 @@ export const loginSchema = z
   })
   .strict();
 
+/** Invitation d'un nouveau compte staff. Le mot de passe est généré côté serveur. */
+export const inviteStaffSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200),
+    email: emailField,
+  })
+  .strict();
+
+/**
+ * Changement de mot de passe, qu'il soit temporaire ou déjà personnel.
+ *
+ * `currentPassword` est exigé même quand `mustChangePassword` est vrai : sans
+ * lui, connaître le jeton de session (volé, ou une machine restée ouverte)
+ * suffirait à changer le mot de passe sans jamais le connaître.
+ */
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1).max(200),
+    newPassword: z.string().min(PASSWORD_MIN).max(200),
+  })
+  .strict();
+
 /** Corps accepté par la route d'audit IA du coach. */
 export const coachReviewSchema = z
   .object({

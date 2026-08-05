@@ -26,6 +26,8 @@ export interface UseAuthResult {
   expired: boolean;
   login: (email: string, password: string) => Promise<void>;
   setup: (email: string, password: string) => Promise<void>;
+  /** Change le mot de passe et lève `mustChangePassword`. */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   /** Repasse en `unauthenticated` sans appeler le serveur. */
   markLoggedOut: () => void;
   refresh: () => Promise<void>;
@@ -93,11 +95,16 @@ export function useAuth(): UseAuthResult {
     setStatus("authenticated");
   }, []);
 
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    const result = await api.changePassword(currentPassword, newPassword);
+    setUser(result.user);
+  }, []);
+
   const markLoggedOut = useCallback(() => {
     setUser(null);
     setExpired(false);
     setStatus("unauthenticated");
   }, []);
 
-  return { status, user, expired, login, setup, markLoggedOut, refresh };
+  return { status, user, expired, login, setup, changePassword, markLoggedOut, refresh };
 }

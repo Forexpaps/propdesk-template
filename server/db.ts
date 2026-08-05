@@ -124,22 +124,30 @@ db.exec(`
     PRIMARY KEY (module_id, user_id)
   );
 
-  -- Identifiants de connexion, volontairement HORS de users.payload.
+  -- Comptes staff : identité de connexion, DÉCOUPLÉE du bureau partagé.
   --
-  -- GET /api/state renvoie le payload du profil tel quel au navigateur : un hash
-  -- de mot de passe qui y vivrait partirait au client à chaque démarrage. Une
-  -- table séparée rend cette fuite structurellement impossible.
+  -- Plusieurs coachs peuvent avoir chacun leur propre email et mot de passe,
+  -- tout en travaillant sur les MÊMES données (le bureau "users" reste
+  -- singulier). C'est pourquoi il n'y a PAS de clé étrangère vers users(id) :
+  -- un compte staff n'est pas "propriétaire" d'un bureau, il y accède.
   --
-  -- email_lower porte enfin la contrainte d'unicité qui manquait, et elle est
-  -- déjà correcte pour le jour où plusieurs comptes existeront.
-  CREATE TABLE IF NOT EXISTS user_credentials (
-    user_id       TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    email         TEXT NOT NULL,
-    email_lower   TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    created_at    TEXT NOT NULL,
-    updated_at    TEXT NOT NULL
+  -- Aucun champ ici n'atteint jamais le client via /api/state : GET /api/state
+  -- ne renvoie que le payload de "users", jamais cette table.
+  CREATE TABLE IF NOT EXISTS staff_accounts (
+    id                   TEXT PRIMARY KEY,
+    name                 TEXT NOT NULL,
+    email                TEXT NOT NULL,
+    email_lower          TEXT NOT NULL UNIQUE,
+    password_hash        TEXT NOT NULL,
+    -- Vrai tant qu'un mot de passe temporaire d'invitation n'a pas été
+    -- remplacé par l'intéressé. Jamais vrai pour le premier compte (créé via
+    -- /auth/setup, qui choisit son propre mot de passe).
+    must_change_password INTEGER NOT NULL DEFAULT 0,
+    invited_by           TEXT REFERENCES staff_accounts(id) ON DELETE SET NULL,
+    created_at           TEXT NOT NULL,
+    updated_at           TEXT NOT NULL
   );
+  CREATE INDEX IF NOT EXISTS idx_staff_accounts_email ON staff_accounts(email_lower);
 
   -- Sessions actives. La colonne id est le SHA-256 du jeton, jamais le jeton
   -- lui-même : le fichier de base vit en clair sur le disque (et dans le WAL, et
@@ -150,7 +158,7 @@ db.exec(`
   -- comparaison chronologique, ce dont dépend le filtre sur expires_at.
   CREATE TABLE IF NOT EXISTS sessions (
     id           TEXT PRIMARY KEY,
-    user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id      TEXT NOT NULL REFERENCES staff_accounts(id) ON DELETE CASCADE,
     created_at   TEXT NOT NULL,
     expires_at   TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
@@ -159,6 +167,111 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions(user_id);
   CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 `);
+
+/**
+ * Migration ponctuelle : sépare l'identité de connexion (désormais
+ * `staff_accounts`) de l'ancien modèle à un seul compte (`user_credentials`,
+ * lié 1:1 au bureau partagé par une clé étrangère qui interdirait tout second
+ * compte).
+ *
+ * Le compte existant conserve exactement son `id` d'origine (celui qui était
+ * `user_id` dans `user_credentials`, presque toujours `DEFAULT_USER_ID`) :
+ * les sessions déjà émises restent donc valides, personne n'est déconnecté
+ * par cette migration.
+ *
+ * Protégée par un marqueur dans `meta`, comme `bootstrapped_at` : elle ne
+ * s'exécute qu'une fois, même si `user_credentials` a déjà été vidée depuis.
+ */
+const MIGRATION_KEY = "migrated_staff_accounts_v1";
+
+function migrateToStaffAccounts(): void {
+  const already = db
+    .prepare("SELECT 1 FROM meta WHERE key = ?")
+    .get(MIGRATION_KEY);
+  if (already) return;
+
+  const hasLegacyTable = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='user_credentials'")
+    .get();
+
+  // `CREATE TABLE IF NOT EXISTS` plus haut ne modifie jamais une table déjà
+  // existante : sur une base créée avant cette migration, `sessions` porte
+  // encore sa contrainte d'origine vers `users(id)`, incompatible avec des
+  // comptes staff qui n'ont pas de ligne dans `users`. Il faut la recréer.
+  const sessionsForeignKeys = db.pragma("foreign_key_list(sessions)") as {
+    table: string;
+  }[];
+  const sessionsReferenceUsers = sessionsForeignKeys.some((fk) => fk.table === "users");
+
+  db.transaction(() => {
+    // Ordre impératif : `staff_accounts` doit être peuplée AVANT de recréer
+    // `sessions` avec sa clé étrangère vers elle, sinon les lignes de session
+    // copiées référenceraient des comptes qui n'existent pas encore.
+    if (hasLegacyTable) {
+      const legacy = db
+        .prepare(
+          "SELECT user_id, email, email_lower, password_hash, created_at, updated_at FROM user_credentials"
+        )
+        .all() as {
+        user_id: string;
+        email: string;
+        email_lower: string;
+        password_hash: string;
+        created_at: string;
+        updated_at: string;
+      }[];
+
+      const insertStaff = db.prepare(
+        `INSERT INTO staff_accounts
+           (id, name, email, email_lower, password_hash, must_change_password, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
+      );
+
+      for (const row of legacy) {
+        // Nom d'affichage de repli : la partie locale de l'email, faute de
+        // mieux — cette table n'a jamais eu de champ "name" avant cette
+        // migration. Le titulaire peut le changer depuis l'écran de compte.
+        const displayName = row.email.split("@")[0] || "Coach";
+        insertStaff.run(
+          row.user_id,
+          displayName,
+          row.email,
+          row.email_lower,
+          row.password_hash,
+          row.created_at,
+          row.updated_at
+        );
+      }
+
+      db.exec("DROP TABLE user_credentials");
+    }
+
+    if (sessionsReferenceUsers) {
+      db.exec(`
+        CREATE TABLE sessions_new (
+          id           TEXT PRIMARY KEY,
+          user_id      TEXT NOT NULL REFERENCES staff_accounts(id) ON DELETE CASCADE,
+          created_at   TEXT NOT NULL,
+          expires_at   TEXT NOT NULL,
+          last_seen_at TEXT NOT NULL,
+          user_agent   TEXT
+        );
+        INSERT INTO sessions_new SELECT * FROM sessions WHERE user_id IN (SELECT id FROM staff_accounts);
+        DROP TABLE sessions;
+        ALTER TABLE sessions_new RENAME TO sessions;
+        CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions(user_id);
+        CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+      `);
+    }
+
+    db.prepare("INSERT INTO meta (key, value) VALUES (?, ?)").run(
+      MIGRATION_KEY,
+      new Date().toISOString()
+    );
+  })();
+}
+
+migrateToStaffAccounts();
 
 export function getMeta(key: string): string | null {
   const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as

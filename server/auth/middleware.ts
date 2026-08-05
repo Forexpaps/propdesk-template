@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import { getProfile } from "../repositories";
+import { getStaffById } from "./credentials";
 import { readSessionToken, validateSession } from "./sessions";
 
 /**
@@ -14,6 +14,13 @@ import { readSessionToken, validateSession } from "./sessions";
 /** Identité attachée à la requête par `requireAuth`. */
 export interface AuthContext {
   userId: string;
+  /**
+   * Toujours vrai après cette barrière : avoir un compte staff, c'est être du
+   * staff — décision produit, tous les comptes ont les mêmes droits. Le champ
+   * reste distinct d'un simple "authentifié" pour ne rien changer côté
+   * consommateurs (`requireAdmin`, le profil renvoyé au client) si un rôle
+   * différencié devenait nécessaire un jour.
+   */
   isAdmin: boolean;
 }
 
@@ -43,6 +50,14 @@ const PUBLIC_PATHS = new Set([
   "/auth/setup",
 ]);
 
+/**
+ * Seule route accessible à une session dont le mot de passe est encore
+ * temporaire. Le client se gouverne déjà sur `mustChangePassword` renvoyé par
+ * `/auth/me` et n'appelle normalement jamais les autres routes dans cet état
+ * — ce blocage est un filet de sécurité, pas le mécanisme principal.
+ */
+const CHANGE_PASSWORD_PATH = "/auth/change-password";
+
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   if (PUBLIC_PATHS.has(req.path)) {
     next();
@@ -57,22 +72,33 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     return;
   }
 
-  // Le statut d'administrateur est relu en base à chaque requête, jamais pris
-  // dans le cookie : une révocation prend effet immédiatement.
-  const profile = getProfile<{ isAdmin?: boolean }>(session.userId);
+  // Relu en base à chaque requête, jamais pris dans le cookie : la
+  // suppression d'un compte ou un changement de mot de passe prennent effet
+  // immédiatement, sans attendre l'expiration de la session.
+  const staff = getStaffById(session.userId);
+  if (!staff) {
+    res.status(401).json({ error: "Session expirée ou absente." });
+    return;
+  }
 
-  req.auth = {
-    userId: session.userId,
-    isAdmin: profile?.isAdmin === true,
-  };
+  if (staff.mustChangePassword && req.path !== CHANGE_PASSWORD_PATH) {
+    res.status(403).json({
+      error: "Mot de passe temporaire : choisis-en un nouveau avant de continuer.",
+      code: "MUST_CHANGE_PASSWORD",
+    });
+    return;
+  }
 
+  req.auth = { userId: session.userId, isAdmin: true };
   next();
 };
 
 /**
  * Réserve une route aux administrateurs.
  *
- * À placer après `requireAuth`, qui a déjà renseigné `req.auth`.
+ * Toujours vrai aujourd'hui après `requireAuth` (tous les comptes staff sont
+ * égaux) — conservé pour documenter l'intention à l'appel, et pour rester le
+ * seul endroit à modifier si des rôles différenciés apparaissent un jour.
  */
 export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (req.auth?.isAdmin !== true) {
