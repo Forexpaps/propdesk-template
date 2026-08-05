@@ -307,29 +307,42 @@ function AcademyApp({ initialState, syncEnabled, onLoggedOut }: AcademyAppProps)
       return;
     }
 
-    if (
-      !confirm(
+    let confirmed: boolean;
+    try {
+      confirmed = confirm(
         "Se déconnecter ? Tes données restent enregistrées sur le serveur. Le cache de cet appareil sera effacé."
-      )
-    ) {
+      );
+    } catch (err) {
+      // Certains contextes (iframe sandboxée, extension bloquant les dialogues
+      // natifs) font lever confirm() plutôt que renvoyer false. Sans ce
+      // filet, le clic resterait sans aucun effet ni message.
+      console.error("[propdesk] confirm() a levé une exception.", err);
+      alert("La déconnexion n'a pas pu être confirmée. Réessaie, ou recharge la page.");
       return;
     }
+    if (!confirmed) return;
 
+    // Le `try/finally` garantit que l'écran de connexion s'affiche même si
+    // `api.logout()` ou `localStorage.clear()` échoue de façon inattendue —
+    // sans lui, une exception imprévue laisserait le bouton sans aucun effet
+    // visible, ce qui est exactement le symptôme le plus trompeur possible.
     try {
-      await api.logout();
-    } catch (err) {
-      // Serveur devenu injoignable : on nettoie quand même l'appareil. Le pire
-      // cas est une session orpheline côté serveur, qui expirera d'elle-même.
-      console.warn("[propdesk] Déconnexion serveur échouée.", err);
-    }
+      try {
+        await api.logout();
+      } catch (err) {
+        // Serveur devenu injoignable : on nettoie quand même l'appareil. Le
+        // pire cas est une session orpheline côté serveur, qui expirera seule.
+        console.warn("[propdesk] Déconnexion serveur échouée.", err);
+      }
 
-    try {
-      localStorage.clear();
-    } catch {
-      // Stockage indisponible : il n'y avait alors rien à oublier.
+      try {
+        localStorage.clear();
+      } catch {
+        // Stockage indisponible : il n'y avait alors rien à oublier.
+      }
+    } finally {
+      onLoggedOut();
     }
-
-    onLoggedOut();
   };
 
   // Notifications Handlers
