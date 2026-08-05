@@ -234,6 +234,44 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
     }));
   }, [trades]);
 
+  /**
+   * Ferme la session.
+   *
+   * L'application n'a pas encore d'authentification : il n'y a donc aucune
+   * session à invalider, et rien à masquer puisque le serveur ne connaît qu'un
+   * utilisateur. Ce que ce bouton peut faire de sensible aujourd'hui, c'est
+   * ramener l'application à un démarrage propre : on oublie le cache local et
+   * on relit tout depuis le serveur.
+   *
+   * Quand l'écran de connexion arrivera, seul le corps de cette fonction
+   * change — l'appel de la sidebar reste le même.
+   */
+  const handleLogout = () => {
+    // Hors ligne, le cache local est la SEULE copie des données : le vider
+    // serait une perte sèche. On refuse plutôt que de détruire en silence.
+    if (!syncEnabled) {
+      alert(
+        "Déconnexion impossible hors ligne : les données de cette session ne sont pas encore enregistrées sur le serveur."
+      );
+      return;
+    }
+
+    if (
+      !confirm(
+        "Se déconnecter ? Tes données restent enregistrées sur le serveur, l'application repartira d'un démarrage propre."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      localStorage.clear();
+    } catch {
+      // Stockage indisponible : il n'y avait alors rien à oublier.
+    }
+    window.location.reload();
+  };
+
   // Notifications Handlers
   const handleMarkNotificationAsRead = (id: string) => {
     setNotifications((prev) =>
@@ -611,6 +649,7 @@ function AcademyApp({ initialState, syncEnabled }: AcademyAppProps) {
           setProfileModalTab("profile");
           setIsProfileModalOpen(true);
         }}
+        onLogout={handleLogout}
         onOpenChecklist={() => setIsChecklistOpen(true)}
         onOpenSetupAnalyzer={() => setIsSetupAnalyzerOpen(true)}
         onOpenPropFirmRules={() => setIsPropFirmRulesOpen(true)}

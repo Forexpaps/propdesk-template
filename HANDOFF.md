@@ -297,6 +297,15 @@ hors ligne, migration automatique depuis `localStorage`.
   d'onglet. Masquables comme les autres.
 - Le réglage de visibilité n'est proposé qu'en sidebar **dépliée** : repliée,
   les en-têtes de section — donc l'interrupteur — ne sont pas rendus.
+- **Seule la navigation défile.** Le logo et le pied (carte de profil,
+  déconnexion) sont `shrink-0` et restent atteignables sans défilement. Avant,
+  `overflow-y-auto` était posé sur le conteneur entier : sur un écran de 900 px
+  de haut, le contenu faisait déjà 941 px et **la carte de profil sortait de
+  l'écran**. Ne remets pas le défilement sur le conteneur.
+- **Bouton de déconnexion** dans le pied, sous la carte de profil. Il n'est pas
+  masquable : il ne vit dans aucune section. Rose au survol, comme les autres
+  actions qui font quitter ou détruire quelque chose. En sidebar repliée, il
+  devient une icône seule avec une infobulle.
 
 ### Journal de trading
 
@@ -400,8 +409,8 @@ survols sur des surfaces neutres de la sidebar et du header. Le texte
 
 | Fichier | Nature des changements |
 |---|---|
-| `src/App.tsx` | bootstrap serveur, 12 `useSyncedState`, câblage des modales |
-| `src/components/Sidebar.tsx` | masquage admin, `TabType`, logo, clés stables, section OUTILS, `renderSection` |
+| `src/App.tsx` | bootstrap serveur, 12 `useSyncedState`, câblage des modales, `handleLogout` |
+| `src/components/Sidebar.tsx` | masquage admin, `TabType`, logo, clés stables, section OUTILS, `renderSection`, bouton de déconnexion, pied non défilant |
 | `src/components/TradingJournal.tsx` | horodatages de sortie, CSV, palette |
 | `src/components/StudentTracking.tsx` | style de trading, palette, statuts |
 | `src/components/TopHeader.tsx` | 5 boutons retirés, fil d'ariane, props mortes retirées |
@@ -427,6 +436,24 @@ confluences ».
 La **seule** fonction Gemini réellement branchée est `TradeAuditModal`, via
 `/api/coach/ai-review` — plus la réponse du coach dans la messagerie
 (`handleSendMessage` dans [`App.tsx:426`](src/App.tsx:426)).
+
+### « Déconnexion » ne ferme pas encore de session
+
+Le bouton existe dans le pied de la sidebar, mais **il n'y a pas encore
+d'authentification** (§6.2) : aucune session à invalider, et rien à masquer
+puisque le serveur ne connaît qu'un utilisateur.
+
+Ce qu'il fait aujourd'hui, et c'est le seul comportement honnête disponible :
+il vide le cache `localStorage` et recharge, ce qui ramène l'application à un
+démarrage propre relu depuis le serveur.
+
+Il **refuse d'agir hors ligne** : le cache est alors la seule copie des données
+et le vider serait une perte sèche. L'utilisateur reçoit un message explicite
+au lieu d'une destruction silencieuse.
+
+Quand l'écran de connexion arrivera (§7, tâche 1), **seul le corps de
+`handleLogout` change** — l'appel depuis la sidebar reste identique. Ne
+réimplémente pas le bouton, remplis le handler.
 
 ### Supprimé
 
@@ -457,6 +484,11 @@ technique.
 
 Un utilisateur unique implicite (`user-local`) est utilisé. C'est le plus gros
 manque fonctionnel. Voir §7, tâche 1.
+
+Le pied de la sidebar affiche un **bouton « Déconnexion »**, mais il ne ferme
+aucune session — il n'y en a pas. Il ramène l'application à un démarrage
+propre. C'est assumé et documenté en §4 ; ne le prends pas pour la preuve
+qu'une authentification existe.
 
 ### 3. Deux onglets du centre d'alertes sont injoignables
 
@@ -616,10 +648,16 @@ faites : 768 px → 332 Ko, 600 px → 208 Ko, 768 px en JPEG q88 → 40 Ko. Le 
 risque un léger halo sur les bords nets du D blanc et de la flèche verte : à
 comparer à l'œil. L'original reste dans git (`6f2547c`).
 
-Note de conception : les comptes créés porteront chacun un avatar. Le
-redimensionnement de `src/lib/image.ts` est déjà en place et **doit être
-réutilisé** pour tout nouveau champ image — c'est exactement le scénario qui
-avait produit un profil de 4 Mo.
+Notes de conception, déjà en place :
+
+- **Le bouton de déconnexion existe** dans le pied de la sidebar, câblé à
+  `handleLogout` dans `App.tsx`. Il ne reste qu'à remplacer le corps de cette
+  fonction par une véritable invalidation de session. Ne réimplémente pas le
+  bouton.
+- Les comptes créés porteront chacun un avatar. Le redimensionnement de
+  `src/lib/image.ts` est déjà en place et **doit être réutilisé** pour tout
+  nouveau champ image — c'est exactement le scénario qui avait produit un
+  profil de 4 Mo.
 
 ### 2. Remplir le module « Examen »
 
@@ -908,6 +946,15 @@ que l'avatar recompressé vient bien de SQLite. Deux limites à connaître :
   le chemin WebP a été observé en conditions réelles ;
 - le redressement EXIF est demandé via `createImageBitmap`, mais **aucune photo
   réellement orientée par EXIF n'a été testée**.
+
+Le bouton de déconnexion a été exercé sur ses **trois** chemins : en ligne
+(confirmation, cache vidé, rechargement, état relu depuis SQLite), sidebar
+repliée (icône seule, infobulle, même position), et **hors ligne** (refus
+explicite, aucune confirmation demandée, cache intact). La branche hors ligne
+n'étant pas atteignable en arrêtant le serveur — c'est lui qui sert
+l'application — elle a été exercée en forçant temporairement `setStatus`
+dans `useServerSync.ts`, modification ensuite annulée (`git diff` vérifié
+vide).
 
 Le dernier point mérite d'être explicite : `/api/coach/ai-review` n'a été testée
 que sur sa **validation d'entrée** et sa **limitation de débit**. Aucun appel
