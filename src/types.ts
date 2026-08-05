@@ -149,6 +149,9 @@ export interface StudentProfile {
 
 export type StudentStatusTag = "En Évaluation FTMO" | "Prop Firm Financé" | "Besoin Coaching" | "Alerte Tilt";
 
+/** Horizon de tenue des positions travaillé par l'élève. */
+export type TradingStyle = "Scalping" | "Intraday" | "Swing Trading";
+
 export interface EnrolledStudent {
   id: string;
   name: string;
@@ -159,6 +162,8 @@ export interface EnrolledStudent {
   assignedCoach: string;
   level: string;
   statusTag: StudentStatusTag;
+  /** Absent pour les fiches créées avant l'ajout du champ. */
+  tradingStyle?: TradingStyle;
   courseCompletionPercentage: number;
   startingCapital: number;
   currentCapital: number;

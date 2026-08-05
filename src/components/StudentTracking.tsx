@@ -24,9 +24,10 @@ import {
   Sparkles,
   Zap,
   Tag,
+  Timer,
   MessageSquare
 } from "lucide-react";
-import { EnrolledStudent, StudentStatusTag, TradingAccount, Trade } from "../types";
+import { EnrolledStudent, StudentStatusTag, TradingStyle, TradingAccount, Trade } from "../types";
 
 interface StudentTrackingProps {
   students: EnrolledStudent[];
@@ -69,7 +70,10 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
 
   const handleOpenEdit = (student: EnrolledStudent) => {
     setSelectedStudent(student);
-    setEditForm({ ...student });
+    // Une fiche antérieure au champ n'a pas de style : on aligne l'état du
+    // formulaire sur ce que le menu affiche, sinon enregistrer sans y toucher
+    // laisserait la valeur vide.
+    setEditForm({ ...student, tradingStyle: student.tradingStyle ?? "Intraday" });
     setIsEditingFile(true);
   };
 
@@ -106,6 +110,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
       assignedCoach: editForm.assignedCoach || "Thomas Laurent",
       level: editForm.level || "Élève Débutant",
       statusTag: (editForm.statusTag as StudentStatusTag) || "En Évaluation FTMO",
+      tradingStyle: (editForm.tradingStyle as TradingStyle) || "Intraday",
       courseCompletionPercentage: Number(editForm.courseCompletionPercentage) || 0,
       startingCapital: Number(editForm.startingCapital) || 10000,
       currentCapital: Number(editForm.currentCapital) || 10000,
@@ -235,6 +240,12 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                       <span className={`px-2 py-0.5 rounded text-[10px] border ${STATUS_TAG_STYLES[st.statusTag]}`}>
                         {st.statusTag}
                       </span>
+                      {st.tradingStyle && (
+                        <span className="px-2 py-0.5 rounded text-[10px] border border-[#232D29] bg-[#1B2320] text-slate-300 flex items-center gap-1">
+                          <Timer className="w-3 h-3 text-slate-500" />
+                          {st.tradingStyle}
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-slate-400">{st.email} • {st.level}</p>
                     <p className="text-[11px] text-slate-500">Coach attribué : <span className="text-[#00E676]">{st.assignedCoach}</span></p>
@@ -396,6 +407,19 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     <option value="Prop Firm Financé">Prop Firm Financé 🏆</option>
                     <option value="Besoin Coaching">Besoin Coaching ⚠️</option>
                     <option value="Alerte Tilt">Alerte Tilt 🔴</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-medium text-slate-300 mb-1">Style de Trading</label>
+                  <select
+                    value={editForm.tradingStyle || "Intraday"}
+                    onChange={(e) => setEditForm({ ...editForm, tradingStyle: e.target.value as TradingStyle })}
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
+                  >
+                    <option value="Scalping">Scalping</option>
+                    <option value="Intraday">Intraday</option>
+                    <option value="Swing Trading">Swing Trading</option>
                   </select>
                 </div>
 
@@ -625,6 +649,12 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     <span className={`px-2 py-0.5 rounded text-xs border ${STATUS_TAG_STYLES[selectedStudent.statusTag]}`}>
                       {selectedStudent.statusTag}
                     </span>
+                    {selectedStudent.tradingStyle && (
+                      <span className="px-2 py-0.5 rounded text-xs border border-[#232D29] bg-[#1B2320] text-slate-300 flex items-center gap-1">
+                        <Timer className="w-3 h-3 text-slate-500" />
+                        {selectedStudent.tradingStyle}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-400">{selectedStudent.email} • Inscrit le {selectedStudent.joinedDate}</p>
                   <p className="text-xs text-[#00E676]">Coach Référent : {selectedStudent.assignedCoach}</p>
