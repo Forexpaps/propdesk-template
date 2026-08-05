@@ -29,7 +29,8 @@ import {
   Trophy,
   Brain,
   Calendar,
-  Target
+  Target,
+  LogOut
 } from "lucide-react";
 import { StudentProfile } from "../types";
 
@@ -131,6 +132,11 @@ interface SidebarProps {
   isCollapsed: boolean;
   setIsCollapsed: (collapsed: boolean) => void;
   onOpenProfileModal: () => void;
+  /**
+   * Ferme la session. Absent tant qu'aucune authentification n'existe : le
+   * bouton n'est alors pas rendu plutôt que de rester inerte.
+   */
+  onLogout?: () => void;
   onOpenChecklist?: () => void;
   // Section OUTILS : chaque entrée ouvre une modale.
   onOpenSetupAnalyzer?: () => void;
@@ -152,6 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isCollapsed,
   setIsCollapsed,
   onOpenProfileModal,
+  onLogout,
   onOpenChecklist,
   onOpenSetupAnalyzer,
   onOpenPropFirmRules,
@@ -360,9 +367,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           mobileOpen ? "translate-x-0 w-64" : "-translate-x-full lg:translate-x-0"
         } ${isCollapsed ? "lg:w-20" : "lg:w-64"}`}
       >
-        <div className="flex flex-col h-full overflow-y-auto scrollbar-none">
+        {/* Seule la navigation défile : le logo et le pied (profil,
+            déconnexion) doivent rester atteignables sans défilement, sur les
+            écrans courts comme sur les grands. */}
+        <div className="flex flex-col h-full min-h-0">
           {/* Header Brand Logo: PropDesk */}
-          <div className={`p-4 border-b border-[#151D1A] flex items-center ${isCollapsed ? "justify-center" : "justify-between"}`}>
+          <div className={`shrink-0 p-4 border-b border-[#151D1A] flex items-center ${isCollapsed ? "justify-center" : "justify-between"}`}>
             <div
               className="flex items-center gap-3 cursor-pointer group"
               onClick={() => {
@@ -397,7 +407,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           {/* Navigation Items */}
-          <nav className="p-3 space-y-4 flex-1 text-xs">
+          <nav className="p-3 space-y-4 flex-1 min-h-0 overflow-y-auto scrollbar-none text-xs">
             {/* Main Item: Tableau de bord */}
             <div>
               <button
@@ -431,7 +441,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Reduce Sidebar Button */}
           {!isCollapsed && (
-            <div className="px-4 py-2">
+            <div className="shrink-0 px-4 py-2">
               <button
                 onClick={() => setIsCollapsed(true)}
                 className="w-full flex items-center gap-2 text-[11px] text-slate-400 hover:text-white px-2 py-1.5 rounded-lg hover:bg-slate-900 transition-colors"
@@ -442,7 +452,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
 
           {/* User Profile Footer */}
-          <div className="p-3 border-t border-[#151D1A] bg-[#0A0E0D] mt-auto">
+          <div className="shrink-0 p-3 border-t border-[#151D1A] bg-[#0A0E0D] mt-auto">
             {!isCollapsed ? (
               <div
                 onClick={onOpenProfileModal}
@@ -484,6 +494,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   />
                 </button>
               </div>
+            )}
+
+            {/* Déconnexion. Ne quitte pas une section : elle vit sous la carte
+                de profil, à laquelle elle se rapporte. */}
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                title={isCollapsed ? "Déconnexion" : undefined}
+                className={`mt-2 w-full flex items-center gap-2 rounded-lg px-3 py-2 text-[11px] font-medium text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors ${
+                  isCollapsed ? "justify-center" : ""
+                }`}
+              >
+                <LogOut className="w-4 h-4 shrink-0" />
+                {!isCollapsed && <span>Déconnexion</span>}
+              </button>
             )}
           </div>
         </div>
