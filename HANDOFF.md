@@ -32,14 +32,25 @@ interface :
 - quatre **outils** en modale : audit de setup, règles prop firm, mindset,
   calendrier économique.
 
+**Qui l'utilise, et ce que cela implique.** C'est l'outil de travail d'un coach
+(« ForexPaps ») et de son staff. Plusieurs comptes staff peuvent se connecter
+séparément, mais tous partagent **le même bureau** : mêmes trades, mêmes fiches
+élèves, mêmes portefeuilles. Ce n'est pas du multi-tenant — voir §6.3, c'est la
+confusion la plus coûteuse possible sur ce projet. Les élèves, eux, n'ont
+**pas** de compte : ce sont des fiches de suivi (`EnrolledStudent`).
+
 L'interface est **entièrement en français**. Le ton des libellés est direct et
 tutoie l'utilisateur. Conserve cette langue et ce registre.
 
 Le projet vient de **Google AI Studio** : c'est important, plusieurs choix
 initiaux en découlent (voir §8).
 
-**Ordres de grandeur** : ~12 400 lignes de TypeScript dans `src/` + `server/`,
-26 fichiers `.ts`/`.tsx`, 25 commits.
+**Ordres de grandeur** : ~15 300 lignes de TypeScript, 49 fichiers `.ts`/`.tsx`,
+29 commits. Le plus gros fichier applicatif est `src/App.tsx` (1057 l.), le plus
+gros tout court `src/data/mockData.ts` (1455 l., données d'amorçage).
+
+**La base de données contient de vraies données de travail** — pas un jeu de
+démonstration. Voir l'avertissement en §6.5 avant toute manipulation de `data/`.
 
 ---
 
@@ -73,14 +84,35 @@ Il n'y a **qu'un seul port**. Pas de proxy à configurer.
 Un `.claude/launch.json` est présent : l'outil de prévisualisation démarre le
 serveur sous le nom **`horizon-dev`** (port 3000, `autoPort` activé).
 
-Inspecter la base :
+Inspecter la base — c'est le chemin le plus direct, l'API exige une session :
 
 ```bash
 sqlite3 data/horizon.db "select id, pair, pnl from trades order by position"
 ```
 
 ```bash
-curl -s localhost:3000/api/state | head -c 400
+sqlite3 data/horizon.db "select id, name, email, must_change_password from staff_accounts"
+```
+
+Sonder l'API **sans** session (les seules routes qui répondent) :
+
+```bash
+curl -s localhost:3000/api/health && curl -s localhost:3000/api/auth/me
+```
+
+`/api/state` et tout le reste renvoient **401** sans cookie. Pour exercer les
+routes protégées, connecte-toi d'abord et garde le cookie :
+
+```bash
+curl -s -c /tmp/pd.txt -X POST localhost:3000/api/auth/login -H 'Content-Type: application/json' -d '{"email":"…","password":"…"}' && curl -s -b /tmp/pd.txt localhost:3000/api/state | head -c 400
+```
+
+**Ne teste jamais l'authentification sur `data/`.** Utilise une base jetable —
+c'est ce qui a permis de valider le flux complet sans toucher aux vraies
+données ni créer de compte parasite :
+
+```bash
+DATA_DIR=/tmp/propdesk-test PORT=3100 npx tsx server.ts
 ```
 
 ---
@@ -93,27 +125,40 @@ Un serveur **Express unique** sert l'API **et** l'application. En
 développement il monte Vite en middleware ; en production il sert `dist/`.
 
 ```
-server.ts              point d'entrée : Express + Vite/statique (46 l.)
+server.ts              point d'entrée : Express + Vite/statique (55 l.)
 server/
-  db.ts                connexion SQLite (better-sqlite3, WAL) et schéma (146 l.)
+  db.ts                SQLite (better-sqlite3, WAL), schéma + migration (294 l.)
   repositories.ts      accès aux données — SEUL module qui parle à SQLite (173 l.)
-  routes.ts            routes /api/* (261 l.)
-  schemas.ts           validation zod des entrées (51 l.)
+  routes.ts            routes /api/*, barrière requireAuth (299 l.)
+  schemas.ts           validation zod des entrées (143 l.)
   seed.ts              amorçage et import d'un état complet (81 l.)
+  auth/
+    password.ts        hachage scrypt, vérification, re-hachage (208 l.)
+    sessions.ts        jetons, cookie, purge, lecture du cookie (211 l.)
+    credentials.ts     accès à staff_accounts (241 l.)
+    routes.ts          authRouter (public) + staffRouter (protégé) (357 l.)
+    middleware.ts      requireAuth, requireAdmin (109 l.)
+  middleware/
+    rateLimit.ts       fabrique de limiteur par IP (62 l.)
 src/
   main.tsx             point de montage React (10 l.)
-  App.tsx              état applicatif et câblage de toutes les vues (879 l.)
+  App.tsx              porte d'auth + état applicatif + câblage des vues (1057 l.)
   types.ts             source de vérité des formes de données (300 l.)
   index.css            Tailwind 4 + styles globaux
   data/mockData.ts     jeu de données d'amorçage (1455 l.)
   hooks/
     usePersistentState.ts   état miroité dans localStorage (41 l.)
     useServerSync.ts        bootstrap serveur + synchronisation optimiste (183 l.)
-  lib/api.ts           client HTTP typé (86 l.)
-  components/          10 vues d'onglet + 9 modales + Sidebar et TopHeader
+    useAuth.ts              état d'authentification côté client (110 l.)
+  lib/
+    api.ts             client HTTP typé, interception du 401 (179 l.)
+    image.ts           réduction des images téléversées (107 l.)
+  components/          10 vues d'onglet + 10 modales + Sidebar et TopHeader
+    auth/              AuthShell, LoginScreen, SetupScreen, ChangePasswordScreen
 public/
-  icon.png             icône 512x512 — sidebar et favicon
-  logo.png             logo complet 1536x1024 — réservé à l'écran de connexion (§6 bis)
+  icon.png             icône 512×512 — sidebar, favicon, icône iOS
+  logo-auth.jpg        logo 768×512, 38,8 ko — écrans d'authentification
+  logo.png             source haute résolution 1536×1024 (§6 bis)
   Fonctionnalites_Horizon_SMC.pdf
 scripts/generate_pdf.js  génération hors ligne du PDF
 ```
@@ -125,16 +170,47 @@ scripts/generate_pdf.js  génération hors ligne du PDF
 `ForumSection`, `CoachMessaging`, `PerformanceDashboard`. L'onglet `exam` n'a
 pas de composant : il est rendu en ligne dans `App.tsx` (§6 bis).
 
-**Modales (9)** — `UserProfileModal`, `TradeAuditModal`,
+**Modales (10)** — `UserProfileModal`, `TradeAuditModal`,
 `PositionCalculatorModal`, `TradingPlanModal`, `EconomicCalendarModal`,
 `PropFirmRulesModal`, `MindsetJournalModal`, `SetupAnalyzerModal`,
-`NotificationModal`.
+`NotificationModal`, `StaffAccountsModal`.
 
-**Chrome** — `Sidebar` (494 l.), `TopHeader` (133 l.).
+**Écrans d'authentification (3 + coque)** — `LoginScreen`, `SetupScreen`,
+`ChangePasswordScreen`, tous bâtis sur `AuthShell` (qui porte la palette et les
+primitives `AuthField` / `AuthError` / `AUTH_INPUT_CLASS` / `AUTH_BUTTON_CLASS`).
+Ils se montent **avant** l'application, jamais dedans.
+
+**Chrome** — `Sidebar` (519 l.), `TopHeader` (133 l.).
 
 Les plus gros fichiers, si tu cherches où le poids se concentre :
-`mockData.ts` (1455), `App.tsx` (879), `TradingJournal.tsx` (848),
-`ForumSection.tsx` (764), `VideoAcademy.tsx` (756), `StudentTracking.tsx` (746).
+`mockData.ts` (1455), `App.tsx` (1057), `TradingJournal.tsx` (848),
+`ForumSection.tsx` (764), `VideoAcademy.tsx` (756), `StudentTracking.tsx` (746),
+`UserProfileModal.tsx` (650).
+
+### Démarrage du client — le chemin critique
+
+`src/App.tsx` est découpé en **trois composants successifs**, et c'est ce
+découpage qui garantit qu'aucune donnée ne part avant qu'une session existe
+(les hooks ne pouvant pas être conditionnels) :
+
+```
+App()                        ne fait QUE useAuth()  →  GET /api/auth/me
+ ├─ "loading"          → LoadingScreen
+ ├─ "no-account"       → SetupScreen           (première installation)
+ ├─ "unauthenticated"  → LoginScreen
+ ├─ authentifié mais mustChangePassword
+ │                     → ChangePasswordScreen  (bloquant)
+ └─ AuthenticatedApp()        monté seulement ici
+      └─ useBootstrap()       →  GET /api/state
+           └─ AcademyApp()    12 useSyncedState, toutes les vues et modales
+```
+
+`AcademyApp` porte l'essentiel de l'application (~900 des 1057 lignes) et **sa
+structure interne n'a jamais été restructurée** — les chantiers successifs ont
+délibérément gardé la surface de modification minimale sur ce composant.
+
+`"offline"` mène aussi à `AuthenticatedApp` : sans serveur, aucune vérification
+n'est possible et on démarre sur le cache (§6.2, choix assumé).
 
 ### Navigation
 
@@ -215,38 +291,67 @@ La base vit dans `DATA_DIR` (`./data` par défaut), **hors du dépôt**
 
 ### API
 
+**Publiques** — accessibles sans session :
+
 | Méthode | Route | Rôle |
 |---|---|---|
 | GET | `/api/health` | sonde de vie |
+| GET | `/api/auth/me` | état d'auth ; **répond toujours 200** |
+| POST | `/api/auth/setup` | première installation ; `409` si un compte existe |
+| POST | `/api/auth/login` | connexion |
+| POST | `/api/auth/logout` | déconnexion ; `204`, idempotente |
+
+**Protégées** — derrière `api.use(requireAuth)` :
+
+| Méthode | Route | Rôle |
+|---|---|---|
+| GET | `/api/auth/staff` | liste des comptes staff |
+| POST | `/api/auth/staff` | invite un compte, renvoie un mot de passe temporaire |
+| DELETE | `/api/auth/staff/:id` | révoque un compte ; `409` sur le dernier |
+| POST | `/api/auth/change-password` | change son propre mot de passe |
 | GET | `/api/state` | état complet de démarrage |
 | PUT | `/api/collections/:name` | remplace une collection entière |
-| PUT | `/api/profile` | profil de l'élève courant |
+| PUT | `/api/profile` | profil affiché du bureau partagé |
 | PUT | `/api/quiz-results` | résultats de quiz |
 | POST | `/api/state/seed` | amorce avec le jeu de démonstration |
 | POST | `/api/state/import` | reprend un état venu de `localStorage` |
 | POST | `/api/coach/ai-review` | audit IA d'un trade ou réponse à une question |
 | GET | `/api/download-features-pdf` | catalogue PDF des fonctionnalités |
 
-Toutes les entrées sont validées par **zod**. `/api/coach/ai-review` est
-limitée à **10 appels par minute et par IP** (fenêtre glissante en mémoire) :
-c'est la seule route facturée à l'appel (Gemini, modèle `gemini-3.6-flash`).
+Toutes les entrées sont validées par **zod**.
 
-Codes de retour à connaître : `400` entrée invalide, `404` collection inconnue,
-`409` base déjà amorcée (import ou seed refusé), `429` quota IA dépassé,
-`500` exception non prévue (via `apiErrorHandler`).
+**Quatre limitations de débit par IP** (`createRateLimit`, fenêtre glissante en
+mémoire) : `ai-review` 10/minute (seule route facturée à l'appel — Gemini,
+modèle `gemini-3.6-flash`), `login` 10/quart d'heure, `setup` 5/quart d'heure,
+`staff` (invitation) 10/quart d'heure.
+
+Codes de retour à connaître : `400` entrée invalide, `401` session absente ou
+expirée, `403` action refusée (mot de passe actuel faux, mot de passe
+temporaire non changé, non-admin), `404` collection inconnue, `409` conflit
+(compte déjà existant, base déjà amorcée, dernier compte non supprimable),
+`429` quota dépassé, `500` exception non prévue (via `apiErrorHandler`).
 
 Le corps JSON est plafonné à **8 Mo** (`express.json({ limit: "8mb" })`) — la
 limite par défaut de 100 ko était trop basse pour une collection complète.
+**Un second parseur borné à 16 ko est déclaré AVANT lui sur `/api/auth`** :
+`body-parser` marque la requête comme déjà lue, donc le parseur 8 Mo passe la
+main. Sans cela un corps de 8 Mo atteindrait le hachage du mot de passe.
 
 ### Schéma SQLite
 
-13 tables : `meta`, `users`, `trades`, `trading_accounts`, `coach_signals`,
-`coach_messages`, `forum_topics`, `forum_replies`, `notifications`,
-`enrolled_students`, `badges`, `modules`, `quiz_results`.
+15 tables : `meta`, `users`, `staff_accounts`, `sessions`, `trades`,
+`trading_accounts`, `coach_signals`, `coach_messages`, `forum_topics`,
+`forum_replies`, `notifications`, `enrolled_students`, `badges`, `modules`,
+`quiz_results`.
 
-Chaque ligne porte un `user_id` (`DEFAULT_USER_ID = "user-local"`), **même sans
-authentification** : cela évite une migration douloureuse le jour où elle
-arrivera. Les objets sont stockés en **colonne JSON** (`payload`), ce qui rend
+**`users` est le bureau partagé, `staff_accounts` les identités.** Les deux ne
+sont **pas** liées par une clé étrangère : un compte staff n'est pas
+propriétaire d'un bureau, il y accède (§4 « Authentification »).
+
+Les données portent un `user_id` valant toujours `DEFAULT_USER_ID`
+(`"user-local"`) — **aucun repository ne filtre par identité de session**.
+C'est ce qui a permis d'ajouter les comptes staff sans toucher à la couche de
+données. Les objets sont stockés en **colonne JSON** (`payload`), ce qui rend
 le schéma tolérant à l'ajout de champs — voir §8.
 
 Chaque ligne porte aussi une colonne `position` : **l'ordre des listes est
@@ -566,16 +671,24 @@ survols sur des surfaces neutres de la sidebar et du header. Le texte
 
 ### Créés
 
+**Persistance serveur** (chantier « base de données ») :
+
 | Fichier | Rôle |
 |---|---|
-| `server/db.ts` | connexion SQLite et schéma |
+| `server/db.ts` | connexion SQLite, schéma, migration `staff_accounts` |
 | `server/repositories.ts` | couche d'accès aux données |
-| `server/routes.ts` | routes `/api/*` |
+| `server/routes.ts` | routes `/api/*`, barrière `requireAuth` |
 | `server/schemas.ts` | validation zod |
 | `server/seed.ts` | amorçage et import |
-| `src/lib/api.ts` | client HTTP typé |
-| `src/lib/image.ts` | réduction des images téléversées avant stockage |
-| `server/auth/password.ts` | hachage scrypt, vérification, re-hachage |
+| `src/lib/api.ts` | client HTTP typé, interception du 401 |
+| `src/hooks/usePersistentState.ts` | état miroité dans localStorage |
+| `src/hooks/useServerSync.ts` | bootstrap + synchronisation optimiste |
+
+**Authentification et comptes staff** :
+
+| Fichier | Rôle |
+|---|---|
+| `server/auth/password.ts` | hachage scrypt, vérification, re-hachage, hash factice |
 | `server/auth/sessions.ts` | jetons, cookie, purge, lecture du cookie |
 | `server/auth/credentials.ts` | accès à `staff_accounts` (identité, invitation, révocation) |
 | `server/auth/routes.ts` | `authRouter` (public) + `staffRouter` (protégé) |
@@ -587,14 +700,23 @@ survols sur des surfaces neutres de la sidebar et du header. Le texte
 | `src/components/auth/SetupScreen.tsx` | écran de première installation |
 | `src/components/auth/ChangePasswordScreen.tsx` | changement forcé (mot de passe temporaire) |
 | `src/components/StaffAccountsModal.tsx` | invitation, liste, révocation des comptes staff |
-| `public/logo-auth.jpg` | logo optimisé pour les écrans d'auth |
-| `src/hooks/usePersistentState.ts` | état miroité dans localStorage |
-| `src/hooks/useServerSync.ts` | bootstrap + synchronisation optimiste |
-| `public/icon.png` | icône 512×512 |
-| `public/logo.png` | logo complet (fourni par l'utilisateur) |
-| `.claude/launch.json` | configuration du serveur de prévisualisation |
-| `README.md` | réécrit intégralement |
-| `HANDOFF.md` | ce document |
+
+**Images et identité visuelle** :
+
+| Fichier | Rôle |
+|---|---|
+| `src/lib/image.ts` | réduction des images téléversées avant stockage |
+| `public/icon.png` | icône 512×512 — sidebar, favicon, icône iOS |
+| `public/logo-auth.jpg` | logo 768×512 (38,8 ko) des écrans d'auth |
+| `public/logo.png` | source haute résolution, fournie par l'utilisateur |
+
+**Outillage et documentation** :
+
+| Fichier | Rôle |
+|---|---|
+| `.claude/launch.json` | configuration du serveur de prévisualisation (`horizon-dev`) |
+| `README.md` | réécrit intégralement — documentation utilisateur |
+| `HANDOFF.md` | ce document — documentation de reprise |
 
 ### Renommé
 
@@ -606,16 +728,16 @@ survols sur des surfaces neutres de la sidebar et du header. Le texte
 
 | Fichier | Nature des changements |
 |---|---|
-| `src/App.tsx` | bootstrap serveur, 12 `useSyncedState`, câblage des modales, `handleLogout` |
+| `src/App.tsx` | **porte d'authentification** (`App` → `AuthenticatedApp` → `AcademyApp`), bootstrap serveur, 12 `useSyncedState`, câblage des modales, `handleLogout`, gardes admin, filetage de `currentStaffId` |
 | `src/components/Sidebar.tsx` | masquage admin, `TabType`, logo, clés stables, section OUTILS, `renderSection`, bouton de déconnexion, pied non défilant |
+| `src/components/UserProfileModal.tsx` | `useEffect` sur `isOpen`, palette, réduction des avatars, retrait du bouton « Activer Admin », bouton « Gérer l'équipe » |
 | `src/components/TradingJournal.tsx` | horodatages de sortie, CSV, palette |
 | `src/components/StudentTracking.tsx` | style de trading, palette, statuts |
 | `src/components/TopHeader.tsx` | 5 boutons retirés, fil d'ariane, props mortes retirées |
 | `src/components/MainDashboard.tsx` | props mortes retirées (`onOpenCalculator`, `onOpenCalendar`) |
-| `src/components/UserProfileModal.tsx` | `useEffect` sur `isOpen`, palette, réduction des avatars téléversés |
 | `src/types.ts` | `exitDate`, `exitTime`, `TradingStyle`, `hiddenSidebarItems`, `TradeDraft` |
 | `src/data/mockData.ts` | horodatages de sortie, styles de trading |
-| `server.ts` | simplifié, chemins via `process.cwd()`, limite JSON à 8 Mo |
+| `server.ts` | simplifié, chemins via `process.cwd()`, JSON 8 Mo + parseur 16 ko sur `/api/auth`, purge des sessions au démarrage |
 | `index.html` | favicon et icône iOS |
 | les 8 autres modales et 9 autres vues | migration de palette (slate → jetons du tableau de bord) |
 
@@ -634,23 +756,30 @@ La **seule** fonction Gemini réellement branchée est `TradeAuditModal`, via
 `/api/coach/ai-review` — plus la réponse du coach dans la messagerie
 (`handleSendMessage` dans [`App.tsx:426`](src/App.tsx:426)).
 
-### « Déconnexion » ne ferme pas encore de session
+### « Déconnexion » ferme réellement la session
 
-Le bouton existe dans le pied de la sidebar, mais **il n'y a pas encore
-d'authentification** (§6.2) : aucune session à invalider, et rien à masquer
-puisque le serveur ne connaît qu'un utilisateur.
+Le bouton vit dans le pied de la sidebar (`Sidebar.tsx`, prop `onLogout?`),
+câblé à `handleLogout` dans `App.tsx`. Il appelle `api.logout()` — qui supprime
+la session **en base** et le cookie — puis vide le cache `localStorage` et
+repasse `useAuth` en `unauthenticated` via `onLoggedOut()`.
 
-Ce qu'il fait aujourd'hui, et c'est le seul comportement honnête disponible :
-il vide le cache `localStorage` et recharge, ce qui ramène l'application à un
-démarrage propre relu depuis le serveur.
+Le cache est effacé **délibérément** : hors ligne, l'application démarre sur ce
+cache sans pouvoir vérifier d'identité (§6.2), le laisser en place après une
+déconnexion volontaire rendrait le verrou contournable sur la machine.
 
 Il **refuse d'agir hors ligne** : le cache est alors la seule copie des données
-et le vider serait une perte sèche. L'utilisateur reçoit un message explicite
-au lieu d'une destruction silencieuse.
+et le vider serait une perte sèche. Message explicite plutôt que destruction
+silencieuse.
 
-Quand l'écran de connexion arrivera (§7, tâche 1), **seul le corps de
-`handleLogout` change** — l'appel depuis la sidebar reste identique. Ne
-réimplémente pas le bouton, remplis le handler.
+Le corps est enveloppé d'un `try/finally` : même si `api.logout()` ou
+`localStorage.clear()` lève, l'écran de connexion s'affiche. Ce durcissement
+vient d'un signalement « le bouton ne fonctionne pas » dont la cause réelle
+était le HMR cassé de Vite (§10) laissant tourner l'ancien code — mais un
+échec silencieux était le symptôme le plus trompeur possible, d'où le filet.
+
+`confirm()` est lui-même dans un `try/catch` : certains contextes (iframe
+sandboxée, extension bloquant les dialogues natifs) le font **lever** plutôt
+que renvoyer `false`, ce qui laissait le clic sans aucun effet ni message.
 
 ### Supprimé
 
@@ -856,33 +985,55 @@ l'utilisateur le demande.
 ### 1. Remplir le module « Examen »
 
 L'onglet `exam` existe mais **affiche une page vierge** avec le texte « Contenu
-à venir » ([`App.tsx:773`](src/App.tsx:773)). L'utilisateur a demandé cette
+à venir » ([`App.tsx:933`](src/App.tsx:933)). L'utilisateur a demandé cette
 page vierge en attendant de définir le contenu. Lui demander ce qu'il veut y
 mettre avant de coder.
 
-### 2. Dériver la liste blanche des onglets de notification
+### 2. Supprimer la sauvegarde d'avant migration
+
+`data/horizon.db.avant-staff-accounts` (+ ses fichiers `-shm`/`-wal`) traîne à
+côté de la base. Elle a été laissée **volontairement** le temps que
+l'utilisateur confirme que les comptes staff fonctionnent chez lui.
+**Lui demander avant de supprimer** — c'est le seul retour arrière possible sur
+la migration.
+
+Le répertoire `data/` a déjà accumulé plusieurs bases orphelines au fil des
+sessions (`horizon 2.db`, `horizon.db.bak`, `horizon.db.avant-auth`), toutes
+nettoyées depuis. Ne laisse pas la tienne s'y ajouter.
+
+### 3. Dériver la liste blanche des onglets de notification
 
 `handleNavigateFromNotification` a été complété (`exam`, `propfirm`, et
 `students` réservé à l'admin), mais la liste reste **recopiée à la main**. La
 dériver de `TabType` éviterait qu'un futur onglet crée un trou silencieux.
 
-### 3. Découper le bundle
+### 4. Découper le bundle
 
 `build.rollupOptions.output.manualChunks` ou imports dynamiques sur les vues
 les plus lourdes (`recharts` est le principal contributeur).
 
-### 4. Décider du sort de `onSelectAccountForJournal`
+### 5. Décider du sort de `onSelectAccountForJournal`
 
-Câbler ou supprimer. Demander d'abord.
+Câbler ou supprimer ([`WalletManagement.tsx:29`](src/components/WalletManagement.tsx:29)).
+Demander d'abord (§6.4).
 
-### 5. Nettoyer `.env.example` et `vite.config.ts`
+### 6. Nettoyer `.env.example` et `vite.config.ts`
 
 Retirer les mentions AI Studio et la variable `APP_URL` inutilisée (§6.9,
 §6.10).
 
-### 6. Rejeu des modifications hors ligne
+### 7. Rejeu des modifications hors ligne
 
 Seulement si l'utilisateur le demande : coût élevé, gestion de conflits.
+
+### Ce qui n'est PAS une tâche
+
+- **Le cloisonnement des données par compte** (§6.3). Le bureau partagé est un
+  choix explicite, pas un manque. Ne l'entreprends que si l'utilisateur
+  demande des espaces réellement séparés.
+- **Donner des comptes aux élèves.** Tranché : les élèves restent des fiches de
+  suivi, seul le staff se connecte.
+- **Rétablir un rôle par compte.** Tranché : tous les comptes staff sont égaux.
 
 ---
 
@@ -1121,8 +1272,13 @@ recadre qu'au centre. Pour un recadrage décalé, passer par un BMP intermédiai
 et le manipuler en Python pur (`struct`), puis reconvertir avec `sips`. C'est la
 méthode qui a produit `public/icon.png`.
 
-À noter pour la tâche §7.0 : le redimensionnement de l'avatar se fera **dans le
-navigateur** (`<canvas>`), ces limites de la machine ne s'y appliquent donc pas.
+`sips` **liste** WebP dans ses formats de sortie mais échoue silencieusement à
+en écrire : vérifie l'existence du fichier produit, pas le code de retour.
+C'est pourquoi `logo-auth.jpg` est un JPEG.
+
+Ces limites ne concernent que les images traitées **hors ligne**. Le
+redimensionnement des avatars, lui, se fait **dans le navigateur**
+(`<canvas>`, `src/lib/image.ts`) et y produit du WebP sans difficulté.
 
 ---
 
@@ -1139,6 +1295,14 @@ navigateur** (`<canvas>`), ces limites de la machine ne s'y appliquent donc pas.
   utile — il a ensuite choisi de supprimer le statut.
 - Quand une vérification n'a pas pu être menée à son terme, **le dire
   explicitement** plutôt que de laisser croire que tout est validé.
+- Il attend qu'on **tranche les décisions produit avec lui, pas à sa place** —
+  mais une fois qu'il a tranché, il ne veut pas qu'on rouvre le débat. Les
+  arbitrages rendus sont en §6 ter ; consulte-les avant de proposer un choix.
+- **Ses données de travail sont réelles.** Il l'a rappelé plusieurs fois
+  indirectement (un trade de test oublié en base a faussé ses statistiques
+  pendant plusieurs sessions). Sauvegarde avant toute migration, teste sur
+  `DATA_DIR=/tmp/...`, et ne crée jamais de compte ou de donnée parasite dans
+  `data/horizon.db`.
 
 ### Méthode de vérification attendue
 
@@ -1249,8 +1413,8 @@ modèle déclaré (`gemini-3.6-flash`,
 > Une sauvegarde d'avant migration existe : `data/horizon.db.avant-staff-accounts`.
 > Supprimable une fois le fonctionnement confirmé de votre côté.
 
-- Branche `main`, dernier commit `28d6787`, plus le nettoyage des résidus et le
-  socle de comptes staff, **non committés**.
+- Branche `main`, **arbre de travail propre**, dernier commit `fed79a9`
+  (« Ajoute des comptes staff multiples, sur un bureau toujours partagé »).
 - `npm run lint` et `npm run build` : sans erreur (bundle ~944 ko, §6.8).
 - Migration vérifiée **trois fois** : sur une copie isolée (`/tmp/test-migration`),
   sur une base neuve pour le flux staff complet (`/tmp/staff-neuf`), puis
