@@ -4,9 +4,14 @@ Document de reprise. Il suppose que tu n'as accès ni à la conversation
 précédente, ni à autre chose que ce dépôt.
 
 > **État à la dernière mise à jour de ce document**
-> Branche `main`, arbre propre. `npm run lint` et `npm run build` passent. La
-> base `data/horizon.db` contient les **vraies données de l'utilisateur**, plus
-> le jeu de démonstration.
+> Branche `main`, arbre propre. `npm run lint` et `npm run build` passent.
+>
+> **⚠️ La base `data/horizon.db` est un mélange, pas « les vraies données ».**
+> Seul le **profil** (nom, email, capital) a été saisi par l'utilisateur. Les 4
+> comptes trading, les 4 fiches élèves et les 6 trades sont **encore exactement
+> le jeu de démonstration** de `src/data/mockData.ts` — vérifié champ à champ,
+> voir §6, point 5. Ne présume jamais qu'une valeur en base est réelle sans
+> vérifier.
 >
 > L'authentification est **terminée et vérifiée** : comptes staff multiples sur
 > un bureau unique partagé, invitation avec mot de passe temporaire, le tout
@@ -14,8 +19,14 @@ précédente, ni à autre chose que ce dépôt.
 > d'avant migration a été supprimée — `data/` ne contient plus que la base
 > vivante.
 >
+> Le **rattachement trades ↔ comptes** et l'**édition d'un trade** sont
+> terminés (§4, §8) — mais les 6 trades de démo restent tous « Non rattaché »,
+> voir §7 tâche 2.
+>
 > **Prochaine tâche : remplir le module « Examen »** (§7, tâche 1). Elle demande
-> une décision produit de l'utilisateur **avant** d'écrire du code.
+> une décision produit de l'utilisateur **avant** d'écrire du code. Un chantier
+> plus tardif, confirmé avec l'utilisateur mais pas encore demandé, est de
+> vider les données de démo avant mise en ligne (§7, tâche 5).
 
 ---
 
@@ -51,8 +62,11 @@ initiaux en découlent (voir §8).
 29 commits. Le plus gros fichier applicatif est `src/App.tsx` (1057 l.), le plus
 gros tout court `src/data/mockData.ts` (1455 l., données d'amorçage).
 
-**La base de données contient de vraies données de travail** — pas un jeu de
-démonstration. Voir l'avertissement en §6.5 avant toute manipulation de `data/`.
+**Seul le profil de l'utilisateur, en base, est réel.** Le reste — 4 comptes
+trading, 4 fiches élèves, 6 trades — est encore le jeu de démonstration de
+`mockData.ts`, jamais remplacé. Voir l'avertissement détaillé en §6, point 5,
+avant toute manipulation de `data/` : même si ce n'est « que » de la démo, la
+commande qui la détruirait détruirait aussi le profil réel au passage.
 
 ---
 
@@ -903,31 +917,37 @@ coach ?) contre lesquelles deviendraient privées par bureau, et de décider du
 lien entre `EnrolledStudent` et un compte réel. Chantier bien plus grand que
 l'ajout de comptes staff — ne pas le confondre avec lui.
 
-### 4. Aucun lien entre un trade et un compte
+### 4. (Résolu) Le lien trade ↔ compte existe désormais
 
-`Trade` n'a pas d'`accountId`. Le journal ne peut donc pas être filtré par
-portefeuille, et `tradesCount` d'un `TradingAccount` est une valeur saisie, pas
-un calcul.
+`Trade.accountId` a été ajouté (commit `dbe2bbf`), et un mode édition permet de
+l'assigner après coup sans recalculer le PnL (commit `46bff63`, voir §4 et §8).
+Le journal se filtre par compte, `WalletManagement` calcule le nombre de
+positions par compte au lieu de lire un champ saisi.
 
-Une prop `onSelectAccountForJournal` traînait dans `WalletManagement` et
-laissait croire que ce filtrage n'attendait qu'un branchement — elle était
-déclarée, déstructurée, jamais appelée, jamais transmise. **Elle a été
-supprimée** : le commentaire qui la remplace en tête de
-[`WalletManagement.tsx`](src/components/WalletManagement.tsx) explique pourquoi.
-Le vrai chantier est décrit en §7, tâche 2.
+Ce qui **reste** vrai : les 6 trades de démonstration sont tous non rattachés
+— personne n'a encore assigné de compte à aucun d'eux. Voir §7, tâche 2 : ce
+n'est pas un bug, c'est une action que seul l'utilisateur peut faire.
 
-### 5. Données existantes sans les nouveaux champs
+### 5. La base est un mélange : un seul profil réel, tout le reste est de la démo
 
-Les trades et élèves déjà en base ont été créés avant l'ajout de `exitDate`,
-`exitTime` et `tradingStyle`. Les vues gèrent l'absence proprement (mention
-*sortie non renseignée*, pastille masquée), mais **les valeurs mises dans
-`mockData.ts` ne s'appliquent qu'à une base neuve**.
+**Vérifié par comparaison directe cette session**, pas supposé : les 4
+`trading_accounts`, les 4 `enrolled_students` (`tradingStyle` inclus) et les 6
+`trades` en base sont **identiques champ à champ** à `initialTradingAccounts`,
+`initialEnrolledStudents` et `initialTrades` dans `src/data/mockData.ts`. Une
+affirmation précédente de ce document disait que les styles de trading des
+élèves avaient été saisis à la main — **c'était faux**, corrigé ici.
 
-> **`rm -rf data/` détruit de vraies données.** Le profil en base est celui de
-> l'utilisateur (« ForexPaps », capital 100 000 € / 102 450 €), pas le profil
-> de démonstration de `mockData.ts` (« Alexandre Vance »). Les styles de
-> trading des 4 élèves ont été saisis **à la main via l'interface**, ils ne
-> sont pas amorcés. Une remise à zéro perd tout cela. Sauvegarde d'abord :
+Seul le **profil** (`users`, une ligne : nom « ForexPaps », email, capital
+100 000 € → 102 450 €) a été modifié par l'utilisateur depuis l'interface.
+
+**Conséquence pour la mise en ligne** (§7, tâche 5) : les comptes, élèves et
+trades de démo devront être vidés et remplacés par les vraies données de
+l'utilisateur avant publication. Confirmé avec lui explicitement — mais il n'a
+**pas** demandé qu'on le fasse ni qu'on le planifie maintenant.
+
+> **`rm -rf data/` détruit quand même de vraies données.** Même si la majorité
+> du contenu est de la démo, le profil (nom, email, capital) est réel et n'a
+> pas d'autre copie. Sauvegarde d'abord :
 >
 > ```bash
 > cp data/horizon.db data/horizon.db.bak
@@ -1057,6 +1077,22 @@ des **collections entières**. Une fusion par élément, le plus récent gagnant
 supprimerait l'arbitrage manuel — au prix d'un horodatage par élément et d'une
 réécriture de la synchronisation. Écarté volontairement pour l'instant : le
 bandeau couvre le besoin sans risquer de perdre le travail d'un collègue.
+
+### 5. Vider les données de démonstration avant la mise en ligne
+
+**Pas urgent, pas encore demandé — juste confirmé avec l'utilisateur** pour ne
+pas l'oublier. Voir §6, point 5 : les 4 comptes trading, les 4 fiches élèves
+et les 6 trades en base sont encore le jeu de démo de `mockData.ts`, jamais
+remplacés. Avant une mise en ligne réelle, ils devront être vidés et repeuplés
+avec les vraies données de l'utilisateur.
+
+Deux points à trancher **avec lui** le moment venu, pas à deviner :
+- **Comment vider proprement** — un bouton « réinitialiser les données de
+  démo » dans l'interface (probablement réservé au fondateur, voir §4 bis), ou
+  une commande ponctuelle lancée une fois avant publication ?
+- **Le profil doit-il lui aussi être remis à zéro**, ou son capital actuel
+  (100 000 € → 102 450 €) est-il déjà la vraie valeur de départ de
+  l'utilisateur ?
 
 ### Ce qui n'est PAS une tâche
 
@@ -1648,7 +1684,9 @@ modèle déclaré (`gemini-3.6-flash`,
 > plus aucune base orpheline.
 
 - Branche `main`, **arbre de travail propre**.
-- `npm run lint` et `npm run build` : sans erreur (bundle ~944 ko, §6.8).
+- `npm run lint` et `npm run build` : sans erreur. Chargement initial du
+  bundle à **475 ko** depuis le découpage (§8, « Découpage du bundle ») —
+  l'ancien chiffre de 944 ko cité ici est périmé, ne t'y fie pas.
 - Migration vérifiée **trois fois** : sur une copie isolée (`/tmp/test-migration`),
   sur une base neuve pour le flux staff complet (`/tmp/staff-neuf`), puis
   appliquée à la vraie base par redémarrage du serveur de dev — données
@@ -1688,25 +1726,29 @@ modèle déclaré (`gemini-3.6-flash`,
 
 ### Contenu de `data/horizon.db`
 
-| Table | Lignes |
-|---|---|
-| `users` | 1 (profil « ForexPaps », `isAdmin: true`, capital 102 450 €) |
-| `staff_accounts` | 1 (votre compte, migré, `must_change_password: 0`) |
-| `sessions` | 1 (la vôtre, valable jusqu'au 4 septembre 2026) |
-| `trades` | 6 (le trade de test a été retiré cette session) |
-| `trading_accounts` | 4 |
-| `coach_signals` | 4 |
-| `coach_messages` | 5 |
-| `forum_topics` / `forum_replies` | 4 / 6 |
-| `notifications` | 5 |
-| `enrolled_students` | 4 (tous avec `tradingStyle`) |
-| `badges` | 9 |
-| `modules` | 5 |
-| `meta` | `bootstrapped_at`, `migrated_staff_accounts_v1` |
+**Colonne « Réel ? » ajoutée après vérification directe** (comparaison champ à
+champ avec `src/data/mockData.ts`, voir §6 point 5) — ne présume pas qu'une
+table est réelle sans elle.
 
-Les 4 élèves : Julien Moreau (Intraday, En Évaluation FTMO), Camille Dupont
-(Swing Trading, Prop Firm Financé), Lucas Martin (Scalping, Alerte Tilt),
-Sophie Bernard (Intraday, Besoin Coaching).
+| Table | Lignes | Réel ? |
+|---|---|---|
+| `users` | 1 (profil « ForexPaps », `isAdmin: true`, capital 102 450 €) | **Oui** |
+| `staff_accounts` | 1 (votre compte, migré, `must_change_password: 0`) | Oui (identité, pas de données métier) |
+| `sessions` | 1 (la vôtre, valable jusqu'au 4 septembre 2026) | Oui |
+| `trades` | 6 (le trade de test a été retiré cette session) | **Non — identique à `initialTrades`** |
+| `trading_accounts` | 4 | **Non — identique à `initialTradingAccounts`** |
+| `coach_signals` | 4 | Non vérifié cette session, probablement démo |
+| `coach_messages` | 5 | Non vérifié cette session, probablement démo |
+| `forum_topics` / `forum_replies` | 4 / 6 | Non vérifié cette session, probablement démo |
+| `notifications` | 5 | Non vérifié cette session, probablement démo |
+| `enrolled_students` | 4 (tous avec `tradingStyle`) | **Non — identique à `initialEnrolledStudents`** |
+| `badges` | 9 | Non vérifié cette session, probablement démo |
+| `modules` | 5 | Non vérifié cette session, probablement démo |
+| `meta` | `bootstrapped_at`, `migrated_staff_accounts_v1` | — |
+
+Les 4 élèves (démo, pas réels) : Julien Moreau (Intraday, En Évaluation FTMO),
+Camille Dupont (Swing Trading, Prop Firm Financé), Lucas Martin (Scalping,
+Alerte Tilt), Sophie Bernard (Intraday, Besoin Coaching).
 
 ### Par où commencer
 
