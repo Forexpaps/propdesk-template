@@ -34,19 +34,47 @@ import {
 } from "lucide-react";
 import { StudentProfile } from "../types";
 
-export type TabType =
-  | "dashboard"
-  | "students"
-  | "wallets"
-  | "academy"
-  | "journal"
-  | "simulator"
-  | "signals"
-  | "forum"
-  | "messaging"
-  | "analytics"
-  | "exam"
-  | "propfirm";
+/**
+ * Tous les onglets de l'application, **à l'exécution**.
+ *
+ * `TabType` en dérive, et non l'inverse : un type TypeScript disparaît à la
+ * compilation, il ne peut donc pas servir à valider une chaîne reçue au
+ * moment où elle arrive. Le sens de la dérivation est le point important —
+ * ajouter un onglet ici étend le type *et* tout ce qui s'appuie sur la liste,
+ * sans qu'un endroit puisse être oublié.
+ *
+ * Cette liste avait été recopiée à la main dans `handleNavigateFromNotification`
+ * ([`App.tsx`](../App.tsx)) : un onglet ajouté sans penser à l'y reporter
+ * devenait silencieusement inatteignable depuis le centre d'alertes. Ne
+ * réintroduis pas de copie — utilise `isTabType`.
+ */
+export const ALL_TABS = [
+  "dashboard",
+  "students",
+  "wallets",
+  "academy",
+  "journal",
+  "simulator",
+  "signals",
+  "forum",
+  "messaging",
+  "analytics",
+  "exam",
+  "propfirm",
+] as const;
+
+export type TabType = (typeof ALL_TABS)[number];
+
+/**
+ * Garde de type sur une chaîne d'origine extérieure — aujourd'hui le
+ * `targetTab` en texte libre d'une notification.
+ *
+ * Ne dit **que** si l'onglet existe. Le droit d'y accéder est une question
+ * distincte, tranchée par l'appelant (`students` est réservé à l'admin).
+ */
+export function isTabType(value: string): value is TabType {
+  return (ALL_TABS as readonly string[]).includes(value);
+}
 
 /**
  * Entrées que le compte fondateur peut masquer, identifiées par une clé stable.

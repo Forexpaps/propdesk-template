@@ -7,19 +7,10 @@ import {
 } from "./components/Sidebar";
 import { TopHeader } from "./components/TopHeader";
 import { MainDashboard } from "./components/MainDashboard";
-import { VideoAcademy } from "./components/VideoAcademy";
-import { TradingJournal } from "./components/TradingJournal";
-import { ForumSection } from "./components/ForumSection";
-import { CoachMessaging } from "./components/CoachMessaging";
-import { PerformanceDashboard } from "./components/PerformanceDashboard";
 import { TradeAuditModal } from "./components/TradeAuditModal";
 import { PositionCalculatorModal } from "./components/PositionCalculatorModal";
 import { TradingPlanModal } from "./components/TradingPlanModal";
 import { EconomicCalendarModal } from "./components/EconomicCalendarModal";
-import { WalletManagement } from "./components/WalletManagement";
-import { SMCSimulator } from "./components/SMCSimulator";
-import { CoachSignals } from "./components/CoachSignals";
-import { StudentTracking } from "./components/StudentTracking";
 import { UserProfileModal } from "./components/UserProfileModal";
 import { StaffAccountsModal } from "./components/StaffAccountsModal";
 import { NotificationModal } from "./components/NotificationModal";
@@ -57,7 +48,72 @@ import {
   TraderBadge,
   TradeDraft,
 } from "./types";
-import { TabType as SidebarTabType } from "./components/Sidebar";
+import { isTabType, type TabType as SidebarTabType } from "./components/Sidebar";
+
+/**
+ * Vues d'onglet chargées à la demande.
+ *
+ * Une seule est affichée à la fois, mais toutes partaient dans le bundle
+ * initial — ~4 500 lignes téléchargées pour en montrer une. Elles sont donc
+ * découpées en fichiers séparés, récupérés au premier affichage de l'onglet
+ * puis gardés en mémoire.
+ *
+ * `MainDashboard` reste en import direct, délibérément : c'est l'onglet
+ * d'arrivée et le repli de tout onglet devenu inatteignable. Le différer
+ * n'économiserait rien et ajouterait un écran d'attente au démarrage.
+ *
+ * Les modales ne sont pas traitées ici : elles sont montées en permanence et
+ * pilotées par une prop `isOpen`, si bien qu'un `lazy` les chargerait
+ * immédiatement. Les rendre conditionnelles changerait leur cycle de vie —
+ * leur état interne serait remis à zéro à chaque ouverture.
+ *
+ * Le `.then()` convertit l'export nommé en export par défaut, seule forme que
+ * `React.lazy` accepte.
+ */
+const VideoAcademy = React.lazy(() =>
+  import("./components/VideoAcademy").then((m) => ({ default: m.VideoAcademy }))
+);
+const TradingJournal = React.lazy(() =>
+  import("./components/TradingJournal").then((m) => ({ default: m.TradingJournal }))
+);
+const ForumSection = React.lazy(() =>
+  import("./components/ForumSection").then((m) => ({ default: m.ForumSection }))
+);
+const CoachMessaging = React.lazy(() =>
+  import("./components/CoachMessaging").then((m) => ({ default: m.CoachMessaging }))
+);
+const PerformanceDashboard = React.lazy(() =>
+  import("./components/PerformanceDashboard").then((m) => ({
+    default: m.PerformanceDashboard,
+  }))
+);
+const WalletManagement = React.lazy(() =>
+  import("./components/WalletManagement").then((m) => ({ default: m.WalletManagement }))
+);
+const SMCSimulator = React.lazy(() =>
+  import("./components/SMCSimulator").then((m) => ({ default: m.SMCSimulator }))
+);
+const CoachSignals = React.lazy(() =>
+  import("./components/CoachSignals").then((m) => ({ default: m.CoachSignals }))
+);
+const StudentTracking = React.lazy(() =>
+  import("./components/StudentTracking").then((m) => ({ default: m.StudentTracking }))
+);
+
+/**
+ * Attente d'une vue en cours de chargement.
+ *
+ * Discrète et sans hauteur imposée : sur une connexion correcte le fichier
+ * arrive en quelques dizaines de millisecondes, un grand écran de chargement
+ * produirait un clignotement plus gênant que l'attente elle-même.
+ */
+function ViewFallback() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <p className="text-xs font-mono text-slate-600 animate-pulse">Chargement…</p>
+    </div>
+  );
+}
 import { usePersistentState } from "./hooks/usePersistentState";
 import { useBootstrap, useSyncedState } from "./hooks/useServerSync";
 import { useAuth } from "./hooks/useAuth";
@@ -407,26 +463,18 @@ function AcademyApp({
   // Le centre d'alertes renvoie un targetTab en texte libre : on ne navigue
   // que si c'est un onglet réellement existant.
   //
-  // « students » n'y figure que pour un administrateur : sans cela, une
-  // notification suffirait à contourner le masquage de la vue de suivi.
+  // La liste vit dans `ALL_TABS` (Sidebar.tsx), dont `TabType` dérive : un
+  // onglet ajouté là devient navigable ici sans intervention. Elle était
+  // auparavant recopiée à la main, ce qui rendait tout nouvel onglet
+  // silencieusement inatteignable depuis une notification.
+  //
+  // Exister et être accessible sont deux questions distinctes : « students »
+  // reste réservé à l'administrateur, sans quoi une notification suffirait à
+  // contourner le masquage de la vue de suivi.
   const handleNavigateFromNotification = (tab: string) => {
-    const knownTabs: SidebarTabType[] = [
-      "dashboard",
-      "wallets",
-      "academy",
-      "journal",
-      "simulator",
-      "propfirm",
-      "signals",
-      "forum",
-      "messaging",
-      "analytics",
-      "exam",
-      ...(student.isAdmin ? (["students"] as SidebarTabType[]) : []),
-    ];
-    if (knownTabs.includes(tab as SidebarTabType)) {
-      setActiveTab(tab as SidebarTabType);
-    }
+    if (!isTabType(tab)) return;
+    if (tab === "students" && !student.isAdmin) return;
+    setActiveTab(tab);
   };
 
   // Filet de sécurité : si le statut d'administrateur est révoqué pendant la
@@ -837,7 +885,12 @@ function AcademyApp({
         />
 
         {/* Page Content View */}
+        {/* Une seule frontière Suspense pour toutes les vues : elles
+            s'excluent mutuellement, il n'en charge jamais deux à la fois. La
+            placer à l'intérieur de <main> conserve la mise en page et le
+            gabarit pendant l'attente — au-dessus, la page entière sauterait. */}
         <main className="p-4 sm:p-8 flex-1 max-w-7xl w-full mx-auto">
+          <React.Suspense fallback={<ViewFallback />}>
           {activeTab === "dashboard" && (
             <MainDashboard
               student={student}
@@ -969,6 +1022,7 @@ function AcademyApp({
               </div>
             </div>
           )}
+          </React.Suspense>
         </main>
       </div>
 

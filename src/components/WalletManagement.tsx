@@ -22,18 +22,29 @@ import {
 } from "lucide-react";
 import { TradingAccount, AccountType } from "../types";
 
+/**
+ * Une prop `onSelectAccountForJournal?: (accountId: string) => void` figurait
+ * ici : déclarée, déstructurée, jamais appelée, et jamais transmise par
+ * `App.tsx`. Elle a été retirée.
+ *
+ * Elle laissait croire qu'il suffisait de la brancher pour filtrer le journal
+ * sur un compte. Ce n'est pas le cas : **`Trade` n'a aucun `accountId`** (voir
+ * `src/types.ts`), rien ne relie un trade à un portefeuille. Le faire
+ * demanderait d'ajouter le champ, de décider à quel compte rattacher les
+ * trades déjà en base, d'ajouter un sélecteur au formulaire de saisie et un
+ * filtre au journal — une fonctionnalité entière, pas un branchement. Elle est
+ * décrite comme telle dans le HANDOFF si le besoin se présente.
+ */
 interface WalletManagementProps {
   accounts: TradingAccount[];
   onAddAccount: (account: TradingAccount) => void;
   onUpdateAccountBalance: (id: string, newBalance: number) => void;
-  onSelectAccountForJournal?: (accountId: string) => void;
 }
 
 export const WalletManagement: React.FC<WalletManagementProps> = ({
   accounts,
   onAddAccount,
   onUpdateAccountBalance,
-  onSelectAccountForJournal,
 }) => {
   const [filterType, setFilterType] = useState<string>("ALL");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
