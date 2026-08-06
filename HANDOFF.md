@@ -441,8 +441,9 @@ peut se connecter séparément (email + mot de passe propres), mais tous
 travaillent sur les **mêmes** données — trades, élèves, portefeuilles. Il n'y a
 **aucun cloisonnement** : ce n'est pas du multi-tenant, c'est un bureau partagé
 avec plusieurs badges d'accès. Décision explicite de l'utilisateur : « le staff
-seulement », « tous égaux » (pas de rôles différenciés), invitation depuis
-l'interface avec mot de passe temporaire.
+seulement », invitation depuis l'interface avec mot de passe temporaire. Les
+droits **métier** sont égaux pour tous ; la seule exception est `isOwner`
+(§4 bis).
 
 **L'identité est découplée de la donnée.** C'est la clé de voûte du design :
 aucun repository n'a jamais utilisé l'identité de session pour filtrer quoi que
@@ -450,7 +451,8 @@ ce soit (tout retombe sur `DEFAULT_USER_ID` par défaut) — ça a permis d'ajou
 plusieurs comptes **sans toucher à une seule ligne de `server/repositories.ts`
 ni des routes de collections**. `requireAuth` accorde `isAdmin: true` à toute
 session valide, sans consulter le profil partagé : avoir un compte, c'est être
-du staff, il n'y a rien d'autre à vérifier.
+du staff. Il lit en revanche `isOwner` sur `staff_accounts` — le seul droit qui
+ne soit pas accordé à tous (§4 bis).
 
 **Schéma** — `server/db.ts`. Une seule table d'identité,
 **`staff_accounts`** : `id`, `name`, `email`, `email_lower` (**`UNIQUE`**),
@@ -617,6 +619,50 @@ session à interroger sans serveur ; la modale n'est alors pas rendue. Le mot de
 passe temporaire d'une invitation est tenu dans un état local **volatil**
 (effacé à la fermeture de la modale) : il n'est jamais récupérable après coup,
 y compris par cette modale elle-même.
+
+### 4 bis. `isOwner` : la seule exception aux droits égaux
+
+**Ce que c'est.** Le compte fondateur — celui créé à l'installation par
+`/auth/setup` — est le seul à pouvoir **masquer ou réafficher les modules** de
+la sidebar. Rien d'autre. Un coach invité garde l'intégralité des droits
+métier : journal, suivi des élèves, portefeuilles, invitation et révocation de
+collègues.
+
+**Pourquoi cette exception existe.** `hiddenSidebarItems` vit sur le profil du
+**bureau partagé**, pas sur le compte. Un coach qui masquait un module le
+masquait donc pour tout le monde, fondateur compris, sans que personne ne
+comprenne d'où venait le changement. Ce n'était pas un réglage personnel qui
+avait fuité : c'était un réglage global à la portée de tous.
+
+**Comment le drapeau se lit.** `invited_by IS NULL` dans `staff_accounts` —
+vrai pour le seul compte de `/auth/setup`, renseigné pour tous les invités.
+Aucune colonne ni migration n'a été ajoutée : le schéma portait déjà
+l'information.
+
+**Trois pièges déjà désamorcés, ne les réintroduis pas :**
+
+1. **`isAdmin` n'a pas été réutilisé.** Il reste vrai pour tout le monde. S'en
+   servir aurait retiré aux coachs le suivi des élèves et l'écriture des
+   collections admin — bien plus que ce qui était demandé. `isOwner` est un
+   champ distinct, et il doit le rester.
+2. **`ON DELETE SET NULL` sur `invited_by`.** Supprimer un coach qui en avait
+   invité d'autres remettait leur `invited_by` à `NULL`, donc les promouvait
+   fondateurs. `deleteStaffAccount` réaffecte désormais les filleuls au
+   fondateur **dans la même transaction**, avant la suppression.
+3. **Le compte fondateur n'est plus supprimable** (409). Sans lui, plus aucun
+   compte ne pourrait régler les modules visibles — état irrécupérable, aucune
+   procédure de secours n'existant.
+
+**Le serveur fait autorité, pas l'interface.** `PUT /api/profile` **réinjecte**
+la valeur en base quand l'appelant n'est pas fondateur — il ne rejette pas la
+requête. `hiddenSidebarItems` voyage dans le même objet que le nom, l'avatar et
+le capital, tous légitimement modifiables par un coach : un 403 global lui
+interdirait de modifier son profil à cause d'un champ qu'il n'a pas touché.
+C'est le même motif que `isAdmin`, déjà en place.
+
+**Hors ligne, `isOwner` est faux pour tout le monde**, y compris le fondateur :
+sans serveur, aucune identité n'est vérifiable. Le réglage redevient
+disponible à la reconnexion.
 
 ### Poids des images
 
@@ -969,7 +1015,9 @@ l'utilisateur le demande.
 | Avatar de 4 Mo déjà en base | **recompressé sur place**, la photo de l'utilisateur est conservée |
 | Périmètre de l'authentification | **comptes staff multiples, bureau unique partagé** — pas de multi-tenant, aucune donnée privée par compte (§6.3) |
 | Qui peut avoir un compte | **le staff seulement** — les fiches élèves (`EnrolledStudent`) restent des dossiers de suivi, jamais des comptes |
-| Droits par compte | **tous égaux** — aucun rôle différencié, avoir un compte staff suffit à tout faire |
+| Droits par compte | **égaux sur le métier** — avoir un compte staff suffit à tout faire sur les données. Une seule exception, `isOwner` (§4 bis) |
+| Masquage des modules | **réservé au compte fondateur** — le réglage appartient au bureau partagé, un coach le changerait pour tout le monde |
+| Suppression du compte fondateur | **refusée** — il est l'ancre d'`isOwner` ; le perdre laisserait le bureau sans personne pour régler les modules |
 | Créer un nouveau compte | **invitation depuis l'interface** (`StaffAccountsModal`), mot de passe temporaire généré côté serveur, jamais choisi par l'inviteur |
 | Hachage des mots de passe | **scrypt de `node:crypto`**, aucune dépendance ajoutée — argon2 et bcrypt écartés (compilation native, aucun gain réel à cette échelle) |
 | Premier mot de passe | **écran de première installation**, pas de variable d'environnement ni de script — aucun mot de passe par défaut dans le dépôt |
@@ -1023,7 +1071,9 @@ Seulement si l'utilisateur le demande : coût élevé, gestion de conflits.
   demande des espaces réellement séparés.
 - **Donner des comptes aux élèves.** Tranché : les élèves restent des fiches de
   suivi, seul le staff se connecte.
-- **Rétablir un rôle par compte.** Tranché : tous les comptes staff sont égaux.
+- **Étendre `isOwner` à autre chose que le masquage des modules.** C'est une
+  exception délibérément unique, pas l'amorce d'un système de rôles (§4 bis).
+  Les droits métier restent égaux pour tous les comptes staff.
 
 ---
 

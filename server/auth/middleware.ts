@@ -22,6 +22,18 @@ export interface AuthContext {
    * différencié devenait nécessaire un jour.
    */
   isAdmin: boolean;
+  /**
+   * Vrai pour le seul compte fondateur (`/auth/setup`), faux pour les comptes
+   * invités.
+   *
+   * Volontairement **distinct de `isAdmin`**, qui reste vrai pour tout le
+   * monde : les coachs gardent l'intégralité des droits métier (suivi des
+   * élèves, écriture des collections, gestion de l'équipe). Ce drapeau ne
+   * gouverne que la configuration du bureau partagé — aujourd'hui les entrées
+   * masquées de la sidebar. Réutiliser `isAdmin` aurait retiré aux coachs bien
+   * plus que ce qui était demandé.
+   */
+  isOwner: boolean;
 }
 
 declare global {
@@ -89,7 +101,23 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     return;
   }
 
-  req.auth = { userId: session.userId, isAdmin: true };
+  req.auth = { userId: session.userId, isAdmin: true, isOwner: staff.isOwner };
+  next();
+};
+
+/**
+ * Réserve une route au compte fondateur.
+ *
+ * Distinct de `requireAdmin` : voir `AuthContext.isOwner`. N'est pas monté sur
+ * `PUT /profile`, qui doit rester ouverte aux coachs pour tout le reste du
+ * profil — cette route neutralise le seul champ concerné plutôt que de refuser
+ * l'écriture entière (voir `server/routes.ts`).
+ */
+export const requireOwner = (req: Request, res: Response, next: NextFunction) => {
+  if (req.auth?.isOwner !== true) {
+    res.status(403).json({ error: "Action réservée au compte principal." });
+    return;
+  }
   next();
 };
 

@@ -141,8 +141,14 @@ export interface StudentProfile {
   bio?: string;
   preferredPairs?: string;
   /**
-   * Clés des entrées de la sidebar masquées par l'administrateur (modules pas
-   * encore terminés). Voir SIDEBAR_TOGGLEABLE_KEYS dans components/Sidebar.tsx.
+   * Clés des entrées de la sidebar masquées (modules pas encore terminés).
+   * Voir SIDEBAR_TOGGLEABLE_KEYS dans components/Sidebar.tsx.
+   *
+   * Champ du **bureau partagé** : il vaut pour tout le monde, un masquage est
+   * donc visible par tous les comptes. Seul le compte fondateur peut le
+   * modifier — le serveur réinjecte la valeur en base pour les autres
+   * (`PUT /api/profile`). Ne t'appuie pas sur l'interface pour cette règle :
+   * c'est le serveur qui fait autorité.
    */
   hiddenSidebarItems?: string[];
 }

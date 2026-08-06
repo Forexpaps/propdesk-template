@@ -10,8 +10,14 @@ import { db, DEFAULT_USER_ID } from "../db";
  *
  * Un compte staff est une IDENTITÉ, pas un bureau : plusieurs comptes
  * partagent les mêmes données (celles de `DEFAULT_USER_ID`), voir
- * `server/db.ts`. Tous les comptes ont les mêmes droits — quiconque a un
- * compte est du staff, il n'y a pas de rôle à vérifier.
+ * `server/db.ts`.
+ *
+ * Les comptes ont les mêmes droits **métier** : quiconque est du staff peut
+ * tout faire sur les données. La seule exception est `isOwner`, qui distingue
+ * le compte fondateur et ne gouverne qu'une chose — le réglage des modules
+ * visibles dans la sidebar, qui appartient au bureau partagé et vaut donc pour
+ * tout le monde. Ce n'est pas un système de rôles : n'y accroche rien d'autre
+ * sans y réfléchir à deux fois.
  */
 
 export interface StaffAccount {
@@ -21,6 +27,8 @@ export interface StaffAccount {
   emailLower: string;
   passwordHash: string;
   mustChangePassword: boolean;
+  /** Voir `isOwnerRow` : compte fondateur, seul à régler la sidebar partagée. */
+  isOwner: boolean;
 }
 
 /** Forme exposable au client : jamais de `passwordHash`. */
@@ -30,6 +38,7 @@ export interface StaffAccountSummary {
   email: string;
   mustChangePassword: boolean;
   createdAt: string;
+  isOwner: boolean;
 }
 
 interface StaffAccountRow {
@@ -39,6 +48,7 @@ interface StaffAccountRow {
   email_lower: string;
   password_hash: string;
   must_change_password: number;
+  invited_by: string | null;
 }
 
 interface StaffAccountSummaryRow {
@@ -47,6 +57,23 @@ interface StaffAccountSummaryRow {
   email: string;
   must_change_password: number;
   created_at: string;
+  invited_by: string | null;
+}
+
+/**
+ * Distingue le compte fondateur des comptes invités.
+ *
+ * `invited_by` est `NULL` pour le seul compte créé par `/auth/setup`, et
+ * renseigné pour tous ceux créés par `createInvitedStaffAccount` — le drapeau
+ * se lit donc sur le schéma existant, sans migration ni colonne nouvelle.
+ *
+ * Attention : la clé étrangère est `ON DELETE SET NULL`. Supprimer un compte
+ * qui en a invité d'autres remettrait leur `invited_by` à `NULL` et les
+ * promouvrait fondateurs par accident — d'où la garde dans
+ * `deleteStaffAccount`, qui réaffecte les filleuls avant la suppression.
+ */
+function isOwnerRow(invitedBy: string | null): boolean {
+  return invitedBy === null;
 }
 
 function toStaffAccount(row: StaffAccountRow): StaffAccount {
@@ -57,6 +84,7 @@ function toStaffAccount(row: StaffAccountRow): StaffAccount {
     emailLower: row.email_lower,
     passwordHash: row.password_hash,
     mustChangePassword: row.must_change_password === 1,
+    isOwner: isOwnerRow(row.invited_by),
   };
 }
 
@@ -85,7 +113,7 @@ export function hasAnyStaffAccount(): boolean {
 export function getStaffByEmail(email: string): StaffAccount | null {
   const row = db
     .prepare(
-      `SELECT id, name, email, email_lower, password_hash, must_change_password
+      `SELECT id, name, email, email_lower, password_hash, must_change_password, invited_by
        FROM staff_accounts WHERE email_lower = ?`
     )
     .get(normalizeEmail(email)) as StaffAccountRow | undefined;
@@ -96,7 +124,7 @@ export function getStaffByEmail(email: string): StaffAccount | null {
 export function getStaffById(id: string): StaffAccount | null {
   const row = db
     .prepare(
-      `SELECT id, name, email, email_lower, password_hash, must_change_password
+      `SELECT id, name, email, email_lower, password_hash, must_change_password, invited_by
        FROM staff_accounts WHERE id = ?`
     )
     .get(id) as StaffAccountRow | undefined;
@@ -111,7 +139,7 @@ export function getStaffById(id: string): StaffAccount | null {
 export function listStaffAccounts(): StaffAccountSummary[] {
   const rows = db
     .prepare(
-      `SELECT id, name, email, must_change_password, created_at
+      `SELECT id, name, email, must_change_password, created_at, invited_by
        FROM staff_accounts ORDER BY created_at ASC`
     )
     .all() as StaffAccountSummaryRow[];
@@ -122,7 +150,16 @@ export function listStaffAccounts(): StaffAccountSummary[] {
     email: row.email,
     mustChangePassword: row.must_change_password === 1,
     createdAt: row.created_at,
+    isOwner: isOwnerRow(row.invited_by),
   }));
+}
+
+/** Identifiant du compte fondateur, ou `null` sur une base sans compte. */
+export function getOwnerId(): string | null {
+  const row = db
+    .prepare("SELECT id FROM staff_accounts WHERE invited_by IS NULL ORDER BY created_at ASC LIMIT 1")
+    .get() as { id: string } | undefined;
+  return row?.id ?? null;
 }
 
 /**
@@ -201,20 +238,49 @@ export function setPassword(id: string, passwordHash: string): void {
 }
 
 /**
+ * Motif de refus d'une suppression, ou `null` si elle a bien eu lieu.
+ *
+ * Une union plutôt qu'un booléen : l'appelant doit pouvoir expliquer *pourquoi*
+ * il refuse, les deux cas n'ayant pas le même message.
+ */
+export type DeleteStaffFailure = "not-found" | "last-account" | "owner";
+
+/**
  * Supprime un compte staff.
  *
- * Refuse de supprimer le dernier compte restant : sans lui, plus personne ne
- * pourrait jamais se reconnecter, et il n'existe aucune procédure de
- * récupération pour ce cas (voir README). Renvoie `false` si le compte
- * n'existait pas ou si c'était le dernier — dans les deux cas, rien n'a été
- * supprimé.
+ * Deux refus :
+ *
+ * - **le dernier compte restant** — sans lui, plus personne ne pourrait se
+ *   reconnecter, et il n'existe aucune procédure de récupération (voir README) ;
+ * - **le compte fondateur** — c'est l'ancre du drapeau `isOwner`. Le supprimer
+ *   ne promouvrait personne : plus aucun compte ne pourrait régler la sidebar
+ *   partagée, définitivement et sans recours.
+ *
+ * La réaffectation des filleuls est la partie non évidente. `invited_by` est
+ * déclaré `ON DELETE SET NULL` : supprimer un coach qui en a invité d'autres
+ * remettrait leur `invited_by` à `NULL`, ce qui les ferait passer pour des
+ * fondateurs. On les rattache donc au fondateur **avant** la suppression, dans
+ * la même transaction — sans quoi la suppression d'un compte deviendrait une
+ * élévation de privilège pour un autre.
  */
-export function deleteStaffAccount(id: string): boolean {
+export function deleteStaffAccount(id: string): DeleteStaffFailure | null {
   const total = (db.prepare("SELECT count(*) c FROM staff_accounts").get() as { c: number }).c;
-  if (total <= 1) return false;
+  if (total <= 1) return "last-account";
 
-  const result = db.prepare("DELETE FROM staff_accounts WHERE id = ?").run(id);
-  return result.changes > 0;
+  const target = getStaffById(id);
+  if (!target) return "not-found";
+  if (target.isOwner) return "owner";
+
+  const ownerId = getOwnerId();
+
+  return db.transaction((): DeleteStaffFailure | null => {
+    if (ownerId !== null) {
+      db.prepare("UPDATE staff_accounts SET invited_by = ? WHERE invited_by = ?").run(ownerId, id);
+    }
+
+    const result = db.prepare("DELETE FROM staff_accounts WHERE id = ?").run(id);
+    return result.changes > 0 ? null : "not-found";
+  })();
 }
 
 /**

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { UserPlus, Trash2, Clock, X, Copy, Check } from "lucide-react";
+import { UserPlus, Trash2, Clock, X, Copy, Check, Crown } from "lucide-react";
 import { api, type StaffAccountSummary } from "../lib/api";
 
 interface StaffAccountsModalProps {
@@ -12,8 +12,10 @@ interface StaffAccountsModalProps {
 /**
  * Gestion des comptes staff.
  *
- * Tous les comptes ont les mêmes droits — il n'y a donc rien à régler par
- * compte au-delà de son existence : inviter, ou révoquer. Le mot de passe
+ * Tous les comptes ont les mêmes droits **métier** — il n'y a donc rien à
+ * régler par compte au-delà de son existence : inviter, ou révoquer. Seul le
+ * compte fondateur se distingue, sur un point unique : lui seul règle les
+ * modules visibles dans la sidebar, et il n'est pas révocable. Le mot de passe
  * temporaire d'une invitation n'est affiché qu'une seule fois, au moment de
  * la création ; il n'est jamais récupérable après coup, y compris par cette
  * modale.
@@ -121,7 +123,8 @@ export const StaffAccountsModal: React.FC<StaffAccountsModalProps> = ({
           <div>
             <h3 className="text-base font-bold text-white">Membres du staff</h3>
             <p className="text-xs text-slate-400">
-              Tous les comptes ont les mêmes droits sur ce bureau.
+              Mêmes droits pour tous sur ce bureau. Seul le compte principal
+              règle les modules visibles.
             </p>
           </div>
           <button
@@ -218,6 +221,15 @@ export const StaffAccountsModal: React.FC<StaffAccountsModalProps> = ({
                         En attente
                       </span>
                     )}
+                    {account.isOwner && (
+                      <span
+                        title="Compte principal : seul à régler les modules visibles dans la sidebar, et non supprimable"
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#00E676]/15 text-[#00E676] text-[9px] font-semibold border border-[#00E676]/30 shrink-0"
+                      >
+                        <Crown className="w-2.5 h-2.5" />
+                        Compte principal
+                      </span>
+                    )}
                     {account.id === currentUserId && (
                       <span className="text-[9px] text-slate-500 shrink-0">(toi)</span>
                     )}
@@ -225,7 +237,11 @@ export const StaffAccountsModal: React.FC<StaffAccountsModalProps> = ({
                   <p className="text-[10px] text-slate-400 truncate">{account.email}</p>
                 </div>
 
-                {account.id !== currentUserId && (
+                {/* Le compte principal n'est jamais révocable : c'est lui qui
+                    porte le réglage des modules visibles, et le serveur refuse
+                    sa suppression (409). Ne pas rendre le bouton évite de
+                    proposer une action vouée à échouer. */}
+                {account.id !== currentUserId && !account.isOwner && (
                   <button
                     onClick={() => handleRemove(account)}
                     className="p-2 rounded-lg text-slate-500 hover:text-rose-300 hover:bg-rose-500/10 transition-colors shrink-0"

@@ -112,10 +112,25 @@ Le PDF est généré hors ligne par `node scripts/generate_pdf.js`.
 ## Authentification
 
 Plusieurs comptes staff peuvent se connecter, chacun avec son propre email et
-mot de passe. **Tous ont les mêmes droits et travaillent sur les mêmes
-données** : il n'y a qu'un seul bureau (journal, élèves, portefeuilles), pas un
-par compte. Se connecter avec un identifiant différent ne change donc rien à
-ce que vous voyez — seulement qui est actuellement aux commandes.
+mot de passe. **Tous travaillent sur les mêmes données** : il n'y a qu'un seul
+bureau (journal, élèves, portefeuilles), pas un par compte. Se connecter avec
+un identifiant différent ne change donc rien à ce que vous voyez — seulement
+qui est actuellement aux commandes.
+
+Les droits métier sont identiques pour tous : n'importe quel compte staff peut
+écrire dans le journal, suivre les élèves, inviter ou révoquer un collègue. Une
+seule chose distingue le **compte principal** — celui créé à l'installation :
+
+- lui seul masque ou réaffiche les modules de la sidebar. Ce réglage appartient
+  au bureau partagé : il vaut pour tout le monde, c'est pourquoi un coach ne
+  peut pas le changer. Le serveur, et pas seulement l'interface, refuse la
+  modification venue d'un autre compte ;
+- il n'est pas révocable. Le supprimer laisserait le bureau sans personne pour
+  régler les modules visibles, sans recours possible.
+
+Ce n'est pas un système de rôles, et il n'y en a pas d'autre : c'est une
+exception unique, attachée au seul réglage qui soit à la fois partagé et
+structurant.
 
 Au premier démarrage, l'application détecte qu'aucun compte n'existe et
 affiche un écran d'installation : vous y choisissez une adresse et un mot de

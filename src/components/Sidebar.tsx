@@ -49,7 +49,7 @@ export type TabType =
   | "propfirm";
 
 /**
- * Entrées que l'administrateur peut masquer, identifiées par une clé stable.
+ * Entrées que le compte fondateur peut masquer, identifiées par une clé stable.
  *
  * L'`id` d'onglet ne peut pas servir de clé : « Replay » et « Sim propfirm »
  * pointent tous deux sur `simulator`.
@@ -143,8 +143,17 @@ interface SidebarProps {
   onOpenPropFirmRules?: () => void;
   onOpenMindset?: () => void;
   onOpenCalendar?: () => void;
-  /** Masque ou réaffiche une entrée. Réservé à l'administrateur. */
+  /** Masque ou réaffiche une entrée. Réservé au compte fondateur. */
   onToggleSidebarItem?: (key: SidebarItemKey) => void;
+  /**
+   * Vrai pour le seul compte fondateur.
+   *
+   * Les entrées masquées appartiennent au bureau partagé : un coach qui les
+   * modifierait changerait la sidebar de tout le monde, y compris celle du
+   * fondateur. C'est pourquoi le réglage lui est retiré — il conserve en
+   * revanche tous ses autres droits (`student.isAdmin` reste vrai).
+   */
+  canManageSidebar?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -165,17 +174,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenMindset,
   onOpenCalendar,
   onToggleSidebarItem,
+  canManageSidebar = false,
 }) => {
   const capitalDiff = student.currentCapital - student.startingCapital;
   const capitalDiffPercent = ((capitalDiff / student.startingCapital) * 100).toFixed(1);
 
-  // Section dont l'administrateur règle actuellement la visibilité.
+  // Section dont le fondateur règle actuellement la visibilité.
   const [editingSection, setEditingSection] = React.useState<SectionName | null>(
     null
   );
 
   const hiddenItems = student.hiddenSidebarItems ?? [];
-  const canManage = Boolean(student.isAdmin && onToggleSidebarItem);
+
+  // `canManageSidebar` (identité du compte connecté) et non `student.isAdmin`
+  // (profil partagé, vrai pour tout le monde) : c'est ce qui distingue le
+  // fondateur d'un coach invité.
+  const canManage = Boolean(canManageSidebar && onToggleSidebarItem);
 
   const mainItem = {
     id: "dashboard" as const,
@@ -220,8 +234,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   /**
-   * En-tête de section. Pour l'administrateur, le chevron décoratif laisse la
-   * place à l'interrupteur qui ouvre le réglage de visibilité de la section.
+   * En-tête de section. Pour le compte fondateur, le chevron décoratif laisse
+   * la place à l'interrupteur qui ouvre le réglage de visibilité de la section.
+   * Un coach ne voit que le chevron : le réglage ne lui est pas proposé.
    */
   const renderSectionHeader = (label: string, section: SectionName) => {
     const isEditing = editingSection === section;
@@ -258,9 +273,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
   /**
    * Le réglage n'a de sens qu'en sidebar dépliée : repliée, les en-têtes de
    * section — donc l'interrupteur — ne sont pas rendus.
+   *
+   * `canManage` est retesté ici pour que le mode réglage ne puisse pas
+   * survivre à une perte du droit (déconnexion, bascule hors ligne) alors que
+   * `editingSection` serait resté positionné.
    */
   const isEditingSection = (section: SectionName) =>
-    !isCollapsed && editingSection === section;
+    canManage && !isCollapsed && editingSection === section;
 
   /**
    * Ligne en mode réglage : cliquer n'importe où bascule la visibilité plutôt
