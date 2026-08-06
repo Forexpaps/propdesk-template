@@ -629,6 +629,20 @@ function AcademyApp({
     setTrades((prev) => [tradeWithId, ...prev]);
   };
 
+  /**
+   * Remplace un trade existant.
+   *
+   * Met aussi à jour `selectedTradeForAudit` si la modale d'audit est ouverte
+   * sur ce trade : elle garde sinon une copie périmée, et un audit lancé
+   * ensuite porterait sur les anciennes valeurs.
+   */
+  const handleUpdateTrade = (updated: Trade) => {
+    setTrades((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    setSelectedTradeForAudit((current) =>
+      current?.id === updated.id ? updated : current
+    );
+  };
+
   const handleDeleteTrade = (id: string) => {
     setTrades((prev) => prev.filter((t) => t.id !== id));
   };
@@ -1003,6 +1017,7 @@ function AcademyApp({
               trades={trades}
               accounts={accounts}
               onAddTrade={handleAddTrade}
+              onUpdateTrade={handleUpdateTrade}
               onDeleteTrade={handleDeleteTrade}
               onSelectTradeForAudit={(trade) => setSelectedTradeForAudit(trade)}
               onSendTradeToCoach={handleSendTradeToCoach}
