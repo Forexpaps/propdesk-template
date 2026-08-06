@@ -848,12 +848,14 @@ que renvoyer `false`, ce qui laissait le clic sans aucun effet ni message.
 
 Classés du plus au moins gênant.
 
-### 1. Les modifications hors ligne ne sont pas rejouées
+### 1. Le rejeu hors ligne remplace des collections entières
 
-Elles restent dans le cache local, mais **le rechargement suivant reprend
-l'état du serveur** et les perd. Implémenter le rejeu demande une gestion de
-conflits (quelle version gagne ?) — c'est une décision produit, pas seulement
-technique.
+Corrigé pour l'essentiel : les modifications hors ligne ne sont plus perdues au
+rechargement, un bandeau les propose à la reconnexion (§8, « Modifications hors
+ligne »). La limite qui subsiste est la granularité — envoyer remplace la
+collection **en bloc**. Si un collègue a modifié la même collection pendant la
+coupure, son travail est écrasé. Le bandeau le dit explicitement, et c'est
+pourquoi l'envoi n'est jamais automatique.
 
 ### 2. Le verrou ne protège pas le cache local
 
@@ -948,13 +950,6 @@ et **les données seraient perdues à chaque redémarrage d'instance**. Monter u
 volume sur `DATA_DIR`, ou passer à Postgres. Seul `server/repositories.ts` est
 à réécrire : les routes n'y touchent pas.
 
-### 8. `recharts` pèse encore 327 ko au premier chargement
-
-Le bundle est désormais découpé (§8, « Découpage du bundle ») et aucun bloc ne
-dépasse le seuil de Vite. Il reste que `charts` est chargé d'emblée, parce que
-`MainDashboard` — l'écran d'arrivée — s'en sert pour la courbe de progression.
-C'est le plus gros poste restant. Voir §7, tâche 3.
-
 ---
 
 ## 6 bis. Ce qui ressemble à du code mort, mais ne l'est pas
@@ -1033,31 +1028,25 @@ L'onglet `exam` existe mais **affiche une page vierge** avec le texte « Contenu
 page vierge en attendant de définir le contenu. Lui demander ce qu'il veut y
 mettre avant de coder.
 
-### 2. Rattacher les trades à un compte
+### 2. Rattacher les 6 trades existants à un compte
 
-**Fonctionnalité, pas dette.** `Trade` n'a aucun `accountId` : rien ne relie un
-trade à un portefeuille. Tant que c'est le cas, le journal ne peut pas être
-filtré par compte, et les statistiques d'un compte prop firm ne peuvent pas
-être calculées depuis les trades réels.
+Le rattachement existe (§8, « Rattachement trades ↔ comptes »), mais les six
+trades déjà en base restent **« Non rattaché »** : rien ne permettait de deviner
+leur compte, et l'inventer aurait été pire que de laisser le champ vide. Ils
+s'assignent un par un depuis l'interface, quand l'utilisateur le décidera. Ce
+n'est pas un bug.
 
-C'est ce qui a fait supprimer `onSelectAccountForJournal` (§6.4) : cette prop
-laissait croire à un simple branchement. Le vrai travail serait d'ajouter le
-champ, de décider à quel compte rattacher les **6 trades déjà en base**, puis
-d'ajouter un sélecteur à la saisie et un filtre au journal. À ne lancer que sur
-demande — c'est une décision produit.
+**Il n'existe pas d'écran d'édition d'un trade existant** : seuls la création et
+la suppression sont offertes. Rattacher un ancien trade suppose donc de le
+recréer, ou d'ajouter cette édition — à proposer avant de coder.
 
-### 3. Alléger le bloc `charts`
+### 3. Fusion ligne à ligne des modifications hors ligne
 
-Le bundle est découpé (§8, « Découpage du bundle »), mais `recharts` pèse
-encore **327 ko** au chargement initial : `MainDashboard` s'en sert pour la
-courbe de progression, qui est l'écran d'arrivée. L'isoler dans un
-sous-composant chargé paresseusement retirerait ~40 % du poids initial, au prix
-d'une courbe qui apparaîtrait avec un instant de retard. **Décision produit :
-demander avant de le faire.**
-
-### 4. Rejeu des modifications hors ligne
-
-Seulement si l'utilisateur le demande : coût élevé, gestion de conflits.
+Le rejeu hors ligne existe (§8, « Modifications hors ligne »), mais il remplace
+des **collections entières**. Une fusion par élément, le plus récent gagnant,
+supprimerait l'arbitrage manuel — au prix d'un horodatage par élément et d'une
+réécriture de la synchronisation. Écarté volontairement pour l'instant : le
+bandeau couvre le besoin sans risquer de perdre le travail d'un collègue.
 
 ### Ce qui n'est PAS une tâche
 
@@ -1180,6 +1169,74 @@ complet, qui l'aurait effacé. Le serveur n'écoute plus que sur un seul port.
 Effet de bord utile : un seul port à exposer, ce qui fonctionne tel quel
 derrière un tunnel ou un reverse proxy.
 
+### Rattachement trades ↔ comptes
+
+`Trade.accountId` (optionnel) relie un trade à un `TradingAccount`. Il alimente
+le filtre « Compte » du journal, une colonne du tableau, la colonne « Compte »
+de l'export CSV, et `positionsDuCompte` dans `WalletManagement`.
+
+**Trois choix à ne pas défaire :**
+
+1. **Le champ est optionnel, et doit le rester.** Les trades antérieurs n'en ont
+   pas, et rien ne permet de deviner leur compte — les rendre obligatoires
+   forcerait à en inventer un. « Non rattaché » est un état légitime, pas une
+   anomalie à corriger.
+2. **Un `accountId` introuvable vaut « non rattaché ».** Un compte supprimé
+   laisse des références orphelines ; `nomDuCompte()` renvoie `null` et l'écran
+   affiche « Non rattaché ». Ne transforme jamais ce cas en erreur.
+3. **L'equity reste saisie à la main.** Seul le *nombre de positions* est
+   dérivé. L'equity d'un compte prop firm intègre des dépôts, retraits, frais et
+   trades non journalisés : la recalculer depuis le PnL du journal écraserait
+   des montants justes par des montants faux. Décision explicite de
+   l'utilisateur.
+
+`TradingAccount.tradesCount` subsiste dans le type mais **n'est plus lu à
+l'écran** : il valait 0 depuis la création de chaque compte et n'a jamais été
+mis à jour. C'est `positionsDuCompte` qui fait foi.
+
+### Modifications hors ligne
+
+Sans serveur, l'application tourne sur le cache `localStorage`. Auparavant, le
+rechargement suivant reprenait l'état du serveur et **les modifications hors
+ligne disparaissaient sans un mot**. Trois pièces corrigent cela :
+
+- **`src/lib/pendingChanges.ts`** — registre des collections modifiées hors
+  ligne, dans `localStorage` pour survivre à la fermeture de l'onglet.
+  `useSyncedState` y inscrit une clé dès qu'elle change alors que la
+  synchronisation est désactivée.
+- **`useBootstrap` saute `cacheState()`** quand le registre n'est pas vide.
+  C'est **le** point critique : `cacheState` recopie l'état serveur par-dessus
+  le cache local, il détruisait donc les modifications avant même qu'on ait pu
+  les proposer.
+- **`PendingChangesBanner`** — l'utilisateur envoie ou abandonne.
+
+**Pourquoi jamais d'envoi automatique.** Le bureau est partagé et les
+collections sont remplacées en bloc : renvoyer le cache sans rien demander
+écraserait ce qu'un collègue aurait modifié pendant la coupure. L'arbitrage
+revient donc à qui sait ce que contiennent ces modifications.
+
+**Détails qui ont chacun coûté un bug :**
+
+- `discardPending()` doit appeler `clearPending()`, pas seulement `setPending([])` :
+  l'état React disparaît au rechargement qui suit, c'est le registre
+  `localStorage` qui est relu au démarrage. Sans cela le bandeau réapparaissait
+  aussitôt après avoir été abandonné.
+- Le rejeu lit les valeurs **dans `localStorage`**, pas dans l'état React :
+  celui-ci affiche la version du serveur, alors que le cache porte la version
+  hors ligne — c'est bien celle-ci qu'on veut renvoyer.
+- Les clés sont envoyées **séquentiellement** ; une clé en échec **reste en
+  attente** et sera reproposée, plutôt que d'être perdue silencieusement.
+- L'effet qui recalcule `student.currentCapital` doit renvoyer `prev` à
+  l'identique quand la valeur ne bouge pas. Un nouvel objet à chaque montage
+  suffisait à marquer le profil « modifié » : le bandeau annonçait alors des
+  modifications inexistantes à chaque démarrage hors ligne (et déclenchait un
+  `PUT /api/profile` inutile en ligne).
+
+**Comment le tester** sans attendre une vraie panne : servir `dist/` avec un
+serveur qui renvoie 503 sur `/api/*`. Même origine, donc même `localStorage`,
+et le client voit exactement ce qu'il verrait si le serveur ne répondait plus.
+Tuer le serveur ne marche pas — la page elle-même ne se chargerait plus.
+
 ### Découpage du bundle
 
 Le client partait en **un seul fichier de ~944 ko**. Il est maintenant réparti,
@@ -1212,9 +1269,30 @@ selon deux mécanismes complémentaires qu'il ne faut pas confondre :
   conditionnelles remettrait leur état interne à zéro à chaque ouverture — ce
   serait un changement de comportement, pas une optimisation.
 
-Résultat : le code applicatif passe de **322 ko à 176 ko**, et le chargement
-initial de 944 ko à ~798 ko (255 → 228 ko gzippé). Une seule frontière
+3. **`React.lazy` sur la courbe de progression** (`EquityCurveChart.tsx`).
+   `recharts` est la plus grosse dépendance du client et `MainDashboard` —
+   l'écran d'arrivée — s'en servait, elle partait donc dans le chargement
+   initial. Le graphique est désormais chargé après l'affichage de la page.
+
+   **Piège rencontré :** `EquityCurveChart.tsx` ne doit **jamais** être importé
+   statiquement. Rollup fusionne dans le chunk principal tout module à la fois
+   importé statiquement et dynamiquement — le `React.lazy` devient décoratif et
+   `recharts` repart dans le bundle initial, **sans le moindre avertissement**.
+   C'est arrivé au premier essai, parce que le gabarit d'attente était exporté
+   depuis ce même fichier. Il vit maintenant dans `MainDashboard.tsx`.
+
+   Le gabarit occupe exactement la hauteur du graphique (`h-64`) : sans cela, la
+   page remonterait puis redescendrait à l'arrivée de la courbe, déplaçant des
+   boutons sous le curseur.
+
+Résultat : le chargement initial passe de **944 ko à 475 ko** (255 → ~139 ko
+gzippé), dont 176 ko de code applicatif contre 322. Une seule frontière
 `Suspense` couvre toutes les vues : elles s'excluent mutuellement.
+
+**Comment vérifier que le découpage tient**, plutôt que de se fier à la liste
+des fichiers produits : `dist/index.html` ne doit précharger (`modulepreload`)
+que `react` et `vendor`. Si `charts` y réapparaît, quelqu'un a réintroduit un
+import statique.
 
 ### Tailwind 4, sans fichier de configuration
 
@@ -1548,10 +1626,14 @@ modèle déclaré (`gemini-3.6-flash`,
   rechargement à chaud »). Tu n'as plus à recharger la page à la main après une
   modification — si tu lis encore une consigne en ce sens quelque part, elle est
   périmée.
-- **Bundle découpé** (§8) : plus aucun bloc au-dessus du seuil de Vite. Vérifié
-  sur le build de production servi pour de vrai, pas seulement à la compilation
-  — les neuf vues arrivent bien en fichiers séparés au premier affichage de
-  chaque onglet.
+- **Bundle découpé** (§8) : chargement initial à **475 ko**, plus aucun bloc
+  au-dessus du seuil de Vite. Vérifié sur le build de production servi pour de
+  vrai, pas seulement à la compilation.
+- **Rattachement trades ↔ comptes** et **rejeu hors ligne** (§8) exercés de bout
+  en bout sur une copie de la vraie base : trade rattaché depuis le formulaire et
+  retrouvé en base avec son `accountId`, filtre cohérent (1 + 6 = 7), compteur de
+  positions dérivé, puis cycle hors ligne complet — modification sans serveur,
+  reconnexion, bandeau, envoi vérifié en base, et abandon vérifié lui aussi.
 
 ### Contenu de `data/horizon.db`
 

@@ -20,29 +20,37 @@ import {
   ArrowDownRight,
   RefreshCw
 } from "lucide-react";
-import { TradingAccount, AccountType } from "../types";
+import { TradingAccount, AccountType, Trade } from "../types";
 
 /**
  * Une prop `onSelectAccountForJournal?: (accountId: string) => void` figurait
- * ici : déclarée, déstructurée, jamais appelée, et jamais transmise par
- * `App.tsx`. Elle a été retirée.
+ * ici : déclarée, déstructurée, jamais appelée. Elle a été retirée, parce que
+ * `Trade` n'avait alors aucun `accountId` — le filtrage qu'elle suggérait était
+ * une fonctionnalité entière, pas un branchement.
  *
- * Elle laissait croire qu'il suffisait de la brancher pour filtrer le journal
- * sur un compte. Ce n'est pas le cas : **`Trade` n'a aucun `accountId`** (voir
- * `src/types.ts`), rien ne relie un trade à un portefeuille. Le faire
- * demanderait d'ajouter le champ, de décider à quel compte rattacher les
- * trades déjà en base, d'ajouter un sélecteur au formulaire de saisie et un
- * filtre au journal — une fonctionnalité entière, pas un branchement. Elle est
- * décrite comme telle dans le HANDOFF si le besoin se présente.
+ * Cette fonctionnalité **existe maintenant** : `Trade.accountId` relie un trade
+ * à un portefeuille, le journal se filtre par compte, et `positionsDuCompte`
+ * ci-dessous compte les positions réelles. Si tu veux rétablir un saut
+ * « portefeuille → journal filtré sur ce compte », c'est désormais un vrai
+ * branchement : remonter l'`accountId` à `App.tsx`, basculer l'onglet, et
+ * pré-positionner le filtre du journal.
  */
 interface WalletManagementProps {
   accounts: TradingAccount[];
+  /**
+   * Journal complet, uniquement pour compter les positions par compte.
+   *
+   * Ce composant ne modifie jamais un trade : il ne fait que lire le
+   * rattachement `Trade.accountId`.
+   */
+  trades: Trade[];
   onAddAccount: (account: TradingAccount) => void;
   onUpdateAccountBalance: (id: string, newBalance: number) => void;
 }
 
 export const WalletManagement: React.FC<WalletManagementProps> = ({
   accounts,
+  trades,
   onAddAccount,
   onUpdateAccountBalance,
 }) => {
@@ -69,6 +77,23 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) || accounts[0];
 
   const totalCombinedEquity = accounts.reduce((acc, a) => acc + a.equity, 0);
+
+  /**
+   * Nombre de positions journalisées sur un compte, **calculé** depuis les
+   * trades qui lui sont rattachés.
+   *
+   * Remplace le champ `TradingAccount.tradesCount`, qui était figé à 0 depuis
+   * la création de chaque compte et n'a jamais été mis à jour : il affichait
+   * donc « 0 positions » quel que soit le journal. Le champ subsiste dans le
+   * type pour ne pas casser les données existantes, mais **ne t'y fie pas** —
+   * c'est ce calcul qui fait foi à l'écran.
+   *
+   * L'equity, elle, reste saisie à la main volontairement : elle intègre des
+   * mouvements absents du journal (dépôts, retraits, frais, trades non
+   * journalisés) qu'un calcul depuis le PnL écraserait.
+   */
+  const positionsDuCompte = (accountId: string) =>
+    trades.filter((t) => t.accountId === accountId).length;
   const totalCombinedInitial = accounts.reduce((acc, a) => acc + a.initialBalance, 0);
   const totalCombinedPnl = totalCombinedEquity - totalCombinedInitial;
   const totalCombinedPnlPercent = ((totalCombinedPnl / totalCombinedInitial) * 100).toFixed(2);
@@ -433,7 +458,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
               <div>
                 <div className="text-slate-400 font-mono">Trades Exécutés</div>
                 <div className="text-sm font-bold text-white mt-1">
-                  {selectedAccount.tradesCount} positions
+                  {positionsDuCompte(selectedAccount.id)} positions
                 </div>
               </div>
 

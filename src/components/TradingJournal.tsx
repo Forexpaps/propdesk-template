@@ -26,10 +26,35 @@ import {
   Eye,
   X
 } from "lucide-react";
-import { Trade, TradeDirection, TradeResult, EmotionState, MarketCategory, TradeDraft } from "../types";
+import {
+  Trade,
+  TradeDirection,
+  TradeResult,
+  EmotionState,
+  MarketCategory,
+  TradeDraft,
+  TradingAccount,
+} from "../types";
+
+/** Valeur du sélecteur de compte quand aucun n'est choisi. */
+const SANS_COMPTE = "";
+
+/** Valeur du filtre « tous les comptes », distincte de « non rattaché ». */
+const TOUS_COMPTES = "Tous";
+
+/** Valeur du filtre isolant les trades sans compte. */
+const NON_RATTACHES = "__aucun__";
 
 interface TradingJournalProps {
   trades: Trade[];
+  /**
+   * Portefeuilles disponibles pour rattacher un trade.
+   *
+   * Sert aussi à retrouver le nom d'un compte depuis un `accountId`. Un id
+   * absent de cette liste (compte supprimé depuis) est traité comme « non
+   * rattaché », jamais comme une erreur.
+   */
+  accounts: TradingAccount[];
   onAddTrade: (trade: Omit<Trade, "id">) => void;
   onDeleteTrade: (id: string) => void;
   onSelectTradeForAudit: (trade: Trade) => void;
@@ -43,6 +68,7 @@ interface TradingJournalProps {
 
 export const TradingJournal: React.FC<TradingJournalProps> = ({
   trades,
+  accounts,
   onAddTrade,
   onDeleteTrade,
   onSelectTradeForAudit,
@@ -55,8 +81,18 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   const [selectedMarket, setSelectedMarket] = useState<string>("Tous");
   const [selectedResult, setSelectedResult] = useState<string>("Tous");
   const [selectedEmotion, setSelectedEmotion] = useState<string>("Tous");
+  const [selectedAccount, setSelectedAccount] = useState<string>(TOUS_COMPTES);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedChartTrade, setSelectedChartTrade] = useState<Trade | null>(null);
+
+  /**
+   * Nom affichable d'un compte, ou `null` si le trade n'est rattaché à rien —
+   * y compris quand l'`accountId` pointe sur un compte supprimé depuis.
+   */
+  const nomDuCompte = (accountId?: string): string | null => {
+    if (!accountId) return null;
+    return accounts.find((a) => a.id === accountId)?.name ?? null;
+  };
 
   const exportToCSV = () => {
     if (trades.length === 0) return;
@@ -66,6 +102,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       "Heure Entree",
       "Date Sortie",
       "Heure Sortie",
+      "Compte",
       "Paire",
       "Marche",
       "Direction",
@@ -88,6 +125,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       t.time || "",
       t.exitDate || "",
       t.exitTime || "",
+      `"${(nomDuCompte(t.accountId) ?? "Non rattache").replace(/"/g, '""')}"`,
       t.pair,
       t.marketCategory,
       t.direction,
@@ -121,6 +159,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     time: "14:30",
     exitDate: new Date().toISOString().split("T")[0],
     exitTime: "16:00",
+    accountId: SANS_COMPTE,
     pair: "EUR/USD",
     marketCategory: "Forex" as MarketCategory,
     direction: "LONG" as TradeDirection,
@@ -175,7 +214,15 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     const matchesMarket = selectedMarket === "Tous" || t.marketCategory === selectedMarket;
     const matchesResult = selectedResult === "Tous" || t.result === selectedResult;
     const matchesEmotion = selectedEmotion === "Tous" || t.emotion === selectedEmotion;
-    return matchesPair && matchesMarket && matchesResult && matchesEmotion;
+    // « Non rattachés » couvre aussi les trades pointant sur un compte
+    // supprimé : c'est ce que `nomDuCompte` renvoie à null qui fait foi, pas
+    // la simple absence d'`accountId`.
+    const matchesAccount =
+      selectedAccount === TOUS_COMPTES ||
+      (selectedAccount === NON_RATTACHES
+        ? nomDuCompte(t.accountId) === null
+        : t.accountId === selectedAccount);
+    return matchesPair && matchesMarket && matchesResult && matchesEmotion && matchesAccount;
   });
 
   const getEmotionBadge = (emotion: EmotionState) => {
@@ -227,6 +274,9 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       time: formData.time,
       exitDate: formData.exitDate || undefined,
       exitTime: formData.exitTime || undefined,
+      // `undefined` et non chaîne vide : le champ est optionnel, une chaîne
+      // vide en base se lirait comme un rattachement à un compte sans id.
+      accountId: formData.accountId || undefined,
       pair: formData.pair,
       marketCategory: formData.marketCategory,
       direction: formData.direction,
@@ -360,6 +410,24 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             <option value="Matières Premières">Matières Premières</option>
           </select>
 
+          {/* Le filtre par compte n'apparaît que s'il y a des portefeuilles :
+              sur une base neuve, un sélecteur vide n'apprendrait rien. */}
+          {accounts.length > 0 && (
+            <select
+              value={selectedAccount}
+              onChange={(e) => setSelectedAccount(e.target.value)}
+              className="bg-[#0D1110] border border-[#1B2320] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none"
+            >
+              <option value={TOUS_COMPTES}>Compte : tous</option>
+              {accounts.map((acc) => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.name}
+                </option>
+              ))}
+              <option value={NON_RATTACHES}>Non rattachés</option>
+            </select>
+          )}
+
           <select
             value={selectedResult}
             onChange={(e) => setSelectedResult(e.target.value)}
@@ -394,6 +462,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               <tr>
                 <th className="py-3.5 px-4">Entrée / Sortie</th>
                 <th className="py-3.5 px-4">Actif / Paire</th>
+                <th className="py-3.5 px-4">Compte</th>
                 <th className="py-3.5 px-4">Direction</th>
                 <th className="py-3.5 px-4">Entrée → TP / SL</th>
                 <th className="py-3.5 px-4">Stratégie & Émotion</th>
@@ -405,7 +474,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             <tbody className="divide-y divide-[#1B2320]/60">
               {filteredTrades.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-slate-500">
+                  <td colSpan={9} className="text-center py-12 text-slate-500">
                     Aucun trade trouvé correspondant aux critères de recherche.
                   </td>
                 </tr>
@@ -450,6 +519,18 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                       <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#1B2320] text-slate-400">
                         {trade.marketCategory}
                       </span>
+                    </td>
+
+                    {/* Compte de rattachement. « Non rattaché » couvre aussi
+                        les trades pointant sur un compte supprimé. */}
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      {nomDuCompte(trade.accountId) ? (
+                        <span className="text-[11px] font-semibold text-slate-200">
+                          {nomDuCompte(trade.accountId)}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-600 italic">Non rattaché</span>
+                      )}
                     </td>
 
                     {/* Direction */}
@@ -631,6 +712,30 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   />
                 </div>
               </div>
+
+              {/* Compte de rattachement. Volontairement **sans** `required` :
+                  un trade peut légitimement n'appartenir à aucun portefeuille
+                  suivi ici, et forcer un choix pousserait à en désigner un au
+                  hasard — donnée fausse plutôt que donnée absente. */}
+              {accounts.length > 0 && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">
+                    Compte <span className="text-slate-600 font-normal">(facultatif)</span>
+                  </label>
+                  <select
+                    value={formData.accountId}
+                    onChange={(e) => setFormData({ ...formData, accountId: e.target.value })}
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
+                  >
+                    <option value={SANS_COMPTE}>— Non rattaché —</option>
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} · {acc.firmOrBroker}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>

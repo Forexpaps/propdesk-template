@@ -476,6 +476,7 @@ export const initialModules: Module[] = [
 export const initialTrades: Trade[] = [
   {
     id: "trd-001",
+    accountId: "acc-1",
     date: "2026-07-24",
     time: "14:30",
     exitDate: "2026-07-24",
@@ -514,6 +515,7 @@ export const initialTrades: Trade[] = [
   },
   {
     id: "trd-002",
+    accountId: "acc-1",
     date: "2026-07-22",
     time: "09:15",
     exitDate: "2026-07-23",
@@ -551,6 +553,7 @@ export const initialTrades: Trade[] = [
   },
   {
     id: "trd-003",
+    accountId: "acc-2",
     date: "2026-07-20",
     time: "15:45",
     exitDate: "2026-07-20",
@@ -574,6 +577,7 @@ export const initialTrades: Trade[] = [
   },
   {
     id: "trd-004",
+    accountId: "acc-2",
     date: "2026-07-17",
     time: "11:20",
     exitDate: "2026-07-18",
@@ -597,6 +601,7 @@ export const initialTrades: Trade[] = [
   },
   {
     id: "trd-005",
+    accountId: "acc-3",
     date: "2026-07-15",
     time: "16:10",
     exitDate: "2026-07-15",

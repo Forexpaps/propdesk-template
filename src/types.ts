@@ -61,6 +61,18 @@ export interface Trade {
   exitDate?: string;
   /** Heure de sortie, au format HH:MM. */
   exitTime?: string;
+  /**
+   * Compte sur lequel la position a été prise (`TradingAccount.id`).
+   *
+   * **Optionnel, et il doit le rester.** Les trades saisis avant l'existence
+   * de ce champ n'en ont pas, et rien ne permet de deviner à quel compte les
+   * rattacher — ils s'affichent « Non rattaché » jusqu'à ce que quelqu'un
+   * tranche. Rendre le champ obligatoire reviendrait à inventer cette donnée.
+   *
+   * Un compte supprimé laisse aussi des `accountId` orphelins : traite donc
+   * toujours « introuvable » comme « non rattaché », jamais comme une erreur.
+   */
+  accountId?: string;
   pair: string; // e.g. "EUR/USD", "BTC/USDT"
   marketCategory: MarketCategory;
   direction: TradeDirection;
