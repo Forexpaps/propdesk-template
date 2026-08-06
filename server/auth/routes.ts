@@ -88,6 +88,10 @@ function authenticatedPayload(staffId: string) {
       email: staff?.email ?? "",
       isAdmin: true,
       mustChangePassword: staff?.mustChangePassword === true,
+      // Gouverne la seule configuration réservée au fondateur : les entrées
+      // masquées de la sidebar. Ne retire aucun droit métier — voir
+      // `AuthContext.isOwner`.
+      isOwner: staff?.isOwner === true,
     },
   };
 }
@@ -298,15 +302,28 @@ staffRouter.post(
 /**
  * Révoque un compte staff.
  *
- * Refuse de supprimer le dernier compte restant (`deleteStaffAccount` porte
- * la garde) : sans lui, plus personne ne pourrait jamais se reconnecter.
+ * `deleteStaffAccount` porte les gardes — dernier compte restant, compte
+ * fondateur — et réaffecte les filleuls du compte supprimé pour qu'aucun ne
+ * devienne fondateur par effet de bord.
  */
 staffRouter.delete("/staff/:id", (req, res) => {
-  const removed = deleteStaffAccount(req.params.id);
-  if (!removed) {
+  const failure = deleteStaffAccount(req.params.id);
+
+  if (failure === "last-account") {
+    res.status(409).json({ error: "Impossible de supprimer le dernier compte restant." });
+    return;
+  }
+
+  if (failure === "owner") {
     res.status(409).json({
-      error: "Impossible de supprimer le dernier compte restant.",
+      error:
+        "Le compte principal ne peut pas être supprimé : c'est lui qui règle les modules visibles.",
     });
+    return;
+  }
+
+  if (failure === "not-found") {
+    res.status(404).json({ error: "Ce compte n'existe pas." });
     return;
   }
 

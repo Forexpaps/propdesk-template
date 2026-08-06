@@ -120,7 +120,16 @@ export default function App() {
   // aucune vérification n'est possible : on démarre sur le cache local, comme
   // avant l'authentification. C'est un choix assumé — le verrou n'est donc pas
   // une barrière d'accès aux données déjà présentes sur la machine (voir README).
-  return <AuthenticatedApp onLoggedOut={markLoggedOut} currentStaffId={user?.id ?? null} />;
+  // `isOwner` est faux hors ligne : sans serveur, aucune identité n'est
+  // vérifiable, et le réglage des modules visibles ne pourrait de toute façon
+  // pas être poussé. Le fondateur retrouve la main dès qu'il est reconnecté.
+  return (
+    <AuthenticatedApp
+      onLoggedOut={markLoggedOut}
+      currentStaffId={user?.id ?? null}
+      isOwner={user?.isOwner === true}
+    />
+  );
 }
 
 /**
@@ -133,9 +142,11 @@ export default function App() {
 function AuthenticatedApp({
   onLoggedOut,
   currentStaffId,
+  isOwner,
 }: {
   onLoggedOut: () => void;
   currentStaffId: string | null;
+  isOwner: boolean;
 }) {
   const { status, state } = useBootstrap();
 
@@ -149,6 +160,7 @@ function AuthenticatedApp({
       syncEnabled={status === "online"}
       onLoggedOut={onLoggedOut}
       currentStaffId={currentStaffId}
+      isOwner={isOwner}
     />
   );
 }
@@ -162,9 +174,20 @@ interface AcademyAppProps {
   onLoggedOut: () => void;
   /** Identité du compte staff connecté. `null` hors ligne (pas de session vérifiée). */
   currentStaffId: string | null;
+  /**
+   * Vrai pour le seul compte fondateur. Ne conditionne que le réglage des
+   * modules visibles : un coach garde tous les autres droits.
+   */
+  isOwner: boolean;
 }
 
-function AcademyApp({ initialState, syncEnabled, onLoggedOut, currentStaffId }: AcademyAppProps) {
+function AcademyApp({
+  initialState,
+  syncEnabled,
+  onLoggedOut,
+  currentStaffId,
+  isOwner,
+}: AcademyAppProps) {
   const server = initialState?.collections;
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
 
@@ -760,7 +783,15 @@ function AcademyApp({ initialState, syncEnabled, onLoggedOut, currentStaffId }: 
         onOpenPropFirmRules={() => setIsPropFirmRulesOpen(true)}
         onOpenMindset={() => setIsMindsetModalOpen(true)}
         onOpenCalendar={() => setIsCalendarOpen(true)}
+        canManageSidebar={isOwner}
         onToggleSidebarItem={(key) => {
+          // Garde de sûreté, en plus du masquage de l'interface : la sidebar
+          // n'appelle déjà pas ce rappel pour un coach. Le serveur reste
+          // l'autorité — il réinjecte la valeur en base sur `PUT /api/profile`
+          // — mais sans cette ligne un coach verrait le masquage s'appliquer à
+          // l'écran avant d'être silencieusement annulé au rechargement.
+          if (!isOwner) return;
+
           // Forme fonctionnelle obligatoire : deux bascules dans le même lot de
           // rendu liraient sinon le même `student`, et la seconde écraserait la
           // première.

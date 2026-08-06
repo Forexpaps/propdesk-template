@@ -42,6 +42,12 @@ export interface AuthUser {
   isAdmin: boolean;
   /** Vrai après une invitation, tant que le mot de passe temporaire est actif. */
   mustChangePassword: boolean;
+  /**
+   * Vrai pour le seul compte fondateur. Ne conditionne que le réglage des
+   * modules visibles dans la sidebar : les coachs gardent tous les autres
+   * droits.
+   */
+  isOwner: boolean;
 }
 
 export type AuthState =
@@ -56,6 +62,8 @@ export interface StaffAccountSummary {
   email: string;
   mustChangePassword: boolean;
   createdAt: string;
+  /** Le compte fondateur : non supprimable, seul à régler les modules visibles. */
+  isOwner: boolean;
 }
 
 /**

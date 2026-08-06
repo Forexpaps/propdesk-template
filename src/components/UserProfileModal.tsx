@@ -360,9 +360,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
               {/* Ce statut n'est plus un interrupteur : un interrupteur ici
                   permettait de s'auto-promouvoir, et le serveur ignore
-                  désormais ce champ dans le corps de PUT /api/profile. Tous
-                  les comptes staff ont les mêmes droits — ce bouton mène à
-                  leur gestion (inviter, révoquer), pas à un réglage de rôle. */}
+                  désormais ce champ dans le corps de PUT /api/profile. Les
+                  comptes staff ont les mêmes droits métier — ce bouton mène à
+                  leur gestion (inviter, révoquer), pas à un réglage de rôle.
+                  La seule distinction est le compte fondateur, qui règle les
+                  modules visibles ; elle ne s'édite pas, elle se constate. */}
               {onOpenStaffAccounts ? (
                 <button
                   type="button"

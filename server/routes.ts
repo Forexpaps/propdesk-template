@@ -113,9 +113,35 @@ api.put("/profile", (req, res) => {
   // schéma protège cette route, cette ligne protège l'invariant même si une
   // future route oublie le schéma — et elle empêche aussi qu'un client qui ne
   // renvoie pas le champ ne l'effface.
-  const current = getProfile<{ isAdmin?: boolean }>();
+  const current = getProfile<{
+    isAdmin?: boolean;
+    hiddenSidebarItems?: unknown;
+  }>();
 
-  saveProfile({ ...parsed.data, isAdmin: current?.isAdmin === true });
+  // Seul le compte fondateur règle les entrées masquées de la sidebar.
+  //
+  // La valeur en base est **réinjectée** pour un coach, elle n'est pas rejetée :
+  // `hiddenSidebarItems` voyage dans le même objet que le nom, l'avatar ou le
+  // capital, tous légitimement modifiables par un coach. Un 403 sur la requête
+  // entière lui interdirait de changer son propre profil à cause d'un champ
+  // qu'il n'a même pas touché — le client renvoie fidèlement l'objet reçu.
+  //
+  // La clé n'est réintroduite que si elle existait : l'ajouter à `undefined`
+  // créerait un champ absent du profil d'origine.
+  const profile: Record<string, unknown> = {
+    ...parsed.data,
+    isAdmin: current?.isAdmin === true,
+  };
+
+  if (req.auth?.isOwner !== true) {
+    if (current && "hiddenSidebarItems" in current) {
+      profile.hiddenSidebarItems = current.hiddenSidebarItems;
+    } else {
+      delete profile.hiddenSidebarItems;
+    }
+  }
+
+  saveProfile(profile);
   res.json({ success: true });
 });
 
