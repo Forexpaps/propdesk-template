@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type ServerState } from "../lib/api";
+import { clearPending, listPending, markPending } from "../lib/pendingChanges";
 
 export type SyncStatus = "loading" | "online" | "offline";
 
@@ -88,6 +89,9 @@ function cacheState(state: ServerState): void {
 export function useBootstrap() {
   const [status, setStatus] = useState<SyncStatus>("loading");
   const [state, setState] = useState<ServerState | null>(null);
+  // Clés modifiées hors ligne et jamais envoyées. Relevées **avant** tout
+  // appel réseau : `cacheState` les écraserait sinon.
+  const [pending, setPending] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,9 +113,16 @@ export function useBootstrap() {
           serverState = await api.fetchState();
         }
 
-        cacheState(serverState);
+        // Point critique : `cacheState` recopie l'état serveur par-dessus le
+        // cache local. Tant que des modifications hors ligne attendent d'être
+        // arbitrées, ce serait les détruire avant même de les avoir proposées
+        // — c'est exactement ce qui les faisait disparaître auparavant. On
+        // laisse donc le cache intact et on remet la décision à l'utilisateur.
+        const enAttente = listPending();
+        if (enAttente.length === 0) cacheState(serverState);
 
         if (!cancelled) {
+          setPending(enAttente);
           setState(serverState);
           setStatus("online");
         }
@@ -129,7 +140,28 @@ export function useBootstrap() {
     };
   }, []);
 
-  return { status, state };
+  /**
+   * Oublie les modifications en attente et réaligne le cache sur le serveur.
+   *
+   * Appelé quand l'utilisateur choisit d'abandonner : le `cacheState` sauté
+   * plus haut est rattrapé ici, sinon le cache garderait indéfiniment une
+   * version que plus personne ne compte envoyer.
+   */
+  const discardPending = useCallback(() => {
+    if (state) cacheState(state);
+    // `clearPending()` est indispensable, et pas redondant avec `setPending([])`.
+    // L'état React disparaît au rechargement qui suit ; c'est le registre
+    // `localStorage` qui est relu au démarrage. Sans cette ligne, le bandeau
+    // réapparaissait juste après avoir été abandonné, en proposant d'envoyer
+    // des modifications que le cache ne contenait déjà plus.
+    clearPending();
+    setPending([]);
+  }, [state]);
+
+  /** Signale que le rejeu a eu lieu ; l'appelant recharge ensuite la page. */
+  const acknowledgePending = useCallback(() => setPending([]), []);
+
+  return { status, state, pending, discardPending, acknowledgePending };
 }
 
 /**
@@ -167,7 +199,13 @@ export function useSyncedState<T>(
       // Quota dépassé ou navigation privée : le serveur reste la source fiable.
     }
 
-    if (!enabled) return;
+    // Hors ligne : rien à pousser, mais il faut retenir que cette collection a
+    // divergé du serveur. Sans cette marque, le rechargement suivant reprendrait
+    // l'état serveur et la modification disparaîtrait sans un mot.
+    if (!enabled) {
+      markPending(localKey);
+      return;
+    }
 
     const timer = setTimeout(() => {
       stablePush(value).catch((err) => {

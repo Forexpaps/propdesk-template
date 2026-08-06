@@ -12,6 +12,7 @@ import { PositionCalculatorModal } from "./components/PositionCalculatorModal";
 import { TradingPlanModal } from "./components/TradingPlanModal";
 import { EconomicCalendarModal } from "./components/EconomicCalendarModal";
 import { UserProfileModal } from "./components/UserProfileModal";
+import { PendingChangesBanner } from "./components/PendingChangesBanner";
 import { StaffAccountsModal } from "./components/StaffAccountsModal";
 import { NotificationModal } from "./components/NotificationModal";
 import { PropFirmRulesModal } from "./components/PropFirmRulesModal";
@@ -204,7 +205,7 @@ function AuthenticatedApp({
   currentStaffId: string | null;
   isOwner: boolean;
 }) {
-  const { status, state } = useBootstrap();
+  const { status, state, pending, discardPending, acknowledgePending } = useBootstrap();
 
   if (status === "loading") {
     return <LoadingScreen message="Chargement de ton espace PropDesk…" />;
@@ -217,6 +218,9 @@ function AuthenticatedApp({
       onLoggedOut={onLoggedOut}
       currentStaffId={currentStaffId}
       isOwner={isOwner}
+      pending={pending}
+      onDiscardPending={discardPending}
+      onReplayedPending={acknowledgePending}
     />
   );
 }
@@ -235,6 +239,13 @@ interface AcademyAppProps {
    * modules visibles : un coach garde tous les autres droits.
    */
   isOwner: boolean;
+  /**
+   * Clés modifiées hors ligne et jamais envoyées. Vide dans le cas normal.
+   * Voir `src/lib/pendingChanges.ts`.
+   */
+  pending: string[];
+  onDiscardPending: () => void;
+  onReplayedPending: () => void;
 }
 
 function AcademyApp({
@@ -243,6 +254,9 @@ function AcademyApp({
   onLoggedOut,
   currentStaffId,
   isOwner,
+  pending,
+  onDiscardPending,
+  onReplayedPending,
 }: AcademyAppProps) {
   const server = initialState?.collections;
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
@@ -375,13 +389,22 @@ function AcademyApp({
 
   // L'écriture dans localStorage est désormais assurée par usePersistentState.
 
-  // Recalculate Student Capital from Trades PnL
+  // Le capital courant est dérivé du PnL cumulé du journal.
+  //
+  // Renvoyer `prev` **à l'identique** quand la valeur ne bouge pas n'est pas
+  // une micro-optimisation : cet effet s'exécute à chaque montage, et un
+  // nouvel objet à chaque fois — même porteur de la même valeur — suffisait à
+  // faire croire au reste de l'application que le profil venait d'être
+  // modifié. En ligne cela déclenchait un `PUT /api/profile` inutile à chaque
+  // démarrage ; hors ligne cela marquait le profil comme « en attente », et le
+  // bandeau de reconnexion annonçait des modifications qui n'existaient pas.
+  // Un bandeau qui crie au loup à chaque fois n'est plus lu.
   useEffect(() => {
     const totalPnL = trades.reduce((acc, t) => acc + t.pnl, 0);
-    setStudent((prev) => ({
-      ...prev,
-      currentCapital: prev.startingCapital + totalPnL,
-    }));
+    setStudent((prev) => {
+      const capital = prev.startingCapital + totalPnL;
+      return prev.currentCapital === capital ? prev : { ...prev, currentCapital: capital };
+    });
   }, [trades]);
 
   /**
@@ -871,6 +894,15 @@ function AcademyApp({
 
       {/* Main Content Area (offset by sidebar width on large screens) */}
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isCollapsed ? "lg:pl-20" : "lg:pl-64"}`}>
+        {/* Modifications hors ligne en attente d'arbitrage. Placé au-dessus de
+            l'en-tête, avant tout contenu : c'est une décision à prendre avant
+            de continuer à travailler, pas une notification de plus. */}
+        <PendingChangesBanner
+          pending={pending}
+          onDiscard={onDiscardPending}
+          onReplayed={onReplayedPending}
+        />
+
         {/* Top Header Bar */}
         <TopHeader
           activeTab={activeTab}
@@ -933,6 +965,7 @@ function AcademyApp({
           {activeTab === "wallets" && (
             <WalletManagement
               accounts={accounts}
+              trades={trades}
               onAddAccount={handleAddAccount}
               onUpdateAccountBalance={handleUpdateAccountBalance}
             />
@@ -968,6 +1001,7 @@ function AcademyApp({
           {activeTab === "journal" && (
             <TradingJournal
               trades={trades}
+              accounts={accounts}
               onAddTrade={handleAddTrade}
               onDeleteTrade={handleDeleteTrade}
               onSelectTradeForAudit={(trade) => setSelectedTradeForAudit(trade)}

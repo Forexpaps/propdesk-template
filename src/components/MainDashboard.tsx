@@ -1,13 +1,35 @@
 import React, { useState } from "react";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ReferenceLine,
-} from "recharts";
+
+/**
+ * `recharts` pèse ~327 ko et ne sert ici qu'à la courbe de progression, en bas
+ * de page. Le charger paresseusement sort ce poids du démarrage : le tableau
+ * de bord — écran d'arrivée de l'application — s'affiche sans l'attendre.
+ */
+const EquityCurveChart = React.lazy(() =>
+  import("./EquityCurveChart").then((m) => ({ default: m.EquityCurveChart }))
+);
+
+/**
+ * Gabarit affiché le temps que `recharts` arrive.
+ *
+ * **Il doit rester dans ce fichier, surtout pas dans `EquityCurveChart.tsx`.**
+ * Un module à la fois importé statiquement et dynamiquement est fusionné par
+ * Rollup dans le chunk de l'importateur statique : le `React.lazy` devient
+ * alors décoratif, et `recharts` repart dans le bundle initial sans qu'aucun
+ * avertissement ne le signale. C'est exactement ce qui s'est produit au
+ * premier essai. `EquityCurveChart.tsx` n'est importé que dynamiquement, et
+ * cela doit le rester.
+ *
+ * La hauteur est portée par le conteneur parent (`h-64`) : le gabarit occupe
+ * donc exactement la place du graphique, et la page ne sursaute pas à son
+ * arrivée. Volontairement muet — sur une connexion normale l'attente est trop
+ * brève pour qu'un texte serve à autre chose qu'à clignoter.
+ */
+function EquityCurvePlaceholder() {
+  return (
+    <div className="h-full w-full rounded-xl bg-[#0D1110]/40 animate-pulse" aria-hidden="true" />
+  );
+}
 import {
   TrendingUp,
   BookOpen,
@@ -286,54 +308,9 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
 
           {/* Chart Graphic */}
           <div className="h-64 w-full pt-4">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={equityData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorCapital" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00E676" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#00E676" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="label" stroke="#475569" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis
-                  stroke="#475569"
-                  fontSize={11}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(val) => `${val} €`}
-                  domain={["auto", "auto"]}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#0D1110",
-                    borderColor: "#1B2320",
-                    borderRadius: "12px",
-                    color: "#FFF",
-                    fontSize: "12px",
-                  }}
-                  formatter={(value: any) => [`${Number(value).toLocaleString("fr-FR")} €`, "Capital"]}
-                />
-                <ReferenceLine
-                  y={11500}
-                  stroke="#00E676"
-                  strokeDasharray="4 4"
-                  label={{
-                    value: "PALIER 11 500 € · ATTEINT",
-                    fill: "#00E676",
-                    fontSize: 10,
-                    position: "insideBottomLeft",
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="capital"
-                  stroke="#00E676"
-                  strokeWidth={2.5}
-                  fillOpacity={1}
-                  fill="url(#colorCapital)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <React.Suspense fallback={<EquityCurvePlaceholder />}>
+              <EquityCurveChart data={equityData} />
+            </React.Suspense>
           </div>
         </div>
 
