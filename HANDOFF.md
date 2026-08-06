@@ -900,12 +900,18 @@ coach ?) contre lesquelles deviendraient privées par bureau, et de décider du
 lien entre `EnrolledStudent` et un compte réel. Chantier bien plus grand que
 l'ajout de comptes staff — ne pas le confondre avec lui.
 
-### 4. `onSelectAccountForJournal` est mort
+### 4. Aucun lien entre un trade et un compte
 
-Dans [`WalletManagement.tsx:29`](src/components/WalletManagement.tsx:29), la
-prop est **déclarée et déstructurée mais jamais appelée dans le composant**. La
-câbler depuis `App.tsx` ne produirait rien. Il faut d'abord décider quel
-élément d'interface doit la déclencher.
+`Trade` n'a pas d'`accountId`. Le journal ne peut donc pas être filtré par
+portefeuille, et `tradesCount` d'un `TradingAccount` est une valeur saisie, pas
+un calcul.
+
+Une prop `onSelectAccountForJournal` traînait dans `WalletManagement` et
+laissait croire que ce filtrage n'attendait qu'un branchement — elle était
+déclarée, déstructurée, jamais appelée, jamais transmise. **Elle a été
+supprimée** : le commentaire qui la remplace en tête de
+[`WalletManagement.tsx`](src/components/WalletManagement.tsx) explique pourquoi.
+Le vrai chantier est décrit en §7, tâche 2.
 
 ### 5. Données existantes sans les nouveaux champs
 
@@ -941,25 +947,18 @@ et **les données seraient perdues à chaque redémarrage d'instance**. Monter u
 volume sur `DATA_DIR`, ou passer à Postgres. Seul `server/repositories.ts` est
 à réécrire : les routes n'y touchent pas.
 
-### 8. Bundle client de ~944 Ko
+### 8. `recharts` pèse encore 327 ko au premier chargement
 
-`dist/assets/index-*.js` dépasse **940 ko** (~255 ko gzippé), au-delà du
-seuil d'avertissement de 500 ko de Vite. Aucun découpage de code n'est en
-place. Non bloquant, mais à traiter avant une mise en production sérieuse.
-`recharts` est le principal contributeur.
+Le bundle est désormais découpé (§8, « Découpage du bundle ») et aucun bloc ne
+dépasse le seuil de Vite. Il reste que `charts` est chargé d'emblée, parce que
+`MainDashboard` — l'écran d'arrivée — s'en sert pour la courbe de progression.
+C'est le plus gros poste restant. Voir §7, tâche 3.
 
-### 9. `.env.example` encore rédigé pour AI Studio
+### 9. Le socket HMR de Vite échoue en boucle
 
-Il mentionne l'injection automatique par AI Studio et une variable `APP_URL`
-qui n'est utilisée **nulle part** dans le code. À nettoyer.
-
-### 10. `vite.config.ts` porte encore des béquilles AI Studio
-
-Le bloc `server.hmr` / `server.watch` est piloté par une variable
-`DISABLE_HMR` propre à l'environnement AI Studio, avec un commentaire
-« Do not modify ». Hors AI Studio, cette variable n'est jamais définie : le
-comportement est donc le défaut de Vite. L'alias `@` pointe sur la racine du
-projet et n'est utilisé par aucun import.
+`ws://localhost:24678` en développement. Il faut recharger la page à la main
+après chaque modification. Sans effet en production. Diagnostic et piste de
+correction en §7, tâche 5.
 
 ---
 
@@ -1039,30 +1038,40 @@ L'onglet `exam` existe mais **affiche une page vierge** avec le texte « Contenu
 page vierge en attendant de définir le contenu. Lui demander ce qu'il veut y
 mettre avant de coder.
 
-### 2. Dériver la liste blanche des onglets de notification
+### 2. Rattacher les trades à un compte
 
-`handleNavigateFromNotification` a été complété (`exam`, `propfirm`, et
-`students` réservé à l'admin), mais la liste reste **recopiée à la main**. La
-dériver de `TabType` éviterait qu'un futur onglet crée un trou silencieux.
+**Fonctionnalité, pas dette.** `Trade` n'a aucun `accountId` : rien ne relie un
+trade à un portefeuille. Tant que c'est le cas, le journal ne peut pas être
+filtré par compte, et les statistiques d'un compte prop firm ne peuvent pas
+être calculées depuis les trades réels.
 
-### 3. Découper le bundle
+C'est ce qui a fait supprimer `onSelectAccountForJournal` (§6.4) : cette prop
+laissait croire à un simple branchement. Le vrai travail serait d'ajouter le
+champ, de décider à quel compte rattacher les **6 trades déjà en base**, puis
+d'ajouter un sélecteur à la saisie et un filtre au journal. À ne lancer que sur
+demande — c'est une décision produit.
 
-`build.rollupOptions.output.manualChunks` ou imports dynamiques sur les vues
-les plus lourdes (`recharts` est le principal contributeur).
+### 3. Alléger le bloc `charts`
 
-### 4. Décider du sort de `onSelectAccountForJournal`
+Le bundle est découpé (§8, « Découpage du bundle »), mais `recharts` pèse
+encore **327 ko** au chargement initial : `MainDashboard` s'en sert pour la
+courbe de progression, qui est l'écran d'arrivée. L'isoler dans un
+sous-composant chargé paresseusement retirerait ~40 % du poids initial, au prix
+d'une courbe qui apparaîtrait avec un instant de retard. **Décision produit :
+demander avant de le faire.**
 
-Câbler ou supprimer ([`WalletManagement.tsx:29`](src/components/WalletManagement.tsx:29)).
-Demander d'abord (§6.4).
-
-### 5. Nettoyer `.env.example` et `vite.config.ts`
-
-Retirer les mentions AI Studio et la variable `APP_URL` inutilisée (§6.9,
-§6.10).
-
-### 6. Rejeu des modifications hors ligne
+### 4. Rejeu des modifications hors ligne
 
 Seulement si l'utilisateur le demande : coût élevé, gestion de conflits.
+
+### 5. Corriger le socket HMR de Vite
+
+`ws://localhost:24678` échoue en boucle en développement, obligeant à recharger
+la page à la main après chaque modification. Vite est monté en **mode
+middleware** par `server.ts` ; dans ce mode il ouvre son WebSocket HMR sur un
+port séparé (24678 par défaut) qui n'est pas servi par Express. Passer le
+serveur HTTP à Vite, ou fixer `server.hmr.port`, devrait suffire. Gêne
+quotidienne, sans effet sur la production.
 
 ### Ce qui n'est PAS une tâche
 
@@ -1149,6 +1158,42 @@ ce genre de nuance avant de la migrer.
 - les couleurs par module du tableau de bord — vert (Journal), bleu (Examen),
   violet (Replay), ambre (Module vidéo) — reprises dans chaque vue
   correspondante.
+
+### Découpage du bundle
+
+Le client partait en **un seul fichier de ~944 ko**. Il est maintenant réparti,
+selon deux mécanismes complémentaires qu'il ne faut pas confondre :
+
+1. **`manualChunks` dans `vite.config.ts`** sépare les dépendances tierces du
+   code applicatif — `charts` (recharts et sa famille `d3-*`), `react`,
+   `vendor`. Elles changent rarement : le navigateur les garde en cache d'un
+   déploiement à l'autre au lieu de les retélécharger à chaque correction.
+
+   C'est une **fonction**, pas la forme courte `{nom: ['paquet']}`. Cette
+   dernière compare des identifiants de module exacts : `react` est importé
+   comme `react/jsx-runtime` et `react-dom` comme `react-dom/client`, elle
+   produisait donc des blocs **vides**. Ne reviens pas à la forme courte.
+
+   `jspdf` n'y figure pas volontairement : il n'est utilisé que par
+   `scripts/generate_pdf.js`, sous Node, et n'entre pas dans le bundle client.
+
+2. **`React.lazy` sur les vues d'onglet** (`App.tsx`) sort chaque vue dans son
+   propre fichier, récupéré au premier affichage de l'onglet. Une seule vue est
+   montrée à la fois ; les neuf autres n'ont pas à être téléchargées d'emblée.
+
+**Ce qui reste en import direct, et pourquoi :**
+
+- `MainDashboard` — onglet d'arrivée et repli de tout onglet devenu
+  inatteignable. Le différer ajouterait une attente au démarrage sans rien
+  économiser.
+- **Les modales.** Elles sont montées en permanence et pilotées par une prop
+  `isOpen` : un `lazy` les chargerait immédiatement, sans gain. Les rendre
+  conditionnelles remettrait leur état interne à zéro à chaque ouverture — ce
+  serait un changement de comportement, pas une optimisation.
+
+Résultat : le code applicatif passe de **322 ko à 176 ko**, et le chargement
+initial de 944 ko à ~798 ko (255 → 228 ko gzippé). Une seule frontière
+`Suspense` couvre toutes les vues : elles s'excluent mutuellement.
 
 ### Tailwind 4, sans fichier de configuration
 
@@ -1477,9 +1522,15 @@ modèle déclaré (`gemini-3.6-flash`,
   Méthode : `DATA_DIR` pointé sur une copie `sqlite3 .backup`, serveur sur le
   port 3999 — la vraie base n'a jamais été ouverte en écriture (compteurs et
   `mtime` vérifiés inchangés après coup).
-- **Une erreur console subsiste**, sans rapport avec ce chantier : le socket
-  HMR de Vite (`ws://localhost:24678`) échoue en boucle. **Recharge la page à
-  la main** après une modification — déjà documenté, toujours vrai.
+- **Une erreur console subsiste** : le socket HMR de Vite
+  (`ws://localhost:24678`) échoue en boucle. **Recharge la page à la main**
+  après une modification. La cause est identifiée (§7, tâche 5) : Vite est
+  monté en mode middleware et ouvre son WebSocket sur un port qu'Express ne
+  sert pas.
+- **Bundle découpé** (§8) : plus aucun bloc au-dessus du seuil de Vite. Vérifié
+  sur le build de production servi pour de vrai, pas seulement à la compilation
+  — les neuf vues arrivent bien en fichiers séparés au premier affichage de
+  chaque onglet.
 
 ### Contenu de `data/horizon.db`
 
