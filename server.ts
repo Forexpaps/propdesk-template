@@ -1,4 +1,5 @@
 import express from "express";
+import http from "node:http";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
@@ -33,9 +34,32 @@ startSessionCleanup();
 app.use("/public", express.static(path.join(ROOT,"public")));
 
 async function startServer() {
+  // Le serveur HTTP est créé explicitement, au lieu de laisser `app.listen()`
+  // le faire : en développement, Vite a besoin d'une référence dessus pour y
+  // brancher le rechargement à chaud (voir plus bas).
+  const httpServer = http.createServer(app);
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        // Sans cette ligne, le rechargement à chaud ne fonctionne pas.
+        //
+        // En mode middleware, Vite ne connaît pas le serveur HTTP qui
+        // l'héberge : il ne peut donc pas y brancher son WebSocket, et ouvre
+        // le sien sur un port séparé (24678 par défaut). Ce port n'est servi
+        // par personne — Express écoute sur `PORT` et ignore tout le reste —
+        // si bien que le navigateur tentait `ws://localhost:24678` en boucle,
+        // échouait, et il fallait recharger la page à la main après chaque
+        // modification.
+        //
+        // Lui passer le serveur revient à lui dire « greffe-toi sur celui-ci » :
+        // Vite s'abonne à l'événement `upgrade` et le WebSocket voyage sur le
+        // même port que le reste. Plus de second port à ouvrir, et cela
+        // fonctionne tel quel derrière un tunnel ou un reverse proxy, qui n'ont
+        // qu'un port à relayer.
+        hmr: { server: httpServer },
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
@@ -47,7 +71,7 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`Serveur Académie Horizon démarré sur http://localhost:${PORT}`);
   });
 }

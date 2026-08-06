@@ -822,7 +822,8 @@ silencieuse.
 Le corps est enveloppé d'un `try/finally` : même si `api.logout()` ou
 `localStorage.clear()` lève, l'écran de connexion s'affiche. Ce durcissement
 vient d'un signalement « le bouton ne fonctionne pas » dont la cause réelle
-était le HMR cassé de Vite (§10) laissant tourner l'ancien code — mais un
+était le HMR cassé de Vite (corrigé depuis, §8) laissant tourner l'ancien
+code — mais un
 échec silencieux était le symptôme le plus trompeur possible, d'où le filet.
 
 `confirm()` est lui-même dans un `try/catch` : certains contextes (iframe
@@ -954,12 +955,6 @@ dépasse le seuil de Vite. Il reste que `charts` est chargé d'emblée, parce qu
 `MainDashboard` — l'écran d'arrivée — s'en sert pour la courbe de progression.
 C'est le plus gros poste restant. Voir §7, tâche 3.
 
-### 9. Le socket HMR de Vite échoue en boucle
-
-`ws://localhost:24678` en développement. Il faut recharger la page à la main
-après chaque modification. Sans effet en production. Diagnostic et piste de
-correction en §7, tâche 5.
-
 ---
 
 ## 6 bis. Ce qui ressemble à du code mort, mais ne l'est pas
@@ -1064,15 +1059,6 @@ demander avant de le faire.**
 
 Seulement si l'utilisateur le demande : coût élevé, gestion de conflits.
 
-### 5. Corriger le socket HMR de Vite
-
-`ws://localhost:24678` échoue en boucle en développement, obligeant à recharger
-la page à la main après chaque modification. Vite est monté en **mode
-middleware** par `server.ts` ; dans ce mode il ouvre son WebSocket HMR sur un
-port séparé (24678 par défaut) qui n'est pas servi par Express. Passer le
-serveur HTTP à Vite, ou fixer `server.hmr.port`, devrait suffire. Gêne
-quotidienne, sans effet sur la production.
-
 ### Ce qui n'est PAS une tâche
 
 - **Le cloisonnement des données par compte** (§6.3). Le bureau partagé est un
@@ -1158,6 +1144,41 @@ ce genre de nuance avant de la migrer.
 - les couleurs par module du tableau de bord — vert (Journal), bleu (Examen),
   violet (Replay), ambre (Module vidéo) — reprises dans chaque vue
   correspondante.
+
+### Le rechargement à chaud passe par le serveur d'Express
+
+`server.ts` crée explicitement son `http.Server` au lieu de laisser
+`app.listen()` s'en charger, puis le **passe à Vite** :
+
+```ts
+const httpServer = http.createServer(app);
+const vite = await createViteServer({
+  server: { middlewareMode: true, hmr: { server: httpServer } },
+  appType: "spa",
+});
+```
+
+**Ne retire pas `hmr: { server: httpServer }`.** C'est ce qui répare une panne
+qui a coûté cher : en mode middleware, Vite ne connaît pas le serveur HTTP qui
+l'héberge. Faute de pouvoir s'y greffer, il ouvrait son propre WebSocket sur le
+port 24678, que personne ne servait — le navigateur tentait
+`ws://localhost:24678` en boucle, échouait, et le rechargement à chaud ne
+fonctionnait pas. Il fallait recharger la page à la main après chaque
+modification.
+
+Le coût réel n'était pas la gêne : c'est que **l'ancien code continuait de
+tourner à l'écran**. Un signalement « le bouton Déconnexion ne fonctionne pas »
+en est venu (§5), alors que le bouton était correct — la page exécutait une
+version périmée. Tout symptôme inexplicable en développement doit faire
+soupçonner cela en premier.
+
+Vérifié par une preuve directe plutôt que par l'absence d'erreur : un témoin
+posé dans `window`, puis un fichier modifié. Le texte à l'écran a changé **et**
+le témoin a survécu — donc remplacement de module à chaud, et non rechargement
+complet, qui l'aurait effacé. Le serveur n'écoute plus que sur un seul port.
+
+Effet de bord utile : un seul port à exposer, ce qui fonctionne tel quel
+derrière un tunnel ou un reverse proxy.
 
 ### Découpage du bundle
 
@@ -1522,11 +1543,11 @@ modèle déclaré (`gemini-3.6-flash`,
   Méthode : `DATA_DIR` pointé sur une copie `sqlite3 .backup`, serveur sur le
   port 3999 — la vraie base n'a jamais été ouverte en écriture (compteurs et
   `mtime` vérifiés inchangés après coup).
-- **Une erreur console subsiste** : le socket HMR de Vite
-  (`ws://localhost:24678`) échoue en boucle. **Recharge la page à la main**
-  après une modification. La cause est identifiée (§7, tâche 5) : Vite est
-  monté en mode middleware et ouvre son WebSocket sur un port qu'Express ne
-  sert pas.
+- **La console est propre, et le rechargement à chaud fonctionne.** L'erreur
+  `ws://localhost:24678` qui tournait en boucle est corrigée (§8, « Le
+  rechargement à chaud »). Tu n'as plus à recharger la page à la main après une
+  modification — si tu lis encore une consigne en ce sens quelque part, elle est
+  périmée.
 - **Bundle découpé** (§8) : plus aucun bloc au-dessus du seuil de Vite. Vérifié
   sur le build de production servi pour de vrai, pas seulement à la compilation
   — les neuf vues arrivent bien en fichiers séparés au premier affichage de
