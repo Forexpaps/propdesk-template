@@ -4,16 +4,18 @@ Document de reprise. Il suppose que tu n'as accès ni à la conversation
 précédente, ni à autre chose que ce dépôt.
 
 > **État à la dernière mise à jour de ce document**
-> Branche `main`, dernier commit `69567d7`. `npm run lint` et `npm run build`
-> passent. La base `data/horizon.db` contient les **vraies données de
-> l'utilisateur**, plus le jeu de démonstration.
+> Branche `main`, arbre propre. `npm run lint` et `npm run build` passent. La
+> base `data/horizon.db` contient les **vraies données de l'utilisateur**, plus
+> le jeu de démonstration.
 >
-> Le problème d'avatar qui bloquait tout est **corrigé** : les images
-> téléversées sont désormais réduites à 256×256 avant stockage, et l'avatar
-> déjà en base a été recompressé (§4, « Poids des images »).
+> L'authentification est **terminée et vérifiée** : comptes staff multiples sur
+> un bureau unique partagé, invitation avec mot de passe temporaire, le tout
+> rejoué de bout en bout sur une copie de la vraie base (§10). La sauvegarde
+> d'avant migration a été supprimée — `data/` ne contient plus que la base
+> vivante.
 >
-> **Prochaine tâche : l'écran de connexion** (§7, tâche 1). Elle demande des
-> décisions produit **avant** d'écrire du code.
+> **Prochaine tâche : remplir le module « Examen »** (§7, tâche 1). Elle demande
+> une décision produit de l'utilisateur **avant** d'écrire du code.
 
 ---
 
@@ -989,40 +991,28 @@ L'onglet `exam` existe mais **affiche une page vierge** avec le texte « Contenu
 page vierge en attendant de définir le contenu. Lui demander ce qu'il veut y
 mettre avant de coder.
 
-### 2. Supprimer la sauvegarde d'avant migration
-
-`data/horizon.db.avant-staff-accounts` (+ ses fichiers `-shm`/`-wal`) traîne à
-côté de la base. Elle a été laissée **volontairement** le temps que
-l'utilisateur confirme que les comptes staff fonctionnent chez lui.
-**Lui demander avant de supprimer** — c'est le seul retour arrière possible sur
-la migration.
-
-Le répertoire `data/` a déjà accumulé plusieurs bases orphelines au fil des
-sessions (`horizon 2.db`, `horizon.db.bak`, `horizon.db.avant-auth`), toutes
-nettoyées depuis. Ne laisse pas la tienne s'y ajouter.
-
-### 3. Dériver la liste blanche des onglets de notification
+### 2. Dériver la liste blanche des onglets de notification
 
 `handleNavigateFromNotification` a été complété (`exam`, `propfirm`, et
 `students` réservé à l'admin), mais la liste reste **recopiée à la main**. La
 dériver de `TabType` éviterait qu'un futur onglet crée un trou silencieux.
 
-### 4. Découper le bundle
+### 3. Découper le bundle
 
 `build.rollupOptions.output.manualChunks` ou imports dynamiques sur les vues
 les plus lourdes (`recharts` est le principal contributeur).
 
-### 5. Décider du sort de `onSelectAccountForJournal`
+### 4. Décider du sort de `onSelectAccountForJournal`
 
 Câbler ou supprimer ([`WalletManagement.tsx:29`](src/components/WalletManagement.tsx:29)).
 Demander d'abord (§6.4).
 
-### 6. Nettoyer `.env.example` et `vite.config.ts`
+### 5. Nettoyer `.env.example` et `vite.config.ts`
 
 Retirer les mentions AI Studio et la variable `APP_URL` inutilisée (§6.9,
 §6.10).
 
-### 7. Rejeu des modifications hors ligne
+### 6. Rejeu des modifications hors ligne
 
 Seulement si l'utilisateur le demande : coût élevé, gestion de conflits.
 
@@ -1402,19 +1392,21 @@ modèle déclaré (`gemini-3.6-flash`,
 
 ## 10. État à la reprise
 
-> ### Votre compte a migré, votre session aussi
+> ### Migration close, sauvegarde supprimée
 >
 > La migration `staff_accounts` (§4) a été **appliquée à la vraie base** —
 > pas seulement testée sur une copie. Votre compte (`th.gauthey99@gmail.com`)
-> a conservé son `id` d'origine et **votre session active n'a pas été
-> invalidée** : si vous rechargez l'onglet où vous étiez déjà connecté, vous
-> resterez connecté sans ressaisir de mot de passe.
+> a conservé son `id` d'origine et votre session n'a pas été invalidée.
 >
-> Une sauvegarde d'avant migration existe : `data/horizon.db.avant-staff-accounts`.
-> Supprimable une fois le fonctionnement confirmé de votre côté.
+> La sauvegarde d'avant migration (`data/horizon.db.avant-staff-accounts`) a
+> été **supprimée** après une dernière vérification : les 11 tables métier ont
+> été comparées ligne à ligne entre la sauvegarde et la base actuelle —
+> `users`, `trades`, `enrolled_students`, `trading_accounts`, `modules` et
+> `badges` sortent **identiques**, la migration n'a donc rien perdu. Il n'y a
+> plus de retour arrière, et il n'y en a plus besoin. `data/` est propre :
+> plus aucune base orpheline.
 
-- Branche `main`, **arbre de travail propre**, dernier commit `fed79a9`
-  (« Ajoute des comptes staff multiples, sur un bureau toujours partagé »).
+- Branche `main`, **arbre de travail propre**.
 - `npm run lint` et `npm run build` : sans erreur (bundle ~944 ko, §6.8).
 - Migration vérifiée **trois fois** : sur une copie isolée (`/tmp/test-migration`),
   sur une base neuve pour le flux staff complet (`/tmp/staff-neuf`), puis
@@ -1425,6 +1417,16 @@ modèle déclaré (`gemini-3.6-flash`,
   `/auth/change-password` tant que `mustChangePassword` est vrai, déblocage
   après changement, bureau partagé confirmé identique entre deux comptes,
   suppression avec purge immédiate des sessions, garde-fou du dernier compte.
+- **Rejoué une seconde fois sur une copie de la vraie base** avant de supprimer
+  la sauvegarde (16 contrôles, tous verts) : invitation d'un coach, connexion au
+  mot de passe temporaire, `GET /api/state` refusé en 403 `MUST_CHANGE_PASSWORD`,
+  403 sur un mauvais mot de passe actuel, changement accepté, ancien mot de passe
+  temporaire devenu invalide (401), **écriture du coach visible depuis l'autre
+  compte** (`PUT /api/collections/trades`), suppression du coach en 204 avec
+  session purgée dans la seconde, et 409 sur la suppression du dernier compte.
+  Méthode : `DATA_DIR` pointé sur une copie `sqlite3 .backup`, serveur sur le
+  port 3999 — la vraie base n'a jamais été ouverte en écriture (compteurs et
+  `mtime` vérifiés inchangés après coup).
 - **Une erreur console subsiste**, sans rapport avec ce chantier : le socket
   HMR de Vite (`ws://localhost:24678`) échoue en boucle. **Recharge la page à
   la main** après une modification — déjà documenté, toujours vrai.
@@ -1459,7 +1461,10 @@ choix, pas des urgences :
 - **§7 tâche 1 — remplir le module « Examen ».** À ne pas coder avant d'avoir
   demandé à l'utilisateur ce qu'il veut y mettre : la page vierge est volontaire.
 - **Inviter un second compte**, si l'utilisateur le souhaite — le bouton
-  « Gérer l'équipe » dans le profil est prêt, jamais utilisé sur la vraie base.
+  « Gérer l'équipe » dans le profil est prêt. Le flux complet (invitation,
+  première connexion, changement de mot de passe imposé, suppression) a été
+  rejoué sur une copie de la vraie base, sans anomalie ; il n'a simplement
+  jamais servi à inviter quelqu'un pour de bon.
 - **§6.3 — un vrai cloisonnement des données par compte**, seulement si le
   besoin dépasse un jour le bureau partagé actuel. Chantier nettement plus
   grand que les comptes staff ; la liste de ce qu'il faudrait reprendre y
