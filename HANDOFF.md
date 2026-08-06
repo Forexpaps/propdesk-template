@@ -1030,17 +1030,27 @@ mettre avant de coder.
 
 ### 2. Rattacher les 6 trades existants à un compte
 
-Le rattachement existe (§8, « Rattachement trades ↔ comptes »), mais les six
-trades déjà en base restent **« Non rattaché »** : rien ne permettait de deviner
-leur compte, et l'inventer aurait été pire que de laisser le champ vide. Ils
-s'assignent un par un depuis l'interface, quand l'utilisateur le décidera. Ce
-n'est pas un bug.
+Le rattachement existe (§8), l'édition d'un trade aussi (bouton crayon dans le
+journal), mais les six trades déjà en base restent **« Non rattaché »** : rien
+ne permettait de deviner leur compte, et l'inventer aurait été pire que de
+laisser le champ vide. C'est à l'utilisateur de les assigner un par un. Ce
+n'est pas un bug, et personne d'autre que lui ne peut le faire à sa place.
 
-**Il n'existe pas d'écran d'édition d'un trade existant** : seuls la création et
-la suppression sont offertes. Rattacher un ancien trade suppose donc de le
-recréer, ou d'ajouter cette édition — à proposer avant de coder.
+### 3. Le PnL proposé à la création est faux
 
-### 3. Fusion ligne à ligne des modifications hors ligne
+`pnlDepuis()` dans [`TradingJournal.tsx`](src/components/TradingJournal.tsx)
+applique un multiplicateur de 1 000 à tout instrument. Sur les six trades
+d'origine : 9 € au lieu de 900 (EUR/USD), −50 000 au lieu de −300 (NAS100),
+1 050 000 au lieu de 1 050 (BTC/USDT), 36 000 au lieu de 1 200 (XAU/USD).
+
+Ce n'est plus dangereux — le PnL est un champ saisissable, la formule n'est
+qu'une proposition affichée que l'utilisateur corrige, et l'édition ne
+recalcule jamais. Mais la proposition reste inutile tant qu'elle ignore la
+taille de contrat de l'instrument. La corriger demande de connaître ces
+tailles (100 000 par lot en forex, 1 pour un indice CFD, etc.) : c'est une
+table à établir avec l'utilisateur, pas une constante à deviner.
+
+### 4. Fusion ligne à ligne des modifications hors ligne
 
 Le rejeu hors ligne existe (§8, « Modifications hors ligne »), mais il remplace
 des **collections entières**. Une fusion par élément, le plus récent gagnant,
@@ -1193,6 +1203,43 @@ de l'export CSV, et `positionsDuCompte` dans `WalletManagement`.
 `TradingAccount.tradesCount` subsiste dans le type mais **n'est plus lu à
 l'écran** : il valait 0 depuis la création de chaque compte et n'a jamais été
 mis à jour. C'est `positionsDuCompte` qui fait foi.
+
+### Modifier un trade : ne jamais recalculer le PnL
+
+Le journal permet de modifier un trade existant (bouton crayon). La règle qui
+gouverne cet écran tient en une phrase : **ouvrir une fiche ne doit changer
+aucun chiffre que l'utilisateur n'a pas touché.**
+
+Ce n'est pas une précaution théorique. `pnlDepuis()` applique un multiplicateur
+de 1 000 à tout instrument, ce qui est faux partout :
+
+| Trade | PnL réel | Ce que donne la formule |
+|---|---|---|
+| EUR/USD | 900 € | 9 € |
+| NAS100 | −300 € | −50 000 € |
+| BTC/USDT | 1 050 € | 1 050 000 € |
+| XAU/USD | 1 200 € | 36 000 € |
+
+Recalculer à l'enregistrement ferait donc exploser le capital au seul motif
+qu'on a ouvert un trade pour lui affecter un compte. D'où le dispositif :
+
+- **le PnL est un champ de formulaire**, pas une valeur dérivée ;
+- en **création**, il suit la proposition calculée tant que l'utilisateur n'y a
+  pas touché (`pnlTouche`), et cesse de bouger dès qu'il saisit un montant ;
+- en **modification**, `pnlTouche` démarre à `true` : la valeur enregistrée est
+  reprise telle quelle et rien ne l'écrase jamais.
+
+Ce qui *est* recalculé sans risque : `riskRewardRatio`, pure géométrie des prix
+(vérifié : redonne exactement les valeurs stockées) ; `result` et
+`pnlPercentage`, qui dérivent du PnL retenu.
+
+**`onUpdateTrade` reçoit `{ ...editingTrade, ...champs }`**, dans cet ordre. Le
+premier terme conserve l'`id` et surtout **`aiAudit`**, qui n'existe dans aucun
+champ du formulaire : l'omettre effacerait l'audit IA à la première
+modification. Vérifié en base après édition d'un trade audité.
+
+`App.handleUpdateTrade` rafraîchit aussi `selectedTradeForAudit` si la modale
+d'audit est ouverte sur ce trade, sinon elle garde une copie périmée.
 
 ### Modifications hors ligne
 
@@ -1629,6 +1676,10 @@ modèle déclaré (`gemini-3.6-flash`,
 - **Bundle découpé** (§8) : chargement initial à **475 ko**, plus aucun bloc
   au-dessus du seuil de Vite. Vérifié sur le build de production servi pour de
   vrai, pas seulement à la compilation.
+- **Édition d'un trade** (§8) vérifiée sur une copie de la vraie base : le trade
+  BTC ouvert pour lui affecter un compte ressort avec `pnl`, `pnlPercentage`,
+  `result` et `riskRewardRatio` **identiques au champ près**, et l'audit IA d'un
+  trade audité survit à une modification.
 - **Rattachement trades ↔ comptes** et **rejeu hors ligne** (§8) exercés de bout
   en bout sur une copie de la vraie base : trade rattaché depuis le formulaire et
   retrouvé en base avec son `accountId`, filtre cohérent (1 + 6 = 7), compteur de

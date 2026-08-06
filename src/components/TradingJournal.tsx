@@ -24,6 +24,7 @@ import {
   Calculator,
   Download,
   Eye,
+  Pencil,
   X
 } from "lucide-react";
 import {
@@ -56,6 +57,8 @@ interface TradingJournalProps {
    */
   accounts: TradingAccount[];
   onAddTrade: (trade: Omit<Trade, "id">) => void;
+  /** Remplace un trade existant, identifié par son `id`. */
+  onUpdateTrade: (trade: Trade) => void;
   onDeleteTrade: (id: string) => void;
   onSelectTradeForAudit: (trade: Trade) => void;
   onSendTradeToCoach: (trade: Trade) => void;
@@ -70,6 +73,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   trades,
   accounts,
   onAddTrade,
+  onUpdateTrade,
   onDeleteTrade,
   onSelectTradeForAudit,
   onSendTradeToCoach,
@@ -83,6 +87,25 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   const [selectedEmotion, setSelectedEmotion] = useState<string>("Tous");
   const [selectedAccount, setSelectedAccount] = useState<string>(TOUS_COMPTES);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  /**
+   * Trade en cours de modification, `null` pour une création.
+   *
+   * On conserve l'objet entier et pas seulement son `id` : il porte des champs
+   * absents du formulaire (`aiAudit` notamment) qu'il faut réinjecter tels
+   * quels à l'enregistrement, sous peine de les effacer silencieusement.
+   */
+  const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
+
+  /**
+   * Vrai dès que l'utilisateur a saisi un PnL à la main.
+   *
+   * Tant qu'il est faux (création uniquement), le champ suit la proposition
+   * calculée depuis les prix. Une fois vrai, plus rien ne l'écrase — et il
+   * démarre à vrai en édition, pour que la valeur enregistrée soit intouchable
+   * tant qu'on ne la modifie pas explicitement.
+   */
+  const [pnlTouche, setPnlTouche] = useState(false);
   const [selectedChartTrade, setSelectedChartTrade] = useState<Trade | null>(null);
 
   /**
@@ -160,6 +183,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     exitDate: new Date().toISOString().split("T")[0],
     exitTime: "16:00",
     accountId: SANS_COMPTE,
+    pnl: 0,
     pair: "EUR/USD",
     marketCategory: "Forex" as MarketCategory,
     direction: "LONG" as TradeDirection,
@@ -173,6 +197,73 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     notes: "Validation FVG H1 + Chasse de liquidité.",
     chartUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=800",
   });
+
+  /** Valeurs par défaut d'une création. Recalculées à chaque ouverture. */
+  const formulaireVierge = () => ({
+    date: new Date().toISOString().split("T")[0],
+    time: "14:30",
+    exitDate: new Date().toISOString().split("T")[0],
+    exitTime: "16:00",
+    accountId: SANS_COMPTE,
+    pnl: 0,
+    pair: "EUR/USD",
+    marketCategory: "Forex" as MarketCategory,
+    direction: "LONG" as TradeDirection,
+    entryPrice: 1.085,
+    stopLoss: 1.083,
+    takeProfit: 1.091,
+    exitPrice: 1.091,
+    lotSize: 1.0,
+    strategy: "SMC Orderblock",
+    emotion: "Disciplined" as EmotionState,
+    notes: "",
+    chartUrl: "",
+  });
+
+  const ouvrirCreation = () => {
+    setEditingTrade(null);
+    setPnlTouche(false);
+    setFormData(formulaireVierge());
+    setIsAddModalOpen(true);
+  };
+
+  /**
+   * Ouvre le formulaire sur un trade existant.
+   *
+   * Le PnL est repris **tel qu'il est enregistré**, jamais recalculé — voir le
+   * commentaire de `handleFormSubmit`, c'est le point le plus important de
+   * cette vue.
+   */
+  const ouvrirEdition = (trade: Trade) => {
+    setEditingTrade(trade);
+    setPnlTouche(true);
+    setFormData({
+      date: trade.date,
+      time: trade.time ?? "",
+      exitDate: trade.exitDate ?? "",
+      exitTime: trade.exitTime ?? "",
+      accountId: trade.accountId ?? SANS_COMPTE,
+      pnl: trade.pnl,
+      pair: trade.pair,
+      marketCategory: trade.marketCategory,
+      direction: trade.direction,
+      entryPrice: trade.entryPrice,
+      stopLoss: trade.stopLoss,
+      takeProfit: trade.takeProfit,
+      exitPrice: trade.exitPrice ?? 0,
+      lotSize: trade.lotSize,
+      strategy: trade.strategy,
+      emotion: trade.emotion,
+      notes: trade.notes ?? "",
+      chartUrl: trade.chartUrl ?? "",
+    });
+    setIsAddModalOpen(true);
+  };
+
+  const fermerFormulaire = () => {
+    setIsAddModalOpen(false);
+    setEditingTrade(null);
+  };
 
   // Applique une ébauche venue du calculateur / de l'analyseur IA, puis ouvre le formulaire.
   // Seules les clés fournies écrasent les valeurs par défaut ci-dessus.
@@ -188,6 +279,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       });
       return next;
     });
+    // Une ébauche est toujours une création : sans cela, elle viendrait écraser
+    // un trade en cours d'édition resté ouvert.
+    setEditingTrade(null);
+    setPnlTouche(false);
     setIsAddModalOpen(true);
     onPrefillConsumed?.();
   }, [prefillDraft, onPrefillConsumed]);
@@ -244,24 +339,48 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     }
   };
 
+  /**
+   * Calcul automatique du PnL à la **création**.
+   *
+   * ⚠️ Cette formule suppose un multiplicateur de 1 000 pour tout instrument.
+   * C'est faux en général : sur les six trades d'origine, elle donne 9 € au
+   * lieu de 900 (EUR/USD), −50 000 au lieu de −300 (NAS100), 1 050 000 au lieu
+   * de 1 050 (BTC/USDT). Elle n'est donc qu'une **proposition** que la saisie
+   * affiche et que l'utilisateur corrige — jamais une valeur imposée.
+   */
+  const pnlDepuis = (f: {
+    direction: TradeDirection;
+    entryPrice: number;
+    exitPrice: number;
+    lotSize: number;
+  }) => {
+    if (!f.exitPrice) return 0;
+    const brut =
+      f.direction === "LONG"
+        ? (f.exitPrice - f.entryPrice) * f.lotSize * 1000
+        : (f.entryPrice - f.exitPrice) * f.lotSize * 1000;
+    return Math.round(brut);
+  };
+
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Auto calculate PnL & R:R
-    const riskPipsOrPrice = Math.abs(formData.entryPrice - formData.stopLoss);
-    const rewardPipsOrPrice = Math.abs(formData.takeProfit - formData.entryPrice);
-    const riskReward = riskPipsOrPrice > 0 ? Number((rewardPipsOrPrice / riskPipsOrPrice).toFixed(1)) : 1;
+    // Géométrie pure, indépendante de l'instrument : recalculable sans risque.
+    const risque = Math.abs(formData.entryPrice - formData.stopLoss);
+    const gain = Math.abs(formData.takeProfit - formData.entryPrice);
+    const riskReward = risque > 0 ? Number((gain / risque).toFixed(1)) : 1;
 
-    let pnl = 0;
+    // Le PnL vient du champ, jamais d'un recalcul.
+    //
+    // C'est **la** règle à ne pas casser. La formule ci-dessus est fausse d'un
+    // facteur variable selon l'instrument : la réappliquer à l'enregistrement
+    // ferait passer un trade BTC de 1 050 € à 1 050 000 € au seul motif qu'on
+    // a ouvert la fiche pour lui affecter un compte. Modifier un trade ne doit
+    // jamais changer un chiffre que l'utilisateur n'a pas touché.
+    const pnl = Math.round(Number(formData.pnl) || 0);
+
     let result: TradeResult = "OPEN";
-
     if (formData.exitPrice) {
-      if (formData.direction === "LONG") {
-        pnl = (formData.exitPrice - formData.entryPrice) * formData.lotSize * 1000;
-      } else {
-        pnl = (formData.entryPrice - formData.exitPrice) * formData.lotSize * 1000;
-      }
-
       if (pnl > 50) result = "WIN";
       else if (pnl < -50) result = "LOSS";
       else result = "BREAKEVEN";
@@ -269,7 +388,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
     const pnlPercentage = Number(((pnl / 10000) * 100).toFixed(1));
 
-    onAddTrade({
+    const champs = {
       date: formData.date,
       time: formData.time,
       exitDate: formData.exitDate || undefined,
@@ -285,7 +404,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       takeProfit: Number(formData.takeProfit),
       exitPrice: Number(formData.exitPrice),
       lotSize: Number(formData.lotSize),
-      pnl: Math.round(pnl),
+      pnl,
       pnlPercentage,
       riskRewardRatio: riskReward,
       result,
@@ -293,9 +412,17 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       emotion: formData.emotion,
       notes: formData.notes,
       chartUrl: formData.chartUrl,
-    });
+    };
 
-    setIsAddModalOpen(false);
+    if (editingTrade) {
+      // `...editingTrade` d'abord : conserve `id` et surtout `aiAudit`, absent
+      // du formulaire. Sans cela, modifier un trade effacerait son audit.
+      onUpdateTrade({ ...editingTrade, ...champs });
+    } else {
+      onAddTrade(champs);
+    }
+
+    fermerFormulaire();
   };
 
   return (
@@ -336,7 +463,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           )}
 
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={ouvrirCreation}
             className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-sm shadow-md transition-all shrink-0 cursor-pointer"
           >
             <Plus className="w-5 h-5" />
@@ -619,6 +746,15 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                           <span>{trade.aiAudit ? "Voir Audit" : "Audit IA"}</span>
                         </button>
 
+                        {/* Modifier la saisie */}
+                        <button
+                          onClick={() => ouvrirEdition(trade)}
+                          className="p-1.5 rounded-lg bg-[#1B2320] text-slate-400 hover:text-[#00E676] hover:bg-[#232D29]"
+                          title="Modifier ce trade"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+
                         {/* Send to Coach button */}
                         <button
                           onClick={() => onSendTradeToCoach(trade)}
@@ -653,12 +789,16 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
               <div>
                 <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
-                  Nouveau Trade
+                  {editingTrade ? "Modifier le trade" : "Nouveau Trade"}
                 </span>
-                <h3 className="text-lg font-bold text-white">Consigner une Position au Journal</h3>
+                <h3 className="text-lg font-bold text-white">
+                  {editingTrade
+                    ? `${editingTrade.pair} · ${editingTrade.date}`
+                    : "Consigner une Position au Journal"}
+                </h3>
               </div>
               <button
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={fermerFormulaire}
                 className="p-2 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-400 hover:text-white"
               >
                 ✕
@@ -770,7 +910,14 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Sens</label>
                   <select
                     value={formData.direction}
-                    onChange={(e) => setFormData({ ...formData, direction: e.target.value as TradeDirection })}
+                    onChange={(e) => {
+                      const direction = e.target.value as TradeDirection;
+                      setFormData((prev) => ({
+                        ...prev,
+                        direction,
+                        ...(pnlTouche ? {} : { pnl: pnlDepuis({ ...prev, direction }) }),
+                      }));
+                    }}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-bold"
                   >
                     <option value="LONG">LONG (Achat)</option>
@@ -784,7 +931,14 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     type="number"
                     step="any"
                     value={formData.entryPrice}
-                    onChange={(e) => setFormData({ ...formData, entryPrice: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => {
+                      const entryPrice = parseFloat(e.target.value) || 0;
+                      setFormData((prev) => ({
+                        ...prev,
+                        entryPrice,
+                        ...(pnlTouche ? {} : { pnl: pnlDepuis({ ...prev, entryPrice }) }),
+                      }));
+                    }}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
@@ -815,14 +969,21 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Prix de Sortie (si fermé)</label>
                   <input
                     type="number"
                     step="any"
                     value={formData.exitPrice}
-                    onChange={(e) => setFormData({ ...formData, exitPrice: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => {
+                      const exitPrice = parseFloat(e.target.value) || 0;
+                      setFormData((prev) => ({
+                        ...prev,
+                        exitPrice,
+                        ...(pnlTouche ? {} : { pnl: pnlDepuis({ ...prev, exitPrice }) }),
+                      }));
+                    }}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                   />
                 </div>
@@ -833,10 +994,44 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     type="number"
                     step="any"
                     value={formData.lotSize}
-                    onChange={(e) => setFormData({ ...formData, lotSize: parseFloat(e.target.value) || 1 })}
+                    onChange={(e) => {
+                      const lotSize = parseFloat(e.target.value) || 1;
+                      setFormData((prev) => ({
+                        ...prev,
+                        lotSize,
+                        ...(pnlTouche ? {} : { pnl: pnlDepuis({ ...prev, lotSize }) }),
+                      }));
+                    }}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
+                </div>
+
+                {/* PnL net : saisi, jamais imposé.
+                    En création, le champ suit la proposition calculée depuis
+                    les prix tant qu'on n'y a pas touché. En modification, il
+                    part de la valeur enregistrée et rien ne l'écrase — c'est ce
+                    qui garantit qu'ouvrir un trade pour lui affecter un compte
+                    ne change pas son résultat. */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">
+                    PnL net (€)
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={formData.pnl}
+                    onChange={(e) => {
+                      setPnlTouche(true);
+                      setFormData((prev) => ({ ...prev, pnl: parseFloat(e.target.value) || 0 }));
+                    }}
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                    {editingTrade
+                      ? "Valeur enregistrée. À corriger toi-même si tu changes les prix."
+                      : "Estimation depuis les prix — remplace-la par le montant réel de ton broker."}
+                  </p>
                 </div>
 
                 <div>
@@ -896,7 +1091,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1B2320]">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={fermerFormulaire}
                   className="px-4 py-2 rounded-xl bg-[#1B2320] text-slate-300 text-xs font-semibold"
                 >
                   Annuler
@@ -905,7 +1100,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   type="submit"
                   className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20"
                 >
-                  Enregistrer au Journal
+                  {editingTrade ? "Enregistrer les modifications" : "Enregistrer au Journal"}
                 </button>
               </div>
             </form>
