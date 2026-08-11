@@ -524,44 +524,62 @@ staffRouter.delete("/students/:enrolledStudentId/access", requireStaffKind, (req
  * quoi la fiche affichée au coach ne refléterait jamais les vrais comptes
  * ouverts par l'élève depuis son propre espace Portefeuille.
  */
-staffRouter.get("/students/:enrolledStudentId/trades", requireStaffKind, (req, res) => {
-  const account = getStudentByEnrolledId(req.params.enrolledStudentId);
-  if (!account) {
-    res.status(404).json({ error: "Cette fiche n'a pas d'accès actif." });
-    return;
-  }
+staffRouter.get(
+  "/students/:enrolledStudentId/trades",
+  requireStaffKind,
+  createRateLimit({
+    windowMs: 15 * 60_000,
+    max: 30,
+    message: "Trop de requêtes. Réessaie dans quelques minutes.",
+  }),
+  (req, res) => {
+    const account = getStudentByEnrolledId(req.params.enrolledStudentId);
+    if (!account) {
+      res.status(404).json({ error: "Cette fiche n'a pas d'accès actif." });
+      return;
+    }
 
-  res.json({
-    trades: listCollection("trades", account.userId),
-    accounts: listCollection("accounts", account.userId),
-  });
-});
+    res.json({
+      trades: listCollection("trades", account.userId),
+      accounts: listCollection("accounts", account.userId),
+    });
+  }
+);
 
 // Vue admin complète d'un élève (lecture seule)
-staffRouter.get("/admin/students/:enrolledStudentId/view", requireStaffKind, (req, res) => {
-  const account = getStudentByEnrolledId(req.params.enrolledStudentId);
-  if (!account) {
-    res.status(404).json({ error: "Cette fiche n'a pas d'accès actif." });
-    return;
-  }
+staffRouter.get(
+  "/admin/students/:enrolledStudentId/view",
+  requireStaffKind,
+  createRateLimit({
+    windowMs: 15 * 60_000,
+    max: 30,
+    message: "Trop de requêtes. Réessaie dans quelques minutes.",
+  }),
+  (req, res) => {
+    const account = getStudentByEnrolledId(req.params.enrolledStudentId);
+    if (!account) {
+      res.status(404).json({ error: "Cette fiche n'a pas d'accès actif." });
+      return;
+    }
 
-  // Retourne l'état complet de l'élève (profil, fiches, comptes, trades, etc)
-  //
-  // `accounts`, `modules` et `messages` viennent du bureau personnel de
-  // l'élève (`account.userId`), pas du bureau staff partagé : chaque élève a
-  // ses propres portefeuilles, sa propre copie du programme (progression
-  // individuelle) et son propre fil de messagerie.
-  res.json({
-    student: getProfile(account.userId),
-    collections: {
-      enrolledStudents: listCollection("enrolledStudents", DEFAULT_USER_ID),
-      accounts: listCollection("accounts", account.userId),
-      trades: listCollection("trades", account.userId),
-      modules: listCollection("modules", account.userId),
-      messages: listCollection("messages", account.userId),
-    },
-  });
-});
+    // Retourne l'état complet de l'élève (profil, fiches, comptes, trades, etc)
+    //
+    // `accounts`, `modules` et `messages` viennent du bureau personnel de
+    // l'élève (`account.userId`), pas du bureau staff partagé : chaque élève a
+    // ses propres portefeuilles, sa propre copie du programme (progression
+    // individuelle) et son propre fil de messagerie.
+    res.json({
+      student: getProfile(account.userId),
+      collections: {
+        enrolledStudents: listCollection("enrolledStudents", DEFAULT_USER_ID),
+        accounts: listCollection("accounts", account.userId),
+        trades: listCollection("trades", account.userId),
+        modules: listCollection("modules", account.userId),
+        messages: listCollection("messages", account.userId),
+      },
+    });
+  }
+);
 
 /**
  * Envoie un message de coach dans le fil d'un élève précis.
@@ -571,41 +589,50 @@ staffRouter.get("/admin/students/:enrolledStudentId/view", requireStaffKind, (re
  * et la réponse du coach vivent dans le même fil sans synchronisation à
  * organiser entre deux bureaux.
  */
-staffRouter.post("/students/:enrolledStudentId/messages", requireStaffKind, (req, res) => {
-  const account = getStudentByEnrolledId(req.params.enrolledStudentId);
-  if (!account) {
-    res.status(404).json({ error: "Cette fiche n'a pas d'accès actif." });
-    return;
+staffRouter.post(
+  "/students/:enrolledStudentId/messages",
+  requireStaffKind,
+  createRateLimit({
+    windowMs: 15 * 60_000,
+    max: 10,
+    message: "Trop de messages envoyés. Réessaie dans quelques minutes.",
+  }),
+  (req, res) => {
+    const account = getStudentByEnrolledId(req.params.enrolledStudentId);
+    if (!account) {
+      res.status(404).json({ error: "Cette fiche n'a pas d'accès actif." });
+      return;
+    }
+
+    const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+    if (!text || text.length > 5000) {
+      res.status(400).json({ error: "Le message doit faire entre 1 et 5000 caractères." });
+      return;
+    }
+
+    // `coachId` doit correspondre à l'un des coachs fictifs affichés côté
+    // élève (`src/data/mockData.ts`, `initialCoaches`) : `CoachMessaging`
+    // filtre son fil par ce champ, pas par l'identité réelle du compte staff
+    // qui répond. Fixé sur le head coach faute d'un vrai choix d'expéditeur
+    // dans cette vue — un seul fil existe ici, pas un par coach fictif.
+    const message = {
+      id: `msg-${randomBytes(9).toString("base64url")}`,
+      sender: "coach" as const,
+      coachId: "coach-thomas",
+      text,
+      timestamp: new Date().toISOString(),
+      status: "sent" as const,
+    };
+
+    // Lecture puis écriture dans une même transaction : sans elle, deux coachs
+    // répondant au même instant (ou une réponse coach et un envoi élève
+    // concurrent) pourraient chacun lire l'état avant l'écriture de l'autre et
+    // se marcher dessus au moment d'écrire, perdant l'un des deux messages.
+    db.transaction(() => {
+      const existing = listCollection("messages", account.userId);
+      replaceCollection("messages", [...existing, message], account.userId);
+    })();
+
+    res.status(201).json({ message });
   }
-
-  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
-  if (!text) {
-    res.status(400).json({ error: "Le message ne peut pas être vide." });
-    return;
-  }
-
-  // `coachId` doit correspondre à l'un des coachs fictifs affichés côté
-  // élève (`src/data/mockData.ts`, `initialCoaches`) : `CoachMessaging`
-  // filtre son fil par ce champ, pas par l'identité réelle du compte staff
-  // qui répond. Fixé sur le head coach faute d'un vrai choix d'expéditeur
-  // dans cette vue — un seul fil existe ici, pas un par coach fictif.
-  const message = {
-    id: `msg-${randomBytes(9).toString("base64url")}`,
-    sender: "coach" as const,
-    coachId: "coach-thomas",
-    text,
-    timestamp: new Date().toISOString(),
-    status: "sent" as const,
-  };
-
-  // Lecture puis écriture dans une même transaction : sans elle, deux coachs
-  // répondant au même instant (ou une réponse coach et un envoi élève
-  // concurrent) pourraient chacun lire l'état avant l'écriture de l'autre et
-  // se marcher dessus au moment d'écrire, perdant l'un des deux messages.
-  db.transaction(() => {
-    const existing = listCollection("messages", account.userId);
-    replaceCollection("messages", [...existing, message], account.userId);
-  })();
-
-  res.status(201).json({ message });
-});
+);
