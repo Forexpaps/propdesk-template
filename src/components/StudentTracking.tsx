@@ -32,6 +32,7 @@ import {
 import { EnrolledStudent, StudentStatusTag, TradingStyle, TradingAccount, Trade } from "../types";
 import { formatCurrency } from "../lib/format";
 import { api } from "../lib/api";
+import { AdminStudentView } from "./AdminStudentView";
 
 interface StudentTrackingProps {
   students: EnrolledStudent[];
@@ -58,6 +59,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
   const [selectedStudent, setSelectedStudent] = useState<EnrolledStudent | null>(null);
   const [isEditingFile, setIsEditingFile] = useState(false);
   const [isReadOnlyPreview, setIsReadOnlyPreview] = useState(false);
+  const [isFullViewOpen, setIsFullViewOpen] = useState(false);
   const [isCreatingStudent, setIsCreatingStudent] = useState(false);
 
   // Edit form state
@@ -300,6 +302,16 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    onClick={() => {
+                      setSelectedStudent(st);
+                      setIsFullViewOpen(true);
+                    }}
+                    title="Voir la vue complète de l'élève (Journal, Portefeuille, Rentabilité)"
+                    className="px-2.5 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/20 text-xs font-semibold flex items-center gap-1"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> Vue Complète
+                  </button>
                   <button
                     onClick={() => handleOpenReadOnly(st)}
                     title="Voir en Mode Lecture (Vue Élève)"
@@ -849,6 +861,15 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* Vue complète de l'élève */}
+      {isFullViewOpen && selectedStudent && (
+        <AdminStudentView
+          enrolledStudentId={selectedStudent.id}
+          studentName={selectedStudent.name}
+          onClose={() => setIsFullViewOpen(false)}
+        />
       )}
     </div>
   );

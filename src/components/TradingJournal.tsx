@@ -76,6 +76,8 @@ interface TradingJournalProps {
    * `StudentAuthenticatedApp` dans `src/App.tsx`.
    */
   hideAiAndCoachActions?: boolean;
+  /** Mode lecture seule : masque les boutons d'ajout, édition, suppression. */
+  readOnly?: boolean;
 }
 
 export const TradingJournal: React.FC<TradingJournalProps> = ({
@@ -89,6 +91,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   prefillDraft,
   onPrefillConsumed,
   hideAiAndCoachActions = false,
+  readOnly = false,
 }) => {
   const [searchPair, setSearchPair] = useState("");
   const [selectedMarket, setSelectedMarket] = useState<string>("Tous");
@@ -483,13 +486,15 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             </button>
           )}
 
-          <button
-            onClick={ouvrirCreation}
-            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-sm shadow-md transition-all shrink-0 cursor-pointer"
-          >
-            <Plus className="w-5 h-5" />
-            <span>Saisir un Trade</span>
-          </button>
+          {!readOnly && (
+            <button
+              onClick={ouvrirCreation}
+              className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-sm shadow-md transition-all shrink-0 cursor-pointer"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Saisir un Trade</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -751,13 +756,15 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                         </button>
 
                         {/* Modifier la saisie */}
-                        <button
-                          onClick={() => ouvrirEdition(trade)}
-                          className="p-1.5 rounded-lg bg-[#1B2320] text-slate-400 hover:text-[#00E676] hover:bg-[#232D29]"
-                          title="Modifier ce trade"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
+                        {!readOnly && (
+                          <button
+                            onClick={() => ouvrirEdition(trade)}
+                            className="p-1.5 rounded-lg bg-[#1B2320] text-slate-400 hover:text-[#00E676] hover:bg-[#232D29]"
+                            title="Modifier ce trade"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                        )}
 
                         {/* Send to Coach button */}
                         {!hideAiAndCoachActions && (
@@ -771,13 +778,15 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                         )}
 
                         {/* Delete trade */}
-                        <button
-                          onClick={() => onDeleteTrade(trade.id)}
-                          className="p-1.5 rounded-lg bg-[#1B2320] text-slate-400 hover:text-rose-400 hover:bg-[#232D29]"
-                          title="Supprimer la saisie"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {!readOnly && (
+                          <button
+                            onClick={() => onDeleteTrade(trade.id)}
+                            className="p-1.5 rounded-lg bg-[#1B2320] text-slate-400 hover:text-rose-400 hover:bg-[#232D29]"
+                            title="Supprimer la saisie"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -789,7 +798,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       </div>
 
       {/* Add Trade Modal */}
-      {isAddModalOpen && (
+      {isAddModalOpen && !readOnly && (
         <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-2xl w-full p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">

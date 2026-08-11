@@ -502,3 +502,23 @@ staffRouter.get("/students/:enrolledStudentId/trades", requireStaffKind, (req, r
 
   res.json({ trades: listCollection("trades", account.userId) });
 });
+
+// Vue admin complète d'un élève (lecture seule)
+staffRouter.get("/admin/students/:enrolledStudentId/view", requireStaffKind, (req, res) => {
+  const account = getStudentByEnrolledId(req.params.enrolledStudentId);
+  if (!account) {
+    res.status(404).json({ error: "Cette fiche n'a pas d'accès actif." });
+    return;
+  }
+
+  // Retourne l'état complet de l'élève (profil, fiches, comptes, trades, etc)
+  res.json({
+    student: getProfile(account.userId),
+    collections: {
+      enrolledStudents: listCollection("enrolledStudents", DEFAULT_USER_ID),
+      accounts: listCollection("accounts", DEFAULT_USER_ID),
+      trades: listCollection("trades", account.userId),
+      modules: listCollection("modules", DEFAULT_USER_ID),
+    },
+  });
+});

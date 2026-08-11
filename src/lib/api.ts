@@ -217,6 +217,18 @@ export const api = {
       `/api/auth/students/${encodeURIComponent(enrolledStudentId)}/trades`
     ),
 
+  /** Vue complète d'un élève pour l'admin — profil, comptes, trades, etc. (lecture seule) */
+  fetchAdminStudentView: (enrolledStudentId: string) =>
+    request<{
+      student: StudentProfile | null;
+      collections: {
+        enrolledStudents: EnrolledStudent[];
+        accounts: TradingAccount[];
+        trades: Trade[];
+        modules: Module[];
+      };
+    }>(`/api/auth/admin/students/${encodeURIComponent(enrolledStudentId)}/view`),
+
   // --- Authentification élève ---
 
   fetchStudentMe: () => request<StudentAuthState>("/api/auth/student-me"),
