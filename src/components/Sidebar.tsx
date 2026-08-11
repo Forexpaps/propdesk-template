@@ -353,7 +353,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     label: string,
     section: SectionName,
     items: SidebarEntry[]
-  ) => (
+  ) => {
+    const visibleItems = items.filter((item) => !hiddenItems.includes(item.key) || isEditingSection(section));
+    if (visibleItems.length === 0) return null;
+
+    return (
     <div className="space-y-1">
       {!isCollapsed && renderSectionHeader(label, section)}
       {items.map((item) => {
@@ -398,7 +402,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         );
       })}
     </div>
-  );
+    );
+  };
 
   return (
     <>

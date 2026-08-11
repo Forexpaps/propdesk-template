@@ -11,6 +11,7 @@ import {
 import {
   clearStudentSessionCookie,
   createStudentSession,
+  destroyAllStudentSessions,
   destroyStudentSession,
   purgeExpiredStudentSessions,
   readStudentSessionToken,
@@ -138,6 +139,7 @@ studentProtectedRouter.post(
     }
 
     setStudentPassword(student.id, await hashPassword(parsed.data.newPassword));
+    destroyAllStudentSessions(student.id);
     res.json(authenticatedStudentPayload(student.id));
   })
 );

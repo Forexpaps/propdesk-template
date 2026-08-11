@@ -20,6 +20,7 @@ import {
 import {
   clearSessionCookie,
   createSession,
+  destroyAllSessions,
   destroySession,
   purgeExpiredSessions,
   readSessionToken,
@@ -378,6 +379,7 @@ staffRouter.post(
     }
 
     setPassword(staff.id, await hashPassword(parsed.data.newPassword));
+    destroyAllSessions(staff.id);
     res.json(authenticatedPayload(staff.id));
   })
 );
