@@ -45,6 +45,7 @@ import {
   PlayCircle,
   ExternalLink,
 } from "lucide-react";
+import { formatCurrency } from "../lib/format";
 import {
   StudentProfile,
   Trade,
@@ -63,7 +64,6 @@ interface MainDashboardProps {
   setActiveTab: (
     tab: "dashboard" | "students" | "wallets" | "academy" | "journal" | "simulator" | "signals" | "forum" | "messaging" | "analytics"
   ) => void;
-  onSelectTradeForAudit: (trade: Trade) => void;
   onOpenChecklist?: () => void;
 }
 
@@ -75,7 +75,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   messages,
   courseCompletionPercentage,
   setActiveTab,
-  onSelectTradeForAudit,
   onOpenChecklist,
 }) => {
   // Calculate Metrics
@@ -295,14 +294,14 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           <div className="space-y-1">
             <div className="flex items-baseline gap-3">
               <span className="text-3xl sm:text-4xl font-extrabold text-white">
-                {student.currentCapital.toLocaleString("fr-FR")} €
+                {formatCurrency(student.currentCapital)}
               </span>
               <span className="px-2 py-0.5 rounded bg-[#00E676]/10 text-[#00E676] text-xs font-bold border border-[#00E676]/20">
                 +{capitalDiffPercent}%
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              +{capitalDiff.toLocaleString("fr-FR")} € depuis le départ
+              +{formatCurrency(capitalDiff)} depuis le départ
             </p>
           </div>
 

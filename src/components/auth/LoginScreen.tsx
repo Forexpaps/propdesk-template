@@ -12,11 +12,21 @@ interface LoginScreenProps {
   onLogin: (email: string, password: string) => Promise<void>;
   /** Vrai quand l'utilisateur arrive ici parce que sa session a expiré. */
   expired: boolean;
+  /** Personnalisation du texte d'accroche — le formulaire reste identique. */
+  title?: string;
+  subtitle?: string;
+  footer?: React.ReactNode;
 }
 
 const ERROR_ID = "login-error";
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, expired }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({
+  onLogin,
+  expired,
+  title = "Connexion",
+  subtitle = "Accède à ton espace de trading.",
+  footer = "Mot de passe oublié ? La procédure de secours est décrite dans le README.",
+}) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [visible, setVisible] = useState(false);
@@ -48,8 +58,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, expired }) =>
 
   return (
     <AuthShell
-      title="Connexion"
-      subtitle="Accède à ton espace de trading."
+      title={title}
+      subtitle={subtitle}
       notice={
         expired && !error ? (
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-200">
@@ -57,7 +67,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, expired }) =>
           </div>
         ) : undefined
       }
-      footer="Mot de passe oublié ? La procédure de secours est décrite dans le README."
+      footer={footer}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <AuthField id="login-email" label="Adresse e-mail">

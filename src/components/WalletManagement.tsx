@@ -21,6 +21,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { TradingAccount, AccountType, Trade } from "../types";
+import { formatCurrency } from "../lib/format";
 
 /**
  * Une prop `onSelectAccountForJournal?: (accountId: string) => void` figurait
@@ -162,7 +163,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
             <DollarSign className="w-4 h-4 text-[#00E676]" />
           </div>
           <div className="text-2xl font-bold font-mono text-[#00E676]">
-            {totalCombinedEquity.toLocaleString("fr-FR")} €
+            {formatCurrency(totalCombinedEquity)}
           </div>
           <div className="text-xs text-slate-400 flex items-center gap-1 font-mono">
             {parseFloat(totalCombinedPnlPercent) >= 0 ? (
@@ -197,7 +198,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
             <TrendingUp className="w-4 h-4 text-[#FFB800]" />
           </div>
           <div className="text-2xl font-bold font-mono text-[#00E676]">
-            +{totalCombinedPnl.toLocaleString("fr-FR")} €
+            +{formatCurrency(totalCombinedPnl)}
           </div>
           <div className="text-xs text-slate-400">Bénéfices réels enregistrés sur le desk</div>
         </div>
@@ -280,7 +281,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <div>
                     <div className="text-[10px] text-slate-500">Solde Actuel</div>
                     <div className="text-base font-bold font-mono text-white">
-                      {acc.equity.toLocaleString("fr-FR")} €
+                      {formatCurrency(acc.equity)}
                     </div>
                   </div>
 
@@ -324,7 +325,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 <button
                   onClick={() => {
                     const newBalStr = prompt(
-                      "Mettre à jour le solde du portefeuille (€) :",
+                      "Mettre à jour le solde du portefeuille ($) :",
                       selectedAccount.equity.toString()
                     );
                     if (newBalStr) {
@@ -356,7 +357,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     </span>
                     <span className="text-amber-400 font-mono font-bold">
                       {selectedAccount.maxDailyDrawdownPercent}% Max (
-                      {((selectedAccount.initialBalance * selectedAccount.maxDailyDrawdownPercent) / 100).toLocaleString("fr-FR")} €)
+                      {formatCurrency((selectedAccount.initialBalance * selectedAccount.maxDailyDrawdownPercent) / 100)})
                     </span>
                   </div>
 
@@ -379,7 +380,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     </span>
                     <span className="text-rose-400 font-mono font-bold">
                       {selectedAccount.maxTotalDrawdownPercent}% Max (
-                      {((selectedAccount.initialBalance * selectedAccount.maxTotalDrawdownPercent) / 100).toLocaleString("fr-FR")} €)
+                      {formatCurrency((selectedAccount.initialBalance * selectedAccount.maxTotalDrawdownPercent) / 100)})
                     </span>
                   </div>
 
@@ -404,7 +405,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     </span>
                     <span className="text-[#00E676] font-mono font-bold">
                       +{selectedAccount.profitTargetPercent}% (+
-                      {((selectedAccount.initialBalance * selectedAccount.profitTargetPercent) / 100).toLocaleString("fr-FR")} €)
+                      {formatCurrency((selectedAccount.initialBalance * selectedAccount.profitTargetPercent) / 100)})
                     </span>
                   </div>
 
@@ -430,7 +431,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     <span className="text-slate-400">
                       Bénéfice Actuel:{" "}
                       <span className="text-[#00E676] font-bold">
-                        +{(selectedAccount.equity - selectedAccount.initialBalance).toLocaleString("fr-FR")} €
+                        +{formatCurrency(selectedAccount.equity - selectedAccount.initialBalance)}
                       </span>
                     </span>
                     <span className="text-amber-400 font-bold">
@@ -465,14 +466,14 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
               <div>
                 <div className="text-slate-400 font-mono">Capital Initial</div>
                 <div className="text-sm font-bold text-white mt-1 font-mono">
-                  {selectedAccount.initialBalance.toLocaleString("fr-FR")} €
+                  {formatCurrency(selectedAccount.initialBalance)}
                 </div>
               </div>
 
               <div>
                 <div className="text-slate-400 font-mono">Solde Actuel</div>
                 <div className="text-sm font-bold text-[#00E676] mt-1 font-mono">
-                  {selectedAccount.equity.toLocaleString("fr-FR")} €
+                  {formatCurrency(selectedAccount.equity)}
                 </div>
               </div>
             </div>
@@ -540,7 +541,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-medium text-slate-300 mb-1">Capital Initial (€)</label>
+                  <label className="block font-medium text-slate-300 mb-1">Capital Initial ($)</label>
                   <input
                     type="number"
                     required

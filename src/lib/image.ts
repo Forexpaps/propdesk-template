@@ -105,3 +105,64 @@ export async function resizeAvatar(file: File, size = AVATAR_SIZE): Promise<stri
     if ("close" in source && typeof source.close === "function") source.close();
   }
 }
+
+/**
+ * Plus grande dimension (largeur ou hauteur) conservée pour une capture
+ * d'écran de trade.
+ *
+ * Contrairement à l'avatar, on ne recadre pas en carré : un graphique de
+ * bougies perdrait toute sa lisibilité recadré. On réduit seulement l'image
+ * si elle dépasse cette taille, en conservant ses proportions — 1600 px
+ * suffit à relire un niveau de prix ou une mèche à l'écran, largement au-delà
+ * de la largeur d'affichage réelle dans le journal.
+ */
+export const CHART_SCREENSHOT_MAX_DIMENSION = 1600;
+
+/** Qualité d'encodage. Un peu inférieure à l'avatar : ces images sont bien
+ *  plus grandes, le gain de poids l'emporte sur la perte, à peine visible sur
+ *  un graphique. */
+const CHART_SCREENSHOT_QUALITY = 0.82;
+
+/**
+ * Réduit une capture d'écran de trade avant stockage, sans la recadrer.
+ *
+ * Mêmes contraintes que l'avatar (§ plus haut) : l'image finit en JSON, donc
+ * en base, dans chaque réponse de `/api/state` et dans le cache
+ * `localStorage`. Une capture d'écran brute (souvent plusieurs Mo) y pèserait
+ * son poids trois fois.
+ *
+ * @throws si le fichier n'est pas une image décodable.
+ */
+export async function resizeChartScreenshot(
+  file: File,
+  maxDimension = CHART_SCREENSHOT_MAX_DIMENSION
+): Promise<string> {
+  const source = await decode(file);
+
+  try {
+    const scale = Math.min(1, maxDimension / Math.max(source.width, source.height));
+    const width = Math.round(source.width * scale);
+    const height = Math.round(source.height * scale);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Contexte de rendu indisponible.");
+
+    ctx.imageSmoothingQuality = "high";
+
+    const format = pickFormat();
+    if (format === "image/jpeg") {
+      ctx.fillStyle = SURFACE_COLOR;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    ctx.drawImage(source, 0, 0, width, height);
+
+    return canvas.toDataURL(format, CHART_SCREENSHOT_QUALITY);
+  } finally {
+    if ("close" in source && typeof source.close === "function") source.close();
+  }
+}

@@ -15,6 +15,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { StudentProfile } from "../types";
+import { formatCurrency } from "../lib/format";
 
 interface PropFirmRulesModalProps {
   isOpen: boolean;
@@ -154,7 +155,7 @@ export const PropFirmRulesModal: React.FC<PropFirmRulesModalProps> = ({
               >
                 <div className="text-xs font-bold text-slate-200">{p.name}</div>
                 <div className="text-[10px] text-slate-500 font-mono">
-                  {p.initialCapital.toLocaleString("fr-FR")} €
+                  {formatCurrency(p.initialCapital)}
                 </div>
               </button>
             ))}
@@ -164,7 +165,7 @@ export const PropFirmRulesModal: React.FC<PropFirmRulesModalProps> = ({
         {/* Quick Simulator Inputs */}
         <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
           <div>
-            <label className="block text-slate-400 mb-1 font-sans">Capital Actuel (€)</label>
+            <label className="block text-slate-400 mb-1 font-sans">Capital Actuel ($)</label>
             <input
               type="number"
               value={currentBalance}
@@ -174,7 +175,7 @@ export const PropFirmRulesModal: React.FC<PropFirmRulesModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-slate-400 mb-1 font-sans">PnL du Jour (€)</label>
+            <label className="block text-slate-400 mb-1 font-sans">PnL du Jour ($)</label>
             <input
               type="number"
               value={todayPnl}
@@ -213,7 +214,7 @@ export const PropFirmRulesModal: React.FC<PropFirmRulesModalProps> = ({
             <div>
               <div className="text-sm font-bold">CHALLENGE VALIDE AVEC SUCCÈS ! 🏆</div>
               <p className="text-xs text-slate-300">
-                Objectif de profit de +{targetProfitAmount.toLocaleString("fr-FR")} € atteint ! Félicitations !
+                Objectif de profit de +{formatCurrency(targetProfitAmount)} atteint ! Félicitations !
               </p>
             </div>
           </div>
@@ -225,7 +226,7 @@ export const PropFirmRulesModal: React.FC<PropFirmRulesModalProps> = ({
             </div>
             <span className="font-mono font-bold text-white shrink-0">
               {targetProfitAmount - totalProfitLoss > 0
-                ? `Encore +${(targetProfitAmount - totalProfitLoss).toFixed(0)} € pour valider`
+                ? `Encore +${formatCurrency(targetProfitAmount - totalProfitLoss)} pour valider`
                 : "Objectif atteint"}
             </span>
           </div>
@@ -238,7 +239,7 @@ export const PropFirmRulesModal: React.FC<PropFirmRulesModalProps> = ({
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-400 font-medium">Perte Max Jour (-{selectedPreset.maxDailyDrawdownPercent}%)</span>
               <span className={`font-mono font-bold ${dailyLossPercent >= selectedPreset.maxDailyDrawdownPercent ? "text-rose-400" : "text-white"}`}>
-                {todayPnl < 0 ? `-${Math.abs(todayPnl).toFixed(0)} €` : "0 €"}
+                {todayPnl < 0 ? `-${formatCurrency(Math.abs(todayPnl))}` : formatCurrency(0)}
               </span>
             </div>
 
@@ -252,7 +253,7 @@ export const PropFirmRulesModal: React.FC<PropFirmRulesModalProps> = ({
             </div>
 
             <div className="flex justify-between text-[11px] font-mono text-slate-500">
-              <span>Limite : -{maxDailyLossAmount.toLocaleString("fr-FR")} €</span>
+              <span>Limite : -{formatCurrency(maxDailyLossAmount)}</span>
               <span>{Math.round(dailyDrawdownUsage)}% utilisé</span>
             </div>
           </div>
@@ -262,7 +263,7 @@ export const PropFirmRulesModal: React.FC<PropFirmRulesModalProps> = ({
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-400 font-medium">Perte Max Totale (-{selectedPreset.maxTotalDrawdownPercent}%)</span>
               <span className={`font-mono font-bold ${totalDrawdownPercent >= selectedPreset.maxTotalDrawdownPercent ? "text-rose-400" : "text-white"}`}>
-                {totalDrawdownAmount > 0 ? `-${totalDrawdownAmount.toFixed(0)} €` : "0 €"}
+                {totalDrawdownAmount > 0 ? `-${formatCurrency(totalDrawdownAmount)}` : formatCurrency(0)}
               </span>
             </div>
 
@@ -276,7 +277,7 @@ export const PropFirmRulesModal: React.FC<PropFirmRulesModalProps> = ({
             </div>
 
             <div className="flex justify-between text-[11px] font-mono text-slate-500">
-              <span>Limite : -{maxTotalLossAmount.toLocaleString("fr-FR")} €</span>
+              <span>Limite : -{formatCurrency(maxTotalLossAmount)}</span>
               <span>{Math.round(totalDrawdownUsage)}% utilisé</span>
             </div>
           </div>
@@ -286,7 +287,7 @@ export const PropFirmRulesModal: React.FC<PropFirmRulesModalProps> = ({
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-400 font-medium">Objectif (+{selectedPreset.targetProfitPercent}%)</span>
               <span className="font-mono font-bold text-[#00E676]">
-                +{totalProfitLoss > 0 ? totalProfitLoss.toFixed(0) : 0} €
+                +{formatCurrency(totalProfitLoss > 0 ? totalProfitLoss : 0)}
               </span>
             </div>
 
@@ -298,7 +299,7 @@ export const PropFirmRulesModal: React.FC<PropFirmRulesModalProps> = ({
             </div>
 
             <div className="flex justify-between text-[11px] font-mono text-slate-500">
-              <span>Cible : +{targetProfitAmount.toLocaleString("fr-FR")} €</span>
+              <span>Cible : +{formatCurrency(targetProfitAmount)}</span>
               <span className="text-[#00E676] font-bold">{Math.round(targetProgress)}%</span>
             </div>
           </div>

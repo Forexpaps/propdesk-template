@@ -115,6 +115,38 @@ export function replaceCollection<T extends WithId>(
   run(items);
 }
 
+/**
+ * Met à jour un seul élément d'une collection, sans toucher aux autres.
+ *
+ * `replaceCollection` vide puis réinsère toute la collection — sur
+ * `enrolledStudents`, ça déclenche le `ON DELETE CASCADE` de
+ * `student_accounts.enrolled_student_id` à chaque écriture, supprimant le
+ * compte élève qu'on venait justement de créer dans la même transaction.
+ * Cette fonction ne fait qu'un `UPDATE` ciblé : la ligne parente ne disparaît
+ * jamais, même un instant.
+ */
+export function updateCollectionItem<T extends WithId>(
+  name: CollectionName,
+  id: string,
+  item: T,
+  userId: string = DEFAULT_USER_ID
+): void {
+  const table = TABLES[name];
+  const promoted = PROMOTED[name] ?? [];
+
+  const setClauses = [...promoted.map((col) => `${col} = ?`), "payload = ?"].join(", ");
+  const values = [
+    ...promoted.map((col) => (item[col] ?? null) as string | number | null),
+    JSON.stringify(item),
+  ];
+
+  db.prepare(`UPDATE ${table} SET ${setClauses} WHERE id = ? AND user_id = ?`).run(
+    ...values,
+    id,
+    userId
+  );
+}
+
 function replaceForumReplies(topicId: string, replies: WithId[]): void {
   db.prepare("DELETE FROM forum_replies WHERE topic_id = ?").run(topicId);
   const insert = db.prepare(

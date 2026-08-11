@@ -166,6 +166,41 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions(user_id);
   CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+
+  -- Comptes élève : deuxième monde d'identité, complètement séparé du monde
+  -- staff. Chaque élève a son propre "bureau" (une ligne users(id) dédiée,
+  -- posée dans user_id), donc ses propres trades — au contraire du staff, qui
+  -- partage tous le même bureau. La fiche enrolled_students reste la source
+  -- de vérité administrative : ON DELETE CASCADE, supprimer la fiche
+  -- supprime le compte.
+  CREATE TABLE IF NOT EXISTS student_accounts (
+    id                    TEXT PRIMARY KEY,
+    enrolled_student_id  TEXT NOT NULL REFERENCES enrolled_students(id) ON DELETE CASCADE,
+    user_id               TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email                 TEXT NOT NULL,
+    email_lower           TEXT NOT NULL UNIQUE,
+    password_hash         TEXT NOT NULL,
+    must_change_password  INTEGER NOT NULL DEFAULT 1,
+    invited_by            TEXT REFERENCES staff_accounts(id) ON DELETE SET NULL,
+    created_at            TEXT NOT NULL,
+    updated_at            TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_student_accounts_enrolled ON student_accounts(enrolled_student_id);
+  CREATE INDEX IF NOT EXISTS idx_student_accounts_email ON student_accounts(email_lower);
+
+  -- Sessions élève, structurellement identiques à "sessions" mais FK vers
+  -- student_accounts : deux mondes séparés, jamais de session élève dans la
+  -- table staff ni l'inverse.
+  CREATE TABLE IF NOT EXISTS student_sessions (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL REFERENCES student_accounts(id) ON DELETE CASCADE,
+    created_at   TEXT NOT NULL,
+    expires_at   TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    user_agent   TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_student_sessions_user    ON student_sessions(user_id);
+  CREATE INDEX IF NOT EXISTS idx_student_sessions_expires ON student_sessions(expires_at);
 `);
 
 /**

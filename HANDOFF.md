@@ -4,29 +4,113 @@ Document de reprise. Il suppose que tu n'as accès ni à la conversation
 précédente, ni à autre chose que ce dépôt.
 
 > **État à la dernière mise à jour de ce document**
-> Branche `main`, arbre propre. `npm run lint` et `npm run build` passent.
+> Branche `main`. **Arbre de travail NON committé** — voir §0. `npm run lint`
+> et `npm run build` passent tous les deux, sans erreur.
 >
-> **⚠️ La base `data/horizon.db` est un mélange, pas « les vraies données ».**
-> Seul le **profil** (nom, email, capital) a été saisi par l'utilisateur. Les 4
-> comptes trading, les 4 fiches élèves et les 6 trades sont **encore exactement
-> le jeu de démonstration** de `src/data/mockData.ts` — vérifié champ à champ,
-> voir §6, point 5. Ne présume jamais qu'une valeur en base est réelle sans
-> vérifier.
+> Cette session a livré, dans l'ordre :
+> 1. **Passage € → $** dans toute l'application, et **refonte du champ PnL**
+>    du Journal en saisie libre `$`/`%`, sans plus aucun calcul automatique.
+> 2. **Accès élève** : chaque élève peut avoir un compte de connexion léger
+>    (email + mot de passe), séparé du bureau staff, pour son propre Journal
+>    cloisonné.
+> 3. Trois retouches ciblées du Journal : suppression du bouton **Audit IA**,
+>    renommage de la colonne **Actions**, ajout d'une **capture d'écran**
+>    jointe à chaque trade, et transformation du bouton « œil » en un
+>    **aperçu complet** de toutes les données saisies.
+> 4. **Pastille de session de marché dynamique** dans le header (Sydney,
+>    Tokyo, Londres, New York, calculée en direct — plus de « SESSION NY »
+>    figé avec un faux cours).
+> 5. **Retrait complet de l'IA de toute l'application** (staff compris) —
+>    décision explicite de l'utilisateur, répétée deux fois : « je ne veux
+>    pas qu'il y ait de IA ».
 >
-> L'authentification est **terminée et vérifiée** : comptes staff multiples sur
-> un bureau unique partagé, invitation avec mot de passe temporaire, le tout
-> rejoué de bout en bout sur une copie de la vraie base (§10). La sauvegarde
-> d'avant migration a été supprimée — `data/` ne contient plus que la base
-> vivante.
+> **✅ Le point 5 (retrait de l'IA) est maintenant vérifié visuellement dans
+> le navigateur, en plus de compiler et builder sans erreur.** Connexion
+> staff réelle (`th.gauthey99@gmail.com`), puis contrôle de :
+> `PerformanceDashboard` (« Rentabilité ») — aucun bouton « Générer un Audit
+> IA Globale », aucun rapport IA affiché ; `CoachMessaging` (« Messagerie
+> Coach ») — aucune bascule « Réponse IA Immédiate », un message de test
+> envoyé (« Test vérification retrait IA (sera visible dans la conversation,
+> sans conséquence) », visible dans le fil avec Thomas Laurent, horodaté
+> « Aujourd'hui, 07:10 ») n'a déclenché **aucune** réponse automatique ;
+> `TradingJournal` — colonne « Actions » (renommée), 4 icônes seulement
+> (œil/crayon/message/corbeille), aucun bouton Audit IA sur aucune ligne,
+> et l'aperçu complet (icône œil) affiche bien la capture d'écran + tous les
+> champs saisis. **Ce message de test n'a pas été supprimé** (aucune action
+> de suppression trouvée dans l'UI de la messagerie) — il reste visible dans
+> le fil Thomas Laurent, sans conséquence fonctionnelle, mais à savoir si tu
+> nettoies la messagerie plus tard.
 >
-> Le **rattachement trades ↔ comptes** et l'**édition d'un trade** sont
-> terminés (§4, §8) — mais les 6 trades de démo restent tous « Non rattaché »,
-> voir §7 tâche 2.
+> **⚠️ Le serveur de développement qui tourne peut-être encore (port 3000)
+> n'a pas forcément été redémarré depuis l'ajout des tables
+> `student_accounts` / `student_sessions`.** Voir §2.
 >
-> **Prochaine tâche : remplir le module « Examen »** (§7, tâche 1). Elle demande
-> une décision produit de l'utilisateur **avant** d'écrire du code. Un chantier
-> plus tardif, confirmé avec l'utilisateur mais pas encore demandé, est de
-> vider les données de démo avant mise en ligne (§7, tâche 5).
+> **⚠️ La base `data/horizon.db` est toujours un mélange, pas « les vraies
+> données ».** Le profil (nom, email, capital) est réel ; les 4 comptes
+> trading, les 4 fiches élèves et les 6 trades sont **encore** le jeu de
+> démonstration de `src/data/mockData.ts`. Voir §6, point 5.
+>
+> **Prochaine tâche** : reprendre la liste de §7 (le chantier IA est
+> maintenant clos, tâches 2 à 5 restantes attendent une décision/action de
+> l'utilisateur).
+
+---
+
+## 0. À committer
+
+Tout le travail de cette session est dans l'arbre de travail, **rien n'a été
+committé**. L'utilisateur commite lui-même sur demande explicite (§9) — ne
+commite pas sans qu'il le demande, mais ne perds pas ces changements :
+`git status` avant tout `checkout`/`reset`/`clean`.
+
+```
+ M .env.example
+ M README.md
+ M package-lock.json
+ M package.json
+ M server.ts
+ M server/auth/middleware.ts
+ M server/auth/routes.ts
+ M server/db.ts
+ M server/repositories.ts
+ M server/routes.ts
+ M server/schemas.ts
+ M src/App.tsx
+ M src/components/CoachMessaging.tsx
+ M src/components/EquityCurveChart.tsx
+ M src/components/MainDashboard.tsx
+ M src/components/PerformanceDashboard.tsx
+ M src/components/PositionCalculatorModal.tsx
+ M src/components/PropFirmRulesModal.tsx
+ M src/components/SMCSimulator.tsx
+ M src/components/StudentTracking.tsx
+ M src/components/TopHeader.tsx
+ D src/components/TradeAuditModal.tsx
+ M src/components/TradingJournal.tsx
+ M src/components/UserProfileModal.tsx
+ M src/components/WalletManagement.tsx
+ M src/components/auth/LoginScreen.tsx
+ M src/data/mockData.ts
+ M src/hooks/useAuth.ts
+ M src/hooks/useServerSync.ts
+ M src/lib/api.ts
+ M src/lib/image.ts
+ M src/types.ts
+?? server/auth/studentCredentials.ts
+?? server/auth/studentRoutes.ts
+?? server/auth/studentSessions.ts
+?? src/lib/format.ts
+```
+
+33 fichiers modifiés ou supprimés, 4 fichiers créés. `git diff --stat` :
++2196 / −2738 lignes (la suppression de `TradeAuditModal.tsx` et le retrait de
+l'IA font plus que compenser les ajouts). Dernier commit réel sur la branche :
+`0e2566b` (« Corrige le HANDOFF : les comptes, élèves et trades sont encore de
+la démo ») — **tout** ce que décrit ce document est postérieur à ce commit et
+non committé.
+
+`package.json`/`package-lock.json` ont changé : `@google/genai` a été
+désinstallé (`npm uninstall @google/genai`), plus aucune dépendance IA.
 
 ---
 
@@ -36,37 +120,50 @@ précédente, ni à autre chose que ce dépôt.
 Concepts*) destinée à un coach et à ses élèves. Elle réunit dans une seule
 interface :
 
-- un **journal de trading** avec audit IA de chaque position ;
+- un **journal de trading** — saisie libre du PnL (`$` ou `%`, jamais
+  calculé), capture d'écran jointe à chaque trade, aperçu complet d'un clic ;
 - un **suivi des comptes prop firm** (FTMO, MyFundedFX, brokers réels) ;
 - des **modules vidéo** avec quiz et progression ;
 - un **simulateur** (replay de setups historiques + Monte Carlo) ;
-- un **forum**, une **messagerie coach**, un **centre d'alertes** ;
-- un **espace admin** de suivi des élèves ;
-- quatre **outils** en modale : audit de setup, règles prop firm, mindset,
-  calendrier économique.
+- un **forum**, une **messagerie coach** (sans réponse automatique — voir
+  §4), un **centre d'alertes** ;
+- un **espace admin** de suivi des élèves, avec la possibilité de **donner un
+  accès de connexion** à un élève pour son propre journal ;
+- quatre **outils** en modale : audit de setup (déterministe, pas d'IA —
+  voir §8), règles prop firm, mindset, calendrier économique.
+
+**Aucune IA n'est utilisée nulle part dans l'application.** C'était vrai en
+partie avant cette session (l'« Audit Setup » n'a jamais été de l'IA, voir
+§8) ; c'est maintenant vrai **partout** : la dépendance `@google/genai`, la
+clé `GEMINI_API_KEY`, la route `/api/coach/ai-review`, l'audit IA d'un trade,
+le rapport de performance généré par IA, et la réponse automatique du coach
+dans la messagerie ont tous été retirés (§4, « Retrait de l'IA »).
 
 **Qui l'utilise, et ce que cela implique.** C'est l'outil de travail d'un coach
 (« ForexPaps ») et de son staff. Plusieurs comptes staff peuvent se connecter
 séparément, mais tous partagent **le même bureau** : mêmes trades, mêmes fiches
-élèves, mêmes portefeuilles. Ce n'est pas du multi-tenant — voir §6.3, c'est la
-confusion la plus coûteuse possible sur ce projet. Les élèves, eux, n'ont
-**pas** de compte : ce sont des fiches de suivi (`EnrolledStudent`).
+élèves, mêmes portefeuilles — ce n'est pas du multi-tenant côté staff (§6.3).
+**Les élèves PEUVENT désormais avoir un compte** — mais un compte élève est un
+second monde d'identité totalement séparé, avec son propre bureau de données
+personnel cloisonné (un élève ne voit jamais que son propre Journal). Voir
+§3, « Le modèle d'authentification à deux mondes ».
 
-L'interface est **entièrement en français**. Le ton des libellés est direct et
-tutoie l'utilisateur. Conserve cette langue et ce registre.
+L'interface est **entièrement en français**, ton direct, tutoiement. Devise :
+**`$`**, plus jamais `€` (§4).
 
-Le projet vient de **Google AI Studio** : c'est important, plusieurs choix
-initiaux en découlent (voir §8).
+Le projet vient de **Google AI Studio** à l'origine — c'est un fait
+historique du dépôt, plus une caractéristique de l'application : elle
+n'utilise plus aucun service Google ni aucune IA.
 
-**Ordres de grandeur** : ~15 300 lignes de TypeScript, 49 fichiers `.ts`/`.tsx`,
-29 commits. Le plus gros fichier applicatif est `src/App.tsx` (1057 l.), le plus
-gros tout court `src/data/mockData.ts` (1455 l., données d'amorçage).
+**Ordres de grandeur** (après cette session) : `src/App.tsx` ~1300 lignes,
+`TradingJournal.tsx` ~1180 lignes (capture d'écran + aperçu complet ajoutés),
+`StudentTracking.tsx` ~855 lignes. Le serveur a gagné 3 fichiers dédiés à
+l'accès élève (`studentCredentials.ts`, `studentSessions.ts`,
+`studentRoutes.ts`) et perdu tout le bloc Gemini de `server/routes.ts`.
 
 **Seul le profil de l'utilisateur, en base, est réel.** Le reste — 4 comptes
 trading, 4 fiches élèves, 6 trades — est encore le jeu de démonstration de
-`mockData.ts`, jamais remplacé. Voir l'avertissement détaillé en §6, point 5,
-avant toute manipulation de `data/` : même si ce n'est « que » de la démo, la
-commande qui la détruirait détruirait aussi le profil réel au passage.
+`mockData.ts`, jamais remplacé. Voir §6, point 5.
 
 ---
 
@@ -76,15 +173,10 @@ commande qui la détruirait détruirait aussi le profil réel au passage.
 npm install
 ```
 
-Créer un `.env` à la racine :
-
-```
-GEMINI_API_KEY=ta_clé
-```
-
-La clé n'est lue que **côté serveur**, jamais exposée au navigateur. Sans elle
-l'application fonctionne : seules les fonctions d'audit IA renvoient une erreur
-explicite.
+**Aucune variable d'environnement requise.** Un `.env` vide ou absent
+suffit : toutes les variables ont un défaut utilisable (`.env.example` liste
+`PORT`, `DATA_DIR`, `NODE_ENV`). `GEMINI_API_KEY` n'existe plus nulle part
+dans le code — si tu la vois encore quelque part, c'est un oubli à signaler.
 
 | Commande | Effet |
 |---|---|
@@ -97,38 +189,85 @@ explicite.
 
 Il n'y a **qu'un seul port**. Pas de proxy à configurer.
 
+### ⚠️ Redémarrer le serveur de dev avant de toucher à l'accès élève
+
+Le schéma SQLite a gagné deux tables (`student_accounts`, `student_sessions`)
+cette session. `CREATE TABLE IF NOT EXISTS` ne s'exécute qu'**au chargement du
+module** `server/db.ts` — un serveur déjà démarré avant ce changement ne les a
+jamais créées dans sa connexion ouverte, même si le fichier `.db` sur disque
+est le même.
+
+```bash
+lsof -ti:3000 | xargs -r kill
+npm run dev
+```
+
 Un `.claude/launch.json` est présent : l'outil de prévisualisation démarre le
-serveur sous le nom **`horizon-dev`** (port 3000, `autoPort` activé).
+serveur sous le nom **`horizon-dev`** (port 3000, `autoPort` activé) — même
+remarque si c'est la première fois que tu l'utilises après cette session.
 
-Inspecter la base — c'est le chemin le plus direct, l'API exige une session :
-
-```bash
-sqlite3 data/horizon.db "select id, pair, pnl from trades order by position"
-```
+Inspecter la base :
 
 ```bash
+sqlite3 data/horizon.db "select id, pair, pnl, pnlUnit from trades order by position"
 sqlite3 data/horizon.db "select id, name, email, must_change_password from staff_accounts"
+sqlite3 data/horizon.db "select id, enrolled_student_id, email_lower from student_accounts"
 ```
 
-Sonder l'API **sans** session (les seules routes qui répondent) :
+Sonder l'API **sans** session :
 
 ```bash
-curl -s localhost:3000/api/health && curl -s localhost:3000/api/auth/me
+curl -s localhost:3000/api/health && curl -s localhost:3000/api/auth/me && curl -s localhost:3000/api/auth/student-me
 ```
 
-`/api/state` et tout le reste renvoient **401** sans cookie. Pour exercer les
-routes protégées, connecte-toi d'abord et garde le cookie :
+Compte admin actuel (staff) : `th.gauthey99@gmail.com`. Le mot de passe a été
+réinitialisé manuellement pendant cette session (l'utilisateur l'a demandé en
+clair dans le chat, hors procédure normale) — il ne figure pas ici par
+principe (les mots de passe ne sont jamais consignés), demande-le directement
+à l'utilisateur s'il te faut te connecter.
+
+Pour exercer les routes staff protégées :
 
 ```bash
-curl -s -c /tmp/pd.txt -X POST localhost:3000/api/auth/login -H 'Content-Type: application/json' -d '{"email":"…","password":"…"}' && curl -s -b /tmp/pd.txt localhost:3000/api/state | head -c 400
+curl -s -c /tmp/pd.txt -X POST localhost:3000/api/auth/login -H 'Content-Type: application/json' -d '{"email":"…","password":"…"}' \
+  && curl -s -b /tmp/pd.txt localhost:3000/api/state | head -c 400
 ```
 
-**Ne teste jamais l'authentification sur `data/`.** Utilise une base jetable —
-c'est ce qui a permis de valider le flux complet sans toucher aux vraies
-données ni créer de compte parasite :
+Flux élève complet (depuis une session staff déjà connectée) :
 
 ```bash
-DATA_DIR=/tmp/propdesk-test PORT=3100 npx tsx server.ts
+# 1. Le staff invite une fiche élève existante (id d'un EnrolledStudent, ex. "stud-1")
+curl -s -b /tmp/pd.txt -X POST localhost:3000/api/auth/students/stud-1/invite
+# → { "studentAccountId": "...", "email": "...", "temporaryPassword": "..." }
+
+# 2. L'élève se connecte, SUR UN AUTRE COOKIE JAR
+curl -s -c /tmp/pd_student.txt -X POST localhost:3000/api/auth/student-login \
+  -H 'Content-Type: application/json' -d '{"email":"...","password":"..."}'
+
+# 3. Changement de mot de passe obligatoire
+curl -s -b /tmp/pd_student.txt -c /tmp/pd_student.txt -X POST localhost:3000/api/auth/student-change-password \
+  -H 'Content-Type: application/json' -d '{"currentPassword":"...","newPassword":"UnVraiMotDePasse123"}'
+
+# 4. L'élève ne voit QUE ses trades
+curl -s -b /tmp/pd_student.txt localhost:3000/api/state
+
+# 5. Le staff lit les vrais trades de l'élève, en lecture seule
+curl -s -b /tmp/pd.txt localhost:3000/api/auth/students/stud-1/trades
+
+# 6. Révocation (ne supprime pas les trades ni la fiche)
+curl -s -b /tmp/pd.txt -X DELETE localhost:3000/api/auth/students/stud-1/access
+```
+
+**Ne teste JAMAIS l'authentification (staff ou élève) sur `data/`.** Toujours
+une base jetable :
+
+```bash
+lsof -ti:3102 | xargs -r kill -9
+rm -rf /tmp/propdesk-test && mkdir -p /tmp/propdesk-test
+DATA_DIR=/tmp/propdesk-test PORT=3102 npx tsx server.ts &
+# ... tests ...
+lsof -ti:3102 | xargs -r kill -9
+rm -rf /tmp/propdesk-test
 ```
 
 ---
@@ -141,1631 +280,694 @@ Un serveur **Express unique** sert l'API **et** l'application. En
 développement il monte Vite en middleware ; en production il sert `dist/`.
 
 ```
-server.ts              point d'entrée : Express + Vite/statique (55 l.)
+server.ts              point d'entrée : Express + Vite/statique
 server/
-  db.ts                SQLite (better-sqlite3, WAL), schéma + migration (294 l.)
-  repositories.ts      accès aux données — SEUL module qui parle à SQLite (173 l.)
-  routes.ts            routes /api/*, barrière requireAuth (299 l.)
-  schemas.ts           validation zod des entrées (143 l.)
-  seed.ts              amorçage et import d'un état complet (81 l.)
+  db.ts                SQLite (better-sqlite3, WAL), schéma + migrations
+  repositories.ts      accès aux données — SEUL module qui parle à SQLite
+  routes.ts            routes /api/*, barrière requireAuth, filtrage élève
+                        (plus AUCUNE route IA depuis cette session)
+  schemas.ts           validation zod des entrées (coachReviewSchema retiré)
+  seed.ts              amorçage et import d'un état complet
   auth/
-    password.ts        hachage scrypt, vérification, re-hachage (208 l.)
-    sessions.ts        jetons, cookie, purge, lecture du cookie (211 l.)
-    credentials.ts     accès à staff_accounts (241 l.)
-    routes.ts          authRouter (public) + staffRouter (protégé) (357 l.)
-    middleware.ts      requireAuth, requireAdmin (109 l.)
+    password.ts        hachage scrypt, vérification, re-hachage
+    sessions.ts         jetons, cookie STAFF (pd_session), purge
+    credentials.ts      accès à staff_accounts
+    routes.ts           authRouter (public) + staffRouter (protégé, staff) ;
+                         + routes /students/:id/invite|access|trades
+    middleware.ts        requireAuth (deux mondes), requireStaffKind,
+                         requireStudentKind, requireAdmin, requireOwner
+    studentCredentials.ts   accès à student_accounts
+    studentSessions.ts      jetons, cookie ÉLÈVE (pd_student_session)
+    studentRoutes.ts        studentAuthRouter (public) +
+                             studentProtectedRouter (protégé, élève)
   middleware/
-    rateLimit.ts       fabrique de limiteur par IP (62 l.)
+    rateLimit.ts        fabrique de limiteur par IP
 src/
-  main.tsx             point de montage React (10 l.)
-  App.tsx              porte d'auth + état applicatif + câblage des vues (1057 l.)
-  types.ts             source de vérité des formes de données (300 l.)
-  index.css            Tailwind 4 + styles globaux
-  data/mockData.ts     jeu de données d'amorçage (1455 l.)
+  main.tsx              point de montage React
+  App.tsx               porte d'auth à deux mondes + état applicatif staff
+                         + StudentAuthenticatedApp (journal élève minimal)
+                         + handleSendMessage SANS réponse automatique
+  types.ts              source de vérité des formes de données
+                         (aiAudit et pnlPercentage : @deprecated, lecture seule)
+  index.css             Tailwind 4 + styles globaux
+  data/mockData.ts      jeu de données d'amorçage
   hooks/
-    usePersistentState.ts   état miroité dans localStorage (41 l.)
-    useServerSync.ts        bootstrap serveur + synchronisation optimiste (183 l.)
-    useAuth.ts              état d'authentification côté client (110 l.)
+    usePersistentState.ts   état miroité dans localStorage
+    useServerSync.ts        useBootstrap (staff) + useStudentBootstrap
+                             (élève, minimal) + useSyncedState
+    useAuth.ts               état d'auth à deux mondes (staff + élève)
   lib/
-    api.ts             client HTTP typé, interception du 401 (179 l.)
-    image.ts           réduction des images téléversées (107 l.)
-  components/          10 vues d'onglet + 10 modales + Sidebar et TopHeader
-    auth/              AuthShell, LoginScreen, SetupScreen, ChangePasswordScreen
+    api.ts              client HTTP typé — routes staff ET élève
+    image.ts            réduction des images (avatar carré + capture
+                         d'écran rectangulaire, voir §4)
+    format.ts            formatCurrency() — $ uniquement
+  components/           10 vues d'onglet + modales + Sidebar/TopHeader
+                         (PLUS de TradeAuditModal — supprimé)
+    auth/               AuthShell, LoginScreen (variante staff/élève),
+                        SetupScreen, ChangePasswordScreen (réutilisé tel quel)
 public/
-  icon.png             icône 512×512 — sidebar, favicon, icône iOS
-  logo-auth.jpg        logo 768×512, 38,8 ko — écrans d'authentification
-  logo.png             source haute résolution 1536×1024 (§6 bis)
-  Fonctionnalites_Horizon_SMC.pdf
+  icon.png / logo-auth.jpg / logo.png / Fonctionnalites_Horizon_SMC.pdf
 scripts/generate_pdf.js  génération hors ligne du PDF
 ```
 
-### Inventaire des composants
+### Le modèle d'authentification à deux mondes
 
-**Vues d'onglet (10)** — `MainDashboard`, `StudentTracking`, `WalletManagement`,
-`VideoAcademy`, `TradingJournal`, `SMCSimulator`, `CoachSignals`,
-`ForumSection`, `CoachMessaging`, `PerformanceDashboard`. L'onglet `exam` n'a
-pas de composant : il est rendu en ligne dans `App.tsx` (§6 bis).
+Deux mondes d'identité totalement séparés, chacun avec ses propres tables,
+son propre cookie, sa propre notion de « bureau de données ».
 
-**Modales (10)** — `UserProfileModal`, `TradeAuditModal`,
-`PositionCalculatorModal`, `TradingPlanModal`, `EconomicCalendarModal`,
-`PropFirmRulesModal`, `MindsetJournalModal`, `SetupAnalyzerModal`,
-`NotificationModal`, `StaffAccountsModal`.
-
-**Écrans d'authentification (3 + coque)** — `LoginScreen`, `SetupScreen`,
-`ChangePasswordScreen`, tous bâtis sur `AuthShell` (qui porte la palette et les
-primitives `AuthField` / `AuthError` / `AUTH_INPUT_CLASS` / `AUTH_BUTTON_CLASS`).
-Ils se montent **avant** l'application, jamais dedans.
-
-**Chrome** — `Sidebar` (519 l.), `TopHeader` (133 l.).
-
-Les plus gros fichiers, si tu cherches où le poids se concentre :
-`mockData.ts` (1455), `App.tsx` (1057), `TradingJournal.tsx` (848),
-`ForumSection.tsx` (764), `VideoAcademy.tsx` (756), `StudentTracking.tsx` (746),
-`UserProfileModal.tsx` (650).
-
-### Démarrage du client — le chemin critique
-
-`src/App.tsx` est découpé en **trois composants successifs**, et c'est ce
-découpage qui garantit qu'aucune donnée ne part avant qu'une session existe
-(les hooks ne pouvant pas être conditionnels) :
-
-```
-App()                        ne fait QUE useAuth()  →  GET /api/auth/me
- ├─ "loading"          → LoadingScreen
- ├─ "no-account"       → SetupScreen           (première installation)
- ├─ "unauthenticated"  → LoginScreen
- ├─ authentifié mais mustChangePassword
- │                     → ChangePasswordScreen  (bloquant)
- └─ AuthenticatedApp()        monté seulement ici
-      └─ useBootstrap()       →  GET /api/state
-           └─ AcademyApp()    12 useSyncedState, toutes les vues et modales
-```
-
-`AcademyApp` porte l'essentiel de l'application (~900 des 1057 lignes) et **sa
-structure interne n'a jamais été restructurée** — les chantiers successifs ont
-délibérément gardé la surface de modification minimale sur ce composant.
-
-`"offline"` mène aussi à `AuthenticatedApp` : sans serveur, aucune vérification
-n'est possible et on démarre sur le cache (§6.2, choix assumé).
-
-### Navigation
-
-**Pas de routeur.** `App.tsx` tient un `activeTab` et rend la vue
-correspondante. L'union `TabType` est définie dans
-[`src/components/Sidebar.tsx:36`](src/components/Sidebar.tsx:36) :
-
-```
-dashboard · students · wallets · academy · journal · simulator
-signals · forum · messaging · analytics · exam · propfirm
-```
-
-Conséquences à connaître : **pas d'URL par écran**, pas de bouton retour
-navigateur, pas de lien partageable. Ajouter un routeur serait un chantier à
-part entière.
-
-Deux onglets partagent un composant :
-
-- `simulator` et `propfirm` rendent tous deux `SMCSimulator`, avec une prop
-  `initialMode` (`"REPLAY"` / `"MONTE_CARLO"`). Une `key={activeTab}` force le
-  remontage, sans quoi l'état interne survivrait et ignorerait `initialMode`.
-
-### Structure de la sidebar
-
-Un item principal (Tableau de bord) puis **quatre sections**, toutes rendues
-par la même fonction `renderSection` :
-
-| Section | Entrées |
-|---|---|
-| **SUIVI** | Journal de trading, Portefeuille, Rentabilité, Suivi des Élèves *(admin seul)* |
-| **PRATIQUE** | Examen, Exercice du jour *(modale)*, Replay, Sim propfirm |
-| **FORMATION** | Module vidéo *(badge %)*, Messagerie Coach *(badge non-lus)* |
-| **OUTILS** | Audit Setup, Prop Firm, Mindset, Calendrier — **les 4 sont des modales** |
-
-Une entrée porte soit un `id` d'onglet, soit un `onOpen?: () => void` qui ouvre
-une modale (`id: null`). Le routage passe par `onOpen`, **jamais** par une
-comparaison de libellé : avec cinq entrées-modales, renommer un libellé aurait
-silencieusement cassé la navigation.
-
-**14 entrées masquables** au total (`SIDEBAR_TOGGLEABLE_KEYS`,
-[`Sidebar.tsx:60`](src/components/Sidebar.tsx:60)) :
-
-```
-journal · wallets · analytics · students · exam · checklist · replay
-propfirm · academy · messaging · audit · propfirmrules · mindset · calendar
-```
-
-« Tableau de bord » en est volontairement absent : c'est la destination de
-repli, le masquer créerait le cul-de-sac qu'on cherche à éviter.
-
-### Persistance
-
-Le **serveur est la source de vérité**. Au démarrage, le client appelle
-`GET /api/state` et reçoit toutes les collections en un aller-retour.
-
-Chaque modification suit ce chemin :
-
-1. l'interface se met à jour **immédiatement** (optimiste) ;
-2. la valeur est recopiée dans `localStorage` ;
-3. après **400 ms de regroupement**, elle part vers le serveur.
-
-Si le serveur est injoignable, l'application démarre sur le cache local et
-reste utilisable — voir les limites en §6.1.
-
-Au tout premier lancement sur une base vide, les données présentes dans
-`localStorage` (version antérieure sans serveur) sont importées
-automatiquement. À défaut, la base est amorcée depuis `mockData.ts`.
-
-La base vit dans `DATA_DIR` (`./data` par défaut), **hors du dépôt**
-(`.gitignore`).
-
-**Clés `localStorage` utilisées** — les neuf collections
-(`horizon_trades`, `horizon_accounts`, `horizon_signals`, `horizon_messages`,
-`horizon_forum_topics`, `horizon_notifications`, `horizon_enrolled_students`,
-`horizon_badges`, `horizon_modules`), plus `horizon_student`,
-`horizon_quiz_results`, `horizon_sidebar_collapsed` et `horizon_sound_alerts`
-(préférence locale du centre d'alertes, jamais synchronisée).
-
-### API
-
-**Publiques** — accessibles sans session :
-
-| Méthode | Route | Rôle |
+| | Monde **staff** (inchangé) | Monde **élève** |
 |---|---|---|
-| GET | `/api/health` | sonde de vie |
-| GET | `/api/auth/me` | état d'auth ; **répond toujours 200** |
-| POST | `/api/auth/setup` | première installation ; `409` si un compte existe |
-| POST | `/api/auth/login` | connexion |
-| POST | `/api/auth/logout` | déconnexion ; `204`, idempotente |
+| Table d'identité | `staff_accounts` | `student_accounts` |
+| Table de sessions | `sessions` | `student_sessions` |
+| Cookie | `pd_session` | `pd_student_session` |
+| Bureau de données | `DEFAULT_USER_ID` — un seul, partagé | une ligne `users` dédiée par élève (`student_accounts.user_id`) |
+| Ce qu'il voit | Tout | **Uniquement** sa collection `trades` |
+| Créé par | `/auth/setup` puis invitation staff | Invitation depuis une fiche `EnrolledStudent` existante |
 
-**Protégées** — derrière `api.use(requireAuth)` :
+`req.auth` porte un discriminant `kind` (`server/auth/middleware.ts`) :
 
-| Méthode | Route | Rôle |
-|---|---|---|
-| GET | `/api/auth/staff` | liste des comptes staff |
-| POST | `/api/auth/staff` | invite un compte, renvoie un mot de passe temporaire |
-| DELETE | `/api/auth/staff/:id` | révoque un compte ; `409` sur le dernier |
-| POST | `/api/auth/change-password` | change son propre mot de passe |
-| GET | `/api/state` | état complet de démarrage |
-| PUT | `/api/collections/:name` | remplace une collection entière |
-| PUT | `/api/profile` | profil affiché du bureau partagé |
-| PUT | `/api/quiz-results` | résultats de quiz |
-| POST | `/api/state/seed` | amorce avec le jeu de démonstration |
-| POST | `/api/state/import` | reprend un état venu de `localStorage` |
-| POST | `/api/coach/ai-review` | audit IA d'un trade ou réponse à une question |
-| GET | `/api/download-features-pdf` | catalogue PDF des fonctionnalités |
+```ts
+export interface AuthContext {
+  userId: string;       // id d'IDENTITÉ (staff_accounts.id OU student_accounts.id)
+  kind: "staff" | "student";
+  dataUserId: string;   // le user_id à passer à repositories.ts — DEFAULT_USER_ID
+                         // pour le staff, le bureau dédié pour un élève
+  isAdmin: boolean;
+  isOwner: boolean;
+}
+```
 
-Toutes les entrées sont validées par **zod**.
+**`dataUserId` ≠ `userId` — ne pas les confondre.** `userId` identifie le
+compte (identité de connexion) ; `dataUserId` identifie le bureau de données
+à passer à `repositories.ts`. Deux comptes staff différents ont deux `userId`
+différents mais le **même** `dataUserId` (`DEFAULT_USER_ID`) — c'est ce qui
+leur fait partager le même bureau.
 
-**Quatre limitations de débit par IP** (`createRateLimit`, fenêtre glissante en
-mémoire) : `ai-review` 10/minute (seule route facturée à l'appel — Gemini,
-modèle `gemini-3.6-flash`), `login` 10/quart d'heure, `setup` 5/quart d'heure,
-`staff` (invitation) 10/quart d'heure.
+**⚠️ Piège Express déjà rencontré et corrigé — ne le réintroduis pas.**
+`staffRouter` et `studentProtectedRouter` sont montés sur le **même préfixe**
+`"/auth"`. Une garde de rôle (`requireStaffKind`/`requireStudentKind`) posée
+**au niveau du montage** ou en `.use()` en tête d'un routeur s'exécute pour
+**toute** requête sous `/auth/*`, y compris celles destinées à l'autre
+routeur — Express ne regarde pas d'abord si une route interne correspond.
+**La garde doit être un argument de chaque route individuelle**
+(`staffRouter.post("/staff", requireStaffKind, ...)`), jamais au montage.
+Voir le code actuel de `server/auth/routes.ts`/`studentRoutes.ts` pour le
+motif correct.
 
-Codes de retour à connaître : `400` entrée invalide, `401` session absente ou
-expirée, `403` action refusée (mot de passe actuel faux, mot de passe
-temporaire non changé, non-admin), `404` collection inconnue, `409` conflit
-(compte déjà existant, base déjà amorcée, dernier compte non supprimable),
-`429` quota dépassé, `500` exception non prévue (via `apiErrorHandler`).
+### Chaîne serveur pour `/api/state` ou `/api/collections/:name`
 
-Le corps JSON est plafonné à **8 Mo** (`express.json({ limit: "8mb" })`) — la
-limite par défaut de 100 ko était trop basse pour une collection complète.
-**Un second parseur borné à 16 ko est déclaré AVANT lui sur `/api/auth`** :
-`body-parser` marque la requête comme déjà lue, donc le parseur 8 Mo passe la
-main. Sans cela un corps de 8 Mo atteindrait le hachage du mot de passe.
+- Session **staff** : comportement inchangé — toutes les collections,
+  `listCollection(name, DEFAULT_USER_ID)`.
+- Session **élève** : `GET /api/state` ne renvoie que `collections.trades`
+  (filtré sur `dataUserId`) + un profil minimal. `PUT /api/collections/:name`
+  gardé par `STUDENT_ALLOWED_COLLECTIONS = new Set(["trades"])`.
+- `/api/profile`, `/api/quiz-results`, `/api/state/import`, `/api/state/seed`
+  sont bloquées (403) pour `kind === "student"`.
 
-### Schéma SQLite
+### Démarrage du client
 
-15 tables : `meta`, `users`, `staff_accounts`, `sessions`, `trades`,
-`trading_accounts`, `coach_signals`, `coach_messages`, `forum_topics`,
-`forum_replies`, `notifications`, `enrolled_students`, `badges`, `modules`,
-`quiz_results`.
+```
+App()                        ne fait QUE useAuth()
+ ├─ "loading"                → LoadingScreen
+ ├─ "no-account"             → SetupScreen (première installation, staff)
+ ├─ "unauthenticated"        → LoginScreen, à bascule staff/élève
+ │                             (lien "Tu es élève ?" ↔ "Tu es coach ?")
+ ├─ "authenticated" + mustChangePassword       → ChangePasswordScreen (staff)
+ ├─ "authenticated-student" + mustChangePassword → ChangePasswordScreen (élève)
+ ├─ "authenticated-student"  → StudentAuthenticatedApp()
+ │                             useStudentBootstrap() → <TradingJournal
+ │                             hideAiAndCoachActions accounts={[]} ... />
+ └─ "authenticated" / "offline"  → AuthenticatedApp()
+      └─ useBootstrap()       →  GET /api/state (staff, inchangé)
+           └─ AcademyApp()    toutes les vues et modales
+                               (STRUCTURE INTERNE INTOUCHÉE cette session)
+```
 
-**`users` est le bureau partagé, `staff_accounts` les identités.** Les deux ne
-sont **pas** liées par une clé étrangère : un compte staff n'est pas
-propriétaire d'un bureau, il y accède (§4 « Authentification »).
+`AcademyApp`/`AuthenticatedApp` n'ont subi **aucune** modification
+structurelle. `StudentAuthenticatedApp` (~90 lignes) réutilise
+`<TradingJournal>` tel quel.
 
-Les données portent un `user_id` valant toujours `DEFAULT_USER_ID`
-(`"user-local"`) — **aucun repository ne filtre par identité de session**.
-C'est ce qui a permis d'ajouter les comptes staff sans toucher à la couche de
-données. Les objets sont stockés en **colonne JSON** (`payload`), ce qui rend
-le schéma tolérant à l'ajout de champs — voir §8.
+### Schéma SQLite — deux tables ajoutées cette session
 
-Chaque ligne porte aussi une colonne `position` : **l'ordre des listes est
-significatif dans l'UI** et doit être conservé.
+```sql
+CREATE TABLE student_accounts (
+  id                    TEXT PRIMARY KEY,
+  enrolled_student_id   TEXT NOT NULL REFERENCES enrolled_students(id) ON DELETE CASCADE,
+  user_id               TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  email                 TEXT NOT NULL,
+  email_lower           TEXT NOT NULL UNIQUE,
+  password_hash         TEXT NOT NULL,
+  must_change_password  INTEGER NOT NULL DEFAULT 1,
+  invited_by            TEXT REFERENCES staff_accounts(id) ON DELETE SET NULL,
+  created_at            TEXT NOT NULL,
+  updated_at            TEXT NOT NULL
+);
+CREATE TABLE student_sessions ( -- copie structurelle de `sessions`
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES student_accounts(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL, expires_at TEXT NOT NULL, last_seen_at TEXT NOT NULL, user_agent TEXT
+);
+```
 
-Seule la table `trades` **promeut des colonnes** hors du payload
-(`date`, `pair`, `direction`, `result`, `pnl`), avec deux index — c'est la
-seule collection sur laquelle on voudra requêter. Les autres ne sont jamais
-lues autrement qu'en entier.
+`server/repositories.ts` a gagné `updateCollectionItem(name, id, item,
+userId)` : fait un `UPDATE` ciblé sur une seule ligne, **sans** vider-
+réinsérer toute la collection — voir §8, « Piège : `replaceCollection` et les
+cascades », pour la raison exacte de son existence. **Utilise cette fonction,
+pas `replaceCollection`, chaque fois que tu modifies un seul élément d'une
+collection qui a une table enfant en `ON DELETE CASCADE`.**
 
-Les réponses du forum sont stockées séparément (`forum_replies`, en cascade sur
-`forum_topics`) et **retirées du payload du sujet** à l'écriture, puis
-recomposées à la lecture. La même donnée n'existe donc jamais à deux endroits.
+`EnrolledStudent` a gagné `studentAccountId?: string` (optionnel).
 
 ---
 
 ## 4. Fonctionnalités terminées
 
-### Socle technique
+*(Les fonctionnalités des sessions antérieures à celle-ci — socle technique,
+persistance serveur, navigation et sidebar, authentification staff,
+`isOwner`, poids des images, identité visuelle, rattachement trades/comptes,
+édition d'un trade sans recalcul, modifications hors ligne, découpage du
+bundle — sont **inchangées**. Voir l'historique git de ce fichier
+[commit `0e2566b`] pour leur détail complet. Ce qui suit est le travail de
+cette session, dans l'ordre où il a été livré.)*
 
-- `@types/react` installé et **`strict` activé** dans `tsconfig.json`.
-- `npm run lint` et `npm run build` passent sans erreur (**vérifié**).
-- Dépôt git initialisé, 25 commits, historique propre.
-- `README.md` réécrit (documentation utilisateur ; ce HANDOFF est la
-  documentation de reprise).
+### Passage € → $
 
-### Persistance serveur
+Fonction centralisée `formatCurrency()` dans `src/lib/format.ts`, utilisée
+dans les 13 fichiers qui affichaient un montant. Plus aucune occurrence de
+`€` dans `src/` (vérifié par `grep`). Libellés de champ (« Capital Initial
+(€) ») devenus `($)`.
 
-SQLite complet, validation zod, limitation de débit sur la route IA, repli
-hors ligne, migration automatique depuis `localStorage`.
+### PnL libre : `$` ou `%`, plus aucun calcul automatique
 
-**Vérifié** : mutation dans l'UI → présente en base ; serveur redémarré et
-`localStorage` entièrement vidé → données toujours là.
+`pnlDepuis()` (proposait un PnL avec un multiplicateur de 1000, faux pour
+tout instrument) a été **entièrement supprimé**, ainsi que l'état
+`pnlTouche`. Le champ PnL du formulaire est une saisie libre avec un
+sélecteur d'unité :
 
-### Navigation et sidebar
+```ts
+export type PnlUnit = "USD" | "PERCENT";
+// Trade.pnlUnit?: PnlUnit — optionnel, absent = "USD" implicite
+// Trade.pnlPercentage?: number — @deprecated, plus jamais écrit
+```
 
-- **Masquage de modules par l'admin.** Un engrenage apparaît à droite des
-  titres des 4 sections pour l'administrateur seul. Il bascule la section en
-  mode réglage : chaque entrée se masque ou se réaffiche d'un clic. Hors de ce
-  mode, une entrée masquée disparaît pour tout le monde. **14 entrées
-  masquables** ; « Tableau de bord » ne l'est pas.
-- **Repli automatique** : masquer le dernier accès à l'onglet courant renvoie
-  au tableau de bord. « Replay » et « Sim propfirm » menant au même onglet, la
-  bascule n'a lieu que si plus aucune entrée visible n'y conduit.
-- La configuration vit dans `StudentProfile.hiddenSidebarItems` et transite par
-  `/api/profile` — **aucune migration de base**.
-- **Section OUTILS** : 4 entrées qui ouvrent une modale au lieu de changer
-  d'onglet. Masquables comme les autres.
-- Le réglage de visibilité n'est proposé qu'en sidebar **dépliée** : repliée,
-  les en-têtes de section — donc l'interrupteur — ne sont pas rendus.
-- **Seule la navigation défile.** Le logo et le pied (carte de profil,
-  déconnexion) sont `shrink-0` et restent atteignables sans défilement. Avant,
-  `overflow-y-auto` était posé sur le conteneur entier : sur un écran de 900 px
-  de haut, le contenu faisait déjà 941 px et **la carte de profil sortait de
-  l'écran**. Ne remets pas le défilement sur le conteneur.
-- **Bouton de déconnexion** dans le pied, sous la carte de profil. Il n'est pas
-  masquable : il ne vit dans aucune section. Rose au survol, comme les autres
-  actions qui font quitter ou détruire quelque chose. En sidebar repliée, il
-  devient une icône seule avec une infobulle.
+- **`$`** : montant arrondi à l'entier, `formatCurrency()`.
+- **`%`** : pourcentage **libre, tapé par l'utilisateur**, jamais calculé ni
+  converti. Garde ses décimales.
+- **WIN/LOSS/Breakeven** : seuil `±$50` conservé pour `$` ; pour `%`, aucune
+  marge morte (positif → WIN, négatif → LOSS, zéro → Breakeven).
+- **Agrégation** : tous les totaux monétaires (PnL cumulé, Profit Factor,
+  courbe d'équité, stats par stratégie/émotion) **excluent** les trades en
+  `%` (filtre `(t.pnlUnit ?? "USD") !== "PERCENT"`). Un trade en `%` compte
+  quand même dans le Win Rate et le nombre de positions.
+- **CSV** : colonnes `PnL` + `Unité PnL`.
 
-### Journal de trading
+### Accès élève : Journal de trading cloisonné
 
-- Quatre horodatages : **date et heure d'entrée, date et heure de sortie**.
-  Les champs de sortie sont facultatifs (position ouverte).
-- La colonne « Entrée / Sortie » distingue trois états : sortie renseignée,
-  *position ouverte* (pas de prix de sortie), *sortie non renseignée* (trade
-  clôturé saisi avant l'existence du champ).
-- Export CSV à 20 colonnes, en-têtes et champs alignés.
-- Reçoit des **ébauches de trade** (`TradeDraft`) depuis le calculateur de
-  position et l'audit de setup, via `journalDraft` dans `App.tsx`.
+Voir §3 pour l'architecture. Côté fonctionnel : un élève connecté ne voit que
+son propre Journal (saisie + stats), sans onglets, sans IA (déjà vrai avant
+même le retrait global), sans champ « Compte » utile (`accounts={[]}`).
 
-### Suivi des élèves
+**Comment un élève obtient un compte** : dans Suivi des Élèves
+(`StudentTracking.tsx`), bouton **« Donner un accès »** sur toute fiche sans
+`studentAccountId` → `POST /auth/students/:id/invite` → mot de passe
+temporaire affiché **une seule fois**. Badge **« Compte actif »** ensuite
+(cliquable pour révoquer). Dès qu'un compte est actif, la fiche affiche les
+**vrais** trades de l'élève (`GET /auth/students/:id/trades`) à la place de
+la saisie manuelle `recentTrades`.
 
-- **Style de trading** par élève : `Scalping`, `Intraday`, `Swing Trading`.
-  Réglé dans « Éditer Fiche », affiché en pastille près du nom sur la carte et
-  dans la fiche détaillée.
-- 4 statuts élève, chacun d'une couleur distincte : En Évaluation FTMO
-  (violet), Prop Firm Financé (vert), Besoin Coaching (bleu), Alerte Tilt
-  (rose).
+**Vérifié de bout en bout, sur base jetable** : invitation → connexion sur
+cookie jar séparé → changement de mot de passe obligatoire → saisie d'un
+trade → absence totale dans le bureau staff → lecture par le staff → second
+élève, aucune fuite croisée → révocation propre → 401/403 sur tout ce qui
+est hors périmètre.
 
-### Authentification
+### Journal — retouches ciblées
 
-**Plusieurs comptes staff, un seul bureau.** N'importe quel nombre de comptes
-peut se connecter séparément (email + mot de passe propres), mais tous
-travaillent sur les **mêmes** données — trades, élèves, portefeuilles. Il n'y a
-**aucun cloisonnement** : ce n'est pas du multi-tenant, c'est un bureau partagé
-avec plusieurs badges d'accès. Décision explicite de l'utilisateur : « le staff
-seulement », invitation depuis l'interface avec mot de passe temporaire. Les
-droits **métier** sont égaux pour tous ; la seule exception est `isOwner`
-(§4 bis).
+- **Bouton « Audit IA » retiré** de chaque ligne (`onSelectTradeForAudit`
+  purgé de `TradingJournal.tsx` et de ses deux points d'appel dans
+  `App.tsx`). Le bouton « Discuter avec le coach » n'a pas été touché à ce
+  moment-là (il a depuis perdu sa réponse automatique, voir plus bas).
+- **Colonne « Actions Coach IA » renommée « Actions »**.
+- **Capture d'écran jointe à un trade** : nouveau champ dans le formulaire de
+  saisie/édition, upload + aperçu + boutons Remplacer/Retirer. Nouvelle
+  fonction `resizeChartScreenshot()` dans `src/lib/image.ts` — réduit
+  l'image à 1600 px de large max **sans la recadrer** (contrairement à
+  l'avatar, carré), compressée en WebP/JPEG, même garde-fou 20 Mo au
+  décodage que l'avatar. Réutilise le champ existant `Trade.chartUrl`.
+- **Bouton « œil » transformé en aperçu complet** : disponible sur **toutes**
+  les lignes désormais (avant, seulement si `chartUrl` existait). Affiche la
+  capture d'écran (ou « Aucune capture d'écran jointe ») puis un résumé
+  complet de tous les champs saisis (compte, marché, résultat, dates,
+  taille de lot, prix, PnL avec unité, émotion, notes).
 
-**L'identité est découplée de la donnée.** C'est la clé de voûte du design :
-aucun repository n'a jamais utilisé l'identité de session pour filtrer quoi que
-ce soit (tout retombe sur `DEFAULT_USER_ID` par défaut) — ça a permis d'ajouter
-plusieurs comptes **sans toucher à une seule ligne de `server/repositories.ts`
-ni des routes de collections**. `requireAuth` accorde `isAdmin: true` à toute
-session valide, sans consulter le profil partagé : avoir un compte, c'est être
-du staff. Il lit en revanche `isOwner` sur `staff_accounts` — le seul droit qui
-ne soit pas accordé à tous (§4 bis).
+**Vérifié de bout en bout** sur la vraie base (trade de test créé, capture
+1920×1080 réduite à 4,7 ko en WebP, aperçu et modale d'agrandissement
+fonctionnels, trade de test supprimé, base revérifiée à 6 trades intacts).
 
-**Schéma** — `server/db.ts`. Une seule table d'identité,
-**`staff_accounts`** : `id`, `name`, `email`, `email_lower` (**`UNIQUE`**),
-`password_hash`, `must_change_password`, `invited_by`, horodatages.
-**Délibérément sans clé étrangère vers `users`** : un compte staff n'est pas
-propriétaire d'un bureau, il y accède. `sessions` référence `staff_accounts(id)`,
-plus `id` (**SHA-256 du jeton**, jamais le jeton), `created_at`, `expires_at`,
-`last_seen_at`, `user_agent`.
+### Pastille de session de marché, calculée en direct
 
-Aucun champ de ces tables n'atteint jamais le client : `GET /api/state` renvoie
-`getProfile()` (le bureau partagé) **tel quel au navigateur**, jamais
-`staff_accounts`. Ne réintroduis pas de secret dans le payload du profil.
+`TopHeader.tsx` affichait « SESSION NY » et un faux cours `XAU/USD 2418.4
++1.2%` figés en dur. Remplacé par un calcul réel :
 
-**Migration** (`migrateToStaffAccounts()` dans `server/db.ts`, marqueur
-`migrated_staff_accounts_v1` en `meta`) — le projet est passé par un modèle
-antérieur à un seul compte (`user_credentials`, lié 1:1 au bureau par une clé
-étrangère qui interdisait tout second compte). La migration :
-1. copie chaque ligne de `user_credentials` vers `staff_accounts`, **en
-   conservant exactement le même `id`** — les sessions déjà émises restent
-   valides, personne n'est déconnecté ;
-2. recrée `sessions` avec la nouvelle contrainte (`CREATE TABLE IF NOT EXISTS`
-   ne modifie **jamais** une table existante, un piège réel rencontré ici : sur
-   une base déjà créée, l'ancienne contrainte vers `users` serait restée sans
-   ce recréage explicite) ;
-3. supprime `user_credentials`.
-Idempotente (marqueur en `meta`), testée d'abord sur une **copie** de la vraie
-base avant d'être appliquée (redémarrage du serveur de dev) — voir §9.
+```ts
+const FOREX_SESSIONS = [
+  { name: "Sydney", startUTC: 21, endUTC: 6 },  // traverse minuit UTC
+  { name: "Tokyo", startUTC: 0, endUTC: 9 },
+  { name: "Londres", startUTC: 7, endUTC: 16 },
+  { name: "New York", startUTC: 12, endUTC: 21 },
+];
+```
 
-**Mots de passe** ([`server/auth/password.ts`](server/auth/password.ts)) —
-`scrypt` de `node:crypto`, **aucune dépendance ajoutée**. `N = 32768`, `r = 8`,
-`p = 1`, `keylen = 64`, sel de 16 octets, `maxmem` relevé explicitement (32 Mio
-requis, soit exactement le défaut de Node — sans quoi scrypt échoue sur
-`ERR_CRYPTO_INVALID_SCRYPT_PARAMS`).
+Comparaison sur **l'heure UTC** de l'instant réel (`getUTCHours()`), pas
+l'heure locale du navigateur — comme `new Date()` représente le même instant
+pour tout le monde, chaque utilisateur voit la bonne session ouverte au bon
+moment quel que soit son fuseau. Gère les chevauchements (« Sydney / Tokyo »,
+« Londres / New York »), le week-end (« Marché fermé » de vendredi 21h UTC à
+dimanche 21h UTC), et se rafraîchit toutes les 60 secondes. Le faux cours a
+été retiré, pas remplacé (aucune source de prix réelle n'existe dans
+l'application).
 
-Format de stockage **auto-descriptif** : `scrypt$N$r$p$sel$clé` en base64url.
-Les paramètres voyagent avec le hash, donc durcir `N` plus tard **n'invalide pas**
-les mots de passe existants — `needsRehash()` déclenche un ré-hachage transparent
-à la connexion suivante.
+**Vérifié** : à 04h38 UTC un mardi, affiche correctement « Sydney / Tokyo ».
 
-`N = 32768` et non `16384` parce que `16384` ne coûtait que ~40 ms sur cette
-machine. À 32768 le coût mesuré est de ~80 ms, ce qui est l'objectif : ralentir
-une attaque hors ligne si la base fuit.
+### Retrait complet de l'IA de l'application
 
-**Sessions** ([`server/auth/sessions.ts`](server/auth/sessions.ts)) — jeton
-`randomBytes(32)` en base64url (256 bits). **Aucune signature HMAC** : signer un
-secret aléatoire de 256 bits n'apporterait rien, et cela évite
-`cookie-signature`, qui n'existe qu'en transitif d'Express alors que le build
-est en `--packages=external`. Cela évite aussi un secret à gérer dans `.env`.
+Décision explicite et répétée de l'utilisateur : « je ne veux pas qu'il y
+ait de IA ». Portée : **toute** l'application, staff compris (le module
+élève n'en avait déjà aucune).
 
-Cookie `pd_session` : `HttpOnly`, `SameSite=Lax`, `Path=/`, TTL 30 jours,
-prolongation glissante au-delà de 24 h depuis la dernière vue (le seuil évite un
-`UPDATE` par requête — `useSyncedState` en produit plusieurs par seconde).
-`secure` est **conditionné à la production** : le dev est en HTTP clair, un
-`secure: true` inconditionnel ferait disparaître le cookie sans message
-compréhensible.
+**Retiré :**
+- `src/components/TradeAuditModal.tsx` — **fichier supprimé**. Plus aucune
+  référence (vérifié par `grep`).
+- `server/routes.ts` : le bloc entier « Coach IA (Gemini) » —
+  `getAiClient()`, `aiRateLimit`, la route `POST /api/coach/ai-review` et ses
+  deux prompts (audit de trade / réponse à une question), l'import
+  `GoogleGenAI`.
+- `server/schemas.ts` : `coachReviewSchema` retiré.
+- `src/App.tsx` : `selectedTradeForAudit`, `handleUpdateTradeAudit`, le rendu
+  de `<TradeAuditModal>`, l'appel `fetch("/api/coach/ai-review")` dans
+  `handleSendMessage` (qui simulait une réponse automatique du coach).
+  `handleSendMessage` enregistre maintenant le message envoyé et s'arrête
+  là — **aucune réponse automatique n'est générée**.
+- `src/components/CoachMessaging.tsx` : la bascule « Réponse IA Immédiate »
+  (`isAiCoachMode`), le paramètre `triggerAiReply`, l'indicateur « Le Coach
+  réfléchit... » (remplacé par un simple « Envoi en cours... »).
+- `src/components/PerformanceDashboard.tsx` : le bouton « Générer un Audit IA
+  Globale », `generateAiGlobalAudit()`, l'état `aiReport`/
+  `isGeneratingAiReport`, le bloc d'affichage du rapport généré.
+- `src/components/MainDashboard.tsx` : la prop `onSelectTradeForAudit`
+  (déjà dead code — jamais appelée dans le corps du composant).
+- `package.json`/`package-lock.json` : `@google/genai` désinstallé
+  (`npm uninstall @google/genai`).
+- `.env`, `.env.example`, `README.md` : toute mention de `GEMINI_API_KEY`
+  retirée.
+- `src/data/mockData.ts` : le badge `badge-5` (« Expert de l'AI Audit »,
+  catégorie `AUDIT`) repensé en « Analyste Rigoureux » (catégorie
+  `PERFORMANCE`, même valeurs numériques pour ne rien casser côté
+  progression/XP). Le filtre de catégorie « Audit IA » retiré de
+  `UserProfileModal.tsx`.
+- Libellés résiduels : « obtenir des audits IA automatisés par votre coach »
+  (bandeau du Journal) → « progresser trade après trade ». Deux commentaires
+  de code appelant à tort l'analyseur de setup « analyseur IA » corrigés en
+  « analyseur de setup » (rappel : ce module n'a **jamais** été de l'IA, voir
+  §8 — c'était un mot choisi par erreur dans un commentaire, pas un fait).
 
-**Plusieurs appareils en parallèle** (décision utilisateur) : la connexion ne
-révoque pas les sessions existantes, et la déconnexion ne ferme que la session
-présentée.
+**Conservé sciemment** : `Trade.aiAudit` reste dans `src/types.ts`, marqué
+`@deprecated`, pour ne pas casser la lecture de données existantes (2 trades
+de `mockData.ts` en portent encore). Plus jamais écrit ni lu par aucune UI.
 
-Le cookie est lu à la main depuis `req.headers.cookie` — `cookie-parser` n'est
-pas installé et la contrainte était de ne rien ajouter. Le découpage se fait sur
-le **premier** `=` seulement.
-
-**Routes publiques** (`authRouter`, avant la barrière) — `/auth/me` (répond
-**toujours 200**, union discriminée `no-account` / `unauthenticated` /
-`authenticated`, ce dernier portant `mustChangePassword` : « pas encore
-connecté » est l'état normal au démarrage, un 401 pousserait à traiter un état
-comme une erreur), `/auth/setup` (**409 si un compte existe** — protection
-critique, crée le **premier** compte et amorce le bureau partagé),
-`/auth/login`, `/auth/logout` (**204, idempotente, hors de `requireAuth`** :
-une session expirée doit pouvoir se déconnecter).
-
-Deux protections anti-énumération sur `/auth/login` : le **même message** pour
-email inconnu et mot de passe faux, et un **hachage contre un hash factice**
-quand le compte est absent — sinon l'écart de temps de réponse (immédiat contre
-80 ms) révélerait quels comptes existent.
-
-**Routes staff** (`staffRouter`, **après** la barrière — piège réel : elles ne
-peuvent pas vivre dans `authRouter`, monté avant `requireAuth`, sinon
-l'invitation et le changement de mot de passe seraient publics) —
-`GET /auth/staff` (liste, accessible à tout compte : tous égaux), `POST
-/auth/staff` (invite, génère un mot de passe temporaire de 12 caractères
-**renvoyé une seule fois**, jamais stocké en clair, jamais journalisé),
-`DELETE /auth/staff/:id` (**refuse de supprimer le dernier compte** —
-`deleteStaffAccount()` compte les lignes avant d'agir, sans quoi la base
-deviendrait irrécupérable), `POST /auth/change-password` (exige le mot de passe
-**actuel**, même sous un mot de passe temporaire — sinon voler un jeton de
-session suffirait à changer le mot de passe sans le connaître).
-
-`POST /auth/change-password` répond **403 et non 401** sur un mauvais mot de
-passe actuel : un 401 aurait déclenché l'interception générique de
-`src/lib/api.ts` (`UNAUTHENTICATED_EVENT`) qui traite tout 401 comme une
-session expirée — alors que la session y est parfaitement valide.
-
-**La barrière** — `api.use(requireAuth)` dans `server/routes.ts`, placée **après**
-`/health` et `authRouter`, **avant** `staffRouter` et tout le reste : l'ordre de
-déclaration rend l'exclusion structurelle. Elle est sur le **routeur**, jamais en
-`app.use` : Vite est monté après l'API dans `startServer()`, un middleware au
-niveau application intercepterait `/@vite/client` et le WebSocket HMR et
-casserait le développement. Une liste d'exclusions explicite sert de filet,
-avec des chemins **relatifs au routeur** (`/state`, pas `/api/state`).
-
-`requireAuth` relit le compte staff **en base à chaque requête** (jamais depuis
-le cookie) et bloque tout sauf `/auth/change-password` si
-`mustChangePassword` est vrai — filet de sécurité, le client se gouverne déjà
-sur ce champ sans jamais appeler d'autre route dans cet état.
-
-`/state/seed` et `/state/import` sont **protégés**. Le flux le permet : sur base
-neuve, `me` → `no-account` → `setup` crée le bureau *et* la session →
-le client est authentifié → *ensuite* `useBootstrap` déclenche le seed.
-
-**Durcissement des privilèges**, indissociable de l'auth — sans lui elle serait
-décorative :
-
-- `isAdmin` n'est plus écrivable par le client. Deux verrous : `profileSchema`
-  **retire** la clé du corps (retirer et non rejeter — le client renvoie l'objet
-  qu'il a reçu, un 400 casserait toute sauvegarde), et `PUT /api/profile`
-  réinjecte la valeur autoritative lue en base. **Devenu partiellement
-  vestigial** depuis les comptes staff : `isAdmin` du profil partagé n'a plus
-  de rôle de contrôle d'accès réel (`requireAuth` accorde déjà `isAdmin: true`
-  à tout compte staff) ; il reste lu par `Sidebar.tsx` et le rendu de la vue
-  `students` dans `App.tsx`, où il fonctionne toujours (`isAdmin` vaut
-  toujours `true` en pratique) mais n'a plus de rôle discriminant entre
-  utilisateurs — un compte staff n'est jamais différent d'un autre.
-- Le bouton « Activer Admin 👑 » de `UserProfileModal` est **retiré**, remplacé
-  par « Gérer l'équipe » qui ouvre `StaffAccountsModal`.
-- La vue `students` est gardée **au rendu**, plus seulement masquée dans la
-  sidebar, avec un message explicite.
-- `PUT /api/collections/enrolledStudents` exige l'admin côté serveur.
-- `profileSchema.email` valide enfin une vraie adresse (ou la chaîne vide).
-- `apiErrorHandler` ne renvoie plus `err.message` en production.
-
-**Rate limit** — extrait en fabrique `createRateLimit` dans
-`server/middleware/rateLimit.ts`. L'ancienne version tenait une `Map` au niveau
-du module ; une fabrique donne une `Map` par instance, donc l'isolation devient
-structurelle. La fuite mémoire de cette `Map` est corrigée par un balayage
-périodique. Trois instances : `ai-review` 60 s/10 (**comportement préservé**),
-`login` 15 min/10, `setup` 15 min/5.
-
-**Flux client** — `App` ne fait plus que `useAuth()` et choisit l'écran ;
-`AuthenticatedApp`, monté conditionnellement, porte `useBootstrap()`. Les hooks
-ne pouvant être conditionnels, c'est ce découpage qui garantit qu'aucun appel à
-`/api/state` ne part sans session. **La structure d'`AcademyApp` n'est pas
-touchée** — 800 lignes, la surface de modification devait rester minimale.
-
-Un 401 sur n'importe quelle requête émet un `CustomEvent`
-(`propdesk:unauthenticated`) écouté par `useAuth`, qui ramène à l'écran de
-connexion avec « Ta session a expiré ». Sans cela, `useSyncedState` avalerait le
-401 en `console.warn` et l'utilisateur continuerait de travailler en croyant que
-ses données se sauvegardent.
-
-**Changement de mot de passe forcé** — `App()` intercale un troisième écran
-entre la connexion et l'application : si `status === "authenticated"` et
-`user.mustChangePassword`, `ChangePasswordScreen` s'affiche et **rien d'autre
-ne se monte**, notamment pas `AuthenticatedApp`/`useBootstrap` — cohérent avec
-le blocage serveur qui refuserait `/api/state` de toute façon.
-
-**Gestion de l'équipe** — `StaffAccountsModal.tsx`, ouverte depuis le bouton
-« Gérer l'équipe » de `UserProfileModal`. Nécessite `currentStaffId`
-(`user.id` de `useAuth`), fourni en filetant une nouvelle prop `currentStaffId`
-de `App` → `AuthenticatedApp` → `AcademyApp` — **`null` hors ligne**, aucune
-session à interroger sans serveur ; la modale n'est alors pas rendue. Le mot de
-passe temporaire d'une invitation est tenu dans un état local **volatil**
-(effacé à la fermeture de la modale) : il n'est jamais récupérable après coup,
-y compris par cette modale elle-même.
-
-### 4 bis. `isOwner` : la seule exception aux droits égaux
-
-**Ce que c'est.** Le compte fondateur — celui créé à l'installation par
-`/auth/setup` — est le seul à pouvoir **masquer ou réafficher les modules** de
-la sidebar. Rien d'autre. Un coach invité garde l'intégralité des droits
-métier : journal, suivi des élèves, portefeuilles, invitation et révocation de
-collègues.
-
-**Pourquoi cette exception existe.** `hiddenSidebarItems` vit sur le profil du
-**bureau partagé**, pas sur le compte. Un coach qui masquait un module le
-masquait donc pour tout le monde, fondateur compris, sans que personne ne
-comprenne d'où venait le changement. Ce n'était pas un réglage personnel qui
-avait fuité : c'était un réglage global à la portée de tous.
-
-**Comment le drapeau se lit.** `invited_by IS NULL` dans `staff_accounts` —
-vrai pour le seul compte de `/auth/setup`, renseigné pour tous les invités.
-Aucune colonne ni migration n'a été ajoutée : le schéma portait déjà
-l'information.
-
-**Trois pièges déjà désamorcés, ne les réintroduis pas :**
-
-1. **`isAdmin` n'a pas été réutilisé.** Il reste vrai pour tout le monde. S'en
-   servir aurait retiré aux coachs le suivi des élèves et l'écriture des
-   collections admin — bien plus que ce qui était demandé. `isOwner` est un
-   champ distinct, et il doit le rester.
-2. **`ON DELETE SET NULL` sur `invited_by`.** Supprimer un coach qui en avait
-   invité d'autres remettait leur `invited_by` à `NULL`, donc les promouvait
-   fondateurs. `deleteStaffAccount` réaffecte désormais les filleuls au
-   fondateur **dans la même transaction**, avant la suppression.
-3. **Le compte fondateur n'est plus supprimable** (409). Sans lui, plus aucun
-   compte ne pourrait régler les modules visibles — état irrécupérable, aucune
-   procédure de secours n'existant.
-
-**Le serveur fait autorité, pas l'interface.** `PUT /api/profile` **réinjecte**
-la valeur en base quand l'appelant n'est pas fondateur — il ne rejette pas la
-requête. `hiddenSidebarItems` voyage dans le même objet que le nom, l'avatar et
-le capital, tous légitimement modifiables par un coach : un 403 global lui
-interdirait de modifier son profil à cause d'un champ qu'il n'a pas touché.
-C'est le même motif que `isAdmin`, déjà en place.
-
-**Hors ligne, `isOwner` est faux pour tout le monde**, y compris le fondateur :
-sans serveur, aucune identité n'est vérifiable. Le réglage redevient
-disponible à la reconnexion.
-
-### Poids des images
-
-Les avatars téléversés sont **réduits à 256×256 avant d'entrer dans l'état
-applicatif** ([`src/lib/image.ts`](src/lib/image.ts)). C'est indispensable :
-`StudentProfile.avatar` est sérialisé en JSON, donc une image brute pèserait
-son poids majoré d'un tiers (base64) **à trois endroits à la fois** — la base,
-chaque réponse de `/api/state`, et le cache `localStorage`.
-
-Le recadrage est centré et carré, ce qui reproduit exactement l'affichage
-(`object-cover` dans un cercle) : recadrer ici ne retire donc rien qui aurait
-été visible. La sortie est du **WebP** quand le navigateur sait en produire,
-du **JPEG** sinon — avec dans ce cas un fond `#111615` peint sous l'image, car
-le JPEG n'a pas de canal alpha et les zones transparentes viraient au noir.
-
-`createImageBitmap(file, { imageOrientation: "from-image" })` est préféré
-quand il existe : il **redresse l'image selon son orientation EXIF**, ce que
-les photos prises au téléphone exigent.
-
-**Mesuré de bout en bout :**
-
-| | Avant | Après |
-|---|---|---|
-| Avatar en base | 4 031 890 car. | **42 879 car.** |
-| Réponse `GET /api/state` | 4 073 590 o | **84 579 o** |
-| Total `localStorage` | 4 072 905 car. | **83 894 car.** |
-| Fichier `horizon.db` | 8,2 Mo | **200 ko** |
-
-Téléversement testé avec `public/logo.png` (1,19 Mo, 1536×1024) → **4 839
-caractères** en WebP 256×256, soit une réduction de 327×.
-
-Le garde-fou de `handleFileUpload` est passé de 5 à **20 Mo** et porte
-désormais sur le **décodage**, plus sur le stockage : après réduction, la
-taille du fichier d'origine n'a plus d'incidence.
-
-### Identité visuelle
-
-- Logo PropDesk intégré : `public/icon.png` (recadrage 512×512 de l'icône) dans
-  la sidebar, en favicon et en icône iOS.
-- **Palette unifiée** sur les 10 vues, le centre d'alertes **et les 9 modales**
-  (jetons et règle de conservation en §8). **Vérifié** : les 9 modales
-  n'utilisent plus que les jetons `#0D1110`, `#111615`, `#1B2320`, `#232D29`,
-  `#00E676`, `#00c865`.
-
-Il reste **8 occurrences de `bg-slate-*` / `border-slate-*`** dans `src/`,
-toutes délibérées ou anodines : le gris du coach hors ligne
-([`CoachMessaging.tsx:150`](src/components/CoachMessaging.tsx:150)), et des
-survols sur des surfaces neutres de la sidebar et du header. Le texte
-(`text-slate-*`) n'a jamais été concerné par la migration.
+**⚠️ Non vérifié visuellement** — voir le bandeau en tête de document. Le
+code compile et build sans erreur (`npm run lint`, `npm run build` verts),
+mais aucune capture d'écran n'a confirmé le rendu réel dans le navigateur
+après ces derniers changements.
 
 ---
 
-## 5. Fichiers créés ou modifiés
+## 5. Fichiers créés ou modifiés cette session
 
 ### Créés
 
-**Persistance serveur** (chantier « base de données ») :
-
 | Fichier | Rôle |
 |---|---|
-| `server/db.ts` | connexion SQLite, schéma, migration `staff_accounts` |
-| `server/repositories.ts` | couche d'accès aux données |
-| `server/routes.ts` | routes `/api/*`, barrière `requireAuth` |
-| `server/schemas.ts` | validation zod |
-| `server/seed.ts` | amorçage et import |
-| `src/lib/api.ts` | client HTTP typé, interception du 401 |
-| `src/hooks/usePersistentState.ts` | état miroité dans localStorage |
-| `src/hooks/useServerSync.ts` | bootstrap + synchronisation optimiste |
+| `src/lib/format.ts` | `formatCurrency()` — devise unique `$` |
+| `server/auth/studentCredentials.ts` | accès à `student_accounts` |
+| `server/auth/studentSessions.ts` | jetons/cookie élève `pd_student_session` |
+| `server/auth/studentRoutes.ts` | routes publiques + protégées élève |
 
-**Authentification et comptes staff** :
+### Supprimé
 
-| Fichier | Rôle |
+| Fichier | Raison |
 |---|---|
-| `server/auth/password.ts` | hachage scrypt, vérification, re-hachage, hash factice |
-| `server/auth/sessions.ts` | jetons, cookie, purge, lecture du cookie |
-| `server/auth/credentials.ts` | accès à `staff_accounts` (identité, invitation, révocation) |
-| `server/auth/routes.ts` | `authRouter` (public) + `staffRouter` (protégé) |
-| `server/auth/middleware.ts` | `requireAuth`, `requireAdmin` |
-| `server/middleware/rateLimit.ts` | fabrique de limiteur, extraite de `routes.ts` |
-| `src/hooks/useAuth.ts` | état d'authentification côté client, `changePassword` |
-| `src/components/auth/AuthShell.tsx` | coque et primitives des écrans d'auth |
-| `src/components/auth/LoginScreen.tsx` | écran de connexion |
-| `src/components/auth/SetupScreen.tsx` | écran de première installation |
-| `src/components/auth/ChangePasswordScreen.tsx` | changement forcé (mot de passe temporaire) |
-| `src/components/StaffAccountsModal.tsx` | invitation, liste, révocation des comptes staff |
+| `src/components/TradeAuditModal.tsx` | Audit IA Gemini retiré (§4) |
 
-**Images et identité visuelle** :
+### Modifiés — passage € → $ (mécanique)
 
-| Fichier | Rôle |
-|---|---|
-| `src/lib/image.ts` | réduction des images téléversées avant stockage |
-| `public/icon.png` | icône 512×512 — sidebar, favicon, icône iOS |
-| `public/logo-auth.jpg` | logo 768×512 (38,8 ko) des écrans d'auth |
-| `public/logo.png` | source haute résolution, fournie par l'utilisateur |
-
-**Outillage et documentation** :
-
-| Fichier | Rôle |
-|---|---|
-| `.claude/launch.json` | configuration du serveur de prévisualisation (`horizon-dev`) |
-| `README.md` | réécrit intégralement — documentation utilisateur |
-| `HANDOFF.md` | ce document — documentation de reprise |
-
-### Renommé
-
-| Avant | Après |
-|---|---|
-| `src/components/AISetupAnalyzerModal.tsx` | `src/components/SetupAnalyzerModal.tsx` |
+`CoachMessaging.tsx`, `EquityCurveChart.tsx`, `MainDashboard.tsx`,
+`PositionCalculatorModal.tsx`, `PropFirmRulesModal.tsx`, `SMCSimulator.tsx`,
+`TopHeader.tsx`, `UserProfileModal.tsx`, `WalletManagement.tsx`,
+`mockData.ts` (texte du quiz).
 
 ### Modifiés en profondeur
 
 | Fichier | Nature des changements |
 |---|---|
-| `src/App.tsx` | **porte d'authentification** (`App` → `AuthenticatedApp` → `AcademyApp`), bootstrap serveur, 12 `useSyncedState`, câblage des modales, `handleLogout`, gardes admin, filetage de `currentStaffId` |
-| `src/components/Sidebar.tsx` | masquage admin, `TabType`, logo, clés stables, section OUTILS, `renderSection`, bouton de déconnexion, pied non défilant |
-| `src/components/UserProfileModal.tsx` | `useEffect` sur `isOpen`, palette, réduction des avatars, retrait du bouton « Activer Admin », bouton « Gérer l'équipe » |
-| `src/components/TradingJournal.tsx` | horodatages de sortie, CSV, palette |
-| `src/components/StudentTracking.tsx` | style de trading, palette, statuts |
-| `src/components/TopHeader.tsx` | 5 boutons retirés, fil d'ariane, props mortes retirées |
-| `src/components/MainDashboard.tsx` | props mortes retirées (`onOpenCalculator`, `onOpenCalendar`) |
-| `src/types.ts` | `exitDate`, `exitTime`, `TradingStyle`, `hiddenSidebarItems`, `TradeDraft` |
-| `src/data/mockData.ts` | horodatages de sortie, styles de trading |
-| `server.ts` | simplifié, chemins via `process.cwd()`, JSON 8 Mo + parseur 16 ko sur `/api/auth`, purge des sessions au démarrage |
-| `index.html` | favicon et icône iOS |
-| les 8 autres modales et 9 autres vues | migration de palette (slate → jetons du tableau de bord) |
-
-### « Audit Setup » n'est pas une fonction IA
-
-Le module note un setup à partir de **six cases à cocher pondérées**, en local
-et de façon déterministe : aucun appel réseau, aucun modèle. Il s'appelait
-`AISetupAnalyzerModal` et s'annonçait « Audit & Scoring de Trade SMC IA », ce
-qui était faux. **Décision de l'utilisateur : ce module ne doit pas se
-présenter comme boosté à l'IA.** Renommé `SetupAnalyzerModal`, titré « Audit &
-Scoring de Setup SMC », icône `Target` au lieu de `Sparkles` (réservée à l'IA
-dans cette application), et la note transférée au journal parle de « matrice de
-confluences ».
-
-La **seule** fonction Gemini réellement branchée est `TradeAuditModal`, via
-`/api/coach/ai-review` — plus la réponse du coach dans la messagerie
-(`handleSendMessage` dans [`App.tsx:426`](src/App.tsx:426)).
-
-### « Déconnexion » ferme réellement la session
-
-Le bouton vit dans le pied de la sidebar (`Sidebar.tsx`, prop `onLogout?`),
-câblé à `handleLogout` dans `App.tsx`. Il appelle `api.logout()` — qui supprime
-la session **en base** et le cookie — puis vide le cache `localStorage` et
-repasse `useAuth` en `unauthenticated` via `onLoggedOut()`.
-
-Le cache est effacé **délibérément** : hors ligne, l'application démarre sur ce
-cache sans pouvoir vérifier d'identité (§6.2), le laisser en place après une
-déconnexion volontaire rendrait le verrou contournable sur la machine.
-
-Il **refuse d'agir hors ligne** : le cache est alors la seule copie des données
-et le vider serait une perte sèche. Message explicite plutôt que destruction
-silencieuse.
-
-Le corps est enveloppé d'un `try/finally` : même si `api.logout()` ou
-`localStorage.clear()` lève, l'écran de connexion s'affiche. Ce durcissement
-vient d'un signalement « le bouton ne fonctionne pas » dont la cause réelle
-était le HMR cassé de Vite (corrigé depuis, §8) laissant tourner l'ancien
-code — mais un
-échec silencieux était le symptôme le plus trompeur possible, d'où le filet.
-
-`confirm()` est lui-même dans un `try/catch` : certains contextes (iframe
-sandboxée, extension bloquant les dialogues natifs) le font **lever** plutôt
-que renvoyer `false`, ce qui laissait le clic sans aucun effet ni message.
-
-### Supprimé
-
-- `src/components/CertificateModal.tsx` (140 lignes) et toutes ses traces —
-  entrée de sidebar, état et rendu dans `App.tsx`, ligne « Attestation &
-  Certificat Officiel » du catalogue PDF (`scripts/generate_pdf.js`, PDF
-  régénéré). **Décision de l'utilisateur : un certificat d'académie n'a aucune
-  valeur juridique, la fonctionnalité n'avait donc pas d'utilité.** Ne pas la
-  réintroduire.
-- `src/components/Navbar.tsx` (187 lignes, remplacé par `Sidebar` + `TopHeader`,
-  plus aucun import).
-- Dépendance `motion` (déclarée, jamais importée).
+| `src/components/TradingJournal.tsx` | Suppression `pnlDepuis()`/`pnlTouche` ; champ PnL `$`/`%` ; seuils WIN/LOSS différenciés ; agrégats filtrés `%` ; CSV ; bouton Audit IA retiré ; colonne « Actions » ; capture d'écran (upload + aperçu) ; modale « œil » → aperçu complet ; prop `hideAiAndCoachActions` |
+| `src/components/StudentTracking.tsx` | Bouton « Donner un accès », modale mot de passe temporaire, bascule vrais trades, révocation |
+| `src/components/auth/LoginScreen.tsx` | Props `title`/`subtitle`/`footer` pour la variante élève |
+| `src/App.tsx` | Branche `"authenticated-student"`, `StudentAuthenticatedApp`, filtre `%` sur `totalPnL`, retrait complet du bloc Audit IA et de la réponse automatique du coach |
+| `src/components/PerformanceDashboard.tsx` | Filtre `%` sur les agrégats ; retrait du bouton/rapport d'Audit IA Globale |
+| `src/components/CoachMessaging.tsx` | Retrait de la bascule IA et de l'indicateur « Le Coach réfléchit » |
+| `src/components/TopHeader.tsx` | Pastille de session calculée en direct (UTC), faux cours retiré |
+| `src/hooks/useAuth.ts` | `AuthStatus` élargi, `studentUser`, `studentLogin`, `studentChangePassword` |
+| `src/hooks/useServerSync.ts` | `useStudentBootstrap()` |
+| `src/lib/api.ts` | Routes élève (invite/revoke/fetchTrades/login/logout/changePassword) |
+| `src/lib/image.ts` | `resizeChartScreenshot()` (capture d'écran, sans recadrage) |
+| `src/types.ts` | `PnlUnit`, `Trade.pnlUnit`, `pnlPercentage`/`aiAudit` devenus `@deprecated`, `EnrolledStudent.studentAccountId` |
+| `server/db.ts` | Tables `student_accounts`, `student_sessions` |
+| `server/repositories.ts` | `updateCollectionItem()` |
+| `server/routes.ts` | Routeurs élève, filtrage `/api/state`/`/api/collections/:name`, **retrait complet du bloc Coach IA (Gemini)** |
+| `server/schemas.ts` | `coachReviewSchema` retiré |
+| `server/auth/middleware.ts` | `AuthContext.kind`/`dataUserId`, `requireStaffKind`, `requireStudentKind` |
+| `server/auth/routes.ts` | Routes `/students/:id/invite|access|trades`, gardes posées **par route** |
+| `server.ts` | `startStudentSessionCleanup()` |
+| `package.json` | `@google/genai` désinstallé |
+| `.env`, `.env.example`, `README.md` | Toute mention de Gemini/`GEMINI_API_KEY` retirée |
 
 ---
 
 ## 6. Bugs connus et limites
 
-Classés du plus au moins gênant.
+### 1. (Corrigé cette session) Retrait de l'IA — vérification visuelle faite
 
-### 1. Le rejeu hors ligne remplace des collections entières
+Voir le bandeau en tête de document. `npm run lint`/`npm run build` verts,
+**et** contrôle visuel fait dans le navigateur sur `PerformanceDashboard`,
+`CoachMessaging` (message de test envoyé, aucune réponse automatique) et
+`TradingJournal`. Chantier clos.
 
-Corrigé pour l'essentiel : les modifications hors ligne ne sont plus perdues au
-rechargement, un bandeau les propose à la reconnexion (§8, « Modifications hors
-ligne »). La limite qui subsiste est la granularité — envoyer remplace la
-collection **en bloc**. Si un collègue a modifié la même collection pendant la
-coupure, son travail est écrasé. Le bandeau le dit explicitement, et c'est
-pourquoi l'envoi n'est jamais automatique.
+### 2. (Corrigé cette session) `replaceCollection` et les cascades SQL
 
-### 2. Le verrou ne protège pas le cache local
+`replaceCollection("enrolledStudents", ...)` vide puis réinsère toute la
+table, ce qui déclenchait `ON DELETE CASCADE` sur
+`student_accounts.enrolled_student_id` et supprimait silencieusement le
+compte élève juste créé, dans la même transaction, sans lever d'exception.
+**Corrigé** par `updateCollectionItem()` (§3, §8). Si tu ajoutes une nouvelle
+table avec une FK `ON DELETE CASCADE` vers une collection existante, vérifie
+qu'aucune écriture serveur simultanée sur une table liée n'utilise
+`replaceCollection`.
 
-L'authentification existe désormais (§4, « Authentification »), mais **le mode
-hors ligne la contourne** : si le serveur ne répond pas, l'application démarre
-sur le cache `localStorage` sans écran de connexion, faute de pouvoir vérifier
-quoi que ce soit.
+### 3. Redémarrage serveur requis pour le schéma élève
 
-**C'est une décision de l'utilisateur**, prise en connaissance de cause : elle
-préserve le filet anti-perte de données. Le cache est effacé à la déconnexion
-volontaire, mais quelqu'un ayant accès physique à la machine et coupant le
-serveur verrait les données. Ne présente donc pas cet écran comme une barrière
-d'accès — ce n'en est pas une contre un tiers présent devant l'écran.
+Voir §2. Pas un bug de code, un piège opérationnel.
 
-Les deux alternatives ont été écartées : bloquer hors ligne ferait perdre les
-modifications non synchronisées le jour où le serveur ne redémarre pas, et le
-mode lecture seule demandait de désactiver les actions d'écriture dans les dix
-vues.
+### 4. Rattachement trades ↔ comptes — inchangé, toujours vrai
 
-### 3. Plusieurs comptes, mais aucun cloisonnement de données
-
-**Les comptes multiples sont faits** (§4 « Authentification ») : n'importe
-quel nombre de comptes staff peut se connecter séparément. Mais c'est un
-**bureau partagé**, pas du multi-tenant — décision explicite de l'utilisateur
-(« le staff seulement », « tous égaux »). Personne n'a de données privées :
-tous les comptes voient et modifient les mêmes trades, élèves, portefeuilles.
-
-Ce que ce choix laisse délibérément non fait, si le besoin change un jour vers
-des bureaux réellement séparés par personne :
-
-- aucun repository ne filtre par identité de session — tout retombe sur
-  `DEFAULT_USER_ID`, quel que soit le compte connecté (c'est précisément ce qui
-  a permis d'ajouter les comptes staff sans toucher aux repositories) ;
-- `forum_replies` n'a **pas** de `user_id` (rattachement indirect par `topic_id`) ;
-- `isBootstrapped()` reste un drapeau **global** dans `meta` ;
-- le forum identifie les auteurs par **chaîne de nom**, sans `authorId` ;
-- les clés `localStorage` sont **globales**, sans namespace par compte ;
-- `EnrolledStudent` n'a toujours aucun lien avec un compte staff — ce sont des
-  fiches de suivi, pas des comptes (voir §3 « Inventaire »).
-
-Faire cela demanderait de reprendre chaque repository pour accepter un
-`userId` réel (la signature existe déjà mais n'est jamais alimentée), de
-trancher quelles collections resteraient partagées (modules vidéo, signaux
-coach ?) contre lesquelles deviendraient privées par bureau, et de décider du
-lien entre `EnrolledStudent` et un compte réel. Chantier bien plus grand que
-l'ajout de comptes staff — ne pas le confondre avec lui.
-
-### 4. (Résolu) Le lien trade ↔ compte existe désormais
-
-`Trade.accountId` a été ajouté (commit `dbe2bbf`), et un mode édition permet de
-l'assigner après coup sans recalculer le PnL (commit `46bff63`, voir §4 et §8).
-Le journal se filtre par compte, `WalletManagement` calcule le nombre de
-positions par compte au lieu de lire un champ saisi.
-
-Ce qui **reste** vrai : les 6 trades de démonstration sont tous non rattachés
-— personne n'a encore assigné de compte à aucun d'eux. Voir §7, tâche 2 : ce
-n'est pas un bug, c'est une action que seul l'utilisateur peut faire.
+Le rattachement existe, mais les 6 trades de démo restent tous « Non
+rattaché ». Action utilisateur, pas un bug (§7, tâche 2).
 
 ### 5. La base est un mélange : un seul profil réel, tout le reste est de la démo
 
-**Vérifié par comparaison directe cette session**, pas supposé : les 4
-`trading_accounts`, les 4 `enrolled_students` (`tradingStyle` inclus) et les 6
-`trades` en base sont **identiques champ à champ** à `initialTradingAccounts`,
-`initialEnrolledStudents` et `initialTrades` dans `src/data/mockData.ts`. Une
-affirmation précédente de ce document disait que les styles de trading des
-élèves avaient été saisis à la main — **c'était faux**, corrigé ici.
+**Inchangé**. Les 4 `trading_accounts`, les 4 `enrolled_students` et les 6
+`trades` sont identiques à `mockData.ts`. Seul le profil (`users`, 1 ligne)
+est réel.
 
-Seul le **profil** (`users`, une ligne : nom « ForexPaps », email, capital
-100 000 € → 102 450 €) a été modifié par l'utilisateur depuis l'interface.
-
-**Conséquence pour la mise en ligne** (§7, tâche 5) : les comptes, élèves et
-trades de démo devront être vidés et remplacés par les vraies données de
-l'utilisateur avant publication. Confirmé avec lui explicitement — mais il n'a
-**pas** demandé qu'on le fasse ni qu'on le planifie maintenant.
-
-> **`rm -rf data/` détruit quand même de vraies données.** Même si la majorité
-> du contenu est de la démo, le profil (nom, email, capital) est réel et n'a
-> pas d'autre copie. Sauvegarde d'abord :
->
-> ```bash
-> cp data/horizon.db data/horizon.db.bak
-> ```
->
-> Ne laisse pas cette sauvegarde derrière toi une fois la tâche terminée : le
-> répertoire `data/` a déjà accumulé plusieurs bases orphelines au fil des
-> sessions passées (`horizon 2.db`, `horizon.db.bak`, `horizon.db.avant-auth`),
-> toutes nettoyées depuis.
+> **`rm -rf data/` détruit quand même de vraies données.** Sauvegarde
+> d'abord (`cp data/horizon.db data/horizon.db.bak`), et ne laisse pas la
+> sauvegarde derrière toi.
 
 ### 6. Aucun test automatisé
 
-Le projet n'a pas de *runner*. En ajouter un est une décision à part entière.
-Voir §9 pour ce qui a réellement été vérifié, et comment.
+Inchangé. Tout est vérifié à la main (§9).
 
 ### 7. SQLite sur disque éphémère
 
-Sur Cloud Run (cible naturelle vu l'origine AI Studio), le disque est éphémère
-et **les données seraient perdues à chaque redémarrage d'instance**. Monter un
-volume sur `DATA_DIR`, ou passer à Postgres. Seul `server/repositories.ts` est
-à réécrire : les routes n'y touchent pas.
+Inchangé (Cloud Run, disque éphémère — voir historique git pour le détail).
+
+### 8. Mot de passe admin réinitialisé en clair dans le chat
+
+Pendant cette session, l'utilisateur a demandé le mot de passe du compte
+admin, puis a fourni un nouveau mot de passe directement dans le chat pour
+qu'il soit haché et enregistré en base. C'est une entorse à la bonne
+pratique habituelle (ne jamais faire transiter un mot de passe en clair) —
+fait une fois, à la demande explicite de l'utilisateur, mot de passe haché
+immédiatement avec la fonction scrypt existante de l'application. Ne
+propose jamais ce chemin de toi-même ; si l'utilisateur perd de nouveau
+l'accès, la même procédure reste possible mais doit rester à son initiative.
 
 ---
 
 ## 6 bis. Ce qui ressemble à du code mort, mais ne l'est pas
 
-Trois pièges où un repreneur pressé supprimerait du code encore utile.
+*(Inchangé cette session pour les points déjà connus — `CoachSignals` sans
+entrée de sidebar mais atteignable par notification, l'onglet `exam`
+volontairement vide, `public/logo.png` non importé mais source du logo. Voir
+l'historique git pour le détail. Un ajout ci-dessous.)*
 
-### La vue `CoachSignals` n'a plus d'entrée de sidebar
-
-Elle a été retirée de la section FORMATION (`84e5e33`) à la demande de
-l'utilisateur. Mais l'onglet `signals` **reste atteignable** par la
-notification « Signal Coach SMC Actif » du centre d'alertes, dont le
-`targetTab` pointe dessus
-([`mockData.ts:1415`](src/data/mockData.ts:1415)). Le composant, l'onglet et la
-collection `signals` (4 signaux en base) sont donc bien vivants.
-
-### L'onglet `exam` est vide volontairement
-
-Il affiche « Contenu à venir », rendu **en ligne dans `App.tsx`**
-([`App.tsx:773`](src/App.tsx:773)) — il n'a pas de composant dédié.
-L'utilisateur a explicitement demandé une page vierge en attendant de définir
-le contenu. Ne pas la supprimer ni la remplir sans lui demander.
-
-### `public/logo.png` n'est utilisé nulle part
-
-Ce fichier de 1,1 Mo est la **source haute résolution** du logo. Les écrans
-d'authentification utilisent `public/logo-auth.jpg` (768 px, ~39 ko), généré
-depuis lui. `public/icon.png` (512×512) sert dans la sidebar, en favicon et en
-icône iOS. Ne supprime pas `logo.png` : c'est l'original dont dérivent les deux
-autres.
-
-Note d'outillage : `sips` **liste** WebP dans ses formats mais échoue
-silencieusement à en écrire — d'où le JPEG. L'original n'a pas de canal alpha
-(`sips -g hasAlpha` → `no`), le JPEG ne perd donc rien.
+**`Trade.pnlPercentage` et `Trade.aiAudit`** sont `@deprecated` dans
+`src/types.ts` et ne sont plus jamais écrits — mais ils restent dans le type
+et peuvent apparaître sur des trades mock anciens (`mockData.ts`). Ne les
+supprime pas du type sans vérifier qu'aucune donnée existante ne les porte
+encore : ce sont des champs de lecture historique, pas du code mort à nettoyer.
 
 ---
 
 ## 6 ter. Arbitrages déjà rendus
 
-Ces débats ont eu lieu et sont tranchés. Ne pas les rouvrir sans que
-l'utilisateur le demande.
+*(Table cumulative — consulte-la avant de proposer un choix déjà tranché.
+Les lignes ci-dessous sont celles décidées cette session ; voir l'historique
+git pour les arbitrages antérieurs, tous toujours valides.)*
 
 | Sujet | Décision |
 |---|---|
-| Statut « Accompagnement VIP » | **supprimé** — devenu indistinguable de « Prop Firm Financé » une fois la vue passée au vert |
-| Bouton « Lecture » du suivi élèves | **passé au vert** en connaissance de cause : il ne se distingue plus d'« Éditer Fiche » par la couleur |
-| Modale « Certificat » | **supprimée** — sans valeur juridique, donc sans utilité |
-| « Badges & paliers » en sidebar | **retiré** — les badges restent dans le profil, onglet Badges |
-| Les 5 modales orphelines | **remises dans la sidebar** (section OUTILS + « Exercice du jour ») |
-| Harmonisation des 9 modales | **faite** |
-| « Audit Setup » présenté comme IA | **corrigé** — c'est une matrice de confluences déterministe |
-| Stockage des avatars | **redimensionnement côté client**, pas de route d'upload — l'avatar reste dans le profil, ce qui préserve le repli hors ligne (une URL ne résoudrait plus sans serveur) |
-| Avatar de 4 Mo déjà en base | **recompressé sur place**, la photo de l'utilisateur est conservée |
-| Périmètre de l'authentification | **comptes staff multiples, bureau unique partagé** — pas de multi-tenant, aucune donnée privée par compte (§6.3) |
-| Qui peut avoir un compte | **le staff seulement** — les fiches élèves (`EnrolledStudent`) restent des dossiers de suivi, jamais des comptes |
-| Droits par compte | **égaux sur le métier** — avoir un compte staff suffit à tout faire sur les données. Une seule exception, `isOwner` (§4 bis) |
-| Masquage des modules | **réservé au compte fondateur** — le réglage appartient au bureau partagé, un coach le changerait pour tout le monde |
-| Suppression du compte fondateur | **refusée** — il est l'ancre d'`isOwner` ; le perdre laisserait le bureau sans personne pour régler les modules |
-| Créer un nouveau compte | **invitation depuis l'interface** (`StaffAccountsModal`), mot de passe temporaire généré côté serveur, jamais choisi par l'inviteur |
-| Hachage des mots de passe | **scrypt de `node:crypto`**, aucune dépendance ajoutée — argon2 et bcrypt écartés (compilation native, aucun gain réel à cette échelle) |
-| Premier mot de passe | **écran de première installation**, pas de variable d'environnement ni de script — aucun mot de passe par défaut dans le dépôt |
-| Sessions multi-appareils | **autorisées** — la connexion ne révoque pas les autres sessions, la déconnexion ne ferme que la session courante |
-| Accès hors ligne | **conservé** — le verrou n'est donc pas une barrière physique (§6.2). Bloquer ou passer en lecture seule ont été écartés |
-| Longueur minimale du mot de passe | **10 caractères**, sans contrainte de composition |
-| Suppression du dernier compte | **refusée par le serveur** — aucune procédure de récupération n'existe si plus aucun compte ne peut se connecter |
-| `onSelectAccountForJournal` | **non tranché** — demande une décision produit |
-| Rejeu des modifications hors ligne | **non tranché** — coût élevé, à ne faire que sur demande |
+| Utiliser l'IA quelque part dans l'application | **Non, nulle part.** Décision explicite et répétée deux fois par l'utilisateur (§4, « Retrait de l'IA »). Ne réintroduis aucun appel à un service d'IA sans qu'il le redemande explicitement |
+| Réponse automatique dans la messagerie coach | **Supprimée avec l'IA.** Un message envoyé reste sans réponse tant qu'un humain n'y répond pas — aucune fonctionnalité de réponse humaine par le staff n'a été construite pour autant (hors sujet de ce chantier) |
+| Badge « Expert de l'AI Audit » | **Repensé**, pas supprimé — devenu « Analyste Rigoureux », catégorie PERFORMANCE, même valeurs numériques |
+| Formule de PnL automatique (table de tailles de contrat) | **Abandonnée** — remplacée par une saisie libre `$`/`%`, aucun calcul |
+| Devise de l'application | **`$` partout**, plus jamais `€` |
+| Le `%` du champ PnL représente | un nombre tapé librement, jamais calculé ni converti |
+| Agrégation des trades `$` et `%` | Exclusion des `%` de tout total monétaire ; ils comptent dans le Win Rate et le nombre de positions |
+| Champ « Compte » côté élève | Masqué (`accounts={[]}`) — aucun sens sans accès au module Portefeuille |
+| Qui peut avoir un compte | Le staff, ET désormais les élèves — deux mondes d'identité séparés |
+| Périmètre d'un compte élève | Uniquement son propre Journal de trading |
+| Stockage de l'identité élève | Tables séparées (`student_accounts`, `student_sessions`) |
+| Fiche élève vs vrai journal | Le vrai journal devient la source dès qu'un compte est actif |
+| Bouton « œil » du Journal | Transformé en aperçu complet de toutes les données du trade, disponible sur toutes les lignes (plus seulement celles avec capture d'écran) |
+| Capture d'écran d'un trade | Réduite à 1600 px de large max, **sans recadrage** (contrairement à l'avatar) |
+| Pastille « Session » du header | Calculée en direct (UTC), sessions réelles (Sydney/Tokyo/Londres/New York), plus de faux cours affiché |
 
 ---
 
 ## 7. Prochaines tâches, dans l'ordre
 
-### 1. Remplir le module « Examen »
+### 1. (Fait cette session) Vérification du retrait de l'IA
 
-L'onglet `exam` existe mais **affiche une page vierge** avec le texte « Contenu
-à venir » ([`App.tsx:933`](src/App.tsx:933)). L'utilisateur a demandé cette
-page vierge en attendant de définir le contenu. Lui demander ce qu'il veut y
-mettre avant de coder.
+Voir le bandeau en tête de document et §6 point 1. Clos.
 
-### 2. Rattacher les 6 trades existants à un compte
+### 2. Remplir le module « Examen »
 
-Le rattachement existe (§8), l'édition d'un trade aussi (bouton crayon dans le
-journal), mais les six trades déjà en base restent **« Non rattaché »** : rien
-ne permettait de deviner leur compte, et l'inventer aurait été pire que de
-laisser le champ vide. C'est à l'utilisateur de les assigner un par un. Ce
-n'est pas un bug, et personne d'autre que lui ne peut le faire à sa place.
+Inchangé depuis les sessions précédentes. L'onglet `exam` affiche une page
+vierge volontaire (« Contenu à venir »). Demander à l'utilisateur ce qu'il
+veut y mettre avant de coder.
 
-### 3. Le PnL proposé à la création est faux
+### 3. Rattacher les 6 trades existants à un compte
 
-`pnlDepuis()` dans [`TradingJournal.tsx`](src/components/TradingJournal.tsx)
-applique un multiplicateur de 1 000 à tout instrument. Sur les six trades
-d'origine : 9 € au lieu de 900 (EUR/USD), −50 000 au lieu de −300 (NAS100),
-1 050 000 au lieu de 1 050 (BTC/USDT), 36 000 au lieu de 1 200 (XAU/USD).
-
-Ce n'est plus dangereux — le PnL est un champ saisissable, la formule n'est
-qu'une proposition affichée que l'utilisateur corrige, et l'édition ne
-recalcule jamais. Mais la proposition reste inutile tant qu'elle ignore la
-taille de contrat de l'instrument. La corriger demande de connaître ces
-tailles (100 000 par lot en forex, 1 pour un indice CFD, etc.) : c'est une
-table à établir avec l'utilisateur, pas une constante à deviner.
+Inchangé. Action utilisateur, pas une tâche de code.
 
 ### 4. Fusion ligne à ligne des modifications hors ligne
 
-Le rejeu hors ligne existe (§8, « Modifications hors ligne »), mais il remplace
-des **collections entières**. Une fusion par élément, le plus récent gagnant,
-supprimerait l'arbitrage manuel — au prix d'un horodatage par élément et d'une
-réécriture de la synchronisation. Écarté volontairement pour l'instant : le
-bandeau couvre le besoin sans risquer de perdre le travail d'un collègue.
+Inchangé. Écarté volontairement — coût élevé, à ne faire que sur demande.
 
 ### 5. Vider les données de démonstration avant la mise en ligne
 
-**Pas urgent, pas encore demandé — juste confirmé avec l'utilisateur** pour ne
-pas l'oublier. Voir §6, point 5 : les 4 comptes trading, les 4 fiches élèves
-et les 6 trades en base sont encore le jeu de démo de `mockData.ts`, jamais
-remplacés. Avant une mise en ligne réelle, ils devront être vidés et repeuplés
-avec les vraies données de l'utilisateur.
-
-Deux points à trancher **avec lui** le moment venu, pas à deviner :
-- **Comment vider proprement** — un bouton « réinitialiser les données de
-  démo » dans l'interface (probablement réservé au fondateur, voir §4 bis), ou
-  une commande ponctuelle lancée une fois avant publication ?
-- **Le profil doit-il lui aussi être remis à zéro**, ou son capital actuel
-  (100 000 € → 102 450 €) est-il déjà la vraie valeur de départ de
-  l'utilisateur ?
+Inchangé. Pas urgent, juste confirmé avec l'utilisateur.
 
 ### Ce qui n'est PAS une tâche
 
-- **Le cloisonnement des données par compte** (§6.3). Le bureau partagé est un
-  choix explicite, pas un manque. Ne l'entreprends que si l'utilisateur
-  demande des espaces réellement séparés.
-- **Donner des comptes aux élèves.** Tranché : les élèves restent des fiches de
-  suivi, seul le staff se connecte.
-- **Étendre `isOwner` à autre chose que le masquage des modules.** C'est une
-  exception délibérément unique, pas l'amorce d'un système de rôles (§4 bis).
-  Les droits métier restent égaux pour tous les comptes staff.
+- **Réintroduire de l'IA sous quelque forme que ce soit.** Décision explicite
+  et répétée — ne le fais pas sans nouvelle demande claire.
+- **Construire une réponse humaine du staff dans la messagerie coach**, pour
+  remplacer l'ancienne réponse automatique IA. Personne ne l'a demandé ; la
+  messagerie reste fonctionnelle pour l'envoi, simplement sans réponse
+  automatique.
+- **Le cloisonnement des données par compte staff** — bureau partagé
+  toujours voulu pour le staff. *Ne pas confondre* avec l'accès élève, qui
+  est lui bien cloisonné par construction.
+- **Étendre `isOwner` à autre chose que le masquage des modules.**
+- **Donner aux élèves accès à autre chose que leur Journal.**
 
 ---
 
 ## 8. Décisions techniques importantes
 
-### Le typage était un mensonge — ne pas y revenir
-
-À la reprise, **`@types/react` n'était pas installé** et `noImplicitAny` était
-désactivé. Tout le code React était donc silencieusement typé `any` : aucune
-prop n'a jamais été vérifiée, et `npm run lint` était vert **pour cette
-raison**.
-
-Une fois les types réels en place, exactement **deux erreurs** sont apparues —
-et c'étaient deux vrais bugs qui rendaient des fonctionnalités inaccessibles
-(modale certificat qui plantait, calculateur qui ignorait le capital). Le reste
-du code s'est révélé conforme à `strict`, qui a donc été activé gratuitement.
-
-**Ne jamais désactiver `strict` ni retirer `@types/react`.**
-
-### Palette : jetons du tableau de bord
-
-Le tableau de bord fait référence. Les autres vues utilisaient une palette
-`slate` bleutée ; elles ont été migrées vers :
-
-| Rôle | Jeton |
-|---|---|
-| Fond de page | `#0A0E0D` (sidebar) / `#0B0F0E` (corps) |
-| Fond en creux | `#0D1110` |
-| Surface de carte | `#111615` |
-| Bordure de carte / pastille | `#1B2320` |
-| Pastille haute | `#232D29` |
-| Bordure de section | `#151D1A` |
-| Fond d'entrée active | `#131B18` |
-| **Vert de marque** | `#00E676` |
-| Survol de bouton vert | `#00c865` |
-| Survol de lien vert | `#69F0AE` |
-
-Rayons : `rounded-2xl` pour les cartes, `rounded-xl` pour les éléments internes.
-
-Correspondance utilisée lors de la migration — elle a été appliquée partout,
-elle sert désormais de référence pour tout nouvel écran :
-
-```
-bg-slate-950 → bg-[#0D1110]     border-slate-800 → border-[#1B2320]
-bg-slate-900 → bg-[#111615]     border-slate-700 → border-[#232D29]
-bg-slate-800 → bg-[#1B2320]     border-slate-900 → border-[#151D1A]
-bg-slate-700 → bg-[#232D29]
-emerald-300/400/500 → [#00E676]     indigo-* → purple-*
-```
-
-**`hover:bg-slate-800` ne suit pas la table.** Il est toujours posé sur une base
-`bg-[#1B2320]` : le traduire en `hover:bg-[#1B2320]` rendrait le survol
-invisible. Il devient `hover:bg-[#232D29]`, la pastille haute.
-
-Ambre conservé partout où il **porte un sens** : avertissement (« Axes
-d'Amélioration », alerte de checklist, note du calendrier), palier de jauge
-(drawdown > 50 %, conformité incomplète), état dans une échelle (badge « à
-réclamer » face à débloqué/verrouillé, verdict B+ face à A+/non conforme,
-phase de respiration), et le thème doré des récompenses (rang, XP, couronne).
-Ailleurs il n'était qu'un accent : il est passé au vert de marque.
-
-**Piège trouvé** : `slate-850` et `slate-750` étaient utilisés à 13 endroits.
-**Ces nuances n'existent pas en Tailwind 4** et le projet n'a pas de
-`tailwind.config` — ces éléments n'avaient donc *aucun* fond ni bordure. Vérifie
-ce genre de nuance avant de la migrer.
-
-**Couleurs conservées volontairement** (elles portent un sens) :
-
-- la palette des 4 statuts élève, chacun devant rester distinguable ;
-- l'ambre du type « risque » dans le centre d'alertes ;
-- le rose des actions destructives (« Effacer », « Supprimer ») ;
-- le gris d'un coach hors ligne dans la messagerie ;
-- les couleurs par module du tableau de bord — vert (Journal), bleu (Examen),
-  violet (Replay), ambre (Module vidéo) — reprises dans chaque vue
-  correspondante.
-
-### Le rechargement à chaud passe par le serveur d'Express
-
-`server.ts` crée explicitement son `http.Server` au lieu de laisser
-`app.listen()` s'en charger, puis le **passe à Vite** :
-
-```ts
-const httpServer = http.createServer(app);
-const vite = await createViteServer({
-  server: { middlewareMode: true, hmr: { server: httpServer } },
-  appType: "spa",
-});
-```
-
-**Ne retire pas `hmr: { server: httpServer }`.** C'est ce qui répare une panne
-qui a coûté cher : en mode middleware, Vite ne connaît pas le serveur HTTP qui
-l'héberge. Faute de pouvoir s'y greffer, il ouvrait son propre WebSocket sur le
-port 24678, que personne ne servait — le navigateur tentait
-`ws://localhost:24678` en boucle, échouait, et le rechargement à chaud ne
-fonctionnait pas. Il fallait recharger la page à la main après chaque
-modification.
-
-Le coût réel n'était pas la gêne : c'est que **l'ancien code continuait de
-tourner à l'écran**. Un signalement « le bouton Déconnexion ne fonctionne pas »
-en est venu (§5), alors que le bouton était correct — la page exécutait une
-version périmée. Tout symptôme inexplicable en développement doit faire
-soupçonner cela en premier.
-
-Vérifié par une preuve directe plutôt que par l'absence d'erreur : un témoin
-posé dans `window`, puis un fichier modifié. Le texte à l'écran a changé **et**
-le témoin a survécu — donc remplacement de module à chaud, et non rechargement
-complet, qui l'aurait effacé. Le serveur n'écoute plus que sur un seul port.
-
-Effet de bord utile : un seul port à exposer, ce qui fonctionne tel quel
-derrière un tunnel ou un reverse proxy.
-
-### Rattachement trades ↔ comptes
-
-`Trade.accountId` (optionnel) relie un trade à un `TradingAccount`. Il alimente
-le filtre « Compte » du journal, une colonne du tableau, la colonne « Compte »
-de l'export CSV, et `positionsDuCompte` dans `WalletManagement`.
-
-**Trois choix à ne pas défaire :**
-
-1. **Le champ est optionnel, et doit le rester.** Les trades antérieurs n'en ont
-   pas, et rien ne permet de deviner leur compte — les rendre obligatoires
-   forcerait à en inventer un. « Non rattaché » est un état légitime, pas une
-   anomalie à corriger.
-2. **Un `accountId` introuvable vaut « non rattaché ».** Un compte supprimé
-   laisse des références orphelines ; `nomDuCompte()` renvoie `null` et l'écran
-   affiche « Non rattaché ». Ne transforme jamais ce cas en erreur.
-3. **L'equity reste saisie à la main.** Seul le *nombre de positions* est
-   dérivé. L'equity d'un compte prop firm intègre des dépôts, retraits, frais et
-   trades non journalisés : la recalculer depuis le PnL du journal écraserait
-   des montants justes par des montants faux. Décision explicite de
-   l'utilisateur.
-
-`TradingAccount.tradesCount` subsiste dans le type mais **n'est plus lu à
-l'écran** : il valait 0 depuis la création de chaque compte et n'a jamais été
-mis à jour. C'est `positionsDuCompte` qui fait foi.
-
-### Modifier un trade : ne jamais recalculer le PnL
-
-Le journal permet de modifier un trade existant (bouton crayon). La règle qui
-gouverne cet écran tient en une phrase : **ouvrir une fiche ne doit changer
-aucun chiffre que l'utilisateur n'a pas touché.**
-
-Ce n'est pas une précaution théorique. `pnlDepuis()` applique un multiplicateur
-de 1 000 à tout instrument, ce qui est faux partout :
-
-| Trade | PnL réel | Ce que donne la formule |
-|---|---|---|
-| EUR/USD | 900 € | 9 € |
-| NAS100 | −300 € | −50 000 € |
-| BTC/USDT | 1 050 € | 1 050 000 € |
-| XAU/USD | 1 200 € | 36 000 € |
-
-Recalculer à l'enregistrement ferait donc exploser le capital au seul motif
-qu'on a ouvert un trade pour lui affecter un compte. D'où le dispositif :
-
-- **le PnL est un champ de formulaire**, pas une valeur dérivée ;
-- en **création**, il suit la proposition calculée tant que l'utilisateur n'y a
-  pas touché (`pnlTouche`), et cesse de bouger dès qu'il saisit un montant ;
-- en **modification**, `pnlTouche` démarre à `true` : la valeur enregistrée est
-  reprise telle quelle et rien ne l'écrase jamais.
-
-Ce qui *est* recalculé sans risque : `riskRewardRatio`, pure géométrie des prix
-(vérifié : redonne exactement les valeurs stockées) ; `result` et
-`pnlPercentage`, qui dérivent du PnL retenu.
-
-**`onUpdateTrade` reçoit `{ ...editingTrade, ...champs }`**, dans cet ordre. Le
-premier terme conserve l'`id` et surtout **`aiAudit`**, qui n'existe dans aucun
-champ du formulaire : l'omettre effacerait l'audit IA à la première
-modification. Vérifié en base après édition d'un trade audité.
-
-`App.handleUpdateTrade` rafraîchit aussi `selectedTradeForAudit` si la modale
-d'audit est ouverte sur ce trade, sinon elle garde une copie périmée.
-
-### Modifications hors ligne
-
-Sans serveur, l'application tourne sur le cache `localStorage`. Auparavant, le
-rechargement suivant reprenait l'état du serveur et **les modifications hors
-ligne disparaissaient sans un mot**. Trois pièces corrigent cela :
-
-- **`src/lib/pendingChanges.ts`** — registre des collections modifiées hors
-  ligne, dans `localStorage` pour survivre à la fermeture de l'onglet.
-  `useSyncedState` y inscrit une clé dès qu'elle change alors que la
-  synchronisation est désactivée.
-- **`useBootstrap` saute `cacheState()`** quand le registre n'est pas vide.
-  C'est **le** point critique : `cacheState` recopie l'état serveur par-dessus
-  le cache local, il détruisait donc les modifications avant même qu'on ait pu
-  les proposer.
-- **`PendingChangesBanner`** — l'utilisateur envoie ou abandonne.
-
-**Pourquoi jamais d'envoi automatique.** Le bureau est partagé et les
-collections sont remplacées en bloc : renvoyer le cache sans rien demander
-écraserait ce qu'un collègue aurait modifié pendant la coupure. L'arbitrage
-revient donc à qui sait ce que contiennent ces modifications.
-
-**Détails qui ont chacun coûté un bug :**
-
-- `discardPending()` doit appeler `clearPending()`, pas seulement `setPending([])` :
-  l'état React disparaît au rechargement qui suit, c'est le registre
-  `localStorage` qui est relu au démarrage. Sans cela le bandeau réapparaissait
-  aussitôt après avoir été abandonné.
-- Le rejeu lit les valeurs **dans `localStorage`**, pas dans l'état React :
-  celui-ci affiche la version du serveur, alors que le cache porte la version
-  hors ligne — c'est bien celle-ci qu'on veut renvoyer.
-- Les clés sont envoyées **séquentiellement** ; une clé en échec **reste en
-  attente** et sera reproposée, plutôt que d'être perdue silencieusement.
-- L'effet qui recalcule `student.currentCapital` doit renvoyer `prev` à
-  l'identique quand la valeur ne bouge pas. Un nouvel objet à chaque montage
-  suffisait à marquer le profil « modifié » : le bandeau annonçait alors des
-  modifications inexistantes à chaque démarrage hors ligne (et déclenchait un
-  `PUT /api/profile` inutile en ligne).
-
-**Comment le tester** sans attendre une vraie panne : servir `dist/` avec un
-serveur qui renvoie 503 sur `/api/*`. Même origine, donc même `localStorage`,
-et le client voit exactement ce qu'il verrait si le serveur ne répondait plus.
-Tuer le serveur ne marche pas — la page elle-même ne se chargerait plus.
-
-### Découpage du bundle
-
-Le client partait en **un seul fichier de ~944 ko**. Il est maintenant réparti,
-selon deux mécanismes complémentaires qu'il ne faut pas confondre :
-
-1. **`manualChunks` dans `vite.config.ts`** sépare les dépendances tierces du
-   code applicatif — `charts` (recharts et sa famille `d3-*`), `react`,
-   `vendor`. Elles changent rarement : le navigateur les garde en cache d'un
-   déploiement à l'autre au lieu de les retélécharger à chaque correction.
-
-   C'est une **fonction**, pas la forme courte `{nom: ['paquet']}`. Cette
-   dernière compare des identifiants de module exacts : `react` est importé
-   comme `react/jsx-runtime` et `react-dom` comme `react-dom/client`, elle
-   produisait donc des blocs **vides**. Ne reviens pas à la forme courte.
-
-   `jspdf` n'y figure pas volontairement : il n'est utilisé que par
-   `scripts/generate_pdf.js`, sous Node, et n'entre pas dans le bundle client.
-
-2. **`React.lazy` sur les vues d'onglet** (`App.tsx`) sort chaque vue dans son
-   propre fichier, récupéré au premier affichage de l'onglet. Une seule vue est
-   montrée à la fois ; les neuf autres n'ont pas à être téléchargées d'emblée.
-
-**Ce qui reste en import direct, et pourquoi :**
-
-- `MainDashboard` — onglet d'arrivée et repli de tout onglet devenu
-  inatteignable. Le différer ajouterait une attente au démarrage sans rien
-  économiser.
-- **Les modales.** Elles sont montées en permanence et pilotées par une prop
-  `isOpen` : un `lazy` les chargerait immédiatement, sans gain. Les rendre
-  conditionnelles remettrait leur état interne à zéro à chaque ouverture — ce
-  serait un changement de comportement, pas une optimisation.
-
-3. **`React.lazy` sur la courbe de progression** (`EquityCurveChart.tsx`).
-   `recharts` est la plus grosse dépendance du client et `MainDashboard` —
-   l'écran d'arrivée — s'en servait, elle partait donc dans le chargement
-   initial. Le graphique est désormais chargé après l'affichage de la page.
-
-   **Piège rencontré :** `EquityCurveChart.tsx` ne doit **jamais** être importé
-   statiquement. Rollup fusionne dans le chunk principal tout module à la fois
-   importé statiquement et dynamiquement — le `React.lazy` devient décoratif et
-   `recharts` repart dans le bundle initial, **sans le moindre avertissement**.
-   C'est arrivé au premier essai, parce que le gabarit d'attente était exporté
-   depuis ce même fichier. Il vit maintenant dans `MainDashboard.tsx`.
-
-   Le gabarit occupe exactement la hauteur du graphique (`h-64`) : sans cela, la
-   page remonterait puis redescendrait à l'arrivée de la courbe, déplaçant des
-   boutons sous le curseur.
-
-Résultat : le chargement initial passe de **944 ko à 475 ko** (255 → ~139 ko
-gzippé), dont 176 ko de code applicatif contre 322. Une seule frontière
-`Suspense` couvre toutes les vues : elles s'excluent mutuellement.
-
-**Comment vérifier que le découpage tient**, plutôt que de se fier à la liste
-des fichiers produits : `dist/index.html` ne doit précharger (`modulepreload`)
-que `react` et `vendor`. Si `charts` y réapparaît, quelqu'un a réintroduit un
-import statique.
-
-### Tailwind 4, sans fichier de configuration
-
-Le projet utilise `@tailwindcss/vite` et **n'a pas de `tailwind.config.js`**.
-Toutes les couleurs de marque sont écrites en notation arbitraire
-(`bg-[#111615]`). Il n'y a donc **aucun nom de jeton à étendre** : si tu veux
-en introduire, c'est un choix d'architecture à proposer, pas à faire en
-passant.
-
-### Ajouter un champ ne demande pas de migration
-
-`profileSchema` et `collectionItem` sont en **`.passthrough()`** (zod), et les
-objets sont stockés en **colonne JSON**. Ajouter un champ à `Trade`,
-`StudentProfile` ou `EnrolledStudent` ne demande donc **aucun changement
-serveur ni migration SQL**.
-
-C'est ainsi qu'ont été ajoutés `exitDate`, `exitTime`, `tradingStyle` et
-`hiddenSidebarItems`. Rends les nouveaux champs **optionnels** : les données
-existantes ne les auront pas.
-
-La contrepartie : le serveur ne valide que ce qui lui est indispensable
-(un `id` non vide, des bornes de taille, l'unicité des identifiants). Le
-contrat de forme réel reste `src/types.ts`. **Ne redéclare pas les types métier
-dans `schemas.ts`** : cela créerait deux sources de vérité à garder
-synchronisées.
-
-### Remplacement de collection entière, pas de mutation partielle
-
-`PUT /api/collections/:name` **remplace** tout, dans une transaction. Ce n'est
-pas de la paresse : le client détient toujours le tableau complet en mémoire et
-chaque action produit un nouveau tableau complet. Remplacer correspond donc
-exactement à sa sémantique, et l'opération est idempotente — un renvoi après
-échec réseau ne peut pas dupliquer.
-
-### Toujours la forme fonctionnelle de `setState`
-
-Un bug réel a été introduit puis corrigé : lire `student` depuis la closure du
-rendu faisait que **deux bascules dans le même lot de rendu partaient de la
-même valeur**, et la seconde écrasait la première.
-
-```tsx
-// NON — perd une mise à jour si deux surviennent dans le même lot
-const hidden = student.hiddenSidebarItems ?? [];
-setStudent({ ...student, hiddenSidebarItems: [...hidden, key] });
-
-// OUI
-setStudent((prev) => ({ ...prev, hiddenSidebarItems: [...(prev.hiddenSidebarItems ?? []), key] }));
-```
-
-### Une valeur affichée doit être une valeur enregistrable
-
-Piège rencontré deux fois. Quand un menu affiche une valeur par défaut pour une
-donnée absente, **aligne l'état du formulaire sur ce qui est affiché à
-l'ouverture** :
-
-```tsx
-setEditForm({ ...student, tradingStyle: student.tradingStyle ?? "Intraday" });
-```
-
-Sans cela, le menu montre « Intraday » mais enregistrer sans y toucher laisse
-le champ vide. L'écran mentirait sur ce qui va être sauvegardé.
-
-Même famille de piège : `UserProfileModal` reste montée entre deux ouvertures,
-donc un `useState(initialTab)` ne se réévalue jamais. Il a fallu un `useEffect`
-sur `isOpen`.
-
-### Clés stables, indépendantes des identifiants d'onglet
-
-`SIDEBAR_TOGGLEABLE_KEYS` n'utilise pas les `id` d'onglet parce que **« Replay »
-et « Sim propfirm » pointaient tous deux sur `simulator`**. Les distinguer par
-`id` aurait masqué les deux ensemble.
-
-Pour la même raison, la clé de l'entrée « Prop Firm » de la section OUTILS est
-`propfirmrules` et non `propfirm` : cette dernière est déjà prise par « Sim
-propfirm ».
-
-Le contournement historique `isActive = activeTab === item.id && idx === 0`,
-qui limitait la surbrillance à la première entrée, a été retiré une fois les
-`id` rendus uniques.
-
-### Le seed est déclenché par le client, pas au démarrage du serveur
-
-Volontaire. Si le serveur amorçait la base à son démarrage, elle serait
-**toujours déjà amorcée** à l'arrivée du premier navigateur, et les données que
-celui-ci détient encore dans son `localStorage` ne pourraient jamais être
-reprises. Le client décide : il voit `bootstrapped: false`, regarde ce qu'il a
-en local, et appelle soit `/api/state/import`, soit `/api/state/seed`.
-
-Le `409` renvoyé quand la base est déjà amorcée n'est pas une erreur à
-remonter : il signifie qu'un autre onglet a gagné la course. Le client
-l'avale et relit simplement l'état.
-
-### Pièges de l'authentification, à ne pas redécouvrir
-
-Rencontrés ou anticipés pendant l'implémentation du socle. Le premier a
-réellement coûté du temps.
-
-**Les commentaires SQL vivent dans un template literal.** Le schéma de
-`server/db.ts` est une chaîne entre backticks. Un backtick dans un commentaire
-`--` **ferme la chaîne** et produit des erreurs de syntaxe TypeScript
-incompréhensibles à des dizaines de lignes de là. N'utilise pas de backtick dans
-ce bloc.
-
-**`sips` ne sait pas écrire le WebP** bien qu'il le liste dans ses formats : la
-commande échoue sans message et ne crée pas le fichier. Vérifie l'existence du
-fichier de sortie, pas le code de retour.
-
-**`secure: true` inconditionnel sur le cookie** rend la connexion impossible en
-développement (HTTP clair) sans aucun message compréhensible. Conditionner à
-`NODE_ENV === "production"`.
-
-**Un middleware d'auth en `app.use`** intercepterait `/@vite/client`,
-`/@react-refresh` et le WebSocket HMR, puisque Vite est monté après l'API. Il
-doit aller sur le routeur `api`.
-
-**`req.path` est relatif au routeur** : dans un middleware monté sur `/api`,
-c'est `/state`, pas `/api/state`.
-
-**`timingSafeEqual` lève** `RangeError` sur des longueurs différentes — comparer
-les longueurs d'abord.
-
-**`scrypt` avec `N ≥ 2^15` exige `maxmem` explicite** : 32 Mio requis, soit
-exactement le défaut de Node, d'où un `ERR_CRYPTO_INVALID_SCRYPT_PARAMS`.
-
-**`clearCookie` sans les mêmes attributs** que l'émission ne supprime rien.
-
-**`express.json` global s'applique aussi aux routes d'auth** : un parseur borné
-à 16 ko déclaré **avant** lui les protège, `body-parser` marquant la requête
-comme déjà lue.
-
-**`setInterval` sans `.unref()`** empêche le processus de se terminer.
-
-**`z.string().email()` est déprécié en Zod 4** au profit de `z.email()`.
-
-**Un timing différent entre « email inconnu » et « mot de passe faux »** offre
-une énumération des comptes : hacher contre un hash factice dans le premier cas.
-
-### Tout ce qui entre dans l'état applicatif est sérialisé trois fois
-
-C'est la leçon du profil de 4 Mo, et elle vaut au-delà des images.
-
-Une valeur placée dans un état synchronisé se retrouve **dans la base, dans
-chaque réponse de `/api/state`, et dans `localStorage`**. Le coût est donc
-triplé, et le plafond de `localStorage` (~5 Mo, tout confondu) est le premier
-atteint — en échouant **silencieusement**, puisque `usePersistentState` et
-`useSyncedState` avalent l'exception pour ne pas casser l'interaction en cours.
-
-Avant d'ajouter un champ volumineux (image, fichier, historique long), réduis-le
-à la source ou sors-le de l'état synchronisé. Ne compte pas sur un
-avertissement : il n'y en aura pas.
-
-### Le nom des fichiers d'assets doit être en minuscules
-
-macOS ignore la casse, **un serveur Linux non**. Le logo fourni s'appelait
-`Logo.png` et aurait disparu au déploiement.
-
-### Outils d'image disponibles
-
-La machine n'a **ni ImageMagick, ni PIL, ni sharp** — seulement `sips`, qui ne
-recadre qu'au centre. Pour un recadrage décalé, passer par un BMP intermédiaire
-et le manipuler en Python pur (`struct`), puis reconvertir avec `sips`. C'est la
-méthode qui a produit `public/icon.png`.
-
-`sips` **liste** WebP dans ses formats de sortie mais échoue silencieusement à
-en écrire : vérifie l'existence du fichier produit, pas le code de retour.
-C'est pourquoi `logo-auth.jpg` est un JPEG.
-
-Ces limites ne concernent que les images traitées **hors ligne**. Le
-redimensionnement des avatars, lui, se fait **dans le navigateur**
-(`<canvas>`, `src/lib/image.ts`) et y produit du WebP sans difficulté.
+*(Les décisions des sessions antérieures — typage strict, palette, HMR,
+rattachement trades/comptes, modification sans recalcul, modifications hors
+ligne, découpage du bundle, Tailwind 4, `.passthrough()`, remplacement de
+collection entière, `setState` fonctionnel, clés stables de sidebar, seed
+côté client, pièges d'authentification, poids des assets sérialisés,
+« Audit Setup » n'est pas une fonction IA — restent **toutes valides**. Voir
+l'historique git de ce fichier pour leur détail complet. Ce qui suit est
+nouveau ou complète un point déjà connu.)*
+
+### Piège : `replaceCollection` et les cascades SQL
+
+**Le bug rencontré.** La route d'invitation élève faisait, dans une seule
+transaction : (1) `createStudentAccount(...)` — insère `student_accounts`
+avec FK `ON DELETE CASCADE` vers `enrolled_students` ; (2)
+`replaceCollection("enrolledStudents", updated)` pour poser
+`studentAccountId` sur la fiche. `replaceCollection` **vide puis réinsère
+toute la collection** : le `DELETE` de l'étape 2 supprime **momentanément**
+la ligne de la fiche, et SQLite applique le `ON DELETE CASCADE`
+**immédiatement**, pas à la fin de la transaction — la ligne
+`student_accounts` créée à l'étape 1 est supprimée à son tour. La fiche est
+ensuite réinsérée avec le nouveau payload (elle a donc l'air correcte), mais
+le compte élève a disparu, **sans qu'aucune exception ne soit levée**.
+
+Découvert en comparant la réponse de l'API (succès annoncé) au contenu réel
+de `student_accounts` via `sqlite3` — la seule façon de le voir.
+
+**La correction** : `updateCollectionItem(name, id, item, userId)` fait un
+`UPDATE` ciblé, jamais de suppression, donc jamais de cascade déclenchée.
+
+**Règle à retenir** : dès qu'une collection a une table enfant avec
+`ON DELETE CASCADE`, n'utilise jamais `replaceCollection` pour modifier un
+seul élément à l'intérieur d'une transaction qui vient d'écrire dans la
+table enfant — utilise `updateCollectionItem`.
+
+### Piège : les gardes de rôle doivent être posées route par route
+
+Voir §3 pour le détail complet. Deux routeurs Express montés sur le même
+préfixe ne peuvent pas chacun avoir une garde de rôle en `.use()` ou en
+argument du montage — la garde du premier routeur enregistré s'exécute pour
+toutes les requêtes sous ce préfixe. La garde doit être un argument de
+**chaque route individuelle**.
+
+### Deux mondes d'identité : pourquoi pas un rôle sur `staff_accounts`
+
+Plutôt que d'ajouter une colonne `role` à `staff_accounts` et de réutiliser
+`sessions`, deux tables et deux cookies entièrement séparés. Raison : la
+contrainte FK stricte existante `sessions.user_id → staff_accounts(id) ON
+DELETE CASCADE` aurait dû être affaiblie, et tout endroit lisant
+`staff_accounts` sans filtrer explicitement par rôle aurait pu
+accidentellement traiter un élève comme un membre du staff (ex.
+`GET /auth/staff`, qui liste littéralement « tous les comptes »).
+
+### Session de marché : heure UTC, pas heure locale du navigateur
+
+`getActiveSessionLabel()` dans `TopHeader.tsx` compare `date.getUTCHours()`,
+jamais `date.getHours()`. Les horaires d'ouverture des marchés sont fixes
+dans le temps réel (UTC), indépendants d'où se trouve la personne qui
+regarde l'écran — `new Date()` représente déjà le même instant réel pour
+tout le monde, donc comparer en UTC suffit à donner la bonne réponse à
+chaque utilisateur, sans avoir besoin de connaître son fuseau horaire
+explicitement.
+
+### Capture d'écran d'un trade : pas de recadrage, contrairement à l'avatar
+
+`resizeChartScreenshot()` (`src/lib/image.ts`) réduit à une dimension
+maximale (1600 px) en conservant les proportions, **sans recadrer en carré**
+comme le fait `resizeAvatar()`. Un graphique de bougies recadré en carré
+perdrait toute lisibilité (mèches et niveaux de prix coupés) — le compromis
+qui fonctionne pour un visage ne fonctionne pas pour un graphique.
+
+### Retirer l'IA : distinguer le vrai du faux
+
+`server/routes.ts` avait **une seule** route branchée sur un vrai service
+externe (`/api/coach/ai-review`, Gemini) — mais elle servait **trois**
+usages différents dans l'interface (audit d'un trade, rapport de
+performance global, réponse dans la messagerie coach). Les trois ont dû être
+retirés séparément côté client, alors qu'ils partageaient la même route
+serveur. À l'inverse, l'« Audit Setup » (`SetupAnalyzerModal.tsx`) n'a
+**jamais** appelé cette route ni aucun service externe — c'est une matrice de
+confluences déterministe (6 cases à cocher pondérées), malgré un nom
+historique trompeur (`AISetupAnalyzerModal`, déjà corrigé lors d'une session
+antérieure) et deux commentaires de code qui l'appelaient encore à tort
+« analyseur IA », corrigés cette session. **Avant de retirer quoi que ce soit
+au nom du retrait de l'IA, vérifie par un `grep` du nom de la route/du
+service si la fonctionnalité appelle réellement un service externe** — un
+nom ou un commentaire mentionnant « IA » ne le garantit pas.
 
 ---
 
 ## 9. Contexte de travail avec l'utilisateur
 
+*(Inchangé pour l'essentiel — voir l'historique git pour le détail complet.
+Résumé, complété par cette session :)*
+
 - Il **communique en français** et attend des réponses en français.
-- Il travaille par **demandes courtes et itératives**, souvent visuelles, et
-  désigne fréquemment un élément de l'interface plutôt que de le nommer.
-- Il **commite lui-même la décision de committer** : il demande explicitement
-  « commit the working tree changes ». Ne pas committer sans qu'il le demande.
-- Il apprécie qu'on **signale les conséquences d'un choix** plutôt qu'on
-  l'applique en silence. Exemple : quand il a demandé de passer le statut VIP au
-  vert, le signaler comme devenu indistinguable de « Prop Firm Financé » était
-  utile — il a ensuite choisi de supprimer le statut.
-- Quand une vérification n'a pas pu être menée à son terme, **le dire
-  explicitement** plutôt que de laisser croire que tout est validé.
-- Il attend qu'on **tranche les décisions produit avec lui, pas à sa place** —
-  mais une fois qu'il a tranché, il ne veut pas qu'on rouvre le débat. Les
-  arbitrages rendus sont en §6 ter ; consulte-les avant de proposer un choix.
-- **Ses données de travail sont réelles.** Il l'a rappelé plusieurs fois
-  indirectement (un trade de test oublié en base a faussé ses statistiques
-  pendant plusieurs sessions). Sauvegarde avant toute migration, teste sur
-  `DATA_DIR=/tmp/...`, et ne crée jamais de compte ou de donnée parasite dans
-  `data/horizon.db`.
+- Il travaille par **demandes courtes et itératives**, souvent en désignant
+  un élément précis de l'interface (captures d'écran avec élément
+  sélectionné, comme pour la pastille de session).
+- Il **commite lui-même la décision de committer** — ne pas committer sans
+  qu'il le demande. **Rien n'a été committé cette session** (§0).
+- Il donne des instructions **fermes et sans ambiguïté sur ses choix
+  produits une fois qu'il les a formulés** deux fois de suite (« je ne veux
+  pas d'IA », répété identiquement à la session précédente puis à
+  celle-ci) — inutile de redemander confirmation dans ce cas, agir
+  directement mais **vérifier exhaustivement** (grep sur tout le dépôt)
+  plutôt que de s'arrêter aux occurrences évidentes.
+- **Ses données de travail sont réelles.** Ne jamais tester l'authentification
+  (staff ou élève) ni la persistance sur `data/horizon.db` — toujours une
+  base jetable, nettoyée après usage. Cette règle a été respectée sans
+  écart cette session (vérifié : `data/horizon.db` toujours à 6 trades après
+  tous les tests).
+- Ponctuellement, il peut demander une action qui sort du cadre des bonnes
+  pratiques habituelles (ex. transmettre un nouveau mot de passe en clair
+  dans le chat pour réinitialiser son propre compte, §6 point 8) — dans ce
+  cas, signaler que ce n'est pas la procédure normale mais s'exécuter
+  puisque c'est son propre compte et une demande explicite, sans réclamer
+  de validation supplémentaire.
 
-### Méthode de vérification attendue
+### Méthode de vérification utilisée cette session (à reprendre)
 
-Le serveur de développement est piloté par les outils navigateur
-(`preview_start` avec le nom `horizon-dev`). Le cycle utilisé jusqu'ici, à
-reprendre :
+1. `npm run lint` et `npm run build` après chaque changement significatif.
+2. Pour un changement serveur touchant à l'auth/aux données : base jetable,
+   scénario complet au `curl`, vérification directe en `sqlite3` de ce qui a
+   **réellement** été écrit (pas seulement la réponse HTTP — c'est ce qui a
+   révélé le bug de cascade).
+3. Pour un changement visuel : capture d'écran dans le navigateur après
+   chaque étape significative, jamais seulement après la compilation.
+4. Nettoyage systématique des données de test après chaque vérification —
+   aucune trace de test n'est restée dans `data/horizon.db`.
 
-1. `npm run lint` et `npm run build` après chaque changement ;
-2. contrôle visuel de la vue touchée par capture d'écran ;
-3. pour tout ce qui touche aux données : mutation dans l'UI → vérification via
-   `curl -s localhost:3000/api/state` ou une requête `sqlite3` ;
-4. **preuve de persistance réelle** : `localStorage.clear()` puis rechargement,
-   et si possible redémarrage du serveur — c'est le seul test qui prouve que la
-   donnée vient bien de SQLite et non du cache ;
-5. `read_console_messages` pour confirmer l'absence d'erreur.
+### Ce qui n'a pas été vérifié cette session, à ne pas supposer fait
 
-Nettoie derrière toi : les données de test créées pendant la vérification
-doivent être supprimées avant de rendre la main. **Cette règle a déjà été
-enfreinte une fois** — un trade de test (`MARQUEUR/TEST`) et plusieurs bases de
-sauvegarde sont restés dans `data/` pendant plusieurs sessions avant d'être
-retirés. Pour l'authentification, la vérification du flux d'installation a été
-faite sur une base jetable (`DATA_DIR=/tmp/...`) séparée : aucun identifiant de
-test n'a jamais atteint `data/horizon.db`.
-
-### Ce qui a réellement été vérifié — et ce qui ne l'a pas été
-
-Le projet n'a aucun test automatisé (§6.6). Tout a été vérifié à la main, et
-**pas au même degré selon les zones**. Ne suppose pas une couverture uniforme.
-
-| Degré | Zones |
-|---|---|
-| **Exercé de bout en bout** — mutation, base, redémarrage | persistance SQLite, masquage de sidebar, horodatages du journal, style de trading, validation et quotas de l'API (`400`/`404`/`409`/`429`), migration `localStorage` → base, repli hors ligne |
-| **Contrôlé visuellement seulement** — la vue s'affiche, rien de plus | forum, académie vidéo, quiz, portefeuilles, messagerie coach, badges, simulateur |
-| **Ouverture exercée** — la modale s'ouvre depuis la sidebar | les 4 entrées OUTILS + « Exercice du jour » ; « Audit Setup → Appliquer au journal » exercé jusqu'au formulaire pré-rempli |
-| **Jamais exécuté** | la route Gemini **avec une vraie clé** |
-
-Le redimensionnement d'avatar a été exercé **de bout en bout** : téléversement
-d'un PNG de 1,19 Mo → data URI WebP de 4 839 caractères en 256×256, rendu
-vérifié dans la modale, puis `localStorage.clear()` + rechargement pour prouver
-que l'avatar recompressé vient bien de SQLite. Deux limites à connaître :
-
-- le format de sortie **dépend du navigateur** (WebP ici, JPEG ailleurs) ; seul
-  le chemin WebP a été observé en conditions réelles ;
-- le redressement EXIF est demandé via `createImageBitmap`, mais **aucune photo
-  réellement orientée par EXIF n'a été testée**.
-
-Le bouton de déconnexion a été exercé sur ses **trois** chemins : en ligne
-(confirmation, cache vidé, rechargement, état relu depuis SQLite), sidebar
-repliée (icône seule, infobulle, même position), et **hors ligne** (refus
-explicite, aucune confirmation demandée, cache intact). La branche hors ligne
-n'étant pas atteignable en arrêtant le serveur — c'est lui qui sert
-l'application — elle a été exercée en forçant temporairement `setStatus`
-dans `useServerSync.ts`, modification ensuite annulée (`git diff` vérifié
-vide). **Attention : son corps a depuis été réécrit pour appeler
-`api.logout()`, et cette nouvelle version n'a jamais été exécutée.**
-
-### L'authentification a été exercée de bout en bout
-
-| Zone | Ce qui a été prouvé |
-|---|---|
-| `password.ts` | 24 contrôles : bon/mauvais mot de passe, 9 formats corrompus renvoyant `false` **sans lever**, sel aléatoire, `needsRehash`, borne de longueur. Coût mesuré **81 ms**, hash factice **79 ms** — l'écart de timing est éliminé |
-| `sessions.ts` / `credentials.ts` | 37 contrôles sur base jetable : `readCookie` sur 9 cas (valeur percent-encodée mal formée, nom partiellement homonyme, en-tête absent), non-écrasement d'un profil existant, normalisation d'email, unicité de `email_lower`, empreinte SHA-256 ≠ jeton, sessions parallèles, expiration, purge, renouvellement glissant, **absence d'écriture quand la session vient d'être vue** |
-| Les 4 routes | 20 contrôles `curl` : `no-account` → `setup` 201 → `409` au second → `login` → `logout` 204 idempotent. Cookie `HttpOnly; SameSite=Lax; Path=/` **sans `Secure`** en dev. Rate limit `429` au 11ᵉ essai. **Timing identique** (80-83 ms) entre email inconnu et mot de passe faux |
-| La barrière | `/health` 200 sans cookie ; `/state`, `/collections/*`, `/download-features-pdf`, `/coach/ai-review` en **401** sans session. **Le HMR de Vite continue de fonctionner** — c'est le test qui prouve que la barrière est sur le routeur et non sur l'application |
-| Le flux client | Installation → application chargée avec les vraies données → rechargement, **session persistée** → cookie **invisible en JS** → révocation serveur puis écriture réelle → **retour à l'écran de connexion avec « Ta session a expiré »** → déconnexion, **`localStorage` vidé à 0 clé** |
-| Le durcissement | `PUT /profile` avec `isAdmin` : **valeur en base inchangée**. Email invalide `400`, vide `200`. Non-admin sur `enrolledStudents` : **403 et les 4 fiches survivent**. Sidebar dégradée (entrée, engrenages et badge absents). Bouton « Activer Admin » remplacé par « Défini côté serveur » |
-| Installation neuve | Sur `DATA_DIR=/tmp/propdesk-neuf` : `no-account` → `setup` → session → **seed derrière la barrière** → 6 trades et 4 élèves amorcés. L'ordre `users` avant `user_credentials` (contrainte de clé étrangère) tient |
-| Production | `npm run build` puis `NODE_ENV=production node dist/server.cjs` : `/logo-auth.jpg` servi (38 830 o), SPA servie, `/api/auth/me` répond |
-
-**Deux réserves honnêtes.**
-
-La **garde au rendu de la vue `students`** pour un non-admin n'a pas pu être
-déclenchée : l'entrée de sidebar disparaît et `knownTabs` exclut l'onglet, donc
-l'état n'est plus atteignable par l'interface — ce qui est le but, mais ce qui
-empêche aussi d'exercer la branche. Les deux autres couches (masquage et `403`
-serveur) sont, elles, vérifiées.
-
-Le **clic automatisé ne soumet pas un formulaire** dans cet outillage : la
-soumission n'a pu être déclenchée que par `requestSubmit()`. Le chemin de
-soumission lui-même est donc prouvé (erreur affichée, `aria-invalid`,
-`aria-describedby`), mais pas le clic humain sur le bouton — comportement
-standard du navigateur, hors de portée d'ici.
-
-**Piège si tu écris un script de test** : poser `process.env.DATA_DIR` sur une
-base jetable **avant** d'importer `server/db.ts` — ce module ouvre la connexion
-au chargement, un import statique en tête de fichier écrirait donc dans la vraie
-base. Utiliser un `await import()` après avoir posé la variable.
-
-Le dernier point mérite d'être explicite : `/api/coach/ai-review` n'a été testée
-que sur sa **validation d'entrée** et sa **limitation de débit**. Aucun appel
-réel à Gemini n'a abouti pendant le développement. **Ne suppose pas que l'audit
-IA fonctionne** — c'est la première chose à vérifier si tu y touches, et le
-modèle déclaré (`gemini-3.6-flash`,
-[`routes.ts:243`](server/routes.ts:243)) est à confirmer.
+- **Le rendu visuel du retrait de l'IA** dans `PerformanceDashboard` et
+  `CoachMessaging` — voir le bandeau en tête de document, c'est la priorité
+  n°1 de reprise (§7, tâche 1).
+- Le comportement de re-invitation après révocation d'un élève (edge case
+  déjà documenté avant cette session, toujours non traité).
+- Aucun test avec une vraie clé Gemini — devenu sans objet, la fonctionnalité
+  n'existe plus.
 
 ---
 
 ## 10. État à la reprise
 
-> ### Migration close, sauvegarde supprimée
->
-> La migration `staff_accounts` (§4) a été **appliquée à la vraie base** —
-> pas seulement testée sur une copie. Votre compte (`th.gauthey99@gmail.com`)
-> a conservé son `id` d'origine et votre session n'a pas été invalidée.
->
-> La sauvegarde d'avant migration (`data/horizon.db.avant-staff-accounts`) a
-> été **supprimée** après une dernière vérification : les 11 tables métier ont
-> été comparées ligne à ligne entre la sauvegarde et la base actuelle —
-> `users`, `trades`, `enrolled_students`, `trading_accounts`, `modules` et
-> `badges` sortent **identiques**, la migration n'a donc rien perdu. Il n'y a
-> plus de retour arrière, et il n'y en a plus besoin. `data/` est propre :
-> plus aucune base orpheline.
-
-- Branche `main`, **arbre de travail propre**.
-- `npm run lint` et `npm run build` : sans erreur. Chargement initial du
-  bundle à **475 ko** depuis le découpage (§8, « Découpage du bundle ») —
-  l'ancien chiffre de 944 ko cité ici est périmé, ne t'y fie pas.
-- Migration vérifiée **trois fois** : sur une copie isolée (`/tmp/test-migration`),
-  sur une base neuve pour le flux staff complet (`/tmp/staff-neuf`), puis
-  appliquée à la vraie base par redémarrage du serveur de dev — données
-  comparées champ par champ à une sauvegarde d'avant migration, aucun écart.
-- Flux staff exercé de bout en bout, au `curl` et dans le navigateur : invitation,
-  connexion avec mot de passe temporaire, blocage sur toute route hors
-  `/auth/change-password` tant que `mustChangePassword` est vrai, déblocage
-  après changement, bureau partagé confirmé identique entre deux comptes,
-  suppression avec purge immédiate des sessions, garde-fou du dernier compte.
-- **Rejoué une seconde fois sur une copie de la vraie base** avant de supprimer
-  la sauvegarde (16 contrôles, tous verts) : invitation d'un coach, connexion au
-  mot de passe temporaire, `GET /api/state` refusé en 403 `MUST_CHANGE_PASSWORD`,
-  403 sur un mauvais mot de passe actuel, changement accepté, ancien mot de passe
-  temporaire devenu invalide (401), **écriture du coach visible depuis l'autre
-  compte** (`PUT /api/collections/trades`), suppression du coach en 204 avec
-  session purgée dans la seconde, et 409 sur la suppression du dernier compte.
-  Méthode : `DATA_DIR` pointé sur une copie `sqlite3 .backup`, serveur sur le
-  port 3999 — la vraie base n'a jamais été ouverte en écriture (compteurs et
-  `mtime` vérifiés inchangés après coup).
-- **La console est propre, et le rechargement à chaud fonctionne.** L'erreur
-  `ws://localhost:24678` qui tournait en boucle est corrigée (§8, « Le
-  rechargement à chaud »). Tu n'as plus à recharger la page à la main après une
-  modification — si tu lis encore une consigne en ce sens quelque part, elle est
-  périmée.
-- **Bundle découpé** (§8) : chargement initial à **475 ko**, plus aucun bloc
-  au-dessus du seuil de Vite. Vérifié sur le build de production servi pour de
-  vrai, pas seulement à la compilation.
-- **Édition d'un trade** (§8) vérifiée sur une copie de la vraie base : le trade
-  BTC ouvert pour lui affecter un compte ressort avec `pnl`, `pnlPercentage`,
-  `result` et `riskRewardRatio` **identiques au champ près**, et l'audit IA d'un
-  trade audité survit à une modification.
-- **Rattachement trades ↔ comptes** et **rejeu hors ligne** (§8) exercés de bout
-  en bout sur une copie de la vraie base : trade rattaché depuis le formulaire et
-  retrouvé en base avec son `accountId`, filtre cohérent (1 + 6 = 7), compteur de
-  positions dérivé, puis cycle hors ligne complet — modification sans serveur,
-  reconnexion, bandeau, envoi vérifié en base, et abandon vérifié lui aussi.
-
-### Contenu de `data/horizon.db`
-
-**Colonne « Réel ? » ajoutée après vérification directe** (comparaison champ à
-champ avec `src/data/mockData.ts`, voir §6 point 5) — ne présume pas qu'une
-table est réelle sans elle.
-
-| Table | Lignes | Réel ? |
-|---|---|---|
-| `users` | 1 (profil « ForexPaps », `isAdmin: true`, capital 102 450 €) | **Oui** |
-| `staff_accounts` | 1 (votre compte, migré, `must_change_password: 0`) | Oui (identité, pas de données métier) |
-| `sessions` | 1 (la vôtre, valable jusqu'au 4 septembre 2026) | Oui |
-| `trades` | 6 (le trade de test a été retiré cette session) | **Non — identique à `initialTrades`** |
-| `trading_accounts` | 4 | **Non — identique à `initialTradingAccounts`** |
-| `coach_signals` | 4 | Non vérifié cette session, probablement démo |
-| `coach_messages` | 5 | Non vérifié cette session, probablement démo |
-| `forum_topics` / `forum_replies` | 4 / 6 | Non vérifié cette session, probablement démo |
-| `notifications` | 5 | Non vérifié cette session, probablement démo |
-| `enrolled_students` | 4 (tous avec `tradingStyle`) | **Non — identique à `initialEnrolledStudents`** |
-| `badges` | 9 | Non vérifié cette session, probablement démo |
-| `modules` | 5 | Non vérifié cette session, probablement démo |
-| `meta` | `bootstrapped_at`, `migrated_staff_accounts_v1` | — |
-
-Les 4 élèves (démo, pas réels) : Julien Moreau (Intraday, En Évaluation FTMO),
-Camille Dupont (Swing Trading, Prop Firm Financé), Lucas Martin (Scalping,
-Alerte Tilt), Sophie Bernard (Intraday, Besoin Coaching).
+- Branche `main`, **arbre de travail avec des changements non committés**
+  (§0) — 33 fichiers modifiés/supprimés, 4 fichiers créés.
+- `npm run lint` et `npm run build` : **sans erreur**, vérifié juste avant la
+  rédaction de ce document.
+- Quatre chantiers complets et vérifiés de bout en bout (€→$/PnL libre,
+  accès élève, retouches du Journal avec capture d'écran, pastille de
+  session dynamique) — voir §4 pour le détail des scénarios exercés.
+- Un cinquième chantier (retrait de l'IA) **complet et entièrement vérifié**,
+  y compris dans le navigateur (bandeau en tête de document).
+- **`data/horizon.db` n'a pas été altéré** par les tests de cette session.
+  Son contenu réel est inchangé : 1 profil réel, le reste est de la démo
+  (§6 point 5). Ses tables `student_accounts`/`student_sessions`
+  **n'existent pas encore** dans ce fichier tant que le serveur qui le sert
+  n'a pas été redémarré depuis cette session (§2).
+- Le mot de passe du compte admin (`th.gauthey99@gmail.com`) a été changé à
+  la demande de l'utilisateur pendant cette session (§6 point 8) — ne le
+  redemande pas à moins qu'il ne signale un nouveau problème d'accès.
 
 ### Par où commencer
 
-Plus rien n'est cassé ni en cours. Les points d'entrée restants sont des
-choix, pas des urgences :
-
-- **§7 tâche 1 — remplir le module « Examen ».** À ne pas coder avant d'avoir
-  demandé à l'utilisateur ce qu'il veut y mettre : la page vierge est volontaire.
-- **Inviter un second compte**, si l'utilisateur le souhaite — le bouton
-  « Gérer l'équipe » dans le profil est prêt. Le flux complet (invitation,
-  première connexion, changement de mot de passe imposé, suppression) a été
-  rejoué sur une copie de la vraie base, sans anomalie ; il n'a simplement
-  jamais servi à inviter quelqu'un pour de bon.
-- **§6.3 — un vrai cloisonnement des données par compte**, seulement si le
-  besoin dépasse un jour le bureau partagé actuel. Chantier nettement plus
-  grand que les comptes staff ; la liste de ce qu'il faudrait reprendre y
-  figure.
+1. Le retrait de l'IA est désormais **entièrement clos** (code + vérification
+   visuelle) — plus rien à faire dessus.
+2. **Si tu dois continuer sur l'accès élève** : redémarre le serveur de
+   développement (§2) avant toute chose.
+3. Les tâches 2 à 5 de §7 (Examen, rattachement des 6 trades, fusion hors
+   ligne, purge des données démo) restent dans le même état qu'avant cette
+   session — aucune n'est urgente, toutes attendent une décision ou une
+   action de l'utilisateur plutôt qu'un blocage technique.
 
 > Ce document est la **seule** source de reprise. Des plans de travail ont pu
 > être écrits dans `~/.claude/plans/`, **hors du dépôt** : un nouveau Claude ne

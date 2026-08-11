@@ -1,8 +1,59 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Menu, Activity, ShieldCheck, Bell, TrendingUp, Clock, Calculator, CheckSquare, Award, User, Crown, Sliders, FileText, Download } from "lucide-react";
 import { StudentProfile } from "../types";
+import { formatCurrency } from "../lib/format";
 
 import { TabType } from "./Sidebar";
+
+/**
+ * Sessions de trading Forex, en heures UTC — fixes dans le temps, quel que
+ * soit le fuseau horaire de la personne qui regarde l'écran. `new Date()`
+ * représente toujours le même instant réel pour tout le monde ; c'est en
+ * comparant son heure **UTC** (`getUTCHours`), et non l'heure locale
+ * (`getHours`), que chaque utilisateur voit la bonne session ouverte au même
+ * moment, d'où qu'il se connecte.
+ *
+ * Plages usuelles du marché (approximation standard, chevauchements compris
+ * — Londres/New York se recouvrent l'après-midi UTC, la session la plus
+ * active de la journée).
+ */
+const FOREX_SESSIONS: { name: string; startUTC: number; endUTC: number }[] = [
+  { name: "Sydney", startUTC: 21, endUTC: 6 }, // traverse minuit UTC
+  { name: "Tokyo", startUTC: 0, endUTC: 9 },
+  { name: "Londres", startUTC: 7, endUTC: 16 },
+  { name: "New York", startUTC: 12, endUTC: 21 },
+];
+
+function isSessionActive(session: { startUTC: number; endUTC: number }, hourUTC: number): boolean {
+  if (session.startUTC < session.endUTC) {
+    return hourUTC >= session.startUTC && hourUTC < session.endUTC;
+  }
+  // La session traverse minuit UTC (Sydney) : active avant OU après le seuil.
+  return hourUTC >= session.startUTC || hourUTC < session.endUTC;
+}
+
+/**
+ * Le marché Forex ferme du vendredi 21h UTC (clôture de New York) au dimanche
+ * 21h UTC (ouverture de Sydney) — un week-end complet sans aucune session
+ * active, quelle que soit l'heure.
+ */
+function isForexMarketClosed(date: Date): boolean {
+  const day = date.getUTCDay(); // 0 = dimanche, 5 = vendredi, 6 = samedi
+  const hour = date.getUTCHours();
+  if (day === 6) return true;
+  if (day === 5 && hour >= 21) return true;
+  if (day === 0 && hour < 21) return true;
+  return false;
+}
+
+/** Nom de la ou des sessions actuellement ouvertes, ou `null` marché fermé. */
+function getActiveSessionLabel(date: Date): string | null {
+  if (isForexMarketClosed(date)) return null;
+
+  const hourUTC = date.getUTCHours();
+  const active = FOREX_SESSIONS.filter((s) => isSessionActive(s, hourUTC)).map((s) => s.name);
+  return active.length > 0 ? active.join(" / ") : null;
+}
 
 interface TopHeaderProps {
   activeTab: TabType;
@@ -21,6 +72,17 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onOpenNotifications,
   unreadNotificationsCount = 0,
 }) => {
+  const [activeSession, setActiveSession] = useState(() => getActiveSessionLabel(new Date()));
+
+  // Une session change au plus toutes les heures (bornes UTC) : une minute de
+  // granularité suffit très largement, sans re-rendre le header en continu.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveSession(getActiveSessionLabel(new Date()));
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const getBreadcrumbTitle = () => {
     switch (activeTab) {
       case "dashboard":
@@ -72,19 +134,26 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       {/* Right Header Badges & Quick Tools */}
       <div className="flex items-center gap-2 sm:gap-2.5 text-xs">
 
-        {/* Live Session NY Pill (from PropDesk aesthetic) */}
+        {/* Session de marché actuellement ouverte, calculée en direct
+            (heures UTC des sessions, comparées à l'instant réel — voir
+            `getActiveSessionLabel` en tête de fichier). */}
         <div className="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#111615] border border-[#1B2320] text-slate-300 font-mono text-[11px]">
-          <span className="w-2 h-2 rounded-full bg-[#00E676] animate-pulse" />
-          <span className="text-slate-400">SESSION NY</span>
-          <span className="text-white font-bold">XAU/USD 2418.4</span>
-          <span className="text-[#00E676] font-bold">+1.2%</span>
+          <span
+            className={`w-2 h-2 rounded-full ${
+              activeSession ? "bg-[#00E676] animate-pulse" : "bg-slate-600"
+            }`}
+          />
+          <span className="text-slate-400">SESSION</span>
+          <span className="text-white font-bold">
+            {activeSession ?? "Marché fermé"}
+          </span>
         </div>
 
         {/* Capital Pill */}
         <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#111615] border border-[#1B2320] text-slate-300 font-mono text-[11px]">
           <span className="text-slate-400">CAPITAL</span>
           <span className="text-white font-bold">
-            {student.currentCapital.toLocaleString("fr-FR")} €
+            {formatCurrency(student.currentCapital)}
           </span>
         </div>
 

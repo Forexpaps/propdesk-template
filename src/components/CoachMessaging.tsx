@@ -2,8 +2,6 @@ import React, { useState } from "react";
 import {
   Send,
   Paperclip,
-  Sparkles,
-  Bot,
   User,
   CheckCheck,
   Clock,
@@ -17,6 +15,7 @@ import {
   ShieldCheck
 } from "lucide-react";
 import { Coach, CoachMessage, Trade, StudentProfile } from "../types";
+import { formatCurrency } from "../lib/format";
 
 interface CoachMessagingProps {
   coaches: Coach[];
@@ -27,8 +26,7 @@ interface CoachMessagingProps {
     coachId: string,
     text: string,
     attachedTradeId?: string,
-    attachedModuleTitle?: string,
-    triggerAiReply?: boolean
+    attachedModuleTitle?: string
   ) => Promise<void>;
   prefilledLessonTitle?: string;
   prefilledTradeId?: string;
@@ -52,7 +50,6 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
   const [selectedTradeAttachment, setSelectedTradeAttachment] = useState<string>(
     prefilledTradeId || ""
   );
-  const [isAiCoachMode, setIsAiCoachMode] = useState<boolean>(true);
   const [isSending, setIsSending] = useState<boolean>(false);
 
   const selectedCoach = coaches.find((c) => c.id === selectedCoachId) || coaches[0];
@@ -68,8 +65,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
         selectedCoachId,
         inputText,
         selectedTradeAttachment || undefined,
-        prefilledLessonTitle,
-        isAiCoachMode
+        prefilledLessonTitle
       );
       setInputText("");
       setSelectedTradeAttachment("");
@@ -95,25 +91,6 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
           <p className="text-slate-400 text-xs sm:text-sm max-w-2xl">
             Posez vos questions sur vos cours, demandez un avis sur un trade spécifique ou recevez des conseils psychologiques personnalisés.
           </p>
-        </div>
-
-        {/* AI Quick Response Toggle */}
-        <div className="bg-[#0D1110]/80 p-3 rounded-xl border border-[#1B2320] flex items-center gap-3 shrink-0">
-          <div className="p-2 rounded-lg bg-[#00E676]/10 text-[#00E676]">
-            <Sparkles className="w-5 h-5 animate-pulse" />
-          </div>
-          <div className="text-xs">
-            <div className="font-bold text-slate-200 flex items-center gap-1.5">
-              Réponse IA Immédiate
-            </div>
-            <p className="text-[10px] text-slate-400">Activer le double coach Gemini</p>
-          </div>
-          <input
-            type="checkbox"
-            checked={isAiCoachMode}
-            onChange={(e) => setIsAiCoachMode(e.target.checked)}
-            className="w-4 h-4 accent-[#00E676] rounded cursor-pointer"
-          />
         </div>
       </div>
 
@@ -239,7 +216,9 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
                             {/* La bulle de l'élève est verte : un PnL positif en
                                 vert y serait illisible, il passe en quasi-noir. */}
                             <span className={attachedTrade.pnl >= 0 ? "text-[#0A2E1A] font-bold" : "text-rose-700 font-bold"}>
-                              {attachedTrade.pnl} €
+                              {(attachedTrade.pnlUnit ?? "USD") === "PERCENT"
+                                ? `${attachedTrade.pnl}%`
+                                : formatCurrency(attachedTrade.pnl)}
                             </span>
                           </div>
                           <div className="text-[11px] opacity-80">
@@ -279,8 +258,8 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
 
             {isSending && (
               <div className="flex items-center gap-2 text-xs text-[#00E676] animate-pulse py-2">
-                <Sparkles className="w-4 h-4" />
-                <span>Le Coach réfléchit et rédige sa réponse...</span>
+                <Clock className="w-4 h-4" />
+                <span>Envoi en cours...</span>
               </div>
             )}
           </div>
@@ -298,7 +277,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
                 <option value="">-- Aucun trade rattaché --</option>
                 {trades.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.date} - {t.pair} ({t.direction}) [{t.pnl} €]
+                    {t.date} - {t.pair} ({t.direction}) [{(t.pnlUnit ?? "USD") === "PERCENT" ? `${t.pnl}%` : formatCurrency(t.pnl)}]
                   </option>
                 ))}
               </select>

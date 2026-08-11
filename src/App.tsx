@@ -7,7 +7,6 @@ import {
 } from "./components/Sidebar";
 import { TopHeader } from "./components/TopHeader";
 import { MainDashboard } from "./components/MainDashboard";
-import { TradeAuditModal } from "./components/TradeAuditModal";
 import { PositionCalculatorModal } from "./components/PositionCalculatorModal";
 import { TradingPlanModal } from "./components/TradingPlanModal";
 import { EconomicCalendarModal } from "./components/EconomicCalendarModal";
@@ -115,8 +114,9 @@ function ViewFallback() {
     </div>
   );
 }
+import { formatCurrency } from "./lib/format";
 import { usePersistentState } from "./hooks/usePersistentState";
-import { useBootstrap, useSyncedState } from "./hooks/useServerSync";
+import { useBootstrap, useSyncedState, useStudentBootstrap } from "./hooks/useServerSync";
 import { useAuth } from "./hooks/useAuth";
 import { LoginScreen } from "./components/auth/LoginScreen";
 import { SetupScreen } from "./components/auth/SetupScreen";
@@ -150,8 +150,24 @@ function LoadingScreen({ message }: { message: string }) {
  * nécessairement ici, à partir de `/api/auth/me`.
  */
 export default function App() {
-  const { status, user, expired, login, setup, changePassword, markLoggedOut, refresh } =
-    useAuth();
+  const {
+    status,
+    user,
+    studentUser,
+    expired,
+    login,
+    setup,
+    changePassword,
+    studentLogin,
+    studentChangePassword,
+    markLoggedOut,
+    refresh,
+  } = useAuth();
+
+  // Au premier chargement, personne ne sait encore si la personne devant
+  // l'écran est du staff ou un élève — un seul écran de connexion couvre les
+  // deux mondes, avec un lien pour basculer entre les deux formulaires.
+  const [loginMode, setLoginMode] = useState<"staff" | "student">("staff");
 
   if (status === "loading") {
     return <LoadingScreen message="Vérification de ta session…" />;
@@ -162,7 +178,45 @@ export default function App() {
   }
 
   if (status === "unauthenticated") {
-    return <LoginScreen onLogin={login} expired={expired} />;
+    if (loginMode === "student") {
+      return (
+        <LoginScreen
+          onLogin={studentLogin}
+          expired={expired}
+          title="Connexion élève"
+          subtitle="Accède à ton Journal de trading."
+          footer={
+            <button
+              type="button"
+              onClick={() => setLoginMode("staff")}
+              className="text-slate-400 hover:text-[#00E676] underline underline-offset-2"
+            >
+              Tu es coach ou staff ? Connecte-toi ici.
+            </button>
+          }
+        />
+      );
+    }
+
+    return (
+      <LoginScreen
+        onLogin={login}
+        expired={expired}
+        footer={
+          <>
+            Mot de passe oublié ? La procédure de secours est décrite dans le README.
+            <br />
+            <button
+              type="button"
+              onClick={() => setLoginMode("student")}
+              className="text-slate-400 hover:text-[#00E676] underline underline-offset-2"
+            >
+              Tu es élève ? Connecte-toi ici.
+            </button>
+          </>
+        }
+      />
+    );
   }
 
   // Un mot de passe temporaire (compte invité) bloque l'accès à l'application
@@ -171,6 +225,15 @@ export default function App() {
   // cette étape n'est pas franchie (filet de sécurité, voir requireAuth).
   if (status === "authenticated" && user?.mustChangePassword) {
     return <ChangePasswordScreen onChangePassword={changePassword} />;
+  }
+  if (status === "authenticated-student" && studentUser?.mustChangePassword) {
+    return <ChangePasswordScreen onChangePassword={studentChangePassword} />;
+  }
+
+  // Session élève : jamais `AuthenticatedApp`/`AcademyApp` (le bureau staff),
+  // toujours ce composant dédié et minimal — voir §Contexte du plan élève.
+  if (status === "authenticated-student") {
+    return <StudentAuthenticatedApp onLoggedOut={markLoggedOut} />;
   }
 
   // `authenticated` et `offline` mènent tous deux à l'application. Hors ligne,
@@ -186,6 +249,85 @@ export default function App() {
       currentStaffId={user?.id ?? null}
       isOwner={user?.isOwner === true}
     />
+  );
+}
+
+/**
+ * Journal de trading cloisonné d'un élève — jamais `AcademyApp`. Pas de
+ * sidebar à onglets, pas d'IA, pas de rattachement à un compte prop firm : un
+ * élève ne voit et ne modifie que ses propres trades.
+ */
+function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
+  const { status, trades } = useStudentBootstrap();
+  const [syncedTrades, setSyncedTrades] = useSyncedState<Trade[]>(
+    "horizon_student_trades",
+    trades,
+    (v) => api.saveCollection("trades", v),
+    status === "online"
+  );
+
+  // `useSyncedState` initialise sa valeur une seule fois, au montage — tant
+  // que le chargement serveur n'est pas revenu, on affiche un état vide plutôt
+  // que la valeur par défaut `[]` figée avant que `trades` ne soit connu.
+  useEffect(() => {
+    if (status === "online") setSyncedTrades(trades);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+
+  const handleAddTrade = (newTrade: Omit<Trade, "id">) => {
+    const tradeWithId: Trade = { ...newTrade, id: `trd-${Date.now()}` };
+    setSyncedTrades((prev) => [tradeWithId, ...prev]);
+  };
+
+  const handleUpdateTrade = (updated: Trade) => {
+    setSyncedTrades((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+  };
+
+  const handleDeleteTrade = (id: string) => {
+    setSyncedTrades((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const handleLogout = async () => {
+    try {
+      await api.studentLogout();
+    } finally {
+      onLoggedOut();
+    }
+  };
+
+  if (status === "loading") {
+    return <LoadingScreen message="Chargement de ton journal…" />;
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0B0F0E] text-slate-200 font-sans">
+      <header className="flex items-center justify-between px-6 py-4 border-b border-[#1B2320] bg-[#0A0E0D]">
+        <div className="flex items-center gap-2">
+          <img src="/icon.png" alt="PropDesk" className="w-8 h-8 rounded-lg" />
+          <span className="font-bold text-white">Mon Journal de trading</span>
+        </div>
+        <button
+          onClick={() => void handleLogout()}
+          className="text-xs text-slate-400 hover:text-rose-400 transition-colors"
+        >
+          Déconnexion
+        </button>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <React.Suspense fallback={<ViewFallback />}>
+          <TradingJournal
+            trades={syncedTrades}
+            accounts={[]}
+            onAddTrade={handleAddTrade}
+            onUpdateTrade={handleUpdateTrade}
+            onDeleteTrade={handleDeleteTrade}
+            onSendTradeToCoach={() => undefined}
+            hideAiAndCoachActions
+          />
+        </React.Suspense>
+      </main>
+    </div>
   );
 }
 
@@ -369,10 +511,7 @@ function AcademyApp({
     syncEnabled
   );
 
-  // Modal & Pre-filled Messaging Navigation state
-  const [selectedTradeForAudit, setSelectedTradeForAudit] = useState<Trade | null>(
-    null
-  );
+  // Pre-filled Messaging Navigation state
   const [prefilledLessonTitle, setPrefilledLessonTitle] = useState<
     string | undefined
   >(undefined);
@@ -380,7 +519,7 @@ function AcademyApp({
     undefined
   );
 
-  // Ébauche de trade poussée vers le Journal par le calculateur ou l'analyseur IA
+  // Ébauche de trade poussée vers le Journal par le calculateur ou l'analyseur de setup
   const [journalDraft, setJournalDraft] = useState<TradeDraft | null>(null);
 
   const [isPropFirmRulesOpen, setIsPropFirmRulesOpen] = useState<boolean>(false);
@@ -400,7 +539,11 @@ function AcademyApp({
   // bandeau de reconnexion annonçait des modifications qui n'existaient pas.
   // Un bandeau qui crie au loup à chaque fois n'est plus lu.
   useEffect(() => {
-    const totalPnL = trades.reduce((acc, t) => acc + t.pnl, 0);
+    // Un trade saisi en % n'est pas une somme d'argent : l'exclure du capital
+    // recalculé, sous peine de mélanger deux unités hétérogènes.
+    const totalPnL = trades
+      .filter((t) => (t.pnlUnit ?? "USD") !== "PERCENT")
+      .reduce((acc, t) => acc + t.pnl, 0);
     setStudent((prev) => {
       const capital = prev.startingCapital + totalPnL;
       return prev.currentCapital === capital ? prev : { ...prev, currentCapital: capital };
@@ -582,7 +725,6 @@ function AcademyApp({
       takeProfit: sig.takeProfit1,
       lotSize: 1.0,
       pnl: sig.pnlResultPips ? sig.pnlResultPips * 10 : 0,
-      pnlPercentage: 1.5,
       riskRewardRatio: 2.5,
       result: sig.status === "TP_ATTEINT" ? "WIN" : sig.status === "SL_ATTEINT" ? "LOSS" : "OPEN",
       strategy: `Signal Coach ${sig.coachName}`,
@@ -629,37 +771,12 @@ function AcademyApp({
     setTrades((prev) => [tradeWithId, ...prev]);
   };
 
-  /**
-   * Remplace un trade existant.
-   *
-   * Met aussi à jour `selectedTradeForAudit` si la modale d'audit est ouverte
-   * sur ce trade : elle garde sinon une copie périmée, et un audit lancé
-   * ensuite porterait sur les anciennes valeurs.
-   */
   const handleUpdateTrade = (updated: Trade) => {
     setTrades((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-    setSelectedTradeForAudit((current) =>
-      current?.id === updated.id ? updated : current
-    );
   };
 
   const handleDeleteTrade = (id: string) => {
     setTrades((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  const handleUpdateTradeAudit = (tradeId: string, auditData: any) => {
-    setTrades((prev) =>
-      prev.map((t) => {
-        if (t.id === tradeId) {
-          const updated = { ...t, aiAudit: auditData };
-          if (selectedTradeForAudit?.id === tradeId) {
-            setSelectedTradeForAudit(updated);
-          }
-          return updated;
-        }
-        return t;
-      })
-    );
   };
 
   const handleAskCoachAboutLesson = (lessonTitle: string) => {
@@ -674,12 +791,19 @@ function AcademyApp({
     setActiveTab("messaging");
   };
 
+  /**
+   * Enregistre un message envoyé à un coach.
+   *
+   * Aucune réponse automatique n'est générée : le message attend une réponse
+   * humaine du coach, comme n'importe quelle messagerie. Il n'existait avant
+   * cette suppression aucune vraie réponse humaine — seule une réponse
+   * générée par IA simulait un coach qui répondait instantanément.
+   */
   const handleSendMessage = async (
     coachId: string,
     text: string,
     attachedTradeId?: string,
-    attachedModuleTitle?: string,
-    triggerAiReply: boolean = true
+    attachedModuleTitle?: string
   ) => {
     const timestamp = "Aujourd'hui, " + new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
     const studentMsg: CoachMessage = {
@@ -694,41 +818,6 @@ function AcademyApp({
     };
 
     setMessages((prev) => [...prev, studentMsg]);
-
-    if (triggerAiReply) {
-      try {
-        const attachedTrade = attachedTradeId
-          ? trades.find((t) => t.id === attachedTradeId)
-          : undefined;
-
-        const response = await fetch("/api/coach/ai-review", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            question: text,
-            trade: attachedTrade,
-          }),
-        });
-
-        const json = await response.json();
-        let coachFeedbackText =
-          json.data?.coachFeedback ||
-          "Excellente question. Continue à respecter ta checklist et ton Risk Management.";
-
-        const coachReply: CoachMessage = {
-          id: `msg-reply-${Date.now()}`,
-          sender: "coach",
-          coachId,
-          text: coachFeedbackText,
-          timestamp: "À l'instant",
-          status: "replied",
-        };
-
-        setMessages((prev) => [...prev, coachReply]);
-      } catch (err) {
-        console.error("Erreur réponse IA Coach:", err);
-      }
-    }
   };
 
   // Forum Handlers
@@ -946,7 +1035,6 @@ function AcademyApp({
               messages={messages}
               courseCompletionPercentage={courseCompletionPercentage}
               setActiveTab={setActiveTab}
-              onSelectTradeForAudit={(trade) => setSelectedTradeForAudit(trade)}
               onOpenChecklist={() => setIsChecklistOpen(true)}
             />
           )}
@@ -1019,7 +1107,6 @@ function AcademyApp({
               onAddTrade={handleAddTrade}
               onUpdateTrade={handleUpdateTrade}
               onDeleteTrade={handleDeleteTrade}
-              onSelectTradeForAudit={(trade) => setSelectedTradeForAudit(trade)}
               onSendTradeToCoach={handleSendTradeToCoach}
               onOpenCalculator={() => setIsCalculatorOpen(true)}
               prefillDraft={journalDraft}
@@ -1104,15 +1191,6 @@ function AcademyApp({
         />
       )}
 
-      {/* AI Trade Audit Modal */}
-      {selectedTradeForAudit && (
-        <TradeAuditModal
-          trade={selectedTradeForAudit}
-          onClose={() => setSelectedTradeForAudit(null)}
-          onUpdateTradeAudit={handleUpdateTradeAudit}
-        />
-      )}
-
       {/* Position Calculator Modal */}
       <PositionCalculatorModal
         isOpen={isCalculatorOpen}
@@ -1125,9 +1203,9 @@ function AcademyApp({
             stopLoss: calc.stopLoss,
             takeProfit: calc.takeProfit,
             lotSize: calc.lotSize,
-            notes: `Position dimensionnée avec le calculateur : risque ${calc.riskAmount.toFixed(
-              2
-            )} € pour un R:R de ${calc.riskRewardRatio}.`,
+            notes: `Position dimensionnée avec le calculateur : risque ${formatCurrency(
+              calc.riskAmount
+            )} pour un R:R de ${calc.riskRewardRatio}.`,
           });
           setIsCalculatorOpen(false);
           setActiveTab("journal");

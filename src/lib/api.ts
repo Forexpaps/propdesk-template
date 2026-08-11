@@ -55,6 +55,17 @@ export type AuthState =
   | { state: "unauthenticated" }
   | { state: "authenticated"; user: AuthUser };
 
+/** État d'authentification élève, renvoyé par `/api/auth/student-me`. */
+export interface StudentAuthUser {
+  id: string;
+  email: string;
+  mustChangePassword: boolean;
+}
+
+export type StudentAuthState =
+  | { state: "unauthenticated" }
+  | { state: "authenticated"; user: StudentAuthUser };
+
 /** Compte staff tel que listé dans l'écran de gestion de l'équipe. */
 export interface StaffAccountSummary {
   id: string;
@@ -184,4 +195,46 @@ export const api = {
 
   removeStaff: (id: string) =>
     request<void>(`/api/auth/staff/${encodeURIComponent(id)}`, { method: "DELETE" }),
+
+  // --- Accès élève (compte personnel, journal cloisonné) ---
+
+  /** Donne un accès élève depuis une fiche EnrolledStudent. Mot de passe renvoyé une seule fois. */
+  inviteStudent: (enrolledStudentId: string) =>
+    request<{ studentAccountId: string; email: string; temporaryPassword: string }>(
+      `/api/auth/students/${encodeURIComponent(enrolledStudentId)}/invite`,
+      { method: "POST" }
+    ),
+
+  /** Révoque l'accès élève d'une fiche. Ne supprime ni la fiche ni ses trades. */
+  revokeStudentAccess: (enrolledStudentId: string) =>
+    request<void>(`/api/auth/students/${encodeURIComponent(enrolledStudentId)}/access`, {
+      method: "DELETE",
+    }),
+
+  /** Vrais trades d'un élève, en lecture — pour la fiche côté coach. */
+  fetchStudentTrades: (enrolledStudentId: string) =>
+    request<{ trades: Trade[] }>(
+      `/api/auth/students/${encodeURIComponent(enrolledStudentId)}/trades`
+    ),
+
+  // --- Authentification élève ---
+
+  fetchStudentMe: () => request<StudentAuthState>("/api/auth/student-me"),
+
+  studentLogin: (email: string, password: string) =>
+    request<Extract<StudentAuthState, { state: "authenticated" }>>("/api/auth/student-login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+
+  studentLogout: () => request<void>("/api/auth/student-logout", { method: "POST" }),
+
+  studentChangePassword: (currentPassword: string, newPassword: string) =>
+    request<Extract<StudentAuthState, { state: "authenticated" }>>(
+      "/api/auth/student-change-password",
+      {
+        method: "POST",
+        body: JSON.stringify({ currentPassword, newPassword }),
+      }
+    ),
 };

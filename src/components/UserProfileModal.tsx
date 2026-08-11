@@ -425,7 +425,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
 
               <div>
-                <label className="block font-medium text-slate-300 mb-1">Capital Initial (€)</label>
+                <label className="block font-medium text-slate-300 mb-1">Capital Initial ($)</label>
                 <input
                   type="number"
                   value={startingCapital}
@@ -435,7 +435,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
 
               <div>
-                <label className="block font-medium text-slate-300 mb-1">Capital Actuel Enregistré (€)</label>
+                <label className="block font-medium text-slate-300 mb-1">Capital Actuel Enregistré ($)</label>
                 <input
                   type="number"
                   value={currentCapital}
@@ -532,7 +532,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 { id: "ACADEMY", label: "Académie" },
                 { id: "PERFORMANCE", label: "Performance" },
                 { id: "PROPFIRM", label: "Prop Firm" },
-                { id: "AUDIT", label: "Audit IA" },
               ].map((f) => (
                 <button
                   key={f.id}

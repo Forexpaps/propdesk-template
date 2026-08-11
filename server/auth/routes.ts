@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { randomBytes } from "node:crypto";
 import { db, DEFAULT_USER_ID } from "../db";
-import { getProfile, saveProfile } from "../repositories";
+import { getProfile, saveProfile, listCollection, updateCollectionItem } from "../repositories";
 import { setupSchema, loginSchema, inviteStaffSchema, changePasswordSchema } from "../schemas";
 import { createRateLimit } from "../middleware/rateLimit";
 import { hashPassword, verifyPassword, needsRehash, verifyAgainstDecoy } from "./password";
@@ -26,6 +26,13 @@ import {
   setSessionCookie,
   validateSession,
 } from "./sessions";
+import {
+  createStudentAccount,
+  deleteStudentAccount,
+  getStudentByEmail as getStudentAccountByEmail,
+  getStudentByEnrolledId,
+} from "./studentCredentials";
+import { requireStaffKind } from "./middleware";
 
 /** Routes accessibles sans session : `/me`, `/setup`, `/login`, `/logout`. */
 export const authRouter = Router();
@@ -247,7 +254,7 @@ authRouter.post("/logout", (req, res) => {
  * Liste les comptes staff. Tous égaux, donc accessible à quiconque est
  * connecté — il n'y a pas de rôle "peut voir la liste" séparé de "est staff".
  */
-staffRouter.get("/staff", (_req, res) => {
+staffRouter.get("/staff", requireStaffKind, (_req, res) => {
   res.json({ accounts: listStaffAccounts() });
 });
 
@@ -261,6 +268,7 @@ staffRouter.get("/staff", (_req, res) => {
  */
 staffRouter.post(
   "/staff",
+  requireStaffKind,
   createRateLimit({
     windowMs: 15 * 60_000,
     max: 10,
@@ -306,7 +314,7 @@ staffRouter.post(
  * fondateur — et réaffecte les filleuls du compte supprimé pour qu'aucun ne
  * devienne fondateur par effet de bord.
  */
-staffRouter.delete("/staff/:id", (req, res) => {
+staffRouter.delete("/staff/:id", requireStaffKind, (req, res) => {
   const failure = deleteStaffAccount(req.params.id);
 
   if (failure === "last-account") {
@@ -344,6 +352,7 @@ staffRouter.delete("/staff/:id", (req, res) => {
  */
 staffRouter.post(
   "/change-password",
+  requireStaffKind,
   createRateLimit({
     windowMs: 15 * 60_000,
     max: 10,
@@ -372,3 +381,124 @@ staffRouter.post(
     res.json(authenticatedPayload(staff.id));
   })
 );
+
+// --- Accès élève, géré par le staff depuis une fiche EnrolledStudent -----
+
+/** Forme minimale d'une fiche telle que stockée : on ne lit que ce dont on a besoin. */
+interface EnrolledStudentLike {
+  id: string;
+  email: string;
+  studentAccountId?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Donne un accès élève à une fiche existante.
+ *
+ * Le mot de passe est généré côté serveur, jamais choisi par le staff, sur le
+ * même modèle que l'invitation staff : renvoyé une seule fois, jamais
+ * restocké en clair. La création du compte ET la pose du lien sur la fiche
+ * sont dans une même transaction — un échec ne doit pas laisser un compte
+ * orphelin sans lien, ni une fiche qui pointe vers un compte qui n'existe
+ * plus.
+ */
+staffRouter.post(
+  "/students/:enrolledStudentId/invite",
+  requireStaffKind,
+  createRateLimit({
+    windowMs: 15 * 60_000,
+    max: 10,
+    message: "Trop d'invitations envoyées. Réessaie dans quelques minutes.",
+  }),
+  wrap(async (req, res) => {
+    const students = listCollection<EnrolledStudentLike>("enrolledStudents");
+    const student = students.find((s) => s.id === req.params.enrolledStudentId);
+
+    if (!student) {
+      res.status(404).json({ error: "Fiche élève introuvable." });
+      return;
+    }
+
+    if (student.studentAccountId || getStudentByEnrolledId(student.id)) {
+      res.status(409).json({ error: "Cette fiche a déjà un accès actif." });
+      return;
+    }
+
+    if (!student.email) {
+      res.status(400).json({ error: "La fiche n'a pas d'adresse e-mail." });
+      return;
+    }
+
+    if (getStudentAccountByEmail(student.email)) {
+      res.status(409).json({ error: "Un compte existe déjà avec cette adresse." });
+      return;
+    }
+
+    // Même génération que l'invitation staff : 12 caractères base64url.
+    const temporaryPassword = randomBytes(9).toString("base64url");
+    const passwordHash = await hashPassword(temporaryPassword);
+
+    const created = db.transaction(() => {
+      const account = createStudentAccount({
+        enrolledStudentId: student.id,
+        email: student.email,
+        passwordHash,
+        invitedBy: req.auth!.userId,
+      });
+
+      updateCollectionItem("enrolledStudents", student.id, {
+        ...student,
+        studentAccountId: account.id,
+      });
+
+      return account;
+    })();
+
+    res.status(201).json({
+      studentAccountId: created.id,
+      email: student.email,
+      temporaryPassword,
+    });
+  })
+);
+
+/**
+ * Révoque l'accès élève d'une fiche.
+ *
+ * Supprime le compte (cascade ses sessions) et retire le lien de la fiche.
+ * La fiche elle-même, son bureau `users` et ses trades ne sont pas supprimés
+ * — seul l'accès disparaît.
+ */
+staffRouter.delete("/students/:enrolledStudentId/access", requireStaffKind, (req, res) => {
+  const students = listCollection<EnrolledStudentLike>("enrolledStudents");
+  const student = students.find((s) => s.id === req.params.enrolledStudentId);
+
+  if (!student) {
+    res.status(404).json({ error: "Fiche élève introuvable." });
+    return;
+  }
+
+  db.transaction(() => {
+    deleteStudentAccount(student.id);
+    const { studentAccountId, ...rest } = student;
+    updateCollectionItem("enrolledStudents", student.id, rest);
+  })();
+
+  res.status(204).end();
+});
+
+/**
+ * Trades réels d'un élève, en lecture seule — sert à `StudentTracking.tsx`
+ * pour afficher les vrais trades une fois un accès actif, à la place de la
+ * saisie manuelle `recentTrades`. Jamais d'écriture par cette route : l'élève
+ * reste seul à journaliser ses propres trades.
+ */
+staffRouter.get("/students/:enrolledStudentId/trades", requireStaffKind, (req, res) => {
+  const account = getStudentByEnrolledId(req.params.enrolledStudentId);
+  if (!account) {
+    res.status(404).json({ error: "Cette fiche n'a pas d'accès actif." });
+    return;
+  }
+
+  res.json({ trades: listCollection("trades", account.userId) });
+});
