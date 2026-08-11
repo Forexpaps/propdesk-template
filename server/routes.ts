@@ -1,7 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import fs from "fs";
 import path from "path";
-import { GoogleGenAI } from "@google/genai";
 import {
   listCollection,
   replaceCollection,
@@ -18,10 +17,9 @@ import {
   profileSchema,
   quizResultsSchema,
   importStateSchema,
-  coachReviewSchema,
 } from "./schemas";
-import { createRateLimit } from "./middleware/rateLimit";
 import { authRouter, staffRouter } from "./auth/routes";
+import { studentAuthRouter, studentProtectedRouter } from "./auth/studentRoutes";
 import { requireAuth } from "./auth/middleware";
 
 export const api = Router();
@@ -38,6 +36,7 @@ api.get("/health", (_req, res) => {
 });
 
 api.use("/auth", authRouter);
+api.use("/auth", studentAuthRouter);
 
 /**
  * Barrière d'authentification.
@@ -49,27 +48,56 @@ api.use("/auth", authRouter);
  * Elle est ici, sur le routeur, et non en `app.use` : Vite est monté après l'API
  * dans `startServer()`, un middleware au niveau application casserait le
  * rechargement à chaud.
+ *
+ * Accepte désormais deux mondes de session (staff ou élève) — voir
+ * `server/auth/middleware.ts`. `req.auth.kind` distingue les deux ensuite.
  */
 api.use(requireAuth);
 
-// Monté ici et non avec `authRouter` plus haut : ces routes (invitation,
-// liste, suppression, changement de mot de passe) exigent une session
-// valide, donc doivent passer APRÈS la barrière. `req.path` y vaut
-// "/auth/staff" et "/auth/change-password", cohérent avec les chemins
-// écrits en dur dans `server/auth/middleware.ts`.
+// Montées ici et non avec les routeurs publics plus haut : ces routes exigent
+// une session valide, donc doivent passer APRÈS la barrière.
+//
+// `requireStaffKind`/`requireStudentKind` sont appliquées route par route,
+// À L'INTÉRIEUR de chaque routeur (voir `server/auth/routes.ts` et
+// `studentRoutes.ts`) — jamais ici, au niveau du montage. Les deux routeurs
+// partagent le même préfixe "/auth" : une garde posée ici s'exécuterait pour
+// TOUTE requête sous "/auth", y compris celles destinées à l'autre monde,
+// avant même qu'Express n'ait pu constater qu'aucune route de ce routeur ne
+// correspond. C'est exactement ce qui bloquait `/auth/student-change-password`
+// avec « Action réservée au staff » avant ce correctif.
 api.use("/auth", staffRouter);
+api.use("/auth", studentProtectedRouter);
+
+/** Collections qu'une session élève peut lire/écrire — uniquement son Journal. */
+const STUDENT_ALLOWED_COLLECTIONS = new Set<CollectionName>(["trades"]);
 
 /**
  * Payload de démarrage : toutes les collections en un aller-retour, dans les
  * formes exactes attendues par le client.
+ *
+ * Une session élève ne reçoit que sa collection de trades (+ un profil
+ * minimal) — pas les autres collections, même vides : un filtrage franc côté
+ * serveur, pas une forme complète à moitié cachée côté client.
  */
-api.get("/state", (_req, res) => {
+api.get("/state", (req, res) => {
+  const dataUserId = req.auth!.dataUserId;
+
+  if (req.auth!.kind === "student") {
+    res.json({
+      bootstrapped: isBootstrapped(),
+      student: { name: "", email: "" },
+      quizResults: {},
+      collections: { trades: listCollection("trades", dataUserId) },
+    });
+    return;
+  }
+
   res.json({
     bootstrapped: isBootstrapped(),
-    student: getProfile(),
-    quizResults: getQuizResults(),
+    student: getProfile(dataUserId),
+    quizResults: getQuizResults(dataUserId),
     collections: Object.fromEntries(
-      COLLECTION_NAMES.map((name) => [name, listCollection(name)])
+      COLLECTION_NAMES.map((name) => [name, listCollection(name, dataUserId)])
     ),
   });
 });
@@ -81,6 +109,13 @@ api.put("/collections/:name", (req, res) => {
   const name = req.params.name as CollectionName;
   if (!COLLECTION_NAMES.includes(name)) {
     res.status(404).json({ error: `Collection inconnue : ${req.params.name}` });
+    return;
+  }
+
+  // Une session élève ne touche jamais qu'à son propre Journal — ni les
+  // collections du bureau staff, ni celles d'un autre élève.
+  if (req.auth!.kind === "student" && !STUDENT_ALLOWED_COLLECTIONS.has(name)) {
+    res.status(403).json({ error: "Action réservée au staff." });
     return;
   }
 
@@ -97,11 +132,19 @@ api.put("/collections/:name", (req, res) => {
     return;
   }
 
-  replaceCollection(name, parsed.data);
+  replaceCollection(name, parsed.data, req.auth!.dataUserId);
   res.json({ success: true, count: parsed.data.length });
 });
 
 api.put("/profile", (req, res) => {
+  // Le profil élève n'existe pas en tant que tel dans ce chantier (pas de
+  // capital, pas d'avatar à gérer côté élève) — cette route reste réservée au
+  // bureau staff.
+  if (req.auth!.kind === "student") {
+    res.status(403).json({ error: "Action réservée au staff." });
+    return;
+  }
+
   const parsed = profileSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Profil invalide.", details: parsed.error.issues });
@@ -146,6 +189,12 @@ api.put("/profile", (req, res) => {
 });
 
 api.put("/quiz-results", (req, res) => {
+  // Pas de quiz côté élève dans ce chantier — réservé au bureau staff.
+  if (req.auth!.kind === "student") {
+    res.status(403).json({ error: "Action réservée au staff." });
+    return;
+  }
+
   const parsed = quizResultsSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Résultats de quiz invalides.", details: parsed.error.issues });
@@ -162,6 +211,11 @@ api.put("/quiz-results", (req, res) => {
  * deux onglets ouverts ne puissent pas réimporter et dupliquer.
  */
 api.post("/state/import", (req, res) => {
+  if (req.auth!.kind === "student") {
+    res.status(403).json({ error: "Action réservée au staff." });
+    return;
+  }
+
   if (isBootstrapped()) {
     res.status(409).json({ error: "Base déjà amorcée, import ignoré." });
     return;
@@ -192,7 +246,12 @@ api.post("/state/import", (req, res) => {
  * Amorce la base avec le jeu de démonstration. Appelé par le client quand il
  * découvre une base vierge et qu'il n'a rien à reprendre de son localStorage.
  */
-api.post("/state/seed", (_req, res) => {
+api.post("/state/seed", (req, res) => {
+  if (req.auth!.kind === "student") {
+    res.status(403).json({ error: "Action réservée au staff." });
+    return;
+  }
+
   if (isBootstrapped()) {
     res.status(409).json({ error: "Base déjà amorcée." });
     return;
@@ -210,98 +269,6 @@ api.get("/download-features-pdf", (_req, res) => {
     res.status(404).json({ error: "Fichier PDF non trouvé." });
   }
 });
-
-// --- Coach IA (Gemini) ---------------------------------------------------
-
-const getAiClient = () => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY non disponible sur le serveur.");
-  }
-  return new GoogleGenAI({
-    apiKey,
-    httpOptions: { headers: { "User-Agent": "aistudio-build" } },
-  });
-};
-
-/**
- * C'est la seule route qui appelle un service facturé à l'appel : elle ne doit
- * pas pouvoir être martelée. Comportement identique à avant l'extraction du
- * limiteur dans son propre module.
- */
-const aiRateLimit = createRateLimit({
-  windowMs: 60_000,
-  max: 10,
-  message: "Trop de demandes d'audit IA. Réessayez dans une minute.",
-});
-
-api.post(
-  "/coach/ai-review",
-  aiRateLimit,
-  wrap(async (req, res) => {
-    const parsed = coachReviewSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "Données insuffisantes", details: parsed.error.issues });
-      return;
-    }
-
-    const { trade, question } = parsed.data as {
-      trade?: Record<string, unknown>;
-      question?: string;
-    };
-
-    let prompt = "";
-    if (trade) {
-      prompt = `
-Vous êtes le Master Coach Senior de l'Académie de Trading "Horizon".
-Effectuez un audit clinique, pédagogique et motivant du trade suivant soumis par un élève:
-
-- Actif / Paire: ${trade.pair || "Non spécifié"}
-- Direction: ${trade.direction || "Long/Short"}
-- Prix Entrée: ${trade.entryPrice}
-- Stop Loss: ${trade.stopLoss}
-- Take Profit: ${trade.takeProfit}
-- Prix Sortie: ${trade.exitPrice || "En cours"}
-- Résultat PnL (€): ${trade.pnl} (€)
-- Stratégie / Setup: ${trade.strategy || "Analyse technique"}
-- État émotionnel / Émotion lors de la prise de position: ${trade.emotion || "Neutre"}
-- Notes de l'élève: ${trade.notes || "Aucune note"}
-
-Fournissez une analyse complète au format JSON strict avec les clés suivantes:
-- technicalScore (nombre de 1 à 10)
-- riskScore (nombre de 1 à 10)
-- disciplineScore (nombre de 1 à 10)
-- diagnosis (résumé en 1 phrase percutante)
-- strengths (tableau de 2-3 points forts du trade)
-- improvements (tableau de 2-3 points à corriger ou axes d'amélioration)
-- coachFeedback (conseil détaillé et bienveillant de 3-4 paragraphes en français, faisant référence au Money Management, au R:R ratio, et au contrôle émotionnel).
-`;
-    } else {
-      prompt = `
-Vous êtes le Head Trading Coach de l'Académie Horizon.
-Un élève vous pose la question suivante dans la messagerie de l'académie:
-
-"${question}"
-
-Répondez de manière structurée, professionnelle et pédagogique en français avec des conseils pratiques applicables directement sur le marché (gestion des risques, psychologie, analyse technique SMC & Price Action).
-Fournissez le résultat au format JSON strict:
-{
-  "coachFeedback": "Votre réponse détaillée ici avec des puces et des exemples concréts",
-  "recommendedModule": "Nom ou sujet du module de cours recommandé dans l'académie (ex: Gestion du Risque & Money Management, Smart Money Concepts, Masterclass Psychologie)"
-}
-`;
-    }
-
-    const ai = getAiClient();
-    const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
-      contents: prompt,
-      config: { responseMimeType: "application/json" },
-    });
-
-    res.json({ success: true, data: JSON.parse(response.text || "{}") });
-  })
-);
 
 /**
  * Gestionnaire d'erreurs : une exception non prévue renvoie un 500 propre.

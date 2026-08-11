@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type ServerState } from "../lib/api";
 import { clearPending, listPending, markPending } from "../lib/pendingChanges";
+import type { Trade } from "../types";
 
 export type SyncStatus = "loading" | "online" | "offline";
 
@@ -162,6 +163,43 @@ export function useBootstrap() {
   const acknowledgePending = useCallback(() => setPending([]), []);
 
   return { status, state, pending, discardPending, acknowledgePending };
+}
+
+/**
+ * Chargement minimal pour le Journal élève.
+ *
+ * Volontairement plus simple que `useBootstrap` : pas d'import depuis un
+ * ancien `localStorage` (aucun élève n'a de données antérieures à son
+ * compte), pas de bandeau de modifications hors ligne (pas de mode hors ligne
+ * élève). `GET /api/state` est déjà filtré côté serveur pour une session
+ * élève — il ne renvoie que sa collection `trades`.
+ */
+export function useStudentBootstrap() {
+  const [status, setStatus] = useState<SyncStatus>("loading");
+  const [trades, setTrades] = useState<Trade[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const serverState = await api.fetchState();
+        if (!cancelled) {
+          setTrades(serverState.collections.trades ?? []);
+          setStatus("online");
+        }
+      } catch (err) {
+        console.warn("[propdesk] Serveur injoignable.", err);
+        if (!cancelled) setStatus("offline");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return { status, trades };
 }
 
 /**

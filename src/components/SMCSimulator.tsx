@@ -21,6 +21,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { BacktestScenario, TradeDirection } from "../types";
+import { formatCurrency } from "../lib/format";
 
 export type SimulatorMode = "REPLAY" | "MONTE_CARLO";
 
@@ -187,7 +188,7 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
-              <label className="block text-xs font-mono text-slate-400 mb-1">Capital Initial (€)</label>
+              <label className="block text-xs font-mono text-slate-400 mb-1">Capital Initial ($)</label>
               <input
                 type="number"
                 value={initialCapital}
@@ -244,7 +245,7 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({
             <div className="bg-[#0D1110] border border-[#1B2320] p-4 rounded-xl space-y-1">
               <div className="text-[11px] text-slate-400 font-mono">Solde Final Projeté</div>
               <div className="text-2xl font-black text-[#00E676] font-mono">
-                {mcResult.finalBalance.toLocaleString("fr-FR")} €
+                {formatCurrency(mcResult.finalBalance)}
               </div>
               <div className="text-[10px] text-[#00E676]">
                 +{mcResult.netReturnPercent}% de rendement
@@ -254,7 +255,7 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({
             <div className="bg-[#0D1110] border border-[#1B2320] p-4 rounded-xl space-y-1">
               <div className="text-[11px] text-slate-400 font-mono">PnL Net Simulé</div>
               <div className={`text-2xl font-black font-mono ${mcResult.netProfit >= 0 ? "text-[#00E676]" : "text-rose-400"}`}>
-                {mcResult.netProfit >= 0 ? `+${mcResult.netProfit.toLocaleString("fr-FR")} €` : `${mcResult.netProfit.toLocaleString("fr-FR")} €`}
+                {mcResult.netProfit >= 0 ? `+${formatCurrency(mcResult.netProfit)}` : formatCurrency(mcResult.netProfit)}
               </div>
               <div className="text-[10px] text-slate-500">
                 {mcResult.wins} Win / {mcResult.losses} Loss

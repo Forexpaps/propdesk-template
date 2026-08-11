@@ -336,15 +336,15 @@ export const initialModules: Module[] = [
     quiz: [
       {
         id: "q-m4-1",
-        question: "Sur un compte de 10 000 €, si vous appliquez la règle stricte de 1% de risque par trade, quel est votre montant risqué maximal ?",
+        question: "Sur un compte de $10,000, si vous appliquez la règle stricte de 1% de risque par trade, quel est votre montant risqué maximal ?",
         options: [
-          "10 €",
-          "100 €",
-          "500 €",
-          "1000 €"
+          "$10",
+          "$100",
+          "$500",
+          "$1000"
         ],
         correctAnswerIndex: 1,
-        explanation: "1% de 10 000 € = 100 €. C'est le montant maximum que votre Stop Loss doit autoriser en cas de scénario négatif.",
+        explanation: "1% de $10,000 = $100. C'est le montant maximum que votre Stop Loss doit autoriser en cas de scénario négatif.",
       },
       {
         id: "q-m4-2",
@@ -1083,15 +1083,15 @@ export const initialTraderBadges: TraderBadge[] = [
   },
   {
     id: "badge-5",
-    title: "Expert de l'AI Audit",
-    description: "Soumettre 5 trades à l'audit IA et obtenir un score technique moyen supérieur à 85/100.",
+    title: "Analyste Rigoureux",
+    description: "Relire et documenter 5 trades clôturés avec une note technique complète dans le journal.",
     iconName: "Sparkles",
-    category: "AUDIT",
+    category: "PERFORMANCE",
     unlocked: true,
     progressPercentage: 100,
     currentValue: 5,
     targetValue: 5,
-    unit: "audits IA",
+    unit: "trades documentés",
     unlockedAt: "25 Juillet 2026",
     rewardXP: 250,
   },

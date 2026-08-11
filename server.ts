@@ -5,6 +5,7 @@ import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { api, apiErrorHandler } from "./server/routes";
 import { startSessionCleanup } from "./server/auth/sessions";
+import { startStudentSessionCleanup } from "./server/auth/studentSessions";
 
 dotenv.config();
 
@@ -29,6 +30,7 @@ app.use("/api", apiErrorHandler);
 
 // Hygiène : retire les sessions expirées au démarrage puis toutes les heures.
 startSessionCleanup();
+startStudentSessionCleanup();
 
 // Serve public static assets
 app.use("/public", express.static(path.join(ROOT,"public")));

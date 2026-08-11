@@ -19,7 +19,6 @@ import {
   TrendingUp,
   ShieldCheck,
   Zap,
-  Sparkles,
   BarChart3,
   LineChart,
   Brain,
@@ -32,6 +31,7 @@ import {
   RotateCcw
 } from "lucide-react";
 import { Trade, StudentProfile } from "../types";
+import { formatCurrency } from "../lib/format";
 
 interface PerformanceDashboardProps {
   student: StudentProfile;
@@ -44,9 +44,6 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
   trades,
   courseCompletionPercentage,
 }) => {
-  const [aiReport, setAiReport] = useState<string | null>(null);
-  const [isGeneratingAiReport, setIsGeneratingAiReport] = useState(false);
-
   // 1. Calculate Equity Curve Data
   const sortedTrades = [...trades].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -56,7 +53,9 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
   const equityData = [
     { date: "Début (15 Jan)", capital: student.startingCapital, pnl: 0 },
     ...sortedTrades.map((t, idx) => {
-      runningCapital += t.pnl;
+      // Un trade en % n'est pas une somme d'argent : il reste dans la courbe
+      // temporelle mais n'ajoute rien au capital cumulé.
+      if ((t.pnlUnit ?? "USD") !== "PERCENT") runningCapital += t.pnl;
       return {
         date: `Trade #${idx + 1} (${t.pair})`,
         capital: runningCapital,
@@ -64,6 +63,9 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
       };
     }),
   ];
+
+  // Trades en $ uniquement : seuls ceux-ci entrent dans les totaux monétaires.
+  const tradesEnDollars = trades.filter((t) => (t.pnlUnit ?? "USD") !== "PERCENT");
 
   // 2. Performance by Strategy Data
   const strategyStats: Record<string, { wins: number; total: number; pnl: number }> = {};
@@ -73,7 +75,7 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
     }
     strategyStats[t.strategy].total += 1;
     if (t.result === "WIN") strategyStats[t.strategy].wins += 1;
-    strategyStats[t.strategy].pnl += t.pnl;
+    if ((t.pnlUnit ?? "USD") !== "PERCENT") strategyStats[t.strategy].pnl += t.pnl;
   });
 
   const strategyChartData = Object.keys(strategyStats).map((strat) => ({
@@ -91,7 +93,7 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
     }
     emotionStats[t.emotion].total += 1;
     if (t.result === "WIN") emotionStats[t.emotion].wins += 1;
-    emotionStats[t.emotion].pnl += t.pnl;
+    if ((t.pnlUnit ?? "USD") !== "PERCENT") emotionStats[t.emotion].pnl += t.pnl;
   });
 
   const emotionChartData = Object.keys(emotionStats).map((em) => ({
@@ -113,51 +115,12 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
   const totalTrades = trades.length;
   const wins = trades.filter((t) => t.result === "WIN").length;
   const winRate = totalTrades > 0 ? Math.round((wins / totalTrades) * 100) : 0;
-  const totalPnL = trades.reduce((acc, t) => acc + t.pnl, 0);
+  const totalPnL = tradesEnDollars.reduce((acc, t) => acc + t.pnl, 0);
 
   const disciplinedCount = trades.filter(
     (t) => t.emotion === "Disciplined" || t.emotion === "Calm"
   ).length;
   const disciplineScore = totalTrades > 0 ? Math.round((disciplinedCount / totalTrades) * 100) : 100;
-
-  // Generate Global AI Performance Audit
-  const generateAiGlobalAudit = async () => {
-    setIsGeneratingAiReport(true);
-    try {
-      const response = await fetch("/api/coach/ai-review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: `
-Voici le résumé des performances de l'élève Alexandre Vance:
-- Taux de réussite global: ${winRate}% sur ${totalTrades} trades
-- Capital actuel: ${student.currentCapital} € (Starting: ${student.startingCapital} €)
-- Score de discipline émotionnelle: ${disciplineScore}%
-- Performance par stratégie: ${JSON.stringify(strategyChartData)}
-- Performance par émotion: ${JSON.stringify(emotionChartData)}
-- Progression dans les modules vidéo: ${courseCompletionPercentage}%
-
-Veuillez rédiger un bilan pédagogique personnalisé et motivant en français de 3 paragraphes comprenant :
-1. Un diagnostic général de sa progression technique et émotionnelle.
-2. Ses 2 plus gros points forts (ex: maîtrise de la stratégie SMC, patience).
-3. Son plan d'action prioritaire en 3 étapes pour atteindre la régularité absolue.
-`,
-        }),
-      });
-
-      const data = await response.json();
-      if (data.data?.coachFeedback) {
-        setAiReport(data.data.coachFeedback);
-      } else {
-        setAiReport("L'analyse AI des performances est prête. Continuez à appliquer la discipline !");
-      }
-    } catch (err) {
-      console.error(err);
-      setAiReport("Audit indisponible actuellement. Réessayez plus tard.");
-    } finally {
-      setIsGeneratingAiReport(false);
-    }
-  };
 
   return (
     <div className="space-y-8 pb-12">
@@ -175,15 +138,6 @@ Veuillez rédiger un bilan pédagogique personnalisé et motivant en français d
             Visualisez la trajectoire de votre capital, la rentabilité par stratégie et la corrélation directe entre votre état d'esprit et vos résultats.
           </p>
         </div>
-
-        <button
-          onClick={generateAiGlobalAudit}
-          disabled={isGeneratingAiReport}
-          className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20 hover:brightness-110 transition-all cursor-pointer shrink-0"
-        >
-          <Sparkles className="w-4 h-4" />
-          <span>{isGeneratingAiReport ? "Génération de l'Audit..." : "Générer un Audit IA Globale"}</span>
-        </button>
       </div>
 
       {/* Primary KPI Grid */}
@@ -195,7 +149,7 @@ Veuillez rédiger un bilan pédagogique personnalisé et motivant en français d
             <ShieldCheck className="w-4 h-4 text-[#00E676]" />
           </div>
           <div className="text-3xl font-black text-[#00E676] font-mono">
-            {student.currentCapital.toLocaleString("fr-FR")} €
+            {formatCurrency(student.currentCapital)}
           </div>
           <div className="text-xs text-slate-400 flex items-center gap-1">
             <span className="text-[#00E676] font-bold flex items-center">
@@ -236,39 +190,17 @@ Veuillez rédiger un bilan pédagogique personnalisé et motivant en français d
         </div>
       </div>
 
-      {/* Global AI Performance Report (If Generated) */}
-      {aiReport && (
-        <div className="bg-gradient-to-r from-amber-500/10 via-[#111615] to-[#111615] border border-amber-500/30 p-6 rounded-2xl space-y-4 shadow-xl">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-amber-400" />
-              <h3 className="text-lg font-extrabold text-white">Rapport d'Audit de Performance du Coach IA</h3>
-            </div>
-            <button
-              onClick={() => setAiReport(null)}
-              className="text-xs text-slate-400 hover:text-white"
-            >
-              Fermer
-            </button>
-          </div>
-
-          <div className="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-wrap border-l-2 border-amber-400 pl-4 bg-[#0D1110]/40 p-4 rounded-xl">
-            {aiReport}
-          </div>
-        </div>
-      )}
-
       {/* Charts Row 1: Equity Curve & Strategy Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Equity Curve Area Chart */}
         <div className="lg:col-span-2 bg-[#111615] border border-[#1B2320] p-6 rounded-2xl space-y-4 shadow-xl">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-bold text-white">Courbe d'Équité du Capital (€)</h3>
+              <h3 className="text-base font-bold text-white">Courbe d'Équité du Capital</h3>
               <p className="text-xs text-slate-400">Évolution nette du compte de trading</p>
             </div>
             <span className="text-xs font-mono font-bold text-[#00E676] bg-[#00E676]/10 px-2.5 py-1 rounded border border-[#00E676]/20">
-              +{totalPnL} € net
+              +{formatCurrency(totalPnL)} net
             </span>
           </div>
 
@@ -286,7 +218,9 @@ Veuillez rédiger un bilan pédagogique personnalisé et motivant en français d
                 <YAxis stroke="#475569" fontSize={11} domain={["auto", "auto"]} />
                 <Tooltip
                   contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", fontSize: "12px" }}
-                  formatter={(value: any) => [`${value} €`, "Capital"]}
+                  labelStyle={{ color: "#ffffff" }}
+                  itemStyle={{ color: "#ffffff" }}
+                  formatter={(value: any) => [formatCurrency(Number(value)), "Capital"]}
                 />
                 <Area
                   type="monotone"
@@ -316,6 +250,8 @@ Veuillez rédiger un bilan pédagogique personnalisé et motivant en français d
                 <YAxis stroke="#475569" fontSize={11} unit="%" />
                 <Tooltip
                   contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", fontSize: "12px" }}
+                  labelStyle={{ color: "#ffffff" }}
+                  itemStyle={{ color: "#ffffff" }}
                   formatter={(value: any) => [`${value}%`, "Win Rate"]}
                 />
                 <Bar dataKey="winRate" radius={[6, 6, 0, 0]}>
@@ -337,7 +273,7 @@ Veuillez rédiger un bilan pédagogique personnalisé et motivant en français d
         <div>
           <h3 className="text-base font-bold text-white flex items-center gap-2">
             <Brain className="w-5 h-5 text-purple-400" />
-            Impact Psychologique & Émotionnel sur la Rentabilité (€)
+            Impact Psychologique & Émotionnel sur la Rentabilité
           </h3>
           <p className="text-xs text-slate-400">
             Comparaison directe du PnL net selon l'état émotionnel lors de la prise de position
@@ -349,10 +285,12 @@ Veuillez rédiger un bilan pédagogique personnalisé et motivant en français d
             <BarChart data={emotionChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
               <XAxis dataKey="emotion" stroke="#475569" fontSize={12} />
-              <YAxis stroke="#475569" fontSize={11} unit=" €" />
+              <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
               <Tooltip
                 contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", fontSize: "12px" }}
-                formatter={(value: any) => [`${value} €`, "PnL Total"]}
+                labelStyle={{ color: "#ffffff" }}
+                itemStyle={{ color: "#ffffff" }}
+                formatter={(value: any) => [formatCurrency(Number(value)), "PnL Total"]}
               />
               <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
                 {emotionChartData.map((entry, index) => (

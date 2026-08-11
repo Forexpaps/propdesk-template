@@ -25,9 +25,13 @@ import {
   Zap,
   Tag,
   Timer,
-  MessageSquare
+  MessageSquare,
+  KeyRound,
+  ShieldOff
 } from "lucide-react";
 import { EnrolledStudent, StudentStatusTag, TradingStyle, TradingAccount, Trade } from "../types";
+import { formatCurrency } from "../lib/format";
+import { api } from "../lib/api";
 
 interface StudentTrackingProps {
   students: EnrolledStudent[];
@@ -59,6 +63,37 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
   // Edit form state
   const [editForm, setEditForm] = useState<Partial<EnrolledStudent>>({});
 
+  // Accès élève : invitation en cours, résultat à afficher une seule fois,
+  // et vrais trades chargés pour la fiche en mode lecture (si un compte est actif).
+  const [invitingId, setInvitingId] = useState<string | null>(null);
+  const [inviteResult, setInviteResult] = useState<{ email: string; temporaryPassword: string } | null>(null);
+  const [realTrades, setRealTrades] = useState<Trade[] | null>(null);
+  const [loadingRealTrades, setLoadingRealTrades] = useState(false);
+
+  const handleInviteStudent = async (student: EnrolledStudent) => {
+    setInvitingId(student.id);
+    try {
+      const result = await api.inviteStudent(student.id);
+      onUpdateStudent({ ...student, studentAccountId: result.studentAccountId });
+      setInviteResult({ email: result.email, temporaryPassword: result.temporaryPassword });
+    } catch (err) {
+      alert((err as Error).message || "L'invitation a échoué.");
+    } finally {
+      setInvitingId(null);
+    }
+  };
+
+  const handleRevokeAccess = async (student: EnrolledStudent) => {
+    if (!confirm(`Révoquer l'accès élève de ${student.name} ? Ses trades restent conservés.`)) return;
+    try {
+      await api.revokeStudentAccess(student.id);
+      const { studentAccountId, ...rest } = student;
+      onUpdateStudent(rest);
+    } catch (err) {
+      alert((err as Error).message || "La révocation a échoué.");
+    }
+  };
+
   const filteredStudents = students.filter((st) => {
     const matchesSearch =
       st.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -80,6 +115,18 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
   const handleOpenReadOnly = (student: EnrolledStudent) => {
     setSelectedStudent(student);
     setIsReadOnlyPreview(true);
+    setRealTrades(null);
+
+    // Un compte actif rend la saisie manuelle recentTrades obsolète : on
+    // charge les vrais trades de l'élève à la place, en lecture seule.
+    if (student.studentAccountId) {
+      setLoadingRealTrades(true);
+      api
+        .fetchStudentTrades(student.id)
+        .then((res) => setRealTrades(res.trades))
+        .catch(() => setRealTrades([]))
+        .finally(() => setLoadingRealTrades(false));
+    }
   };
 
   const handleSaveStudentFile = (e: React.FormEvent) => {
@@ -267,6 +314,25 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   >
                     <Edit className="w-3.5 h-3.5" /> Éditer Fiche
                   </button>
+                  {st.studentAccountId ? (
+                    <button
+                      onClick={() => void handleRevokeAccess(st)}
+                      title="Révoquer l'accès élève"
+                      className="px-2.5 py-1.5 rounded-lg bg-[#1B2320] hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 border border-[#232D29] text-xs font-semibold flex items-center gap-1"
+                    >
+                      <ShieldOff className="w-3.5 h-3.5" /> Compte actif
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => void handleInviteStudent(st)}
+                      disabled={invitingId === st.id}
+                      title="Donner un accès élève à son propre Journal"
+                      className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs font-semibold flex items-center gap-1 disabled:opacity-50"
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                      {invitingId === st.id ? "Création…" : "Donner un accès"}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -275,10 +341,10 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 <div>
                   <span className="text-[10px] text-slate-500 block">Capital Enregistré</span>
                   <span className="font-mono font-bold text-white text-sm">
-                    {st.currentCapital.toLocaleString("fr-FR")} €
+                    {formatCurrency(st.currentCapital)}
                   </span>
                   <span className={`text-[10px] block ${isProfit ? "text-[#00E676]" : "text-rose-400"}`}>
-                    {isProfit ? "+" : ""}{pnlTotal.toLocaleString("fr-FR")} €
+                    {isProfit ? "+" : ""}{formatCurrency(pnlTotal)}
                   </span>
                 </div>
                 <div>
@@ -438,7 +504,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-medium text-slate-300 mb-1">Capital Initial (€)</label>
+                  <label className="block font-medium text-slate-300 mb-1">Capital Initial ($)</label>
                   <input
                     type="number"
                     value={editForm.startingCapital || 0}
@@ -448,7 +514,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 </div>
 
                 <div>
-                  <label className="block font-medium text-slate-300 mb-1">Capital Actuel Réel (€)</label>
+                  <label className="block font-medium text-slate-300 mb-1">Capital Actuel Réel ($)</label>
                   <input
                     type="number"
                     value={editForm.currentCapital || 0}
@@ -563,7 +629,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">Capital Départ (€)</label>
+                  <label className="block text-slate-300 font-medium mb-1">Capital Départ ($)</label>
                   <input
                     type="number"
                     value={editForm.startingCapital || 10000}
@@ -665,7 +731,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 <div className="text-right">
                   <span className="text-[10px] text-slate-500 block uppercase font-bold">Capital sous Gestion</span>
                   <span className="text-lg font-mono font-black text-[#00E676]">
-                    {selectedStudent.currentCapital.toLocaleString("fr-FR")} €
+                    {formatCurrency(selectedStudent.currentCapital)}
                   </span>
                 </div>
               </div>
@@ -688,7 +754,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     <div className="text-slate-400 text-[11px]">Courtier/Prop Firm : {acc.firmOrBroker} ({acc.type})</div>
                     <div className="flex items-center justify-between pt-2 border-t border-[#151D1A] font-mono">
                       <span className="text-slate-500">Solde Réel:</span>
-                      <span className="font-bold text-[#00E676] text-sm">{acc.currentBalance.toLocaleString("fr-FR")} €</span>
+                      <span className="font-bold text-[#00E676] text-sm">{formatCurrency(acc.currentBalance)}</span>
                     </div>
                   </div>
                 ))}
@@ -699,14 +765,23 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
             <div className="space-y-3">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
                 <Activity className="w-4 h-4 text-[#00E676]" /> Historique Récent des Trades
+                {selectedStudent.studentAccountId && (
+                  <span className="text-[10px] font-normal text-[#00E676] normal-case">
+                    (vrais trades journalisés par l'élève)
+                  </span>
+                )}
               </h4>
-              {selectedStudent.recentTrades.length === 0 ? (
+              {selectedStudent.studentAccountId && loadingRealTrades ? (
+                <div className="bg-[#0D1110] p-4 rounded-xl text-center text-slate-500 text-xs italic">
+                  Chargement des trades…
+                </div>
+              ) : (selectedStudent.studentAccountId ? realTrades ?? [] : selectedStudent.recentTrades).length === 0 ? (
                 <div className="bg-[#0D1110] p-4 rounded-xl text-center text-slate-500 text-xs italic">
                   Aucune position enregistrée récemment pour cet élève.
                 </div>
               ) : (
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {selectedStudent.recentTrades.map((tr) => (
+                  {(selectedStudent.studentAccountId ? realTrades ?? [] : selectedStudent.recentTrades).map((tr) => (
                     <div key={tr.id} className="bg-[#0D1110] p-3 rounded-xl border border-[#1B2320] flex items-center justify-between text-xs">
                       <div className="flex items-center gap-3">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -721,7 +796,9 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                       </div>
                       <div className="text-right font-mono">
                         <span className={`font-bold ${tr.pnl >= 0 ? "text-[#00E676]" : "text-rose-400"}`}>
-                          {tr.pnl >= 0 ? "+" : ""}{tr.pnl} €
+                          {(tr.pnlUnit ?? "USD") === "PERCENT"
+                            ? `${tr.pnl >= 0 ? "+" : ""}${tr.pnl}%`
+                            : `${tr.pnl >= 0 ? "+" : ""}${formatCurrency(tr.pnl)}`}
                         </span>
                         <span className="text-[10px] text-slate-500 block">{tr.date}</span>
                       </div>
@@ -738,6 +815,38 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               </span>
               <p className="text-slate-300 italic">{selectedStudent.privateCoachNotes}</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mot de passe temporaire de l'invitation élève — affiché une seule
+          fois, jamais récupérable après la fermeture de cette modale. */}
+      {inviteResult && (
+        <div className="fixed inset-0 z-[60] bg-[#0D1110]/90 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#111615] border border-amber-500/40 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-amber-400" /> Accès élève créé
+            </h3>
+            <p className="text-xs text-slate-400">
+              Transmets ces identifiants à l'élève de la main à la main. Ce mot de passe temporaire
+              ne sera plus jamais affiché — il devra le remplacer à sa première connexion.
+            </p>
+            <div className="bg-[#0D1110] border border-[#1B2320] rounded-xl p-4 space-y-2 font-mono text-sm">
+              <div>
+                <span className="text-[10px] text-slate-500 block uppercase">E-mail</span>
+                <span className="text-white">{inviteResult.email}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 block uppercase">Mot de passe temporaire</span>
+                <span className="text-amber-400 font-bold">{inviteResult.temporaryPassword}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setInviteResult(null)}
+              className="w-full px-4 py-2.5 rounded-xl bg-[#00E676] text-slate-950 font-bold"
+            >
+              J'ai bien noté ces identifiants
+            </button>
           </div>
         </div>
       )}

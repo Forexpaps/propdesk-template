@@ -3,7 +3,6 @@ import {
   Plus,
   Search,
   Filter,
-  Sparkles,
   ArrowUpRight,
   ArrowDownRight,
   Trash2,
@@ -25,7 +24,9 @@ import {
   Download,
   Eye,
   Pencil,
-  X
+  X,
+  ImagePlus,
+  Loader2
 } from "lucide-react";
 import {
   Trade,
@@ -35,7 +36,10 @@ import {
   MarketCategory,
   TradeDraft,
   TradingAccount,
+  PnlUnit,
 } from "../types";
+import { formatCurrency } from "../lib/format";
+import { resizeChartScreenshot } from "../lib/image";
 
 /** Valeur du sélecteur de compte quand aucun n'est choisi. */
 const SANS_COMPTE = "";
@@ -60,13 +64,18 @@ interface TradingJournalProps {
   /** Remplace un trade existant, identifié par son `id`. */
   onUpdateTrade: (trade: Trade) => void;
   onDeleteTrade: (id: string) => void;
-  onSelectTradeForAudit: (trade: Trade) => void;
   onSendTradeToCoach: (trade: Trade) => void;
   onOpenCalculator?: () => void;
-  /** Ébauche envoyée par le calculateur de position ou l'analyseur de setup IA. */
+  /** Ébauche envoyée par le calculateur de position ou l'analyseur de setup. */
   prefillDraft?: TradeDraft | null;
   /** Appelé une fois l'ébauche appliquée, pour que le parent la remette à null. */
   onPrefillConsumed?: () => void;
+  /**
+   * Masque le bouton « Discuter avec le coach » sur chaque ligne. Sert au
+   * Journal élève, qui n'a pas accès à la messagerie coach — voir
+   * `StudentAuthenticatedApp` dans `src/App.tsx`.
+   */
+  hideAiAndCoachActions?: boolean;
 }
 
 export const TradingJournal: React.FC<TradingJournalProps> = ({
@@ -75,11 +84,11 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   onAddTrade,
   onUpdateTrade,
   onDeleteTrade,
-  onSelectTradeForAudit,
   onSendTradeToCoach,
   onOpenCalculator,
   prefillDraft,
   onPrefillConsumed,
+  hideAiAndCoachActions = false,
 }) => {
   const [searchPair, setSearchPair] = useState("");
   const [selectedMarket, setSelectedMarket] = useState<string>("Tous");
@@ -97,16 +106,8 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
    */
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
 
-  /**
-   * Vrai dès que l'utilisateur a saisi un PnL à la main.
-   *
-   * Tant qu'il est faux (création uniquement), le champ suit la proposition
-   * calculée depuis les prix. Une fois vrai, plus rien ne l'écrase — et il
-   * démarre à vrai en édition, pour que la valeur enregistrée soit intouchable
-   * tant qu'on ne la modifie pas explicitement.
-   */
-  const [pnlTouche, setPnlTouche] = useState(false);
   const [selectedChartTrade, setSelectedChartTrade] = useState<Trade | null>(null);
+  const [isResizingChart, setIsResizingChart] = useState(false);
 
   /**
    * Nom affichable d'un compte, ou `null` si le trade n'est rattaché à rien —
@@ -134,8 +135,8 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       "Take Profit",
       "Prix Sortie",
       "Taille Lot",
-      "PnL (€)",
-      "PnL (%)",
+      "PnL",
+      "Unite PnL",
       "Ratio RR",
       "Resultat",
       "Strategie",
@@ -158,7 +159,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       t.exitPrice || "",
       t.lotSize,
       t.pnl,
-      t.pnlPercentage,
+      t.pnlUnit ?? "USD",
       t.riskRewardRatio,
       t.result,
       `"${t.strategy.replace(/"/g, '""')}"`,
@@ -184,6 +185,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     exitTime: "16:00",
     accountId: SANS_COMPTE,
     pnl: 0,
+    pnlUnit: "USD" as PnlUnit,
     pair: "EUR/USD",
     marketCategory: "Forex" as MarketCategory,
     direction: "LONG" as TradeDirection,
@@ -206,6 +208,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     exitTime: "16:00",
     accountId: SANS_COMPTE,
     pnl: 0,
+    pnlUnit: "USD" as PnlUnit,
     pair: "EUR/USD",
     marketCategory: "Forex" as MarketCategory,
     direction: "LONG" as TradeDirection,
@@ -222,7 +225,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
   const ouvrirCreation = () => {
     setEditingTrade(null);
-    setPnlTouche(false);
     setFormData(formulaireVierge());
     setIsAddModalOpen(true);
   };
@@ -236,7 +238,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
    */
   const ouvrirEdition = (trade: Trade) => {
     setEditingTrade(trade);
-    setPnlTouche(true);
     setFormData({
       date: trade.date,
       time: trade.time ?? "",
@@ -244,6 +245,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       exitTime: trade.exitTime ?? "",
       accountId: trade.accountId ?? SANS_COMPTE,
       pnl: trade.pnl,
+      pnlUnit: trade.pnlUnit ?? "USD",
       pair: trade.pair,
       marketCategory: trade.marketCategory,
       direction: trade.direction,
@@ -265,7 +267,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     setEditingTrade(null);
   };
 
-  // Applique une ébauche venue du calculateur / de l'analyseur IA, puis ouvre le formulaire.
+  // Applique une ébauche venue du calculateur / de l'analyseur de setup, puis ouvre le formulaire.
   // Seules les clés fournies écrasent les valeurs par défaut ci-dessus.
   useEffect(() => {
     if (!prefillDraft) return;
@@ -282,7 +284,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     // Une ébauche est toujours une création : sans cela, elle viendrait écraser
     // un trade en cours d'édition resté ouvert.
     setEditingTrade(null);
-    setPnlTouche(false);
     setIsAddModalOpen(true);
     onPrefillConsumed?.();
   }, [prefillDraft, onPrefillConsumed]);
@@ -293,9 +294,12 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   const lossTrades = trades.filter((t) => t.result === "LOSS").length;
   const winRate = totalTrades > 0 ? Math.round((winTrades / totalTrades) * 100) : 0;
   
-  const totalPnL = trades.reduce((acc, t) => acc + t.pnl, 0);
-  const totalGains = trades.filter((t) => t.pnl > 0).reduce((acc, t) => acc + t.pnl, 0);
-  const totalLosses = Math.abs(trades.filter((t) => t.pnl < 0).reduce((acc, t) => acc + t.pnl, 0));
+  // Les trades saisis en % sont hors de portée de tout total en $ : leur
+  // valeur n'est pas une somme d'argent, l'additionner fausserait le total.
+  const tradesEnDollars = trades.filter((t) => (t.pnlUnit ?? "USD") !== "PERCENT");
+  const totalPnL = tradesEnDollars.reduce((acc, t) => acc + t.pnl, 0);
+  const totalGains = tradesEnDollars.filter((t) => t.pnl > 0).reduce((acc, t) => acc + t.pnl, 0);
+  const totalLosses = Math.abs(tradesEnDollars.filter((t) => t.pnl < 0).reduce((acc, t) => acc + t.pnl, 0));
   const profitFactor = totalLosses > 0 ? (totalGains / totalLosses).toFixed(2) : "N/A";
 
   const avgRR =
@@ -340,26 +344,37 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   };
 
   /**
-   * Calcul automatique du PnL à la **création**.
+   * Capture d'écran du trade, réduite avant d'entrer dans l'état applicatif.
    *
-   * ⚠️ Cette formule suppose un multiplicateur de 1 000 pour tout instrument.
-   * C'est faux en général : sur les six trades d'origine, elle donne 9 € au
-   * lieu de 900 (EUR/USD), −50 000 au lieu de −300 (NAS100), 1 050 000 au lieu
-   * de 1 050 (BTC/USDT). Elle n'est donc qu'une **proposition** que la saisie
-   * affiche et que l'utilisateur corrige — jamais une valeur imposée.
+   * `Trade.chartUrl` est sérialisé en JSON — dans la base, dans chaque
+   * réponse de `/api/state` et dans le cache `localStorage` — une image brute
+   * y pèserait donc son poids réel à trois endroits à la fois. Voir
+   * `src/lib/image.ts`.
    */
-  const pnlDepuis = (f: {
-    direction: TradeDirection;
-    entryPrice: number;
-    exitPrice: number;
-    lotSize: number;
-  }) => {
-    if (!f.exitPrice) return 0;
-    const brut =
-      f.direction === "LONG"
-        ? (f.exitPrice - f.entryPrice) * f.lotSize * 1000
-        : (f.entryPrice - f.exitPrice) * f.lotSize * 1000;
-    return Math.round(brut);
+  const handleChartUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Sans réinitialiser la valeur, re-choisir le même fichier après une
+    // erreur n'émettrait aucun évènement.
+    e.target.value = "";
+    if (!file) return;
+
+    // Garde-fou sur le décodage, pas sur le stockage : après réduction, la
+    // taille du fichier d'origine n'a plus d'incidence.
+    if (file.size > 20 * 1024 * 1024) {
+      alert("L'image choisie est trop volumineuse (max 20 Mo). Choisis-en une autre.");
+      return;
+    }
+
+    setIsResizingChart(true);
+    try {
+      const chartUrl = await resizeChartScreenshot(file);
+      setFormData((prev) => ({ ...prev, chartUrl }));
+    } catch (err) {
+      console.error("[propdesk] Redimensionnement de la capture d'écran échoué.", err);
+      alert("Cette image n'a pas pu être lue. Essaie un autre fichier (JPEG, PNG ou WebP).");
+    } finally {
+      setIsResizingChart(false);
+    }
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -370,23 +385,29 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     const gain = Math.abs(formData.takeProfit - formData.entryPrice);
     const riskReward = risque > 0 ? Number((gain / risque).toFixed(1)) : 1;
 
-    // Le PnL vient du champ, jamais d'un recalcul.
+    // Le PnL vient du champ, jamais d'un recalcul ni d'une conversion.
     //
-    // C'est **la** règle à ne pas casser. La formule ci-dessus est fausse d'un
-    // facteur variable selon l'instrument : la réappliquer à l'enregistrement
-    // ferait passer un trade BTC de 1 050 € à 1 050 000 € au seul motif qu'on
-    // a ouvert la fiche pour lui affecter un compte. Modifier un trade ne doit
-    // jamais changer un chiffre que l'utilisateur n'a pas touché.
-    const pnl = Math.round(Number(formData.pnl) || 0);
+    // C'est **la** règle à ne pas casser. Aucune formule ne propose plus de
+    // valeur par défaut : l'utilisateur tape le chiffre qu'il lit sur sa
+    // propre plateforme, dans l'unité de son choix. Un montant "$" reste un
+    // entier (comme avant) ; un "%" garde ses décimales, ce n'est pas une
+    // somme d'argent à arrondir.
+    const pnl =
+      formData.pnlUnit === "PERCENT"
+        ? Number(formData.pnl) || 0
+        : Math.round(Number(formData.pnl) || 0);
 
     let result: TradeResult = "OPEN";
     if (formData.exitPrice) {
-      if (pnl > 50) result = "WIN";
-      else if (pnl < -50) result = "LOSS";
-      else result = "BREAKEVEN";
+      if (formData.pnlUnit === "PERCENT") {
+        // Pas de marge morte pour un pourcentage saisi à la main : contrairement
+        // au seuil ±50 $ (qui absorbe le bruit d'une proposition automatique),
+        // ici l'utilisateur tape un résultat réel.
+        result = pnl > 0 ? "WIN" : pnl < 0 ? "LOSS" : "BREAKEVEN";
+      } else {
+        result = pnl > 50 ? "WIN" : pnl < -50 ? "LOSS" : "BREAKEVEN";
+      }
     }
-
-    const pnlPercentage = Number(((pnl / 10000) * 100).toFixed(1));
 
     const champs = {
       date: formData.date,
@@ -405,7 +426,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       exitPrice: Number(formData.exitPrice),
       lotSize: Number(formData.lotSize),
       pnl,
-      pnlPercentage,
+      pnlUnit: formData.pnlUnit,
       riskRewardRatio: riskReward,
       result,
       strategy: formData.strategy,
@@ -438,7 +459,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             Carnet d'Exécution & Registre Émotionnel
           </h1>
           <p className="text-slate-400 text-xs sm:text-sm">
-            Consignez chaque position, vos niveaux techniques et votre état d'esprit pour obtenir des audits IA automatisés par votre coach.
+            Consignez chaque position, vos niveaux techniques et votre état d'esprit pour progresser trade après trade.
           </p>
         </div>
 
@@ -483,7 +504,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1 shadow-sm">
           <div className="text-xs text-slate-400 font-medium">PnL Cumulé</div>
           <div className={`text-2xl font-black font-mono ${totalPnL >= 0 ? "text-[#00E676]" : "text-rose-400"}`}>
-            {totalPnL >= 0 ? `+${totalPnL} €` : `${totalPnL} €`}
+            {totalPnL >= 0 ? `+${formatCurrency(totalPnL)}` : formatCurrency(totalPnL)}
           </div>
           <div className="text-[11px] text-slate-500">{totalTrades} positions fermées</div>
         </div>
@@ -594,8 +615,8 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 <th className="py-3.5 px-4">Entrée → TP / SL</th>
                 <th className="py-3.5 px-4">Stratégie & Émotion</th>
                 <th className="py-3.5 px-4">R:R</th>
-                <th className="py-3.5 px-4 text-right">PnL Net (€)</th>
-                <th className="py-3.5 px-4 text-center">Actions Coach IA</th>
+                <th className="py-3.5 px-4 text-right">PnL Net</th>
+                <th className="py-3.5 px-4 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1B2320]/60">
@@ -711,39 +732,22 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                             : "text-slate-400"
                         }
                       >
-                        {trade.pnl > 0 ? `+${trade.pnl} €` : `${trade.pnl} €`}
-                      </div>
-                      <div className="text-[10px] text-slate-500">
-                        ({trade.pnlPercentage > 0 ? `+${trade.pnlPercentage}%` : `${trade.pnlPercentage}%`})
+                        {(trade.pnlUnit ?? "USD") === "PERCENT"
+                          ? `${trade.pnl > 0 ? "+" : ""}${trade.pnl}%`
+                          : `${trade.pnl > 0 ? "+" : ""}${formatCurrency(trade.pnl)}`}
                       </div>
                     </td>
 
                     {/* Actions: AI Audit & Coach Message */}
                     <td className="py-4 px-4 whitespace-nowrap text-center">
                       <div className="flex items-center justify-center gap-2">
-                        {/* View Chart Screenshot */}
-                        {trade.chartUrl && (
-                          <button
-                            onClick={() => setSelectedChartTrade(trade)}
-                            className="p-1.5 rounded-lg bg-[#1B2320] text-slate-300 hover:text-[#00E676] hover:bg-[#1B2320] transition-colors"
-                            title="Agrandir le graphique du trade"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        )}
-
-                        {/* Gemini AI Audit button */}
+                        {/* Aperçu complet du trade */}
                         <button
-                          onClick={() => onSelectTradeForAudit(trade)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            trade.aiAudit
-                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30"
-                              : "bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-bold hover:brightness-110 shadow-sm"
-                          }`}
-                          title="Obtenir un audit IA Gemini"
+                          onClick={() => setSelectedChartTrade(trade)}
+                          className="p-1.5 rounded-lg bg-[#1B2320] text-slate-300 hover:text-[#00E676] hover:bg-[#232D29] transition-colors"
+                          title="Voir l'aperçu complet du trade"
                         >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          <span>{trade.aiAudit ? "Voir Audit" : "Audit IA"}</span>
+                          <Eye className="w-4 h-4" />
                         </button>
 
                         {/* Modifier la saisie */}
@@ -756,13 +760,15 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                         </button>
 
                         {/* Send to Coach button */}
-                        <button
-                          onClick={() => onSendTradeToCoach(trade)}
-                          className="p-1.5 rounded-lg bg-[#1B2320] text-slate-400 hover:text-white hover:bg-[#232D29]"
-                          title="Discuter de ce trade avec le coach"
-                        >
-                          <MessageSquare className="w-4 h-4 text-amber-400" />
-                        </button>
+                        {!hideAiAndCoachActions && (
+                          <button
+                            onClick={() => onSendTradeToCoach(trade)}
+                            className="p-1.5 rounded-lg bg-[#1B2320] text-slate-400 hover:text-white hover:bg-[#232D29]"
+                            title="Discuter de ce trade avec le coach"
+                          >
+                            <MessageSquare className="w-4 h-4 text-amber-400" />
+                          </button>
+                        )}
 
                         {/* Delete trade */}
                         <button
@@ -910,14 +916,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Sens</label>
                   <select
                     value={formData.direction}
-                    onChange={(e) => {
-                      const direction = e.target.value as TradeDirection;
-                      setFormData((prev) => ({
-                        ...prev,
-                        direction,
-                        ...(pnlTouche ? {} : { pnl: pnlDepuis({ ...prev, direction }) }),
-                      }));
-                    }}
+                    onChange={(e) => setFormData({ ...formData, direction: e.target.value as TradeDirection })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-bold"
                   >
                     <option value="LONG">LONG (Achat)</option>
@@ -931,14 +930,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     type="number"
                     step="any"
                     value={formData.entryPrice}
-                    onChange={(e) => {
-                      const entryPrice = parseFloat(e.target.value) || 0;
-                      setFormData((prev) => ({
-                        ...prev,
-                        entryPrice,
-                        ...(pnlTouche ? {} : { pnl: pnlDepuis({ ...prev, entryPrice }) }),
-                      }));
-                    }}
+                    onChange={(e) => setFormData({ ...formData, entryPrice: parseFloat(e.target.value) || 0 })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
@@ -976,14 +968,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     type="number"
                     step="any"
                     value={formData.exitPrice}
-                    onChange={(e) => {
-                      const exitPrice = parseFloat(e.target.value) || 0;
-                      setFormData((prev) => ({
-                        ...prev,
-                        exitPrice,
-                        ...(pnlTouche ? {} : { pnl: pnlDepuis({ ...prev, exitPrice }) }),
-                      }));
-                    }}
+                    onChange={(e) => setFormData({ ...formData, exitPrice: parseFloat(e.target.value) || 0 })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                   />
                 </div>
@@ -994,43 +979,36 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     type="number"
                     step="any"
                     value={formData.lotSize}
-                    onChange={(e) => {
-                      const lotSize = parseFloat(e.target.value) || 1;
-                      setFormData((prev) => ({
-                        ...prev,
-                        lotSize,
-                        ...(pnlTouche ? {} : { pnl: pnlDepuis({ ...prev, lotSize }) }),
-                      }));
-                    }}
+                    onChange={(e) => setFormData({ ...formData, lotSize: parseFloat(e.target.value) || 1 })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
                 </div>
 
-                {/* PnL net : saisi, jamais imposé.
-                    En création, le champ suit la proposition calculée depuis
-                    les prix tant qu'on n'y a pas touché. En modification, il
-                    part de la valeur enregistrée et rien ne l'écrase — c'est ce
-                    qui garantit qu'ouvrir un trade pour lui affecter un compte
-                    ne change pas son résultat. */}
+                {/* PnL net : toujours saisi à la main, dans l'unité de son
+                    choix. Aucun calcul, aucune conversion — l'utilisateur
+                    tape le chiffre qu'il lit sur sa propre plateforme. */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">
-                    PnL net (€)
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
-                    value={formData.pnl}
-                    onChange={(e) => {
-                      setPnlTouche(true);
-                      setFormData((prev) => ({ ...prev, pnl: parseFloat(e.target.value) || 0 }));
-                    }}
-                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
-                  />
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">PnL</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      step="any"
+                      value={formData.pnl}
+                      onChange={(e) => setFormData({ ...formData, pnl: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
+                    />
+                    <select
+                      value={formData.pnlUnit}
+                      onChange={(e) => setFormData({ ...formData, pnlUnit: e.target.value as PnlUnit })}
+                      className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-bold"
+                    >
+                      <option value="USD">$</option>
+                      <option value="PERCENT">%</option>
+                    </select>
+                  </div>
                   <p className="text-[10px] text-slate-500 mt-1 leading-snug">
-                    {editingTrade
-                      ? "Valeur enregistrée. À corriger toi-même si tu changes les prix."
-                      : "Estimation depuis les prix — remplace-la par le montant réel de ton broker."}
+                    Le chiffre que tu lis sur ta plateforme — aucun calcul de notre part.
                   </p>
                 </div>
 
@@ -1088,6 +1066,64 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Capture d'écran du trade
+                </label>
+                {formData.chartUrl ? (
+                  <div className="relative rounded-lg overflow-hidden border border-[#1B2320] group">
+                    <img
+                      src={formData.chartUrl}
+                      alt="Capture d'écran du trade"
+                      className="w-full max-h-56 object-contain bg-[#0D1110]"
+                    />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <label className="px-3 py-1.5 rounded-lg bg-[#1B2320] text-white text-xs font-semibold cursor-pointer hover:bg-[#232D29]">
+                        Remplacer
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleChartUpload}
+                          className="hidden"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, chartUrl: "" })}
+                        className="px-3 py-1.5 rounded-lg bg-rose-500/80 text-white text-xs font-semibold hover:bg-rose-500"
+                      >
+                        Retirer
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label
+                    className={`flex items-center justify-center gap-2 w-full border border-dashed border-[#1B2320] rounded-lg p-4 text-xs text-slate-400 cursor-pointer hover:border-[#00E676]/40 hover:text-slate-200 transition-colors ${
+                      isResizingChart ? "opacity-60 pointer-events-none" : ""
+                    }`}
+                  >
+                    {isResizingChart ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Traitement de l'image…
+                      </>
+                    ) : (
+                      <>
+                        <ImagePlus className="w-4 h-4" />
+                        Ajouter une capture d'écran (JPEG, PNG, WebP)
+                      </>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleChartUpload}
+                      disabled={isResizingChart}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1B2320]">
                 <button
                   type="button"
@@ -1108,12 +1144,12 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         </div>
       )}
 
-      {/* Chart Screenshot Modal */}
+      {/* Aperçu complet du trade */}
       {selectedChartTrade && (
         <div className="fixed inset-0 z-50 bg-[#0D1110]/85 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-4xl w-full p-6 space-y-4 shadow-2xl relative max-h-[92vh] overflow-y-auto">
+          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-4xl w-full p-6 space-y-5 shadow-2xl relative max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#1B2320] pb-3">
-              <div className="flex items-center gap-2.5">
+              <div className="flex items-center gap-2.5 flex-wrap">
                 <span className="px-2.5 py-1 rounded bg-[#00E676]/10 text-[#00E676] text-xs font-mono font-bold border border-[#00E676]/30">
                   {selectedChartTrade.pair} • {selectedChartTrade.direction}
                 </span>
@@ -1128,12 +1164,96 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               </button>
             </div>
 
-            <div className="rounded-xl overflow-hidden border border-[#1B2320] bg-black max-h-[60vh] flex items-center justify-center">
-              <img
-                src={selectedChartTrade.chartUrl}
-                alt={`Graphique ${selectedChartTrade.pair}`}
-                className="w-full h-full object-contain"
-              />
+            {/* Capture d'écran, ou message d'absence */}
+            {selectedChartTrade.chartUrl ? (
+              <div className="rounded-xl overflow-hidden border border-[#1B2320] bg-black max-h-[50vh] flex items-center justify-center">
+                <img
+                  src={selectedChartTrade.chartUrl}
+                  alt={`Capture d'écran ${selectedChartTrade.pair}`}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-[#1B2320] bg-[#0D1110] p-6 text-center text-xs text-slate-500 italic">
+                Aucune capture d'écran jointe à ce trade.
+              </div>
+            )}
+
+            {/* Résumé complet de la saisie */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Compte</div>
+                <div className="text-white font-semibold">
+                  {nomDuCompte(selectedChartTrade.accountId) ?? "Non rattaché"}
+                </div>
+              </div>
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Marché</div>
+                <div className="text-white font-semibold">{selectedChartTrade.marketCategory}</div>
+              </div>
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Résultat</div>
+                <div className="text-white font-semibold">{selectedChartTrade.result}</div>
+              </div>
+
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Entrée</div>
+                <div className="text-white font-mono">
+                  {selectedChartTrade.date} {selectedChartTrade.time}
+                </div>
+              </div>
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Sortie</div>
+                <div className="text-white font-mono">
+                  {selectedChartTrade.exitDate
+                    ? `${selectedChartTrade.exitDate} ${selectedChartTrade.exitTime ?? ""}`
+                    : "Position ouverte"}
+                </div>
+              </div>
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Taille de lot</div>
+                <div className="text-white font-mono">{selectedChartTrade.lotSize}</div>
+              </div>
+
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Prix d'entrée</div>
+                <div className="text-white font-mono">{selectedChartTrade.entryPrice}</div>
+              </div>
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Stop Loss</div>
+                <div className="text-white font-mono">{selectedChartTrade.stopLoss}</div>
+              </div>
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Take Profit</div>
+                <div className="text-white font-mono">{selectedChartTrade.takeProfit}</div>
+              </div>
+
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Prix de sortie</div>
+                <div className="text-white font-mono">
+                  {selectedChartTrade.exitPrice || "—"}
+                </div>
+              </div>
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">PnL net</div>
+                <div
+                  className={`font-mono font-bold ${
+                    selectedChartTrade.pnl > 0
+                      ? "text-[#00E676]"
+                      : selectedChartTrade.pnl < 0
+                      ? "text-rose-400"
+                      : "text-slate-300"
+                  }`}
+                >
+                  {(selectedChartTrade.pnlUnit ?? "USD") === "PERCENT"
+                    ? `${selectedChartTrade.pnl > 0 ? "+" : ""}${selectedChartTrade.pnl}%`
+                    : `${selectedChartTrade.pnl > 0 ? "+" : ""}${formatCurrency(selectedChartTrade.pnl)}`}
+                </div>
+              </div>
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">État émotionnel</div>
+                <div>{getEmotionBadge(selectedChartTrade.emotion)}</div>
+              </div>
             </div>
 
             <div className="p-4 rounded-xl bg-[#0D1110] border border-[#1B2320] space-y-2 text-xs">

@@ -50,6 +50,11 @@ export type TradeDirection = "LONG" | "SHORT";
 export type TradeResult = "WIN" | "LOSS" | "BREAKEVEN" | "OPEN";
 export type EmotionState = "Disciplined" | "FOMO" | "Impulsive" | "Anxious" | "Calm" | "Greedy";
 export type MarketCategory = "Forex" | "Crypto" | "Indices" | "Matières Premières";
+/**
+ * Unité du champ `Trade.pnl`. Choisie librement par qui saisit le trade,
+ * jamais déduite ni convertie — voir le commentaire de `Trade.pnl`.
+ */
+export type PnlUnit = "USD" | "PERCENT";
 
 export interface Trade {
   id: string;
@@ -81,14 +86,31 @@ export interface Trade {
   takeProfit: number;
   exitPrice?: number;
   lotSize: number; // position size
-  pnl: number; // € gain/loss
-  pnlPercentage: number;
+  /**
+   * Montant saisi librement, jamais recalculé. Son unité est `pnlUnit` : un
+   * montant en $ si `"USD"` (ou absent), un pourcentage libre tapé tel quel
+   * si `"PERCENT"` — dans ce cas ce n'est ni une part du capital, ni convertie
+   * en $ : c'est le chiffre que l'utilisateur lit sur sa propre plateforme.
+   */
+  pnl: number;
+  /** Optionnel : absent = `"USD"`, pour ne pas casser les trades existants. */
+  pnlUnit?: PnlUnit;
+  /**
+   * @deprecated N'est plus jamais écrit — conservé uniquement pour la lecture
+   * de données existantes créées avant l'introduction de `pnlUnit`.
+   */
+  pnlPercentage?: number;
   riskRewardRatio: number;
   result: TradeResult;
   strategy: string; // e.g. "SMC Orderblock", "Breakout FVG", "Liquidity Sweep"
   emotion: EmotionState;
   notes: string;
   chartUrl?: string;
+  /**
+   * @deprecated L'audit IA Gemini a été retiré de l'application. N'est plus
+   * jamais écrit — conservé uniquement pour la lecture de données existantes
+   * créées avant son retrait.
+   */
   aiAudit?: {
     technicalScore: number;
     riskScore: number;
@@ -102,7 +124,7 @@ export interface Trade {
 
 /**
  * Ébauche de trade envoyée au Journal depuis un autre outil
- * (calculateur de position, analyseur de setup IA).
+ * (calculateur de position, analyseur de setup).
  * Tous les champs sont optionnels : seuls ceux fournis écrasent
  * les valeurs par défaut du formulaire d'ajout.
  */
@@ -191,6 +213,14 @@ export interface EnrolledStudent {
   privateCoachNotes: string;
   accounts: TradingAccount[];
   recentTrades: Trade[];
+  /**
+   * Identifiant du compte élève actif pour cette fiche, si le coach lui a
+   * donné un accès (« Donner un accès » dans Suivi des Élèves). Absent = pas
+   * de compte, `recentTrades`/`currentCapital` restent la saisie manuelle du
+   * coach. Présent = ces champs deviennent obsolètes, le coach lit les vrais
+   * trades via `GET /students/:id/trades`.
+   */
+  studentAccountId?: string;
 }
 
 export type AccountType = "Prop Firm Evaluation" | "Prop Firm Funded" | "Broker Réel" | "Compte DÉMO";

@@ -1,4 +1,5 @@
 import React from "react";
+import { formatCurrency } from "../lib/format";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -56,7 +57,7 @@ export const EquityCurveChart: React.FC<EquityCurveChartProps> = ({ data }) => (
         fontSize={11}
         tickLine={false}
         axisLine={false}
-        tickFormatter={(val) => `${val} €`}
+        tickFormatter={(val) => formatCurrency(Number(val))}
         domain={["auto", "auto"]}
       />
       <Tooltip
@@ -67,14 +68,14 @@ export const EquityCurveChart: React.FC<EquityCurveChartProps> = ({ data }) => (
           color: "#FFF",
           fontSize: "12px",
         }}
-        formatter={(value: any) => [`${Number(value).toLocaleString("fr-FR")} €`, "Capital"]}
+        formatter={(value: any) => [formatCurrency(Number(value)), "Capital"]}
       />
       <ReferenceLine
         y={11500}
         stroke="#00E676"
         strokeDasharray="4 4"
         label={{
-          value: "PALIER 11 500 € · ATTEINT",
+          value: "PALIER $11,500 · ATTEINT",
           fill: "#00E676",
           fontSize: 10,
           position: "insideBottomLeft",

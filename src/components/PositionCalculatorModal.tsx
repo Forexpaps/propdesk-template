@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Calculator, Shield, DollarSign, ArrowRight, Check, X, AlertCircle } from "lucide-react";
+import { formatCurrency } from "../lib/format";
 
 interface PositionCalculatorModalProps {
   isOpen: boolean;
@@ -164,7 +165,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
           </div>
 
           <div>
-            <label className="block text-slate-400 mb-1 font-sans">Capital du Compte (€)</label>
+            <label className="block text-slate-400 mb-1 font-sans">Capital du Compte ($)</label>
             <input
               type="number"
               value={capital}
@@ -237,7 +238,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
         <div className="bg-[#0D1110] border border-[#00E676]/30 rounded-xl p-4 space-y-3 font-mono">
           <div className="flex items-center justify-between text-xs border-b border-[#1B2320] pb-2">
             <span className="text-slate-400 font-sans">Montant Risqué :</span>
-            <span className="text-rose-400 font-bold">-{riskAmount.toFixed(2)} €</span>
+            <span className="text-rose-400 font-bold">-{formatCurrency(riskAmount)}</span>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-center">
@@ -250,7 +251,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
             <div className="bg-[#111615] p-3 rounded-lg border border-[#1B2320]">
               <span className="text-[10px] text-slate-400 block uppercase font-sans">Ratio R:R & Gain Potentiel</span>
               <span className="text-xl font-black text-[#00E676]">1 : {riskRewardRatio}</span>
-              <span className="text-[10px] text-[#00E676] block font-bold">+{potentialReward.toFixed(2)} €</span>
+              <span className="text-[10px] text-[#00E676] block font-bold">+{formatCurrency(potentialReward)}</span>
             </div>
           </div>
         </div>
@@ -259,7 +260,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
         <div className="flex items-center justify-between pt-2">
           <button
             onClick={() => {
-              const text = `Position ${pair} (${direction}) - Lots: ${lotSize} - SL: ${stopLoss} (${pipsSL.toFixed(1)} pips) - Risque: ${riskAmount}€`;
+              const text = `Position ${pair} (${direction}) - Lots: ${lotSize} - SL: ${stopLoss} (${pipsSL.toFixed(1)} pips) - Risque: ${formatCurrency(riskAmount)}`;
               navigator.clipboard.writeText(text);
               setCopied(true);
               setTimeout(() => setCopied(false), 2000);

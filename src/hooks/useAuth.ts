@@ -1,33 +1,41 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, UNAUTHENTICATED_EVENT, type AuthUser } from "../lib/api";
+import { api, UNAUTHENTICATED_EVENT, type AuthUser, type StudentAuthUser } from "../lib/api";
 
 /**
  * État d'authentification de l'application.
  *
  * - `loading` : la sonde de démarrage est en cours.
- * - `no-account` : la base n'a aucun identifiant → première installation.
- * - `unauthenticated` : un compte existe, mais pas de session valide.
- * - `authenticated` : session valide, l'application peut se monter.
+ * - `no-account` : la base n'a aucun identifiant staff → première installation.
+ * - `unauthenticated` : aucune session (ni staff, ni élève) valide.
+ * - `authenticated` : session staff valide, `AcademyApp` peut se monter.
+ * - `authenticated-student` : session élève valide, le Journal cloisonné peut
+ *   se monter — jamais `AcademyApp`.
  * - `offline` : le serveur est injoignable. On ne peut alors rien vérifier, et
  *   l'application démarre sur le cache local comme avant l'authentification —
- *   c'est un filet anti-perte de données, assumé (voir le README).
+ *   c'est un filet anti-perte de données, assumé (voir le README). Ne
+ *   concerne que le monde staff : il n'existe pas de mode hors ligne élève.
  */
 export type AuthStatus =
   | "loading"
   | "no-account"
   | "unauthenticated"
   | "authenticated"
+  | "authenticated-student"
   | "offline";
 
 export interface UseAuthResult {
   status: AuthStatus;
   user: AuthUser | null;
+  /** Renseigné seulement quand `status === "authenticated-student"`. */
+  studentUser: StudentAuthUser | null;
   /** Renseigné quand la session vient d'expirer, pour l'expliquer à l'écran. */
   expired: boolean;
   login: (email: string, password: string) => Promise<void>;
   setup: (email: string, password: string) => Promise<void>;
   /** Change le mot de passe et lève `mustChangePassword`. */
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  studentLogin: (email: string, password: string) => Promise<void>;
+  studentChangePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   /** Repasse en `unauthenticated` sans appeler le serveur. */
   markLoggedOut: () => void;
   refresh: () => Promise<void>;
@@ -36,27 +44,44 @@ export interface UseAuthResult {
 export function useAuth(): UseAuthResult {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [studentUser, setStudentUser] = useState<StudentAuthUser | null>(null);
   const [expired, setExpired] = useState(false);
 
   /**
-   * Un seul aller-retour au démarrage : l'union discriminée de `/api/auth/me`
-   * couvre les trois cas, le démarrage reste donc aussi rapide qu'avant.
+   * Deux mondes de session possibles, deux cookies distincts : on interroge
+   * d'abord `/api/auth/me` (staff, comportement inchangé), et seulement s'il
+   * ne trouve aucune session valide, `/api/auth/student-me`. Un navigateur
+   * n'a normalement jamais les deux à la fois, mais si c'était le cas, le
+   * staff prime.
    */
   const refresh = useCallback(async () => {
     try {
       const result = await api.fetchMe();
       if (result.state === "authenticated") {
         setUser(result.user);
+        setStudentUser(null);
         setStatus("authenticated");
         setExpired(false);
-      } else {
-        setUser(null);
-        setStatus(result.state);
+        return;
       }
+
+      const studentResult = await api.fetchStudentMe();
+      if (studentResult.state === "authenticated") {
+        setUser(null);
+        setStudentUser(studentResult.user);
+        setStatus("authenticated-student");
+        setExpired(false);
+        return;
+      }
+
+      setUser(null);
+      setStudentUser(null);
+      setStatus(result.state);
     } catch (err) {
       // Échec réseau, pas un refus : on ne peut rien vérifier sans serveur.
       console.warn("[propdesk] Serveur injoignable, mode hors ligne.", err);
       setUser(null);
+      setStudentUser(null);
       setStatus("offline");
     }
   }, []);
@@ -73,8 +98,11 @@ export function useAuth(): UseAuthResult {
   useEffect(() => {
     const onUnauthenticated = () => {
       setUser(null);
+      setStudentUser(null);
       setExpired(true);
-      setStatus((prev) => (prev === "authenticated" ? "unauthenticated" : prev));
+      setStatus((prev) =>
+        prev === "authenticated" || prev === "authenticated-student" ? "unauthenticated" : prev
+      );
     };
 
     window.addEventListener(UNAUTHENTICATED_EVENT, onUnauthenticated);
@@ -100,11 +128,39 @@ export function useAuth(): UseAuthResult {
     setUser(result.user);
   }, []);
 
+  const studentLogin = useCallback(async (email: string, password: string) => {
+    const result = await api.studentLogin(email, password);
+    setStudentUser(result.user);
+    setExpired(false);
+    setStatus("authenticated-student");
+  }, []);
+
+  const studentChangePassword = useCallback(
+    async (currentPassword: string, newPassword: string) => {
+      const result = await api.studentChangePassword(currentPassword, newPassword);
+      setStudentUser(result.user);
+    },
+    []
+  );
+
   const markLoggedOut = useCallback(() => {
     setUser(null);
+    setStudentUser(null);
     setExpired(false);
     setStatus("unauthenticated");
   }, []);
 
-  return { status, user, expired, login, setup, changePassword, markLoggedOut, refresh };
+  return {
+    status,
+    user,
+    studentUser,
+    expired,
+    login,
+    setup,
+    changePassword,
+    studentLogin,
+    studentChangePassword,
+    markLoggedOut,
+    refresh,
+  };
 }

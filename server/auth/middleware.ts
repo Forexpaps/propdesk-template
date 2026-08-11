@@ -1,6 +1,9 @@
 import type { Request, Response, NextFunction } from "express";
+import { DEFAULT_USER_ID } from "../db";
 import { getStaffById } from "./credentials";
 import { readSessionToken, validateSession } from "./sessions";
+import { getStudentById } from "./studentCredentials";
+import { readStudentSessionToken, validateStudentSession } from "./studentSessions";
 
 /**
  * Barrière d'authentification.
@@ -9,26 +12,44 @@ import { readSessionToken, validateSession } from "./sessions";
  * après l'API dans `startServer()`, un middleware au niveau application
  * intercepterait donc `/@vite/client`, `/@react-refresh` et la négociation
  * WebSocket du rechargement à chaud, cassant tout le développement.
+ *
+ * Deux mondes d'identité peuvent atteindre cette barrière : le staff (bureau
+ * partagé) et, depuis l'accès élève, un compte élève (bureau personnel). Elle
+ * essaie d'abord la session staff, puis la session élève — jamais les deux à
+ * la fois, chacune a son propre cookie.
  */
 
 /** Identité attachée à la requête par `requireAuth`. */
 export interface AuthContext {
+  /** Identifiant du compte (identité de connexion), pas du bureau de données. */
   userId: string;
   /**
-   * Toujours vrai après cette barrière : avoir un compte staff, c'est être du
-   * staff — décision produit, tous les comptes ont les mêmes droits. Le champ
-   * reste distinct d'un simple "authentifié" pour ne rien changer côté
-   * consommateurs (`requireAdmin`, le profil renvoyé au client) si un rôle
-   * différencié devenait nécessaire un jour.
+   * Quel monde d'identité a authentifié cette requête. Détermine quel
+   * bureau de données (`dataUserId`) et quelles routes sont accessibles —
+   * voir `server/routes.ts`, qui réserve `staffRouter` et les collections
+   * hors Journal à `kind === "staff"`.
+   */
+  kind: "staff" | "student";
+  /**
+   * Bureau de données sur lequel cette session peut agir — le `userId` à
+   * passer à `server/repositories.ts`. Pour le staff, c'est toujours
+   * `DEFAULT_USER_ID` (bureau partagé, quel que soit le compte utilisé pour
+   * s'y connecter). Pour un élève, c'est son bureau personnel dédié.
+   */
+  dataUserId: string;
+  /**
+   * Toujours vrai pour une session staff, toujours faux pour une session
+   * élève — décision produit, tous les comptes staff ont les mêmes droits,
+   * aucun élève n'a de droit d'administration.
    */
   isAdmin: boolean;
   /**
    * Vrai pour le seul compte fondateur (`/auth/setup`), faux pour les comptes
-   * invités.
+   * invités et pour toute session élève.
    *
    * Volontairement **distinct de `isAdmin`**, qui reste vrai pour tout le
-   * monde : les coachs gardent l'intégralité des droits métier (suivi des
-   * élèves, écriture des collections, gestion de l'équipe). Ce drapeau ne
+   * monde du staff : les coachs gardent l'intégralité des droits métier (suivi
+   * des élèves, écriture des collections, gestion de l'équipe). Ce drapeau ne
    * gouverne que la configuration du bureau partagé — aujourd'hui les entrées
    * masquées de la sidebar. Réutiliser `isAdmin` aurait retiré aux coachs bien
    * plus que ce qui était demandé.
@@ -60,6 +81,9 @@ const PUBLIC_PATHS = new Set([
   "/auth/login",
   "/auth/logout",
   "/auth/setup",
+  "/auth/student-me",
+  "/auth/student-login",
+  "/auth/student-logout",
 ]);
 
 /**
@@ -69,6 +93,66 @@ const PUBLIC_PATHS = new Set([
  * — ce blocage est un filet de sécurité, pas le mécanisme principal.
  */
 const CHANGE_PASSWORD_PATH = "/auth/change-password";
+const STUDENT_CHANGE_PASSWORD_PATH = "/auth/student-change-password";
+
+/**
+ * Essaie la session staff. Ne répond jamais elle-même — renvoie `null` si
+ * aucune session staff valide n'est présente, pour laisser `requireAuth`
+ * essayer la session élève ensuite.
+ */
+function tryStaffAuth(req: Request, res: Response): AuthContext | "blocked" | null {
+  const token = readSessionToken(req);
+  const session = token ? validateSession(token) : null;
+  if (!session) return null;
+
+  // Relu en base à chaque requête, jamais pris dans le cookie : la
+  // suppression d'un compte ou un changement de mot de passe prennent effet
+  // immédiatement, sans attendre l'expiration de la session.
+  const staff = getStaffById(session.userId);
+  if (!staff) return null;
+
+  if (staff.mustChangePassword && req.path !== CHANGE_PASSWORD_PATH) {
+    res.status(403).json({
+      error: "Mot de passe temporaire : choisis-en un nouveau avant de continuer.",
+      code: "MUST_CHANGE_PASSWORD",
+    });
+    return "blocked";
+  }
+
+  return {
+    userId: staff.id,
+    kind: "staff",
+    dataUserId: DEFAULT_USER_ID,
+    isAdmin: true,
+    isOwner: staff.isOwner,
+  };
+}
+
+/** Même contrat que `tryStaffAuth`, pour le monde élève. */
+function tryStudentAuth(req: Request, res: Response): AuthContext | "blocked" | null {
+  const token = readStudentSessionToken(req);
+  const session = token ? validateStudentSession(token) : null;
+  if (!session) return null;
+
+  const student = getStudentById(session.userId);
+  if (!student) return null;
+
+  if (student.mustChangePassword && req.path !== STUDENT_CHANGE_PASSWORD_PATH) {
+    res.status(403).json({
+      error: "Mot de passe temporaire : choisis-en un nouveau avant de continuer.",
+      code: "MUST_CHANGE_PASSWORD",
+    });
+    return "blocked";
+  }
+
+  return {
+    userId: student.id,
+    kind: "student",
+    dataUserId: student.userId,
+    isAdmin: false,
+    isOwner: false,
+  };
+}
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   if (PUBLIC_PATHS.has(req.path)) {
@@ -76,32 +160,46 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     return;
   }
 
-  const token = readSessionToken(req);
-  const session = token ? validateSession(token) : null;
-
-  if (!session) {
-    res.status(401).json({ error: "Session expirée ou absente." });
+  const staffResult = tryStaffAuth(req, res);
+  if (staffResult === "blocked") return;
+  if (staffResult) {
+    req.auth = staffResult;
+    next();
     return;
   }
 
-  // Relu en base à chaque requête, jamais pris dans le cookie : la
-  // suppression d'un compte ou un changement de mot de passe prennent effet
-  // immédiatement, sans attendre l'expiration de la session.
-  const staff = getStaffById(session.userId);
-  if (!staff) {
-    res.status(401).json({ error: "Session expirée ou absente." });
+  const studentResult = tryStudentAuth(req, res);
+  if (studentResult === "blocked") return;
+  if (studentResult) {
+    req.auth = studentResult;
+    next();
     return;
   }
 
-  if (staff.mustChangePassword && req.path !== CHANGE_PASSWORD_PATH) {
-    res.status(403).json({
-      error: "Mot de passe temporaire : choisis-en un nouveau avant de continuer.",
-      code: "MUST_CHANGE_PASSWORD",
-    });
+  res.status(401).json({ error: "Session expirée ou absente." });
+};
+
+/**
+ * Réserve une route au monde staff, en plus de `requireAuth`.
+ *
+ * Défense en profondeur : `staffRouter` et les routes de gestion des élèves
+ * ne devraient jamais être appelées par une session élève, mais on ne compte
+ * pas uniquement sur l'absence d'appel légitime.
+ */
+export const requireStaffKind = (req: Request, res: Response, next: NextFunction) => {
+  if (req.auth?.kind !== "staff") {
+    res.status(403).json({ error: "Action réservée au staff." });
     return;
   }
+  next();
+};
 
-  req.auth = { userId: session.userId, isAdmin: true, isOwner: staff.isOwner };
+/** Symétrique de `requireStaffKind`, pour les routes propres au monde élève. */
+export const requireStudentKind = (req: Request, res: Response, next: NextFunction) => {
+  if (req.auth?.kind !== "student") {
+    res.status(403).json({ error: "Action réservée à un compte élève." });
+    return;
+  }
   next();
 };
 

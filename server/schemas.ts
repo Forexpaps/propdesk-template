@@ -131,13 +131,3 @@ export const changePasswordSchema = z
     newPassword: z.string().min(PASSWORD_MIN).max(200),
   })
   .strict();
-
-/** Corps accepté par la route d'audit IA du coach. */
-export const coachReviewSchema = z
-  .object({
-    trade: z.object({}).passthrough().optional(),
-    question: z.string().min(1).max(4000).optional(),
-  })
-  .refine((body) => body.trade !== undefined || body.question !== undefined, {
-    message: "Fournir un trade à auditer ou une question.",
-  });

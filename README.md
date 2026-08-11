@@ -1,7 +1,8 @@
 # Académie de Trading Horizon — PropDesk
 
 Plateforme d'académie de trading SMC : modules vidéo, journal d'exécution,
-suivi de comptes prop firm, forum, messagerie coach et audits assistés par IA.
+suivi de comptes prop firm, forum et messagerie coach. Aucune IA n'est
+utilisée nulle part dans l'application.
 
 ## Démarrage
 
@@ -9,15 +10,8 @@ suivi de comptes prop firm, forum, messagerie coach et audits assistés par IA.
 npm install
 ```
 
-Créer un `.env` à la racine (voir [.env.example](.env.example)) :
-
-```
-GEMINI_API_KEY=votre_clé
-```
-
-La clé n'est lue que côté serveur ; elle n'est jamais exposée au navigateur.
-Sans elle, l'application fonctionne — seules les fonctions d'audit IA renvoient
-une erreur explicite.
+Créer un `.env` à la racine (voir [.env.example](.env.example)) — un fichier
+vide suffit, toutes les variables ont un défaut utilisable.
 
 ```bash
 npm run dev     # http://localhost:3000
@@ -95,15 +89,13 @@ La base vit dans `DATA_DIR` (`./data` par défaut), hors du dépôt.
 | PUT | `/api/quiz-results` | résultats de quiz |
 | POST | `/api/state/seed` | amorce avec le jeu de démonstration |
 | POST | `/api/state/import` | reprend un état venu de `localStorage` |
-| POST | `/api/coach/ai-review` | audit IA d'un trade ou réponse à une question |
 | GET | `/api/download-features-pdf` | catalogue PDF des fonctionnalités |
 
 Toutes les routes exigent une session valide, **sauf** `/api/health`,
 `/api/auth/me`, `/api/auth/setup`, `/api/auth/login` et `/api/auth/logout`.
 Toutes les entrées sont validées (zod).
 
-Quatre limitations de débit par IP : `/api/coach/ai-review` 10 par minute
-(seule route facturée à l'appel), `/api/auth/login` 10 par quart d'heure,
+Trois limitations de débit par IP : `/api/auth/login` 10 par quart d'heure,
 `/api/auth/setup` 5 par quart d'heure, `/api/auth/staff` (invitation) 10 par
 quart d'heure.
 
