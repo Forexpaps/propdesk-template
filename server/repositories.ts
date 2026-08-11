@@ -30,6 +30,18 @@ const TABLES: Record<CollectionName, string> = {
 /** Objet de collection : on n'exige qu'un identifiant stable. */
 type WithId = { id: string; [key: string]: unknown };
 
+/**
+ * Levée par `replaceCollection` quand un `id` soumis appartient déjà à un
+ * AUTRE bureau (`user_id` différent). Voir le commentaire de
+ * `replaceCollection` pour le pourquoi de cette vérification.
+ */
+export class CollectionOwnershipConflictError extends Error {
+  constructor(public readonly conflictingIds: string[]) {
+    super(`Conflit de propriété sur ${conflictingIds.length} identifiant(s).`);
+    this.name = "CollectionOwnershipConflictError";
+  }
+}
+
 /** Colonnes promues hors du payload, par collection. */
 const PROMOTED: Partial<Record<CollectionName, string[]>> = {
   trades: ["date", "pair", "direction", "result", "pnl"],
@@ -106,6 +118,24 @@ export function replaceCollection<T extends WithId>(
       .all(userId) as { id: string }[];
     const incomingIds = new Set(rows.map((r) => r.id));
     const staleIds = existingIds.map((r) => r.id).filter((id) => !incomingIds.has(id));
+
+    // `id` est une clé primaire GLOBALE de la table, pas composite avec
+    // `user_id` (voir HANDOFF §3/§8) : sans ce contrôle, l'UPSERT plus bas
+    // (`ON CONFLICT(id) DO UPDATE`) écraserait silencieusement une ligne
+    // appartenant à un AUTRE bureau si son `id` — généré côté client via
+    // `Date.now()`, donc devinable — entre en collision avec un `id` soumis
+    // ici. On rejette toute la requête (rien n'est écrit, transaction
+    // annulée) dès qu'un seul `id` soumis appartient déjà à quelqu'un d'autre.
+    if (incomingIds.size > 0) {
+      const ids = [...incomingIds];
+      const placeholdersForCheck = ids.map(() => "?").join(", ");
+      const conflicting = db
+        .prepare(`SELECT id FROM ${table} WHERE id IN (${placeholdersForCheck}) AND user_id != ?`)
+        .all(...ids, userId) as { id: string }[];
+      if (conflicting.length > 0) {
+        throw new CollectionOwnershipConflictError(conflicting.map((r) => r.id));
+      }
+    }
 
     if (staleIds.length > 0) {
       const placeholdersForDelete = staleIds.map(() => "?").join(", ");

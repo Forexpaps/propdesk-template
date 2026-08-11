@@ -9,6 +9,7 @@ import {
   getQuizResults,
   replaceQuizResults,
   COLLECTION_NAMES,
+  CollectionOwnershipConflictError,
   type CollectionName,
 } from "./repositories";
 import { isBootstrapped, writeFullState, seedDemoData } from "./seed";
@@ -280,7 +281,21 @@ api.put("/collections/:name", (req, res) => {
     ) as typeof parsed.data;
   }
 
-  replaceCollection(name, dataToWrite, req.auth!.dataUserId);
+  try {
+    replaceCollection(name, dataToWrite, req.auth!.dataUserId);
+  } catch (err) {
+    if (err instanceof CollectionOwnershipConflictError) {
+      // Un ou plusieurs `id` soumis appartiennent déjà à un autre bureau
+      // (voir le commentaire de `replaceCollection`) — rien n'a été écrit.
+      // Un id généré côté client (`Date.now()`) est entré en collision ;
+      // recharger régénère un id propre à la prochaine tentative.
+      res.status(409).json({
+        error: "Conflit de synchronisation : recharge la page et réessaie.",
+      });
+      return;
+    }
+    throw err;
+  }
   res.json({ success: true, count: dataToWrite.length });
 });
 
