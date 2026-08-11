@@ -23,6 +23,8 @@ import { studentAuthRouter, studentProtectedRouter } from "./auth/studentRoutes"
 import { requireAuth } from "./auth/middleware";
 import { getEconomicCalendar } from "./economicCalendar";
 import { getMarketData } from "./marketData";
+import { getStudentById } from "./auth/studentCredentials";
+import { DEFAULT_USER_ID } from "./db";
 
 export const api = Router();
 
@@ -102,16 +104,61 @@ api.use(requireAuth);
 api.use("/auth", staffRouter);
 api.use("/auth", studentProtectedRouter);
 
-/** Collections qu'une session élève peut lire/écrire — uniquement son Journal. */
-const STUDENT_ALLOWED_COLLECTIONS = new Set<CollectionName>(["trades"]);
+/**
+ * Collections qu'une session élève peut lire/écrire : son Journal, sa copie
+ * personnelle du programme de formation (leçons vues), et son fil de
+ * messagerie avec le coach — jamais les collections du bureau staff
+ * (comptes, fiches élèves) ni celles d'un autre élève.
+ */
+const STUDENT_ALLOWED_COLLECTIONS = new Set<CollectionName>(["trades", "modules", "messages"]);
+
+interface EnrolledStudentLite {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  level: string;
+  joinedDate: string;
+  currentCapital: number;
+  startingCapital: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Profil affichable pour une session élève, reconstruit depuis sa fiche
+ * `EnrolledStudent` côté coach — le compte élève lui-même n'a pas de ligne
+ * `users` renseignée (voir `AdminStudentView.tsx` côté client, même
+ * problème résolu à la même source).
+ */
+function buildStudentProfile(studentAccountId: string): Record<string, unknown> | null {
+  const account = getStudentById(studentAccountId);
+  if (!account) return null;
+
+  const enrolled = listCollection<EnrolledStudentLite>("enrolledStudents", DEFAULT_USER_ID).find(
+    (s) => s.id === account.enrolledStudentId
+  );
+  if (!enrolled) return null;
+
+  return {
+    name: enrolled.name,
+    email: enrolled.email,
+    avatar: enrolled.avatar,
+    level: enrolled.level,
+    joinedDate: enrolled.joinedDate,
+    currentCapital: enrolled.currentCapital,
+    startingCapital: enrolled.startingCapital,
+    isAdmin: false,
+  };
+}
 
 /**
  * Payload de démarrage : toutes les collections en un aller-retour, dans les
  * formes exactes attendues par le client.
  *
- * Une session élève ne reçoit que sa collection de trades (+ un profil
- * minimal) — pas les autres collections, même vides : un filtrage franc côté
- * serveur, pas une forme complète à moitié cachée côté client.
+ * Une session élève ne reçoit que les collections listées dans
+ * `STUDENT_ALLOWED_COLLECTIONS` (+ son profil reconstruit et ses résultats de
+ * quiz) — un filtrage franc côté serveur, pas une forme complète à moitié
+ * cachée côté client.
  */
 api.get("/state", (req, res) => {
   const dataUserId = req.auth!.dataUserId;
@@ -119,9 +166,11 @@ api.get("/state", (req, res) => {
   if (req.auth!.kind === "student") {
     res.json({
       bootstrapped: isBootstrapped(),
-      student: { name: "", email: "" },
-      quizResults: {},
-      collections: { trades: listCollection("trades", dataUserId) },
+      student: buildStudentProfile(req.auth!.userId),
+      quizResults: getQuizResults(dataUserId),
+      collections: Object.fromEntries(
+        [...STUDENT_ALLOWED_COLLECTIONS].map((name) => [name, listCollection(name, dataUserId)])
+      ),
     });
     return;
   }
@@ -223,19 +272,15 @@ api.put("/profile", (req, res) => {
 });
 
 api.put("/quiz-results", (req, res) => {
-  // Pas de quiz côté élève dans ce chantier — réservé au bureau staff.
-  if (req.auth!.kind === "student") {
-    res.status(403).json({ error: "Action réservée au staff." });
-    return;
-  }
-
   const parsed = quizResultsSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Résultats de quiz invalides.", details: parsed.error.issues });
     return;
   }
 
-  replaceQuizResults(parsed.data);
+  // Portée par bureau de données : un élève n'écrit que les siens, jamais
+  // ceux du bureau staff partagé (`dataUserId` fait déjà cette distinction).
+  replaceQuizResults(parsed.data, req.auth!.dataUserId);
   res.json({ success: true });
 });
 

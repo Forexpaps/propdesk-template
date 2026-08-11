@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type ServerState } from "../lib/api";
 import { clearPending, listPending, markPending } from "../lib/pendingChanges";
-import type { Trade } from "../types";
+import type { Trade, Module, CoachMessage, ModuleQuizResult, StudentProfile } from "../types";
 
 export type SyncStatus = "loading" | "online" | "offline";
 
@@ -172,11 +172,17 @@ export function useBootstrap() {
  * ancien `localStorage` (aucun élève n'a de données antérieures à son
  * compte), pas de bandeau de modifications hors ligne (pas de mode hors ligne
  * élève). `GET /api/state` est déjà filtré côté serveur pour une session
- * élève — il ne renvoie que sa collection `trades`.
+ * élève — il ne renvoie que les collections listées dans
+ * `STUDENT_ALLOWED_COLLECTIONS` (voir `server/routes.ts`) : trades, modules
+ * (sa copie personnelle du programme) et messages (son fil avec le coach).
  */
 export function useStudentBootstrap() {
   const [status, setStatus] = useState<SyncStatus>("loading");
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [modules, setModules] = useState<Module[]>([]);
+  const [messages, setMessages] = useState<CoachMessage[]>([]);
+  const [quizResults, setQuizResults] = useState<Record<string, ModuleQuizResult>>({});
+  const [student, setStudent] = useState<StudentProfile | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -186,6 +192,10 @@ export function useStudentBootstrap() {
         const serverState = await api.fetchState();
         if (!cancelled) {
           setTrades(serverState.collections.trades ?? []);
+          setModules(serverState.collections.modules ?? []);
+          setMessages(serverState.collections.messages ?? []);
+          setQuizResults(serverState.quizResults ?? {});
+          setStudent((serverState.student as StudentProfile | null) ?? null);
           setStatus("online");
         }
       } catch (err) {
@@ -199,7 +209,7 @@ export function useStudentBootstrap() {
     };
   }, []);
 
-  return { status, trades };
+  return { status, trades, modules, messages, quizResults, student };
 }
 
 /**

@@ -255,8 +255,16 @@ export const api = {
         accounts: TradingAccount[];
         trades: Trade[];
         modules: Module[];
+        messages: CoachMessage[];
       };
     }>(`/api/auth/admin/students/${encodeURIComponent(enrolledStudentId)}/view`),
+
+  /** Envoie un message de coach dans le fil d'un élève précis. */
+  sendMessageToStudent: (enrolledStudentId: string, text: string) =>
+    request<{ message: CoachMessage }>(
+      `/api/auth/admin/students/${encodeURIComponent(enrolledStudentId)}/messages`,
+      { method: "POST", body: JSON.stringify({ text }) }
+    ),
 
   // --- Authentification élève ---
 

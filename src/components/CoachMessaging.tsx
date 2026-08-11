@@ -17,6 +17,24 @@ import {
 import { Coach, CoachMessage, Trade, StudentProfile } from "../types";
 import { formatCurrency } from "../lib/format";
 
+/**
+ * Les messages réels stockent un horodatage ISO 8601 (parsable, indépendant
+ * du fuseau) ; les données de démonstration restées telles quelles utilisent
+ * encore un libellé tout fait (« Aujourd'hui, 14:30 »). On affiche le second
+ * tel quel et on ne formate que le premier, plutôt que de réécrire les deux
+ * formats à la source.
+ */
+function formatMessageTimestamp(raw: string): string {
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  return date.toLocaleString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 interface CoachMessagingProps {
   coaches: Coach[];
   messages: CoachMessage[];
@@ -247,7 +265,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
                         }`}
                       >
                         <Clock className="w-2.5 h-2.5" />
-                        <span>{msg.timestamp}</span>
+                        <span>{formatMessageTimestamp(msg.timestamp)}</span>
                         {isStudent && <CheckCheck className="w-3 h-3 ml-1" />}
                       </div>
                     </div>
