@@ -135,6 +135,18 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     return accounts.find((a) => a.id === accountId)?.name ?? null;
   };
 
+  /**
+   * Échappe une cellule CSV de texte libre (saisi par l'utilisateur) : guillemets
+   * doublés, ET neutralisation de l'injection de formule Excel/Sheets — une
+   * cellule commençant par `=`, `+`, `-` ou `@` peut s'exécuter comme une formule
+   * à l'ouverture (voir OWASP CSV Injection). Préfixe d'apostrophe standard :
+   * Excel/Sheets l'interprète comme « force texte », sans dénaturer la lecture.
+   */
+  const csvCell = (value: string): string => {
+    const safe = /^[=+\-@]/.test(value) ? `'${value}` : value;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
+
   const exportToCSV = () => {
     if (trades.length === 0) return;
     const headers = [
@@ -167,8 +179,8 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       t.time || "",
       t.exitDate || "",
       t.exitTime || "",
-      `"${(nomDuCompte(t.accountId) ?? "Non rattache").replace(/"/g, '""')}"`,
-      t.pair,
+      csvCell(nomDuCompte(t.accountId) ?? "Non rattache"),
+      csvCell(t.pair),
       t.marketCategory,
       t.direction,
       t.entryPrice,
@@ -180,10 +192,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       t.pnlUnit ?? "USD",
       t.riskRewardRatio,
       t.result,
-      `"${t.strategy.replace(/"/g, '""')}"`,
+      csvCell(t.strategy),
       t.emotion,
-      `"${(t.mistakes || []).join("; ").replace(/"/g, '""')}"`,
-      `"${(t.notes || "").replace(/"/g, '""')}"`
+      csvCell((t.mistakes || []).join("; ")),
+      csvCell(t.notes || "")
     ]);
 
     const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");

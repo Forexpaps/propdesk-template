@@ -10,10 +10,30 @@ import { z } from "zod";
  * et le fait que ce soit bien du JSON structuré.
  */
 
+/**
+ * `chartUrl`/`avatar` ne sont aujourd'hui rendus qu'en `<img src>`, jamais en
+ * lien cliquable ou en navigation — une URL `javascript:` n'y est donc pas
+ * exploitable en pratique. Verrou défensif tout de même : n'accepte que des
+ * images `https://` ou des `data:image/...` (captures d'écran redimensionnées
+ * côté client), pour qu'un futur refactor de ces champs en lien/iframe ne
+ * réintroduise pas silencieusement un risque.
+ */
+const SAFE_MEDIA_URL_FIELDS = ["chartUrl", "avatar"] as const;
+const isSafeMediaUrl = (value: unknown): boolean =>
+  typeof value !== "string" ||
+  value === "" ||
+  /^https:\/\//.test(value) ||
+  /^data:image\//.test(value);
+
 /** Tout élément de collection doit porter un id non vide et unique. */
 const collectionItem = z
   .object({ id: z.string().min(1).max(200) })
-  .passthrough();
+  .passthrough()
+  .refine(
+    (item) =>
+      SAFE_MEDIA_URL_FIELDS.every((field) => isSafeMediaUrl((item as Record<string, unknown>)[field])),
+    { message: "URL d'image invalide : seules https:// et data:image/... sont acceptées." }
+  );
 
 export const collectionPayloadSchema = z
   .array(collectionItem)
@@ -48,6 +68,9 @@ export const profileSchema = z
     currentCapital: z.number().finite(),
   })
   .passthrough()
+  .refine((profile) => isSafeMediaUrl((profile as Record<string, unknown>).avatar), {
+    message: "URL d'avatar invalide : seules https:// et data:image/... sont acceptées.",
+  })
   .transform((profile) => {
     const cleaned = { ...profile } as Record<string, unknown>;
     for (const field of SERVER_OWNED_PROFILE_FIELDS) delete cleaned[field];

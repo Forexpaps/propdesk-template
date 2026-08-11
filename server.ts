@@ -1,4 +1,5 @@
 import express from "express";
+import helmet from "helmet";
 import http from "node:http";
 import path from "path";
 import { createServer as createViteServer } from "vite";
@@ -15,6 +16,43 @@ const ROOT = process.cwd();
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const isProd = process.env.NODE_ENV === "production";
+
+// Déployé derrière un reverse proxy en production (1 saut) : sans ce
+// réglage, `req.ip` (utilisé par le rate limiter, voir
+// server/middleware/rateLimit.ts) retombe sur l'IP du proxy pour TOUT le
+// monde — le quota de tentatives de connexion devient collectif au lieu
+// d'être par visiteur. Laissé désactivé en dev, où il n'y a pas de proxy et
+// où le faire confiance à un X-Forwarded-For non maîtrisé serait risqué.
+if (isProd) {
+  app.set("trust proxy", 1);
+}
+
+// Content-Security-Policy activée seulement en production : le serveur de
+// dev Vite a besoin d'`eval`/scripts inline pour le rechargement à chaud
+// (HMR), et n'est jamais exposé publiquement. `style-src 'unsafe-inline'`
+// reste nécessaire : l'app utilise `style={{...}}` pour des valeurs
+// dynamiques (barres de progression, dégradés) sans nonce CSP en place.
+app.use(
+  helmet({
+    contentSecurityPolicy: isProd
+      ? {
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "https:"],
+            connectSrc: ["'self'"],
+            frameAncestors: ["'none'"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+          },
+        }
+      : false,
+    hsts: isProd,
+  })
+);
 
 // Les routes d'authentification n'échangent que quelques centaines d'octets. Ce
 // parseur borné est déclaré AVANT le parseur global : body-parser marque la
