@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { X, Eye, AlertCircle, Loader } from "lucide-react";
+import { X, AlertCircle, Loader } from "lucide-react";
 import { EnrolledStudent, StudentProfile, Trade, TradingAccount, Module } from "../types";
 import { api } from "../lib/api";
 import { TradingJournal } from "./TradingJournal";
 import { PerformanceDashboard } from "./PerformanceDashboard";
 import { WalletManagement } from "./WalletManagement";
+import { MainDashboard } from "./MainDashboard";
+import { MacroDashboard } from "./MacroDashboard";
+import { Sidebar, SidebarItemKey, TabType } from "./Sidebar";
+import { TopHeader } from "./TopHeader";
 
 interface AdminStudentViewProps {
   enrolledStudentId: string;
@@ -12,14 +16,35 @@ interface AdminStudentViewProps {
   onClose: () => void;
 }
 
-type TabType = "journal" | "wallet" | "performance" | "calendar";
+/**
+ * Onglets pris en charge par cette vue en lecture seule : ceux dont les
+ * données viennent entièrement de `fetchAdminStudentView` (profil, comptes,
+ * trades) ou qui ne dépendent d'aucune donnée propre à l'élève (Macro, flux
+ * de marché partagé). Les autres (Examen, Replay, Module vidéo, Messagerie,
+ * Sim propfirm...) demanderaient des données supplémentaires — quiz, badges,
+ * fil de messagerie — non exposées par cette route ; masquées plutôt
+ * qu'affichées à moitié cassées.
+ */
+const HIDDEN_ITEMS_FOR_READ_VIEW: SidebarItemKey[] = [
+  "exam",
+  "checklist",
+  "replay",
+  "propfirm",
+  "academy",
+  "messaging",
+  "audit",
+  "propfirmrules",
+  "mindset",
+];
 
 export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
   enrolledStudentId,
   studentName,
   onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState<TabType>("journal");
+  const [activeTab, setActiveTab] = useState<TabType>("dashboard");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [studentData, setStudentData] = useState<{
@@ -64,7 +89,14 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
     );
   }
 
-  if (error || !studentData) {
+  // Le compte élève lui-même n'a jamais de `StudentProfile` renseigné (`{}` en
+  // base) : un élève n'utilise que le Journal, jamais un tableau de bord
+  // complet, donc rien n'écrit ce profil. Nom, avatar, capital et niveau
+  // vivent sur la fiche `EnrolledStudent` côté coach — c'est elle qu'il faut
+  // utiliser pour reconstruire un profil affichable ici.
+  const enrolledStudent = studentData?.enrolledStudents.find((s) => s.id === enrolledStudentId);
+
+  if (error || !studentData || !enrolledStudent) {
     return (
       <div className="fixed inset-0 z-50 bg-[#0D1110]/90 backdrop-blur-md flex items-center justify-center p-4">
         <div className="bg-[#111615] border border-rose-500/30 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
@@ -72,7 +104,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
             <AlertCircle className="w-6 h-6 text-rose-400" />
             <h3 className="text-lg font-bold text-white">Erreur</h3>
           </div>
-          <p className="text-sm text-slate-300">{error}</p>
+          <p className="text-sm text-slate-300">{error ?? "Fiche introuvable."}</p>
           <button
             onClick={onClose}
             className="w-full px-4 py-2 rounded-lg bg-slate-700 text-white font-semibold text-sm hover:bg-slate-600"
@@ -84,54 +116,70 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
     );
   }
 
-  const TAB_CONFIG: Array<{ id: TabType; label: string; icon: string }> = [
-    { id: "journal", label: "Journal de Trading", icon: "📔" },
-    { id: "wallet", label: "Portefeuille", icon: "💼" },
-    { id: "performance", label: "Rentabilité", icon: "📈" },
-    { id: "calendar", label: "Calendrier", icon: "📅" },
-  ];
+  // Sidebar restreinte aux onglets pris en charge — indépendant de
+  // `hiddenSidebarItems`, qui appartient normalement au bureau staff partagé
+  // et n'a ici qu'un rôle local d'affichage pour cette vue.
+  const readOnlyStudent: StudentProfile = {
+    name: enrolledStudent.name,
+    email: enrolledStudent.email,
+    avatar: enrolledStudent.avatar,
+    level: enrolledStudent.level,
+    joinedDate: enrolledStudent.joinedDate,
+    currentCapital: enrolledStudent.currentCapital,
+    startingCapital: enrolledStudent.startingCapital,
+    isAdmin: false,
+    hiddenSidebarItems: HIDDEN_ITEMS_FOR_READ_VIEW,
+  };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0D1110]/40 backdrop-blur-sm overflow-y-auto">
-      <div className="min-h-screen py-8 px-4">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-6 flex items-center justify-between shadow-xl">
-            <div className="flex items-center gap-3">
-              <Eye className="w-6 h-6 text-[#00E676]" />
-              <div>
-                <h2 className="text-2xl font-black text-white">Vue Complète : {studentName}</h2>
-                <p className="text-xs text-slate-400 mt-1">Consultation en lecture seule • Admin</p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-[#1B2320] rounded-lg transition-colors"
-            >
-              <X className="w-6 h-6 text-slate-400" />
-            </button>
-          </div>
+    <div className="fixed inset-0 z-50 bg-[#0B0F0E] overflow-y-auto">
+      {/* Bandeau de contexte : seul ajout par rapport à l'écosystème réel, pour
+          qu'on ne perde jamais de vue qu'on consulte la fiche d'un tiers. */}
+      <div className="sticky top-0 z-[60] bg-[#00E676] text-slate-950 text-xs font-bold px-4 py-2 flex items-center justify-between">
+        <span>
+          Consultation en lecture seule — {studentName} · Aucune modification n'est possible depuis cet écran.
+        </span>
+        <button
+          onClick={onClose}
+          className="p-1 rounded hover:bg-slate-950/10 transition-colors"
+          title="Fermer la vue complète"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
 
-          {/* Tab Navigation */}
-          <div className="flex gap-2 flex-wrap">
-            {TAB_CONFIG.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
-                  activeTab === tab.id
-                    ? "bg-[#00E676] text-slate-950"
-                    : "bg-[#1B2320] text-slate-300 hover:bg-[#232D29]"
-                }`}
-              >
-                {tab.icon} {tab.label}
-              </button>
-            ))}
-          </div>
+      <div className="min-h-screen bg-[#0B0F0E] text-slate-100 font-sans antialiased flex">
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          student={readOnlyStudent}
+          courseCompletionPercentage={enrolledStudent.courseCompletionPercentage}
+          totalUnreadMessages={0}
+          mobileOpen={mobileOpen}
+          setMobileOpen={setMobileOpen}
+          isCollapsed={isCollapsed}
+          setIsCollapsed={setIsCollapsed}
+          onOpenProfileModal={() => {}}
+          canManageSidebar={false}
+        />
 
-          {/* Tab Content */}
-          <div className="space-y-6">
-            {activeTab === "journal" && studentData && (
+        <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isCollapsed ? "lg:pl-20" : "lg:pl-64"}`}>
+          <TopHeader activeTab={activeTab} student={readOnlyStudent} setMobileOpen={setMobileOpen} />
+
+          <main className="p-4 sm:p-8 flex-1 max-w-7xl w-full mx-auto">
+            {activeTab === "dashboard" && (
+              <MainDashboard
+                student={readOnlyStudent}
+                trades={studentData.trades}
+                modules={studentData.modules}
+                forumTopics={[]}
+                messages={[]}
+                courseCompletionPercentage={enrolledStudent.courseCompletionPercentage}
+                setActiveTab={setActiveTab}
+              />
+            )}
+
+            {activeTab === "journal" && (
               <TradingJournal
                 trades={studentData.trades}
                 accounts={studentData.accounts}
@@ -139,34 +187,31 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
                 onUpdateTrade={() => {}}
                 onDeleteTrade={() => {}}
                 onSendTradeToCoach={() => {}}
-                readOnly={true}
-                hideAiAndCoachActions={true}
+                readOnly
+                hideAiAndCoachActions
               />
             )}
 
-            {activeTab === "wallet" && studentData && (
+            {activeTab === "wallets" && (
               <WalletManagement
                 accounts={studentData.accounts}
                 trades={studentData.trades}
                 onAddAccount={() => {}}
                 onUpdateAccountBalance={() => {}}
+                readOnly
               />
             )}
 
-            {activeTab === "performance" && studentData && studentData.student && (
+            {activeTab === "analytics" && (
               <PerformanceDashboard
-                student={studentData.student}
+                student={readOnlyStudent}
                 trades={studentData.trades}
-                courseCompletionPercentage={0}
+                courseCompletionPercentage={enrolledStudent.courseCompletionPercentage}
               />
             )}
 
-            {activeTab === "calendar" && (
-              <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-8 text-center">
-                <p className="text-slate-400">Calendrier économique — À venir</p>
-              </div>
-            )}
-          </div>
+            {activeTab === "macro" && <MacroDashboard />}
+          </main>
         </div>
       </div>
     </div>
