@@ -22,6 +22,7 @@ import { authRouter, staffRouter } from "./auth/routes";
 import { studentAuthRouter, studentProtectedRouter } from "./auth/studentRoutes";
 import { requireAuth } from "./auth/middleware";
 import { getEconomicCalendar } from "./economicCalendar";
+import { getMarketData } from "./marketData";
 
 export const api = Router();
 
@@ -50,6 +51,20 @@ api.get(
     } catch (err) {
       console.warn("[economic-calendar] Aucun cache disponible.", err);
       res.status(503).json({ error: "Calendrier économique indisponible pour le moment." });
+    }
+  })
+);
+
+/** Public, même raisonnement que `/economic-calendar` ci-dessus. */
+api.get(
+  "/market-data",
+  wrap(async (_req, res) => {
+    try {
+      const quotes = await getMarketData();
+      res.json({ quotes });
+    } catch (err) {
+      console.warn("[market-data] Aucun cache disponible.", err);
+      res.status(503).json({ error: "Données de marché indisponibles pour le moment." });
     }
   })
 );

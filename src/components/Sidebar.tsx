@@ -61,6 +61,7 @@ export const ALL_TABS = [
   "analytics",
   "exam",
   "propfirm",
+  "macro",
 ] as const;
 
 export type TabType = (typeof ALL_TABS)[number];
@@ -127,7 +128,7 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   audit: null,
   propfirmrules: null,
   mindset: null,
-  calendar: null,
+  calendar: "macro",
 };
 
 /**
@@ -170,7 +171,6 @@ interface SidebarProps {
   onOpenSetupAnalyzer?: () => void;
   onOpenPropFirmRules?: () => void;
   onOpenMindset?: () => void;
-  onOpenCalendar?: () => void;
   /** Masque ou réaffiche une entrée. Réservé au compte fondateur. */
   onToggleSidebarItem?: (key: SidebarItemKey) => void;
   /**
@@ -200,7 +200,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSetupAnalyzer,
   onOpenPropFirmRules,
   onOpenMindset,
-  onOpenCalendar,
   onToggleSidebarItem,
   canManageSidebar = false,
 }) => {
@@ -229,6 +228,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { key: "journal", id: "journal", label: "Journal de trading", icon: BookMarked },
     { key: "wallets", id: "wallets", label: "Portefeuille", icon: Wallet },
     { key: "analytics", id: "analytics", label: "Rentabilité", icon: LineChart },
+    { key: "calendar", id: "macro", label: "Macro", icon: Calendar },
     ...(student.isAdmin
       ? [{ key: "students" as const, id: "students" as const, label: "Suivi des Élèves", icon: UserCheck }]
       : []),
@@ -249,16 +249,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   /**
-   * Section OUTILS : quatre modales, sans onglet associé.
+   * Section OUTILS : trois modales, sans onglet associé.
    *
    * `propfirmrules` et non `propfirm` : cette dernière clé est déjà prise par
    * « Sim propfirm ».
+   *
+   * « Calendrier » n'y figure plus : devenu l'onglet « Macro » (section
+   * SUIVI), ce n'est plus une modale.
    */
   const outilsItems: SidebarEntry[] = [
     { key: "audit", id: null, label: "Audit Setup", icon: Target, onOpen: onOpenSetupAnalyzer },
     { key: "propfirmrules", id: null, label: "Prop Firm", icon: Trophy, onOpen: onOpenPropFirmRules },
     { key: "mindset", id: null, label: "Mindset", icon: Brain, onOpen: onOpenMindset },
-    { key: "calendar", id: null, label: "Calendrier", icon: Calendar, onOpen: onOpenCalendar },
   ];
 
   /**
