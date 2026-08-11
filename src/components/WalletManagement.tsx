@@ -47,6 +47,8 @@ interface WalletManagementProps {
   trades: Trade[];
   onAddAccount: (account: TradingAccount) => void;
   onUpdateAccountBalance: (id: string, newBalance: number) => void;
+  /** Masque les actions d'ajout et d'ajustement de solde — vue admin d'un élève. */
+  readOnly?: boolean;
 }
 
 export const WalletManagement: React.FC<WalletManagementProps> = ({
@@ -54,6 +56,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   trades,
   onAddAccount,
   onUpdateAccountBalance,
+  readOnly = false,
 }) => {
   const [filterType, setFilterType] = useState<string>("ALL");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -146,13 +149,15 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-sm shadow-md transition-all shrink-0 cursor-pointer z-10"
-        >
-          <Plus className="w-5 h-5" />
-          <span>Ajouter un Portefeuille</span>
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-sm shadow-md transition-all shrink-0 cursor-pointer z-10"
+          >
+            <Plus className="w-5 h-5" />
+            <span>Ajouter un Portefeuille</span>
+          </button>
+        )}
       </div>
 
       {/* Capital Summary Cards */}
@@ -321,25 +326,27 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const newBalStr = prompt(
-                      "Mettre à jour le solde du portefeuille ($) :",
-                      selectedAccount.equity.toString()
-                    );
-                    if (newBalStr) {
-                      const newBal = parseFloat(newBalStr);
-                      if (!isNaN(newBal)) {
-                        onUpdateAccountBalance(selectedAccount.id, newBal);
+              {!readOnly && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const newBalStr = prompt(
+                        "Mettre à jour le solde du portefeuille ($) :",
+                        selectedAccount.equity.toString()
+                      );
+                      if (newBalStr) {
+                        const newBal = parseFloat(newBalStr);
+                        if (!isNaN(newBal)) {
+                          onUpdateAccountBalance(selectedAccount.id, newBal);
+                        }
                       }
-                    }
-                  }}
-                  className="px-3 py-2 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-colors"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" /> Ajuster le Solde
-                </button>
-              </div>
+                    }}
+                    className="px-3 py-2 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 hover:text-white font-bold text-xs flex items-center gap-1.5 transition-colors"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" /> Ajuster le Solde
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Drawdown & Objectives Tracker Bars */}
