@@ -14,13 +14,14 @@ import {
   Info,
   RefreshCw,
 } from "lucide-react";
-import { StudentProfile } from "../types";
+import { StudentProfile, Trade } from "../types";
 import { formatCurrency } from "../lib/format";
 
 interface PropFirmRulesModalProps {
   isOpen: boolean;
   onClose: () => void;
   student: StudentProfile;
+  trades?: Trade[];
 }
 
 interface PropFirmPreset {
@@ -76,11 +77,21 @@ export const PropFirmRulesModal: React.FC<PropFirmRulesModalProps> = ({
   isOpen,
   onClose,
   student,
+  trades = [],
 }) => {
+  // Calculate real values from student data
+  const today = new Date().toISOString().split("T")[0];
+  const todayTradesCount = trades.filter((t) => t.date.startsWith(today)).length;
+  const todayPnlCalculated = trades
+    .filter((t) => t.date.startsWith(today))
+    .reduce((sum, t) => sum + parseFloat(String(t.pnl)) || 0, 0);
+
+  const tradingDays = new Set(trades.map((t) => t.date.split("T")[0])).size;
+
   const [selectedPreset, setSelectedPreset] = useState<PropFirmPreset>(PRESETS[0]);
-  const [currentBalance, setCurrentBalance] = useState<number>(104250);
-  const [todayPnl, setTodayPnl] = useState<number>(-450);
-  const [daysTraded, setDaysTraded] = useState<number>(6);
+  const [currentBalance, setCurrentBalance] = useState<number>(student.currentCapital);
+  const [todayPnl, setTodayPnl] = useState<number>(todayPnlCalculated);
+  const [daysTraded, setDaysTraded] = useState<number>(tradingDays);
 
   if (!isOpen) return null;
 

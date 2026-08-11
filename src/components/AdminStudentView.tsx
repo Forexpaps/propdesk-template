@@ -16,26 +16,6 @@ interface AdminStudentViewProps {
   onClose: () => void;
 }
 
-/**
- * Onglets pris en charge par cette vue en lecture seule : ceux dont les
- * données viennent entièrement de `fetchAdminStudentView` (profil, comptes,
- * trades, messages) ou qui ne dépendent d'aucune donnée propre à l'élève
- * (Macro, flux de marché partagé). Les autres (Examen, Replay, Module vidéo,
- * Sim propfirm...) demanderaient des données ou des écrans supplémentaires ;
- * masqués plutôt qu'affichés à moitié cassés. « Messagerie » est la seule
- * entrée de cette vue qui reste modifiable : répondre à l'élève, pas éditer
- * ses données.
- */
-const HIDDEN_ITEMS_FOR_READ_VIEW: SidebarItemKey[] = [
-  "exam",
-  "checklist",
-  "replay",
-  "propfirm",
-  "academy",
-  "audit",
-  "propfirmrules",
-  "mindset",
-];
 
 export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
   enrolledStudentId,
@@ -136,9 +116,10 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
     );
   }
 
-  // Sidebar restreinte aux onglets pris en charge — indépendant de
-  // `hiddenSidebarItems`, qui appartient normalement au bureau staff partagé
-  // et n'a ici qu'un rôle local d'affichage pour cette vue.
+  // Sidebar restreinte via `hiddenSidebarItems` fusionné depuis le serveur.
+  // Le profil élève (studentData.student) contient déjà la fusion du réglage
+  // admin avec les modules toujours cachés (ALWAYS_HIDDEN_FOR_STUDENTS).
+  // La Vue Complète affiche donc exactement ce que l'élève voit.
   const readOnlyStudent: StudentProfile = {
     name: enrolledStudent.name,
     email: enrolledStudent.email,
@@ -148,7 +129,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
     currentCapital: enrolledStudent.currentCapital,
     startingCapital: enrolledStudent.startingCapital,
     isAdmin: false,
-    hiddenSidebarItems: HIDDEN_ITEMS_FOR_READ_VIEW,
+    hiddenSidebarItems: studentData.student?.hiddenSidebarItems ?? [],
   };
 
   return (

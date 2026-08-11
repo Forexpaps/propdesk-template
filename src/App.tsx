@@ -315,6 +315,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [isPropFirmRulesOpen, setIsPropFirmRulesOpen] = useState(false);
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [prefilledLessonTitle, setPrefilledLessonTitle] = useState<string | undefined>();
 
   const handleAddTrade = (newTrade: Omit<Trade, "id">) => {
@@ -446,7 +447,13 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       />
 
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isCollapsed ? "lg:pl-20" : "lg:pl-64"}`}>
-        <TopHeader activeTab={activeTab} student={studentProfile} setMobileOpen={setMobileOpen} />
+        <TopHeader
+          activeTab={activeTab}
+          student={studentProfile}
+          setMobileOpen={setMobileOpen}
+          onOpenNotifications={() => setIsNotificationsModalOpen(true)}
+          unreadNotificationsCount={syncedMessages.filter((m) => m.sender === "coach" && m.status !== "read").length}
+        />
 
         <main className="p-4 sm:p-8 flex-1 max-w-7xl w-full mx-auto">
           <React.Suspense fallback={<ViewFallback />}>
@@ -459,6 +466,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
                 messages={syncedMessages}
                 courseCompletionPercentage={courseCompletionPercentage}
                 setActiveTab={setActiveTab}
+                onOpenChecklist={() => setIsChecklistOpen(true)}
               />
             )}
 
@@ -542,9 +550,18 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         isOpen={isPropFirmRulesOpen}
         onClose={() => setIsPropFirmRulesOpen(false)}
         student={studentProfile}
+        trades={syncedTrades}
       />
       <MindsetJournalModal isOpen={isMindsetModalOpen} onClose={() => setIsMindsetModalOpen(false)} />
       <TradingPlanModal isOpen={isChecklistOpen} onClose={() => setIsChecklistOpen(false)} />
+      <NotificationModal
+        isOpen={isNotificationsModalOpen}
+        onClose={() => setIsNotificationsModalOpen(false)}
+        notifications={[]}
+        onMarkAsRead={() => {}}
+        onMarkAllAsRead={() => {}}
+        onClearAll={() => {}}
+      />
     </div>
   );
 }
@@ -1441,6 +1458,7 @@ function AcademyApp({
         isOpen={isPropFirmRulesOpen}
         onClose={() => setIsPropFirmRulesOpen(false)}
         student={student}
+        trades={trades}
       />
 
       {/* Mindset & Tilt Radar Modal */}
