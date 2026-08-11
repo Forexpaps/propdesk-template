@@ -125,10 +125,37 @@ interface EnrolledStudentLite {
 }
 
 /**
+ * Entrées de sidebar qu'un élève n'a structurellement aucun moyen d'utiliser
+ * — aucun écran ne les prend en charge côté élève (Portefeuille et
+ * Rentabilité demandent une collection `accounts` que seul le bureau staff
+ * possède ; Suivi des Élèves est réservé à l'admin ; Examen/Exercice du
+ * jour/Replay/Sim propfirm n'ont pas d'écran élève).
+ *
+ * Masquées quoi qu'il arrive, indépendamment du réglage de visibilité du
+ * fondateur — ce dernier gouverne le reste (Module vidéo, Messagerie,
+ * Audit Setup, Prop Firm, Mindset, Macro) : voir la fusion dans
+ * `buildStudentProfile`.
+ */
+const ALWAYS_HIDDEN_FOR_STUDENTS = [
+  "wallets",
+  "analytics",
+  "students",
+  "exam",
+  "checklist",
+  "replay",
+  "propfirm",
+];
+
+/**
  * Profil affichable pour une session élève, reconstruit depuis sa fiche
  * `EnrolledStudent` côté coach — le compte élève lui-même n'a pas de ligne
  * `users` renseignée (voir `AdminStudentView.tsx` côté client, même
  * problème résolu à la même source).
+ *
+ * `hiddenSidebarItems` fusionne les entrées non prises en charge (toujours
+ * masquées) avec le réglage de visibilité du bureau staff partagé : le
+ * fondateur masque ou réaffiche un module pour tout le monde, élèves compris,
+ * depuis la même icône réglage qu'il utilise déjà pour son propre bureau.
  */
 function buildStudentProfile(studentAccountId: string): Record<string, unknown> | null {
   const account = getStudentById(studentAccountId);
@@ -139,6 +166,9 @@ function buildStudentProfile(studentAccountId: string): Record<string, unknown> 
   );
   if (!enrolled) return null;
 
+  const staffProfile = getProfile<{ hiddenSidebarItems?: string[] }>(DEFAULT_USER_ID);
+  const sharedHidden = staffProfile?.hiddenSidebarItems ?? [];
+
   return {
     name: enrolled.name,
     email: enrolled.email,
@@ -148,6 +178,7 @@ function buildStudentProfile(studentAccountId: string): Record<string, unknown> 
     currentCapital: enrolled.currentCapital,
     startingCapital: enrolled.startingCapital,
     isAdmin: false,
+    hiddenSidebarItems: [...new Set([...ALWAYS_HIDDEN_FOR_STUDENTS, ...sharedHidden])],
   };
 }
 

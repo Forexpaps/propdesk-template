@@ -393,22 +393,15 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     return <LoadingScreen message="Chargement de ton espace…" />;
   }
 
-  // Onglets sans donnée propre à un élève, non pris en charge ici : masqués
-  // plutôt qu'affichés à moitié cassés (même principe que la Vue Complète
-  // admin dans AdminStudentView.tsx).
+  // `hiddenSidebarItems` vient déjà fusionné par le serveur (voir
+  // `buildStudentProfile` dans `server/routes.ts`) : les entrées sans écran
+  // élève restent masquées quoi qu'il arrive, le reste (Module vidéo,
+  // Messagerie, Outils, Macro) suit le réglage de visibilité du fondateur —
+  // pas de liste figée ici, sous peine de rendre ce réglage sans effet côté
+  // élève.
   const studentProfile: StudentProfile = {
     ...student,
     isAdmin: false,
-    hiddenSidebarItems: [
-      "wallets",
-      "analytics",
-      "students",
-      "exam",
-      "checklist",
-      "replay",
-      "propfirm",
-      "calendar",
-    ],
   };
 
   return (
@@ -436,6 +429,18 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
 
         <main className="p-4 sm:p-8 flex-1 max-w-7xl w-full mx-auto">
           <React.Suspense fallback={<ViewFallback />}>
+            {activeTab === "dashboard" && (
+              <MainDashboard
+                student={studentProfile}
+                trades={syncedTrades}
+                modules={syncedModules}
+                forumTopics={[]}
+                messages={syncedMessages}
+                courseCompletionPercentage={courseCompletionPercentage}
+                setActiveTab={setActiveTab}
+              />
+            )}
+
             {activeTab === "journal" && (
               <TradingJournal
                 trades={syncedTrades}
@@ -447,6 +452,8 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
                 hideAiAndCoachActions
               />
             )}
+
+            {activeTab === "macro" && <MacroDashboard />}
 
             {activeTab === "academy" && (
               <VideoAcademy
