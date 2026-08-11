@@ -355,7 +355,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     items: SidebarEntry[]
   ) => {
     const visibleItems = items.filter((item) => !hiddenItems.includes(item.key) || isEditingSection(section));
-    if (visibleItems.length === 0) return null;
+
+    // Section vide à masquer entièrement — mais jamais pour un compte qui
+    // peut gérer la visibilité (`canManage`) : sans l'en-tête, le bouton ⚙️
+    // qui permet justement de ressortir de cet état disparaîtrait avec lui.
+    // Un admin qui masque tout le contenu d'une section (ou recharge la page
+    // à ce moment précis, `editingSection` repartant à `null`) se
+    // retrouverait alors sans aucun moyen, depuis l'interface, de rouvrir le
+    // réglage pour la réafficher — seule une modification directe de la base
+    // le permettrait. Pour un simple visiteur (élève, Vue Complète en
+    // lecture seule) qui ne peut de toute façon rien basculer, la section
+    // reste masquée en entier comme avant.
+    if (visibleItems.length === 0 && !canManage) return null;
 
     return (
     <div className="space-y-1">
