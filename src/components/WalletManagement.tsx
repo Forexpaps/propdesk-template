@@ -125,7 +125,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   };
   const totalCombinedInitial = accounts.reduce((acc, a) => acc + a.initialBalance, 0);
   const totalCombinedPnl = totalCombinedEquity - totalCombinedInitial;
-  const totalCombinedPnlPercent = ((totalCombinedPnl / totalCombinedInitial) * 100).toFixed(2);
+  const totalCombinedPnlPercent = totalCombinedInitial > 0 ? ((totalCombinedPnl / totalCombinedInitial) * 100).toFixed(2) : "0.00";
 
   const handleCreateAccount = (e: React.FormEvent) => {
     e.preventDefault();
@@ -273,7 +273,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
           {filteredAccounts.map((acc) => {
             const isSelected = selectedAccount?.id === acc.id;
             const pnl = acc.equity - acc.initialBalance;
-            const pnlPercent = ((pnl / acc.initialBalance) * 100).toFixed(1);
+            const pnlPercent = acc.initialBalance > 0 ? ((pnl / acc.initialBalance) * 100).toFixed(1) : "0.0";
 
             return (
               <div

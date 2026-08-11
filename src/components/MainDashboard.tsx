@@ -78,7 +78,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
 }) => {
   // Calculate Metrics
   const capitalDiff = student.currentCapital - student.startingCapital;
-  const capitalDiffPercent = ((capitalDiff / student.startingCapital) * 100).toFixed(1);
+  const capitalDiffPercent = student.startingCapital > 0 ? ((capitalDiff / student.startingCapital) * 100).toFixed(1) : "0.0";
+  const isCapitalUp = capitalDiff > 0;
 
   const totalTrades = trades.length;
   const winningTrades = trades.filter((t) => t.result === "WIN").length;
@@ -312,11 +313,11 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                 {formatCurrency(student.currentCapital)}
               </span>
               <span className="px-2 py-0.5 rounded bg-[#00E676]/10 text-[#00E676] text-xs font-bold border border-[#00E676]/20">
-                +{capitalDiffPercent}%
+                {isCapitalUp ? "+" : ""}{capitalDiffPercent}%
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              +{formatCurrency(capitalDiff)} depuis le départ
+              {isCapitalUp ? "+" : ""}{formatCurrency(capitalDiff)} depuis le départ
             </p>
           </div>
 
@@ -349,7 +350,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
 
             {/* Task 2: Examen à repasser */}
             <div
-              onClick={() => setActiveTab("analytics")}
+              onClick={() => setActiveTab("exam")}
               className="p-3.5 rounded-xl bg-[#0D1110] border border-[#1B2320] hover:border-amber-500/30 cursor-pointer transition-all space-y-1"
             >
               <div className="flex items-center gap-2">
