@@ -536,15 +536,15 @@ staffRouter.get("/admin/students/:enrolledStudentId/view", requireStaffKind, (re
 
   // Retourne l'état complet de l'élève (profil, fiches, comptes, trades, etc)
   //
-  // `modules` et `messages` viennent du bureau personnel de l'élève
-  // (`account.userId`), pas du bureau staff partagé : chaque élève a sa
-  // propre copie du programme (progression individuelle) et son propre fil
-  // de messagerie, posés à la création de son accès.
+  // `accounts`, `modules` et `messages` viennent du bureau personnel de
+  // l'élève (`account.userId`), pas du bureau staff partagé : chaque élève a
+  // ses propres portefeuilles, sa propre copie du programme (progression
+  // individuelle) et son propre fil de messagerie.
   res.json({
     student: getProfile(account.userId),
     collections: {
       enrolledStudents: listCollection("enrolledStudents", DEFAULT_USER_ID),
-      accounts: listCollection("accounts", DEFAULT_USER_ID),
+      accounts: listCollection("accounts", account.userId),
       trades: listCollection("trades", account.userId),
       modules: listCollection("modules", account.userId),
       messages: listCollection("messages", account.userId),

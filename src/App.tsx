@@ -261,13 +261,19 @@ export default function App() {
  * hors périmètre de l'accès élève.
  */
 function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
-  const { status, trades, modules, messages, quizResults, student } = useStudentBootstrap();
+  const { status, trades, accounts, modules, messages, quizResults, student } = useStudentBootstrap();
   const syncEnabled = status === "online";
 
   const [syncedTrades, setSyncedTrades] = useSyncedState<Trade[]>(
     "horizon_student_trades",
     trades,
     (v) => api.saveCollection("trades", v),
+    syncEnabled
+  );
+  const [syncedAccounts, setSyncedAccounts] = useSyncedState<TradingAccount[]>(
+    "horizon_student_accounts",
+    accounts,
+    (v) => api.saveCollection("accounts", v),
     syncEnabled
   );
   const [syncedModules, setSyncedModules] = useSyncedState<Module[]>(
@@ -295,6 +301,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   useEffect(() => {
     if (status !== "online") return;
     setSyncedTrades(trades);
+    setSyncedAccounts(accounts);
     setSyncedModules(modules);
     setSyncedMessages(messages);
     setSyncedQuizResults(quizResults);
@@ -320,6 +327,18 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
 
   const handleDeleteTrade = (id: string) => {
     setSyncedTrades((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const handleAddAccount = (account: TradingAccount) => {
+    setSyncedAccounts((prev) => [account, ...prev]);
+  };
+
+  const handleUpdateAccountBalance = (id: string, newBalance: number) => {
+    setSyncedAccounts((prev) =>
+      prev.map((acc) =>
+        acc.id === id ? { ...acc, equity: newBalance, currentBalance: newBalance } : acc
+      )
+    );
   };
 
   const handleToggleLessonCompletion = (moduleId: string, lessonId: string) => {
@@ -444,12 +463,29 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
             {activeTab === "journal" && (
               <TradingJournal
                 trades={syncedTrades}
-                accounts={[]}
+                accounts={syncedAccounts}
                 onAddTrade={handleAddTrade}
                 onUpdateTrade={handleUpdateTrade}
                 onDeleteTrade={handleDeleteTrade}
                 onSendTradeToCoach={() => undefined}
                 hideAiAndCoachActions
+              />
+            )}
+
+            {activeTab === "wallets" && (
+              <WalletManagement
+                accounts={syncedAccounts}
+                trades={syncedTrades}
+                onAddAccount={handleAddAccount}
+                onUpdateAccountBalance={handleUpdateAccountBalance}
+              />
+            )}
+
+            {activeTab === "analytics" && (
+              <PerformanceDashboard
+                student={studentProfile}
+                trades={syncedTrades}
+                courseCompletionPercentage={courseCompletionPercentage}
               />
             )}
 

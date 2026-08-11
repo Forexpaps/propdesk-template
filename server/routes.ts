@@ -105,12 +105,18 @@ api.use("/auth", staffRouter);
 api.use("/auth", studentProtectedRouter);
 
 /**
- * Collections qu'une session élève peut lire/écrire : son Journal, sa copie
- * personnelle du programme de formation (leçons vues), et son fil de
- * messagerie avec le coach — jamais les collections du bureau staff
- * (comptes, fiches élèves) ni celles d'un autre élève.
+ * Collections qu'une session élève peut lire/écrire : son Journal, ses
+ * propres portefeuilles (comptes Prop Firm / broker), sa copie personnelle
+ * du programme de formation (leçons vues), et son fil de messagerie avec
+ * le coach — jamais les collections du bureau staff (fiches élèves) ni
+ * celles d'un autre élève.
  */
-const STUDENT_ALLOWED_COLLECTIONS = new Set<CollectionName>(["trades", "modules", "messages"]);
+const STUDENT_ALLOWED_COLLECTIONS = new Set<CollectionName>([
+  "trades",
+  "accounts",
+  "modules",
+  "messages",
+]);
 
 interface EnrolledStudentLite {
   id: string;
@@ -126,25 +132,16 @@ interface EnrolledStudentLite {
 
 /**
  * Entrées de sidebar qu'un élève n'a structurellement aucun moyen d'utiliser
- * — aucun écran ne les prend en charge côté élève (Portefeuille et
- * Rentabilité demandent une collection `accounts` que seul le bureau staff
- * possède ; Suivi des Élèves est réservé à l'admin ; Examen/Exercice du
- * jour/Replay/Sim propfirm n'ont pas d'écran élève).
+ * — aucun écran ne les prend en charge côté élève (Suivi des Élèves est
+ * réservé à l'admin ; Examen/Exercice du jour/Replay/Sim propfirm n'ont pas
+ * d'écran élève).
  *
  * Masquées quoi qu'il arrive, indépendamment du réglage de visibilité du
- * fondateur — ce dernier gouverne le reste (Module vidéo, Messagerie,
- * Audit Setup, Prop Firm, Mindset, Macro) : voir la fusion dans
- * `buildStudentProfile`.
+ * fondateur — ce dernier gouverne le reste (Portefeuille, Rentabilité,
+ * Module vidéo, Messagerie, Audit Setup, Prop Firm, Mindset, Macro) : voir
+ * la fusion dans `buildStudentProfile`.
  */
-const ALWAYS_HIDDEN_FOR_STUDENTS = [
-  "wallets",
-  "analytics",
-  "students",
-  "exam",
-  "checklist",
-  "replay",
-  "propfirm",
-];
+const ALWAYS_HIDDEN_FOR_STUDENTS = ["students", "exam", "checklist", "replay", "propfirm"];
 
 /**
  * Profil affichable pour une session élève, reconstruit depuis sa fiche
