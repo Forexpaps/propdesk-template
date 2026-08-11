@@ -276,15 +276,15 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               key={st.id}
               className="bg-[#111615]/90 border border-[#1B2320] hover:border-[#232D29] rounded-2xl p-5 space-y-4 transition-all hover:shadow-xl relative group"
             >
-              <div className="flex items-start justify-between gap-3 border-b border-[#1B2320]/80 pb-4">
+              <div className="border-b border-[#1B2320]/80 pb-4 space-y-3">
                 <div className="flex items-center gap-3">
                   <img
                     src={st.avatar}
                     alt={st.name}
-                    className="w-12 h-12 rounded-full object-cover border-2 border-[#232D29]"
+                    className="w-12 h-12 rounded-full object-cover border-2 border-[#232D29] shrink-0"
                   />
-                  <div>
-                    <div className="flex items-center gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-bold text-white text-base">{st.name}</h3>
                       <span className={`px-2 py-0.5 rounded text-[10px] border ${STATUS_TAG_STYLES[st.statusTag]}`}>
                         {st.statusTag}
@@ -301,7 +301,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     onClick={() => {
                       setSelectedStudent(st);
