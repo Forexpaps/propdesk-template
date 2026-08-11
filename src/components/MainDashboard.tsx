@@ -53,6 +53,7 @@ import {
   ForumTopic,
   CoachMessage,
 } from "../types";
+import { TabType, SidebarItemKey } from "./Sidebar";
 
 interface MainDashboardProps {
   student: StudentProfile;
@@ -61,9 +62,7 @@ interface MainDashboardProps {
   forumTopics: ForumTopic[];
   messages: CoachMessage[];
   courseCompletionPercentage: number;
-  setActiveTab: (
-    tab: "dashboard" | "students" | "wallets" | "academy" | "journal" | "simulator" | "signals" | "forum" | "messaging" | "analytics"
-  ) => void;
+  setActiveTab: (tab: TabType) => void;
   onOpenChecklist?: () => void;
 }
 
@@ -193,85 +192,101 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
       </div>
 
       {/* 3. MODULES Section (4 Cards Grid) */}
-      <div className="space-y-3 pt-2">
-        <h2 className="text-[11px] font-bold tracking-widest text-slate-500 uppercase">
-          MODULES
-        </h2>
+      {(() => {
+        // Reprend les mêmes clés que la sidebar (Sidebar.tsx,
+        // SIDEBAR_TOGGLEABLE_KEYS) : un module masqué par le fondateur doit
+        // disparaître partout où il est accessible en raccourci, pas
+        // seulement de la sidebar — sinon le masquage n'est que cosmétique.
+        const hiddenItems: SidebarItemKey[] = (student.hiddenSidebarItems ?? []) as SidebarItemKey[];
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Module 1: Journal de trading */}
-          <div
-            onClick={() => setActiveTab("journal")}
-            className="bg-[#111615] bg-[radial-gradient(circle_at_0%_0%,rgba(0,230,118,0.20),transparent_65%)] border border-[#1B2320] hover:border-[#00E676]/40 p-5 rounded-2xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between"
-          >
-            <div className="w-8 h-8 rounded-xl bg-[#00E676]/15 text-[#00E676] border border-[#00E676]/30 flex items-center justify-center font-bold text-sm">
-              J
-            </div>
-            <div className="space-y-1.5">
-              <h3 className="text-sm font-bold text-white group-hover:text-[#00E676] transition-colors">
-                Journal de trading
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Chaque trade audité : exécution, émotion, respect du plan.
-              </p>
+        const cards: Array<{
+          key: SidebarItemKey;
+          tab: TabType;
+          letter: string;
+          title: string;
+          description: string;
+          glow: string;
+          badgeClasses: string;
+          borderHover: string;
+          textHover: string;
+        }> = [
+          {
+            key: "journal",
+            tab: "journal",
+            letter: "J",
+            title: "Journal de trading",
+            description: "Chaque trade audité : exécution, émotion, respect du plan.",
+            glow: "bg-[radial-gradient(circle_at_0%_0%,rgba(0,230,118,0.20),transparent_65%)]",
+            badgeClasses: "text-[#00E676] bg-[#00E676]/15 border-[#00E676]/30",
+            borderHover: "hover:border-[#00E676]/40",
+            textHover: "group-hover:text-[#00E676]",
+          },
+          {
+            key: "exam",
+            tab: "exam",
+            letter: "E",
+            title: "Examen",
+            description: "20 graphiques inédits, notés et corrigés un par un.",
+            glow: "bg-[radial-gradient(circle_at_0%_0%,rgba(59,130,246,0.20),transparent_65%)]",
+            badgeClasses: "text-blue-400 bg-blue-500/15 border-blue-500/30",
+            borderHover: "hover:border-blue-500/40",
+            textHover: "group-hover:text-blue-400",
+          },
+          {
+            key: "replay",
+            tab: "simulator",
+            letter: "R",
+            title: "Replay",
+            description: "Décider bougie par bougie, sans voir la suite.",
+            glow: "bg-[radial-gradient(circle_at_0%_0%,rgba(168,85,247,0.20),transparent_65%)]",
+            badgeClasses: "text-purple-400 bg-purple-500/15 border-purple-500/30",
+            borderHover: "hover:border-purple-500/40",
+            textHover: "group-hover:text-purple-400",
+          },
+          {
+            key: "academy",
+            tab: "academy",
+            letter: "V",
+            title: "Module vidéo",
+            description: "Parcours débutant → masterclass, 14 leçons.",
+            glow: "bg-[radial-gradient(circle_at_0%_0%,rgba(245,158,11,0.20),transparent_65%)]",
+            badgeClasses: "text-amber-400 bg-amber-500/15 border-amber-500/30",
+            borderHover: "hover:border-amber-500/40",
+            textHover: "group-hover:text-amber-400",
+          },
+        ];
+
+        const visibleCards = cards.filter((c) => !hiddenItems.includes(c.key));
+        if (visibleCards.length === 0) return null;
+
+        return (
+          <div className="space-y-3 pt-2">
+            <h2 className="text-[11px] font-bold tracking-widest text-slate-500 uppercase">
+              MODULES
+            </h2>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {visibleCards.map((c) => (
+                <div
+                  key={c.key}
+                  onClick={() => setActiveTab(c.tab)}
+                  className={`bg-[#111615] ${c.glow} border border-[#1B2320] ${c.borderHover} p-5 rounded-2xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between`}
+                >
+                  <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-bold text-sm ${c.badgeClasses}`}>
+                    {c.letter}
+                  </div>
+                  <div className="space-y-1.5">
+                    <h3 className={`text-sm font-bold text-white ${c.textHover} transition-colors`}>
+                      {c.title}
+                    </h3>
+                    <p className="text-xs text-slate-400 leading-relaxed">{c.description}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
-
-          {/* Module 2: Examen */}
-          <div
-            onClick={() => setActiveTab("analytics")}
-            className="bg-[#111615] bg-[radial-gradient(circle_at_0%_0%,rgba(59,130,246,0.20),transparent_65%)] border border-[#1B2320] hover:border-blue-500/40 p-5 rounded-2xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between"
-          >
-            <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center justify-center font-bold text-sm">
-              E
-            </div>
-            <div className="space-y-1.5">
-              <h3 className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">
-                Examen
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                20 graphiques inédits, notés et corrigés un par un.
-              </p>
-            </div>
-          </div>
-
-          {/* Module 3: Replay */}
-          <div
-            onClick={() => setActiveTab("simulator")}
-            className="bg-[#111615] bg-[radial-gradient(circle_at_0%_0%,rgba(168,85,247,0.20),transparent_65%)] border border-[#1B2320] hover:border-purple-500/40 p-5 rounded-2xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between"
-          >
-            <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center justify-center font-bold text-sm">
-              R
-            </div>
-            <div className="space-y-1.5">
-              <h3 className="text-sm font-bold text-white group-hover:text-purple-400 transition-colors">
-                Replay
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Décider bougie par bougie, sans voir la suite.
-              </p>
-            </div>
-          </div>
-
-          {/* Module 4: Module vidéo */}
-          <div
-            onClick={() => setActiveTab("academy")}
-            className="bg-[#111615] bg-[radial-gradient(circle_at_0%_0%,rgba(245,158,11,0.20),transparent_65%)] border border-[#1B2320] hover:border-amber-500/40 p-5 rounded-2xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between"
-          >
-            <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center font-bold text-sm">
-              V
-            </div>
-            <div className="space-y-1.5">
-              <h3 className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
-                Module vidéo
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Parcours débutant → masterclass, 14 leçons.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* 4. Bottom Main Section: Courbe de progression (2/3) + Ta semaine (1/3) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2">
