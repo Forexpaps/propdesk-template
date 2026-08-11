@@ -122,6 +122,11 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
   ).length;
   const disciplineScore = totalTrades > 0 ? Math.round((disciplinedCount / totalTrades) * 100) : 100;
 
+  const capitalDiff = student.currentCapital - student.startingCapital;
+  const capitalDiffPercent =
+    student.startingCapital > 0 ? (capitalDiff / student.startingCapital) * 100 : 0;
+  const isCapitalUp = capitalDiff >= 0;
+
   return (
     <div className="space-y-8 pb-12">
       {/* Header Banner */}
@@ -152,8 +157,16 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
             {formatCurrency(student.currentCapital)}
           </div>
           <div className="text-xs text-slate-400 flex items-center gap-1">
-            <span className="text-[#00E676] font-bold flex items-center">
-              <ArrowUpRight className="w-3.5 h-3.5" /> +24.5%
+            <span
+              className={`font-bold flex items-center ${isCapitalUp ? "text-[#00E676]" : "text-rose-400"}`}
+            >
+              {isCapitalUp ? (
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              ) : (
+                <ArrowDownRight className="w-3.5 h-3.5" />
+              )}
+              {isCapitalUp ? "+" : ""}
+              {capitalDiffPercent.toFixed(1)}%
             </span>
             <span>depuis le démarrage</span>
           </div>
@@ -199,8 +212,15 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
               <h3 className="text-base font-bold text-white">Courbe d'Équité du Capital</h3>
               <p className="text-xs text-slate-400">Évolution nette du compte de trading</p>
             </div>
-            <span className="text-xs font-mono font-bold text-[#00E676] bg-[#00E676]/10 px-2.5 py-1 rounded border border-[#00E676]/20">
-              +{formatCurrency(totalPnL)} net
+            <span
+              className={`text-xs font-mono font-bold px-2.5 py-1 rounded border ${
+                totalPnL >= 0
+                  ? "text-[#00E676] bg-[#00E676]/10 border-[#00E676]/20"
+                  : "text-rose-400 bg-rose-500/10 border-rose-500/20"
+              }`}
+            >
+              {totalPnL >= 0 ? "+" : ""}
+              {formatCurrency(totalPnL)} net
             </span>
           </div>
 

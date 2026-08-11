@@ -515,6 +515,12 @@ staffRouter.delete("/students/:enrolledStudentId/access", requireStaffKind, (req
  * pour afficher les vrais trades une fois un accès actif, à la place de la
  * saisie manuelle `recentTrades`. Jamais d'écriture par cette route : l'élève
  * reste seul à journaliser ses propres trades.
+ *
+ * `accounts` suit le même principe : une fois un accès actif, les
+ * portefeuilles que l'élève a lui-même créés (bureau `account.userId`) font
+ * foi, à la place de la saisie manuelle `EnrolledStudent.accounts` — sans
+ * quoi la fiche affichée au coach ne refléterait jamais les vrais comptes
+ * ouverts par l'élève depuis son propre espace Portefeuille.
  */
 staffRouter.get("/students/:enrolledStudentId/trades", requireStaffKind, (req, res) => {
   const account = getStudentByEnrolledId(req.params.enrolledStudentId);
@@ -523,7 +529,10 @@ staffRouter.get("/students/:enrolledStudentId/trades", requireStaffKind, (req, r
     return;
   }
 
-  res.json({ trades: listCollection("trades", account.userId) });
+  res.json({
+    trades: listCollection("trades", account.userId),
+    accounts: listCollection("accounts", account.userId),
+  });
 });
 
 // Vue admin complète d'un élève (lecture seule)
@@ -587,8 +596,14 @@ staffRouter.post("/students/:enrolledStudentId/messages", requireStaffKind, (req
     status: "sent" as const,
   };
 
-  const existing = listCollection("messages", account.userId);
-  replaceCollection("messages", [...existing, message], account.userId);
+  // Lecture puis écriture dans une même transaction : sans elle, deux coachs
+  // répondant au même instant (ou une réponse coach et un envoi élève
+  // concurrent) pourraient chacun lire l'état avant l'écriture de l'autre et
+  // se marcher dessus au moment d'écrire, perdant l'un des deux messages.
+  db.transaction(() => {
+    const existing = listCollection("messages", account.userId);
+    replaceCollection("messages", [...existing, message], account.userId);
+  })();
 
   res.status(201).json({ message });
 });

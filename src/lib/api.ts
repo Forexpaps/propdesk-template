@@ -242,7 +242,7 @@ export const api = {
 
   /** Vrais trades d'un élève, en lecture — pour la fiche côté coach. */
   fetchStudentTrades: (enrolledStudentId: string) =>
-    request<{ trades: Trade[] }>(
+    request<{ trades: Trade[]; accounts: TradingAccount[] }>(
       `/api/auth/students/${encodeURIComponent(enrolledStudentId)}/trades`
     ),
 
