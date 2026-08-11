@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type ServerState } from "../lib/api";
 import { clearPending, listPending, markPending } from "../lib/pendingChanges";
-import type { Trade, Module, CoachMessage, ModuleQuizResult, StudentProfile } from "../types";
+import type { Trade, TradingAccount, Module, CoachMessage, ModuleQuizResult, StudentProfile } from "../types";
 
 export type SyncStatus = "loading" | "online" | "offline";
 
@@ -173,12 +173,14 @@ export function useBootstrap() {
  * compte), pas de bandeau de modifications hors ligne (pas de mode hors ligne
  * élève). `GET /api/state` est déjà filtré côté serveur pour une session
  * élève — il ne renvoie que les collections listées dans
- * `STUDENT_ALLOWED_COLLECTIONS` (voir `server/routes.ts`) : trades, modules
- * (sa copie personnelle du programme) et messages (son fil avec le coach).
+ * `STUDENT_ALLOWED_COLLECTIONS` (voir `server/routes.ts`) : trades, accounts
+ * (ses propres portefeuilles), modules (sa copie personnelle du programme)
+ * et messages (son fil avec le coach).
  */
 export function useStudentBootstrap() {
   const [status, setStatus] = useState<SyncStatus>("loading");
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [accounts, setAccounts] = useState<TradingAccount[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [quizResults, setQuizResults] = useState<Record<string, ModuleQuizResult>>({});
@@ -192,6 +194,7 @@ export function useStudentBootstrap() {
         const serverState = await api.fetchState();
         if (!cancelled) {
           setTrades(serverState.collections.trades ?? []);
+          setAccounts(serverState.collections.accounts ?? []);
           setModules(serverState.collections.modules ?? []);
           setMessages(serverState.collections.messages ?? []);
           setQuizResults(serverState.quizResults ?? {});
@@ -209,7 +212,7 @@ export function useStudentBootstrap() {
     };
   }, []);
 
-  return { status, trades, modules, messages, quizResults, student };
+  return { status, trades, accounts, modules, messages, quizResults, student };
 }
 
 /**
