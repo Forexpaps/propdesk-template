@@ -38,6 +38,16 @@ export interface EconomicCalendarEvent {
   previous: string;
 }
 
+/** Cotation de marché — voir `server/marketData.ts`. */
+export interface MarketQuote {
+  symbol: string;
+  label: string;
+  price: number;
+  previousClose: number;
+  changePercent: number;
+  sparkline: number[];
+}
+
 export interface ServerState {
   bootstrapped: boolean;
   student: StudentProfile | null;
@@ -161,6 +171,10 @@ export const api = {
   /** Annonces économiques de la semaine — flux public ForexFactory, mis en cache côté serveur. */
   fetchEconomicCalendar: () =>
     request<{ events: EconomicCalendarEvent[] }>("/api/economic-calendar"),
+
+  /** Cotations de marché en direct — flux non officiel Yahoo Finance, mis en cache côté serveur. */
+  fetchMarketData: () =>
+    request<{ quotes: MarketQuote[] }>("/api/market-data"),
 
   importState: (state: {
     student?: StudentProfile;

@@ -9,7 +9,7 @@ import { TopHeader } from "./components/TopHeader";
 import { MainDashboard } from "./components/MainDashboard";
 import { PositionCalculatorModal } from "./components/PositionCalculatorModal";
 import { TradingPlanModal } from "./components/TradingPlanModal";
-import { EconomicCalendarModal } from "./components/EconomicCalendarModal";
+import { MacroDashboard } from "./components/MacroDashboard";
 import { UserProfileModal } from "./components/UserProfileModal";
 import { PendingChangesBanner } from "./components/PendingChangesBanner";
 import { StaffAccountsModal } from "./components/StaffAccountsModal";
@@ -417,7 +417,6 @@ function AcademyApp({
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isStaffAccountsOpen, setIsStaffAccountsOpen] = useState(false);
 
   // Valeur de départ d'une collection : le serveur fait autorité quand il a
@@ -956,7 +955,6 @@ function AcademyApp({
         onOpenSetupAnalyzer={() => setIsSetupAnalyzerOpen(true)}
         onOpenPropFirmRules={() => setIsPropFirmRulesOpen(true)}
         onOpenMindset={() => setIsMindsetModalOpen(true)}
-        onOpenCalendar={() => setIsCalendarOpen(true)}
         canManageSidebar={isOwner}
         onToggleSidebarItem={(key) => {
           // Garde de sûreté, en plus du masquage de l'interface : la sidebar
@@ -1158,6 +1156,8 @@ function AcademyApp({
               </div>
             </div>
           )}
+
+          {activeTab === "macro" && <MacroDashboard />}
           </React.Suspense>
         </main>
       </div>
@@ -1216,12 +1216,6 @@ function AcademyApp({
       <TradingPlanModal
         isOpen={isChecklistOpen}
         onClose={() => setIsChecklistOpen(false)}
-      />
-
-      {/* Economic Calendar Modal */}
-      <EconomicCalendarModal
-        isOpen={isCalendarOpen}
-        onClose={() => setIsCalendarOpen(false)}
       />
 
       {/* Prop Firm Rules & Challenge Modal */}

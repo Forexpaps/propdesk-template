@@ -109,6 +109,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         return "Rentabilité";
       case "exam":
         return "Examen";
+      case "macro":
+        return "Macro";
       default:
         return "Tableau de bord";
     }
