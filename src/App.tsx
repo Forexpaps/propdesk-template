@@ -314,6 +314,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [isSetupAnalyzerOpen, setIsSetupAnalyzerOpen] = useState(false);
   const [isPropFirmRulesOpen, setIsPropFirmRulesOpen] = useState(false);
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
+  const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [prefilledLessonTitle, setPrefilledLessonTitle] = useState<string | undefined>();
 
   const handleAddTrade = (newTrade: Omit<Trade, "id">) => {
@@ -437,6 +438,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         setIsCollapsed={setIsCollapsed}
         onOpenProfileModal={() => {}}
         onLogout={handleLogout}
+        onOpenChecklist={() => setIsChecklistOpen(true)}
         onOpenSetupAnalyzer={() => setIsSetupAnalyzerOpen(true)}
         onOpenPropFirmRules={() => setIsPropFirmRulesOpen(true)}
         onOpenMindset={() => setIsMindsetModalOpen(true)}
@@ -491,6 +493,26 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
 
             {activeTab === "macro" && <MacroDashboard />}
 
+            {/* « Replay » et « Sim propfirm » partagent ce composant, comme côté
+                staff : la clé force le remontage pour que chacun s'ouvre sur sa
+                vue. Aucune donnée propre à l'élève requise (scénarios statiques). */}
+            {(activeTab === "simulator" || activeTab === "propfirm") && (
+              <SMCSimulator
+                key={activeTab}
+                scenarios={initialBacktestScenarios}
+                initialMode={activeTab === "propfirm" ? "MONTE_CARLO" : "REPLAY"}
+              />
+            )}
+
+            {activeTab === "exam" && (
+              <div className="space-y-6">
+                <h1 className="text-2xl font-bold text-white">Examen</h1>
+                <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-8 min-h-96 flex items-center justify-center">
+                  <p className="text-slate-400">Contenu à venir</p>
+                </div>
+              </div>
+            )}
+
             {activeTab === "academy" && (
               <VideoAcademy
                 modules={syncedModules}
@@ -522,6 +544,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         student={studentProfile}
       />
       <MindsetJournalModal isOpen={isMindsetModalOpen} onClose={() => setIsMindsetModalOpen(false)} />
+      <TradingPlanModal isOpen={isChecklistOpen} onClose={() => setIsChecklistOpen(false)} />
     </div>
   );
 }

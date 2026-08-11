@@ -133,15 +133,15 @@ interface EnrolledStudentLite {
 /**
  * Entrées de sidebar qu'un élève n'a structurellement aucun moyen d'utiliser
  * — aucun écran ne les prend en charge côté élève (Suivi des Élèves est
- * réservé à l'admin ; Examen/Exercice du jour/Replay/Sim propfirm n'ont pas
- * d'écran élève).
+ * réservé à l'admin).
  *
  * Masquées quoi qu'il arrive, indépendamment du réglage de visibilité du
  * fondateur — ce dernier gouverne le reste (Portefeuille, Rentabilité,
- * Module vidéo, Messagerie, Audit Setup, Prop Firm, Mindset, Macro) : voir
+ * Examen, Exercice du jour, Replay, Sim propfirm, Module vidéo, Messagerie,
+ * Audit Setup, Prop Firm, Mindset, Macro) : voir
  * la fusion dans `buildStudentProfile`.
  */
-const ALWAYS_HIDDEN_FOR_STUDENTS = ["students", "exam", "checklist", "replay", "propfirm"];
+const ALWAYS_HIDDEN_FOR_STUDENTS = ["students"];
 
 /**
  * Profil affichable pour une session élève, reconstruit depuis sa fiche
