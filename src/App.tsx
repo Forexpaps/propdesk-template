@@ -253,26 +253,61 @@ export default function App() {
 }
 
 /**
- * Journal de trading cloisonné d'un élève — jamais `AcademyApp`. Pas de
- * sidebar à onglets, pas d'IA, pas de rattachement à un compte prop firm : un
- * élève ne voit et ne modifie que ses propres trades.
+ * Espace personnel d'un élève — jamais `AcademyApp` (le bureau staff). Un
+ * élève ne voit et ne modifie que ses propres données : son Journal, sa
+ * copie personnelle du programme de formation, son fil de messagerie avec
+ * le coach, et les outils sans donnée propre à un élève (Audit Setup, Prop
+ * Firm, Mindset). Ni Portefeuille/Rentabilité/Macro ni Suivi des Élèves :
+ * hors périmètre de l'accès élève.
  */
 function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
-  const { status, trades } = useStudentBootstrap();
+  const { status, trades, modules, messages, quizResults, student } = useStudentBootstrap();
+  const syncEnabled = status === "online";
+
   const [syncedTrades, setSyncedTrades] = useSyncedState<Trade[]>(
     "horizon_student_trades",
     trades,
     (v) => api.saveCollection("trades", v),
-    status === "online"
+    syncEnabled
+  );
+  const [syncedModules, setSyncedModules] = useSyncedState<Module[]>(
+    "horizon_student_modules",
+    modules,
+    (v) => api.saveCollection("modules", v),
+    syncEnabled
+  );
+  const [syncedMessages, setSyncedMessages] = useSyncedState<CoachMessage[]>(
+    "horizon_student_messages",
+    messages,
+    (v) => api.saveCollection("messages", v),
+    syncEnabled
+  );
+  const [syncedQuizResults, setSyncedQuizResults] = useSyncedState<Record<string, ModuleQuizResult>>(
+    "horizon_student_quiz_results",
+    quizResults,
+    (v) => api.saveQuizResults(v),
+    syncEnabled
   );
 
   // `useSyncedState` initialise sa valeur une seule fois, au montage — tant
   // que le chargement serveur n'est pas revenu, on affiche un état vide plutôt
-  // que la valeur par défaut `[]` figée avant que `trades` ne soit connu.
+  // que la valeur par défaut figée avant que les données ne soient connues.
   useEffect(() => {
-    if (status === "online") setSyncedTrades(trades);
+    if (status !== "online") return;
+    setSyncedTrades(trades);
+    setSyncedModules(modules);
+    setSyncedMessages(messages);
+    setSyncedQuizResults(quizResults);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
+
+  const [activeTab, setActiveTab] = useState<TabType>("journal");
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isSetupAnalyzerOpen, setIsSetupAnalyzerOpen] = useState(false);
+  const [isPropFirmRulesOpen, setIsPropFirmRulesOpen] = useState(false);
+  const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
+  const [prefilledLessonTitle, setPrefilledLessonTitle] = useState<string | undefined>();
 
   const handleAddTrade = (newTrade: Omit<Trade, "id">) => {
     const tradeWithId: Trade = { ...newTrade, id: `trd-${Date.now()}` };
@@ -287,6 +322,65 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     setSyncedTrades((prev) => prev.filter((t) => t.id !== id));
   };
 
+  const handleToggleLessonCompletion = (moduleId: string, lessonId: string) => {
+    setSyncedModules((prev) =>
+      prev.map((mod) =>
+        mod.id === moduleId
+          ? {
+              ...mod,
+              lessons: mod.lessons.map((l) =>
+                l.id === lessonId ? { ...l, isCompleted: !l.isCompleted } : l
+              ),
+            }
+          : mod
+      )
+    );
+  };
+
+  const handleSaveModuleQuizResult = (moduleId: string, result: ModuleQuizResult) => {
+    setSyncedQuizResults((prev) => ({ ...prev, [moduleId]: result }));
+  };
+
+  const handleAskCoachAboutLesson = (lessonTitle: string) => {
+    setPrefilledLessonTitle(lessonTitle);
+    setActiveTab("messaging");
+  };
+
+  /**
+   * Enregistre un message envoyé au coach. Aucune réponse automatique : le
+   * message attend une réponse humaine, que le coach poste depuis la Vue
+   * Complète de sa fiche (`AdminStudentView.tsx`), dans ce même fil.
+   */
+  const handleSendMessage = async (
+    coachId: string,
+    text: string,
+    attachedTradeId?: string,
+    attachedModuleTitle?: string
+  ) => {
+    const studentMsg: CoachMessage = {
+      id: `msg-${Date.now()}`,
+      sender: "student",
+      coachId,
+      text,
+      timestamp: new Date().toISOString(),
+      attachedTradeId,
+      attachedModuleTitle,
+      status: "sent",
+    };
+    setSyncedMessages((prev) => [...prev, studentMsg]);
+  };
+
+  const totalLessons = syncedModules.reduce((acc, m) => acc + m.lessons.length, 0);
+  const completedLessons = syncedModules.reduce(
+    (acc, m) => acc + m.lessons.filter((l) => l.isCompleted).length,
+    0
+  );
+  const courseCompletionPercentage =
+    totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+  const totalUnreadMessages = syncedMessages.filter(
+    (m) => m.sender === "coach" && m.status !== "read"
+  ).length;
+
   const handleLogout = async () => {
     try {
       await api.studentLogout();
@@ -295,38 +389,96 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     }
   };
 
-  if (status === "loading") {
-    return <LoadingScreen message="Chargement de ton journal…" />;
+  if (status === "loading" || !student) {
+    return <LoadingScreen message="Chargement de ton espace…" />;
   }
 
-  return (
-    <div className="min-h-screen bg-[#0B0F0E] text-slate-200 font-sans">
-      <header className="flex items-center justify-between px-6 py-4 border-b border-[#1B2320] bg-[#0A0E0D]">
-        <div className="flex items-center gap-2">
-          <img src="/icon.png" alt="PropDesk" className="w-8 h-8 rounded-lg" />
-          <span className="font-bold text-white">Mon Journal de trading</span>
-        </div>
-        <button
-          onClick={() => void handleLogout()}
-          className="text-xs text-slate-400 hover:text-rose-400 transition-colors"
-        >
-          Déconnexion
-        </button>
-      </header>
+  // Onglets sans donnée propre à un élève, non pris en charge ici : masqués
+  // plutôt qu'affichés à moitié cassés (même principe que la Vue Complète
+  // admin dans AdminStudentView.tsx).
+  const studentProfile: StudentProfile = {
+    ...student,
+    isAdmin: false,
+    hiddenSidebarItems: [
+      "wallets",
+      "analytics",
+      "students",
+      "exam",
+      "checklist",
+      "replay",
+      "propfirm",
+      "calendar",
+    ],
+  };
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <React.Suspense fallback={<ViewFallback />}>
-          <TradingJournal
-            trades={syncedTrades}
-            accounts={[]}
-            onAddTrade={handleAddTrade}
-            onUpdateTrade={handleUpdateTrade}
-            onDeleteTrade={handleDeleteTrade}
-            onSendTradeToCoach={() => undefined}
-            hideAiAndCoachActions
-          />
-        </React.Suspense>
-      </main>
+  return (
+    <div className="min-h-screen bg-[#0B0F0E] text-slate-100 font-sans antialiased flex">
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        student={studentProfile}
+        courseCompletionPercentage={courseCompletionPercentage}
+        totalUnreadMessages={totalUnreadMessages}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+        isCollapsed={isCollapsed}
+        setIsCollapsed={setIsCollapsed}
+        onOpenProfileModal={() => {}}
+        onLogout={handleLogout}
+        onOpenSetupAnalyzer={() => setIsSetupAnalyzerOpen(true)}
+        onOpenPropFirmRules={() => setIsPropFirmRulesOpen(true)}
+        onOpenMindset={() => setIsMindsetModalOpen(true)}
+        canManageSidebar={false}
+      />
+
+      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isCollapsed ? "lg:pl-20" : "lg:pl-64"}`}>
+        <TopHeader activeTab={activeTab} student={studentProfile} setMobileOpen={setMobileOpen} />
+
+        <main className="p-4 sm:p-8 flex-1 max-w-7xl w-full mx-auto">
+          <React.Suspense fallback={<ViewFallback />}>
+            {activeTab === "journal" && (
+              <TradingJournal
+                trades={syncedTrades}
+                accounts={[]}
+                onAddTrade={handleAddTrade}
+                onUpdateTrade={handleUpdateTrade}
+                onDeleteTrade={handleDeleteTrade}
+                onSendTradeToCoach={() => undefined}
+                hideAiAndCoachActions
+              />
+            )}
+
+            {activeTab === "academy" && (
+              <VideoAcademy
+                modules={syncedModules}
+                quizResults={syncedQuizResults}
+                onToggleLessonCompletion={handleToggleLessonCompletion}
+                onAskCoachAboutLesson={handleAskCoachAboutLesson}
+                onSaveModuleQuizResult={handleSaveModuleQuizResult}
+              />
+            )}
+
+            {activeTab === "messaging" && (
+              <CoachMessaging
+                coaches={initialCoaches}
+                messages={syncedMessages}
+                student={studentProfile}
+                trades={syncedTrades}
+                onSendMessage={handleSendMessage}
+                prefilledLessonTitle={prefilledLessonTitle}
+              />
+            )}
+          </React.Suspense>
+        </main>
+      </div>
+
+      <SetupAnalyzerModal isOpen={isSetupAnalyzerOpen} onClose={() => setIsSetupAnalyzerOpen(false)} />
+      <PropFirmRulesModal
+        isOpen={isPropFirmRulesOpen}
+        onClose={() => setIsPropFirmRulesOpen(false)}
+        student={studentProfile}
+      />
+      <MindsetJournalModal isOpen={isMindsetModalOpen} onClose={() => setIsMindsetModalOpen(false)} />
     </div>
   );
 }

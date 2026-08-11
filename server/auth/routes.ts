@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { randomBytes } from "node:crypto";
 import { db, DEFAULT_USER_ID } from "../db";
-import { getProfile, saveProfile, listCollection, updateCollectionItem } from "../repositories";
+import { getProfile, saveProfile, listCollection, updateCollectionItem, replaceCollection } from "../repositories";
 import { setupSchema, loginSchema, inviteStaffSchema, changePasswordSchema } from "../schemas";
 import { createRateLimit } from "../middleware/rateLimit";
 import { hashPassword, verifyPassword, needsRehash, verifyAgainstDecoy } from "./password";
@@ -451,6 +451,29 @@ staffRouter.post(
         studentAccountId: account.id,
       });
 
+      // Copie le programme de formation partagé dans le bureau personnel du
+      // nouvel élève : sans cette copie, sa progression (leçons vues, quiz)
+      // n'aurait nulle part où vivre, puisque chaque bureau a sa propre
+      // collection `modules`. Une copie et non un renvoi vers le contenu
+      // partagé : la progression de chaque élève doit rester la sienne.
+      //
+      // `id` est une clé primaire GLOBALE de la table `modules`, pas
+      // composite avec `user_id` : réutiliser les id du programme partagé
+      // provoquerait un conflit avec les lignes de DEFAULT_USER_ID (ou d'un
+      // autre élève déjà servi). Chaque copie reçoit donc des id propres,
+      // préfixés par le compte élève.
+      const sharedModules = listCollection<{ id: string; [key: string]: unknown }>(
+        "modules",
+        DEFAULT_USER_ID
+      );
+      if (sharedModules.length > 0) {
+        const personalModules = sharedModules.map((mod) => ({
+          ...mod,
+          id: `${account.userId}-${mod.id}`,
+        }));
+        replaceCollection("modules", personalModules, account.userId);
+      }
+
       return account;
     })();
 
@@ -512,13 +535,60 @@ staffRouter.get("/admin/students/:enrolledStudentId/view", requireStaffKind, (re
   }
 
   // Retourne l'état complet de l'élève (profil, fiches, comptes, trades, etc)
+  //
+  // `modules` et `messages` viennent du bureau personnel de l'élève
+  // (`account.userId`), pas du bureau staff partagé : chaque élève a sa
+  // propre copie du programme (progression individuelle) et son propre fil
+  // de messagerie, posés à la création de son accès.
   res.json({
     student: getProfile(account.userId),
     collections: {
       enrolledStudents: listCollection("enrolledStudents", DEFAULT_USER_ID),
       accounts: listCollection("accounts", DEFAULT_USER_ID),
       trades: listCollection("trades", account.userId),
-      modules: listCollection("modules", DEFAULT_USER_ID),
+      modules: listCollection("modules", account.userId),
+      messages: listCollection("messages", account.userId),
     },
   });
+});
+
+/**
+ * Envoie un message de coach dans le fil d'un élève précis.
+ *
+ * Écrit directement dans le bureau personnel de l'élève (`account.userId`) —
+ * le même espace où vit sa propre collection `messages`, pour que son envoi
+ * et la réponse du coach vivent dans le même fil sans synchronisation à
+ * organiser entre deux bureaux.
+ */
+staffRouter.post("/students/:enrolledStudentId/messages", requireStaffKind, (req, res) => {
+  const account = getStudentByEnrolledId(req.params.enrolledStudentId);
+  if (!account) {
+    res.status(404).json({ error: "Cette fiche n'a pas d'accès actif." });
+    return;
+  }
+
+  const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+  if (!text) {
+    res.status(400).json({ error: "Le message ne peut pas être vide." });
+    return;
+  }
+
+  // `coachId` doit correspondre à l'un des coachs fictifs affichés côté
+  // élève (`src/data/mockData.ts`, `initialCoaches`) : `CoachMessaging`
+  // filtre son fil par ce champ, pas par l'identité réelle du compte staff
+  // qui répond. Fixé sur le head coach faute d'un vrai choix d'expéditeur
+  // dans cette vue — un seul fil existe ici, pas un par coach fictif.
+  const message = {
+    id: `msg-${randomBytes(9).toString("base64url")}`,
+    sender: "coach" as const,
+    coachId: "coach-thomas",
+    text,
+    timestamp: new Date().toISOString(),
+    status: "sent" as const,
+  };
+
+  const existing = listCollection("messages", account.userId);
+  replaceCollection("messages", [...existing, message], account.userId);
+
+  res.status(201).json({ message });
 });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { X, AlertCircle, Loader } from "lucide-react";
-import { EnrolledStudent, StudentProfile, Trade, TradingAccount, Module } from "../types";
+import { X, AlertCircle, Loader, Send } from "lucide-react";
+import { EnrolledStudent, StudentProfile, Trade, TradingAccount, Module, CoachMessage } from "../types";
 import { api } from "../lib/api";
 import { TradingJournal } from "./TradingJournal";
 import { PerformanceDashboard } from "./PerformanceDashboard";
@@ -19,11 +19,12 @@ interface AdminStudentViewProps {
 /**
  * Onglets pris en charge par cette vue en lecture seule : ceux dont les
  * données viennent entièrement de `fetchAdminStudentView` (profil, comptes,
- * trades) ou qui ne dépendent d'aucune donnée propre à l'élève (Macro, flux
- * de marché partagé). Les autres (Examen, Replay, Module vidéo, Messagerie,
- * Sim propfirm...) demanderaient des données supplémentaires — quiz, badges,
- * fil de messagerie — non exposées par cette route ; masquées plutôt
- * qu'affichées à moitié cassées.
+ * trades, messages) ou qui ne dépendent d'aucune donnée propre à l'élève
+ * (Macro, flux de marché partagé). Les autres (Examen, Replay, Module vidéo,
+ * Sim propfirm...) demanderaient des données ou des écrans supplémentaires ;
+ * masqués plutôt qu'affichés à moitié cassés. « Messagerie » est la seule
+ * entrée de cette vue qui reste modifiable : répondre à l'élève, pas éditer
+ * ses données.
  */
 const HIDDEN_ITEMS_FOR_READ_VIEW: SidebarItemKey[] = [
   "exam",
@@ -31,7 +32,6 @@ const HIDDEN_ITEMS_FOR_READ_VIEW: SidebarItemKey[] = [
   "replay",
   "propfirm",
   "academy",
-  "messaging",
   "audit",
   "propfirmrules",
   "mindset",
@@ -53,30 +53,50 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
     accounts: TradingAccount[];
     trades: Trade[];
     modules: Module[];
+    messages: CoachMessage[];
   } | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const loadStudentView = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.fetchAdminStudentView(enrolledStudentId);
+      setStudentData({
+        student: data.student,
+        enrolledStudents: data.collections.enrolledStudents,
+        accounts: data.collections.accounts,
+        trades: data.collections.trades,
+        modules: data.collections.modules,
+        messages: data.collections.messages,
+      });
+    } catch (err) {
+      setError((err as Error).message || "Impossible de charger la vue de l'élève.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadStudentView = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await api.fetchAdminStudentView(enrolledStudentId);
-        setStudentData({
-          student: data.student,
-          enrolledStudents: data.collections.enrolledStudents,
-          accounts: data.collections.accounts,
-          trades: data.collections.trades,
-          modules: data.collections.modules,
-        });
-      } catch (err) {
-        setError((err as Error).message || "Impossible de charger la vue de l'élève.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadStudentView();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enrolledStudentId]);
+
+  const handleSendReply = async () => {
+    const text = replyText.trim();
+    if (!text || sending) return;
+    setSending(true);
+    try {
+      const { message } = await api.sendMessageToStudent(enrolledStudentId, text);
+      setStudentData((prev) => (prev ? { ...prev, messages: [...prev.messages, message] } : prev));
+      setReplyText("");
+    } catch (err) {
+      alert((err as Error).message || "L'envoi a échoué.");
+    } finally {
+      setSending(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -211,6 +231,62 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
             )}
 
             {activeTab === "macro" && <MacroDashboard />}
+
+            {activeTab === "messaging" && (
+              <div className="space-y-4">
+                <h1 className="text-2xl font-bold text-white">Messagerie — {studentData.enrolledStudents.find((s) => s.id === enrolledStudentId)?.name}</h1>
+                <div className="bg-[#111615] border border-[#1B2320] rounded-2xl flex flex-col h-[60vh]">
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {studentData.messages.length === 0 ? (
+                      <p className="text-sm text-slate-500 text-center py-8">Aucun message pour l'instant.</p>
+                    ) : (
+                      studentData.messages.map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={`max-w-[75%] p-3 rounded-xl text-sm ${
+                            msg.sender === "coach"
+                              ? "ml-auto bg-[#00E676]/10 border border-[#00E676]/20 text-white"
+                              : "bg-[#1B2320] text-slate-200"
+                          }`}
+                        >
+                          <p className="whitespace-pre-wrap">{msg.text}</p>
+                          <p className="text-[10px] text-slate-500 mt-1">
+                            {msg.sender === "coach" ? "Toi" : "Élève"} ·{" "}
+                            {new Date(msg.timestamp).toLocaleString("fr-FR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="border-t border-[#1B2320] p-3 flex items-center gap-2">
+                    <input
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
+                          void handleSendReply();
+                        }
+                      }}
+                      placeholder="Répondre à l'élève…"
+                      className="flex-1 bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-[#00E676]/40"
+                    />
+                    <button
+                      onClick={() => void handleSendReply()}
+                      disabled={sending || !replyText.trim()}
+                      className="p-2.5 rounded-xl bg-[#00E676] hover:bg-[#00c865] disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 transition-colors"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </main>
         </div>
       </div>
