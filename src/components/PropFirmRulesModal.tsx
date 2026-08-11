@@ -84,7 +84,10 @@ export const PropFirmRulesModal: React.FC<PropFirmRulesModalProps> = ({
   const todayTradesCount = trades.filter((t) => t.date.startsWith(today)).length;
   const todayPnlCalculated = trades
     .filter((t) => t.date.startsWith(today))
-    .reduce((sum, t) => sum + parseFloat(String(t.pnl)) || 0, 0);
+    // `||` a une précédence plus faible que `+` : sans les parenthèses, un
+    // seul trade avec un `pnl` non numérique (NaN) remettrait tout
+    // l'accumulateur à 0 au lieu d'ignorer juste ce trade.
+    .reduce((sum, t) => sum + (parseFloat(String(t.pnl)) || 0), 0);
 
   const tradingDays = new Set(trades.map((t) => t.date.split("T")[0])).size;
 

@@ -25,6 +25,17 @@ const isSafeMediaUrl = (value: unknown): boolean =>
   /^https:\/\//.test(value) ||
   /^data:image\//.test(value);
 
+/**
+ * `initialBalance` (comptes `TradingAccount`) sert de diviseur dans plusieurs
+ * calculs de pourcentage côté client (progression vers l'objectif de profit,
+ * drawdown) — un compte créé avec un capital nul ou négatif produirait un
+ * pourcentage NaN ou de signe inversé. Le formulaire l'empêche déjà
+ * (`WalletManagement.tsx`), mais un appel direct à l'API le contournerait
+ * sans ce verrou.
+ */
+const isValidInitialBalance = (value: unknown): boolean =>
+  typeof value !== "number" || value > 0;
+
 /** Tout élément de collection doit porter un id non vide et unique. */
 const collectionItem = z
   .object({ id: z.string().min(1).max(200) })
@@ -33,7 +44,10 @@ const collectionItem = z
     (item) =>
       SAFE_MEDIA_URL_FIELDS.every((field) => isSafeMediaUrl((item as Record<string, unknown>)[field])),
     { message: "URL d'image invalide : seules https:// et data:image/... sont acceptées." }
-  );
+  )
+  .refine((item) => isValidInitialBalance((item as Record<string, unknown>).initialBalance), {
+    message: "Le capital initial doit être un nombre supérieur à 0.",
+  });
 
 export const collectionPayloadSchema = z
   .array(collectionItem)

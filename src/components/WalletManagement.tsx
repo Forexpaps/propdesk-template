@@ -131,7 +131,15 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
     e.preventDefault();
     if (!newAccName.trim()) return;
 
-    const initialBal = parseFloat(newAccBalance) || 100000;
+    const parsedBalance = parseFloat(newAccBalance);
+    // Un capital nul ou négatif casse tous les calculs de pourcentage qui en
+    // dépendent (progression vers l'objectif de profit notamment, div/0 ou
+    // signe inversé) — on refuse plutôt que de créer un compte inexploitable.
+    if (!(parsedBalance > 0)) {
+      alert("Le capital initial doit être un nombre supérieur à 0.");
+      return;
+    }
+    const initialBal = parsedBalance;
     const newAcc: TradingAccount = {
       id: `acc-${Date.now()}`,
       name: newAccName,
@@ -476,7 +484,9 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
               </div>
 
               {/* Profit Target Progress (If Prop Firm Evaluation) */}
-              {selectedAccount.profitTargetPercent > 0 && (
+              {/* `initialBalance > 0` : sert de diviseur juste en dessous — un compte
+                  legacy/malformé à 0 ou négatif donnerait un pourcentage NaN/inversé. */}
+              {selectedAccount.profitTargetPercent > 0 && selectedAccount.initialBalance > 0 && (
                 <div className="bg-[#0D1110] p-4 rounded-xl border border-[#00E676]/30 space-y-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-200 font-bold flex items-center gap-1.5">
@@ -624,6 +634,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <input
                     type="number"
                     required
+                    min="1"
                     value={newAccBalance}
                     onChange={(e) => setNewAccBalance(e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676] font-mono"

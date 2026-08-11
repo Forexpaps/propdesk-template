@@ -116,6 +116,27 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
     );
   }
 
+  // Calculé en direct depuis les vrais modules de l'élève — jamais depuis
+  // `enrolledStudent.courseCompletionPercentage`, un champ saisi à la main
+  // par le coach dans la fiche qui dérive silencieusement dès que l'élève a
+  // un compte actif et progresse réellement (même bug de fond que la
+  // désynchronisation de `hiddenSidebarItems`, déjà corrigée ailleurs dans
+  // ce fichier). Même formule que côté élève, voir `src/App.tsx`.
+  const totalLessons = studentData.modules.reduce((acc, m) => acc + m.lessons.length, 0);
+  const completedLessons = studentData.modules.reduce(
+    (acc, m) => acc + m.lessons.filter((l) => l.isCompleted).length,
+    0
+  );
+  const courseCompletionPercentage =
+    totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+
+  // Onglets pour lesquels cette vue a un rendu dédié. Le reste (Module
+  // vidéo, Examen, Replay, Sim propfirm) reste accessible depuis la sidebar
+  // dès que le réglage de visibilité les autorise pour les élèves (fusionné
+  // plus haut), mais n'a pas d'équivalent lecture seule ici — un clic
+  // affichait auparavant une page vide plutôt qu'un message explicite.
+  const SUPPORTED_TABS: TabType[] = ["dashboard", "journal", "wallets", "analytics", "macro", "messaging"];
+
   // Sidebar restreinte via `hiddenSidebarItems` fusionné depuis le serveur.
   // Le profil élève (studentData.student) contient déjà la fusion du réglage
   // admin avec les modules toujours cachés (ALWAYS_HIDDEN_FOR_STUDENTS).
@@ -154,7 +175,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           student={readOnlyStudent}
-          courseCompletionPercentage={enrolledStudent.courseCompletionPercentage}
+          courseCompletionPercentage={courseCompletionPercentage}
           totalUnreadMessages={0}
           mobileOpen={mobileOpen}
           setMobileOpen={setMobileOpen}
@@ -175,7 +196,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
                 modules={studentData.modules}
                 forumTopics={[]}
                 messages={[]}
-                courseCompletionPercentage={enrolledStudent.courseCompletionPercentage}
+                courseCompletionPercentage={courseCompletionPercentage}
                 setActiveTab={setActiveTab}
               />
             )}
@@ -207,7 +228,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
               <PerformanceDashboard
                 student={readOnlyStudent}
                 trades={studentData.trades}
-                courseCompletionPercentage={enrolledStudent.courseCompletionPercentage}
+                courseCompletionPercentage={courseCompletionPercentage}
               />
             )}
 
@@ -266,6 +287,12 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
                     </button>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {!SUPPORTED_TABS.includes(activeTab) && (
+              <div className="rounded-2xl border border-dashed border-[#1B2320] bg-[#111615] p-8 text-center text-sm text-slate-400">
+                Cet onglet n'a pas d'équivalent en lecture seule dans la Vue Complète.
               </div>
             )}
           </main>
