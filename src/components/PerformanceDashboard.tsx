@@ -266,7 +266,7 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
             Tableau de Bord Analytique Personnalisé
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Analyse Complète de la Performance Éleve
+            Analyse Complète de la Performance
           </h1>
           <p className="text-slate-400 text-xs sm:text-sm max-w-2xl">
             Visualisez la trajectoire de votre capital, la rentabilité par stratégie et la corrélation directe entre votre état d'esprit et vos résultats.
