@@ -74,6 +74,15 @@ function listForumReplies(topicId: string): unknown[] {
  * Le client détient toujours le tableau complet en mémoire et chaque action
  * produit un nouveau tableau complet : remplacer est donc l'opération qui
  * correspond exactement à sa sémantique, et elle est idempotente.
+ *
+ * Implémentée en UPSERT (+ suppression des seules lignes disparues), et non
+ * en vidage puis réinsertion complète : sur `enrolledStudents`, un vidage même
+ * suivi d'une réinsertion identique fait passer chaque ligne par un `DELETE`
+ * réel, qui déclenche le `ON DELETE CASCADE` de `student_accounts` — un coach
+ * qui modifierait la note d'un élève sans rapport supprimerait ainsi l'accès
+ * actif de tous les autres élèves de la fiche en un seul enregistrement. Une
+ * ligne qui continue d'exister par son `id` doit donc être mise à jour en
+ * place, jamais recréée.
  */
 export function replaceCollection<T extends WithId>(
   name: CollectionName,
@@ -84,14 +93,28 @@ export function replaceCollection<T extends WithId>(
   const promoted = PROMOTED[name] ?? [];
   const columns = ["id", "user_id", "position", ...promoted, "payload"];
   const placeholders = columns.map(() => "?").join(", ");
+  const updateSet = [...promoted, "payload"].map((col) => `${col} = excluded.${col}`).join(", ");
 
-  const insert = db.prepare(
-    `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${placeholders})`
+  const upsert = db.prepare(
+    `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${placeholders})
+     ON CONFLICT(id) DO UPDATE SET position = excluded.position, ${updateSet}`
   );
-  const clear = db.prepare(`DELETE FROM ${table} WHERE user_id = ?`);
 
   const run = db.transaction((rows: T[]) => {
-    clear.run(userId);
+    const existingIds = db
+      .prepare(`SELECT id FROM ${table} WHERE user_id = ?`)
+      .all(userId) as { id: string }[];
+    const incomingIds = new Set(rows.map((r) => r.id));
+    const staleIds = existingIds.map((r) => r.id).filter((id) => !incomingIds.has(id));
+
+    if (staleIds.length > 0) {
+      const placeholdersForDelete = staleIds.map(() => "?").join(", ");
+      db.prepare(`DELETE FROM ${table} WHERE user_id = ? AND id IN (${placeholdersForDelete})`).run(
+        userId,
+        ...staleIds
+      );
+    }
+
     rows.forEach((item, index) => {
       const values = [
         item.id,
@@ -104,10 +127,10 @@ export function replaceCollection<T extends WithId>(
         // Les réponses sont stockées à part : on les retire du payload du sujet
         // pour éviter d'avoir la même donnée à deux endroits.
         const { replies, ...topic } = item as T & { replies?: WithId[] };
-        insert.run(...values, JSON.stringify(topic));
+        upsert.run(...values, JSON.stringify(topic));
         replaceForumReplies(item.id, replies ?? []);
       } else {
-        insert.run(...values, JSON.stringify(item));
+        upsert.run(...values, JSON.stringify(item));
       }
     });
   });
