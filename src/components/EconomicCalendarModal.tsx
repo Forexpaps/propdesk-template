@@ -1,137 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
+import { api, EconomicCalendarEvent } from "../lib/api";
 
 interface EconomicCalendarModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-type Impact = "HIGH" | "MEDIUM" | "LOW";
-
-interface CalendarEventTemplate {
-  id: string;
-  /** Minutes depuis l'ouverture de la modale — passé (négatif) ou à venir. */
-  offsetMinutes: number;
-  currency: "EUR" | "GBP" | "USD" | "JPY";
-  flag: string;
-  event: string;
-  impact: Impact;
-  forecast: string;
-  previous: string;
-}
-
-/**
- * Événements relatifs à l'instant d'ouverture (`offsetMinutes`), pas à une
- * heure d'horloge fixe : un calendrier codé en dur sur « 08:45 » afficherait
- * un compte à rebours négatif absurde selon l'heure à laquelle l'utilisateur
- * ouvre la modale. En partant de l'instant réel, l'heure affichée et le
- * compte à rebours restent cohérents quel que soit le moment de consultation.
- *
- * Données de démonstration — voir HANDOFF.md §1 : aucune source de cours ou
- * de calendrier économique réelle n'est intégrée à l'application.
- */
-const EVENT_TEMPLATES: CalendarEventTemplate[] = [
-  {
-    id: "1",
-    offsetMinutes: -22,
-    currency: "EUR",
-    flag: "🇫🇷",
-    event: "French Industrial Production m/m",
-    impact: "LOW",
-    forecast: "0.3%",
-    previous: "-0.1%",
-  },
-  {
-    id: "2",
-    offsetMinutes: 8,
-    currency: "EUR",
-    flag: "🇪🇸",
-    event: "Spanish Services PMI",
-    impact: "MEDIUM",
-    forecast: "54.9",
-    previous: "54.2",
-  },
-  {
-    id: "3",
-    offsetMinutes: 38,
-    currency: "EUR",
-    flag: "🇮🇹",
-    event: "Italian Services PMI",
-    impact: "MEDIUM",
-    forecast: "51.0",
-    previous: "50.2",
-  },
-  {
-    id: "4",
-    offsetMinutes: 43,
-    currency: "EUR",
-    flag: "🇫🇷",
-    event: "French Final Services PMI",
-    impact: "LOW",
-    forecast: "49.8",
-    previous: "49.8",
-  },
-  {
-    id: "5",
-    offsetMinutes: 48,
-    currency: "EUR",
-    flag: "🇩🇪",
-    event: "German Final Services PMI",
-    impact: "MEDIUM",
-    forecast: "49.6",
-    previous: "49.6",
-  },
-  {
-    id: "6",
-    offsetMinutes: 53,
-    currency: "EUR",
-    flag: "🇪🇺",
-    event: "Final Services PMI",
-    impact: "MEDIUM",
-    forecast: "51.6",
-    previous: "51.6",
-  },
-  {
-    id: "7",
-    offsetMinutes: 83,
-    currency: "GBP",
-    flag: "🇬🇧",
-    event: "Final Services PMI",
-    impact: "MEDIUM",
-    forecast: "51.8",
-    previous: "51.8",
-  },
-  {
-    id: "8",
-    offsetMinutes: 113,
-    currency: "EUR",
-    flag: "🇪🇺",
-    event: "PPI m/m",
-    impact: "LOW",
-    forecast: "-0.2%",
-    previous: "0.2%",
-  },
-  {
-    id: "9",
-    offsetMinutes: 210,
-    currency: "USD",
-    flag: "🇺🇸",
-    event: "US CPI / Indice des prix à la consommation (m/m)",
-    impact: "HIGH",
-    forecast: "0.3%",
-    previous: "0.2%",
-  },
-  {
-    id: "10",
-    offsetMinutes: 330,
-    currency: "USD",
-    flag: "🇺🇸",
-    event: "Discours du Président Jerome Powell (Fed)",
-    impact: "HIGH",
-    forecast: "-",
-    previous: "-",
-  },
-];
 
 const MARKET_NEWS = [
   "WTI Price Forecast: Edges lower to near $74.50 with bearish bias intact below 100-day SMA",
@@ -140,6 +14,27 @@ const MARKET_NEWS = [
   "Japanese Yen: Joint action fails to secure lasting gains – Commerzbank",
   "Forex Today: US Dollar struggles as risk flows dominate markets",
 ];
+
+/** Repli générique pour toute devise absente de cette table plutôt qu'un rendu vide. */
+const CURRENCY_FLAGS: Record<string, string> = {
+  USD: "🇺🇸",
+  EUR: "🇪🇺",
+  GBP: "🇬🇧",
+  JPY: "🇯🇵",
+  AUD: "🇦🇺",
+  CAD: "🇨🇦",
+  CHF: "🇨🇭",
+  CNY: "🇨🇳",
+  NZD: "🇳🇿",
+};
+const FALLBACK_FLAG = "🌐";
+
+const IMPACT_DOT: Record<string, string> = {
+  High: "bg-rose-500",
+  Medium: "bg-amber-500",
+  Low: "bg-slate-500",
+  Holiday: "bg-slate-700",
+};
 
 /** `"3h07"` au-delà d'une heure, `"8 min"` en-dessous, `null` si déjà passé. */
 function formatCountdown(minutesUntil: number): string | null {
@@ -154,38 +49,96 @@ function formatClock(date: Date): string {
   return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
+/**
+ * Fenêtre du jour calendaire **local** au visiteur, pas en UTC : « aujourd'hui »
+ * est une notion propre au fuseau de la personne qui regarde l'écran. Le flux
+ * fournit des horodatages ISO avec décalage explicite, donc `new Date(iso)`
+ * reste correct quel que soit le fuseau — seule la borne de comparaison doit
+ * être locale.
+ */
+function isToday(isoDate: string, reference: Date): boolean {
+  const d = new Date(isoDate);
+  return (
+    d.getFullYear() === reference.getFullYear() &&
+    d.getMonth() === reference.getMonth() &&
+    d.getDate() === reference.getDate()
+  );
+}
+
 export const EconomicCalendarModal: React.FC<EconomicCalendarModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  // Ancre fixée à l'ouverture : recalculer sur `new Date()` à chaque rendu
-  // ferait dériver les heures affichées d'une minute à l'autre, alors que
-  // seul le compte à rebours doit avancer.
-  const [openedAt] = useState(() => new Date());
   const [now, setNow] = useState(() => new Date());
+  const [rawEvents, setRawEvents] = useState<EconomicCalendarEvent[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // Recalcule uniquement le compte à rebours affiché — pas de requête réseau.
   useEffect(() => {
     if (!isOpen) return;
     const timer = setInterval(() => setNow(new Date()), 30_000);
     return () => clearInterval(timer);
   }, [isOpen]);
 
-  const events = useMemo(
-    () =>
-      EVENT_TEMPLATES.map((tpl) => {
-        const eventTime = new Date(openedAt.getTime() + tpl.offsetMinutes * 60_000);
+  // Charge à l'ouverture, puis rafraîchit périodiquement pour une session
+  // laissée ouverte longtemps. En cas d'échec d'un rafraîchissement en
+  // arrière-plan, la liste déjà affichée est conservée telle quelle plutôt
+  // que vidée — même logique de dégradation gracieuse que le cache serveur.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading((prev) => prev || rawEvents === null);
+      try {
+        const { events } = await api.fetchEconomicCalendar();
+        if (!cancelled) {
+          setRawEvents(events);
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.warn("[calendrier-economique] Chargement échoué.", err);
+          setError((err as Error).message || "Impossible de charger le calendrier.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void load();
+    const refreshTimer = setInterval(() => void load(), 10 * 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(refreshTimer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  const events = useMemo(() => {
+    if (!rawEvents) return [];
+    return rawEvents
+      .filter((ev) => isToday(ev.date, now))
+      .map((ev) => {
+        const eventTime = new Date(ev.date);
         const minutesUntil = Math.round((eventTime.getTime() - now.getTime()) / 60_000);
         return {
-          ...tpl,
+          ...ev,
           time: formatClock(eventTime),
           minutesUntil,
-          countdown: formatCountdown(minutesUntil),
+          countdown: ev.impact === "Holiday" ? null : formatCountdown(minutesUntil),
+          flag: CURRENCY_FLAGS[ev.country] ?? FALLBACK_FLAG,
         };
-      }),
-    [openedAt, now]
-  );
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [rawEvents, now]);
 
   if (!isOpen) return null;
+
+  const showEmptyList = !loading && rawEvents !== null && events.length === 0 && !error;
+  const showErrorState = error !== null && rawEvents === null;
 
   return (
     <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
@@ -204,46 +157,66 @@ export const EconomicCalendarModal: React.FC<EconomicCalendarModalProps> = ({
               <span className="w-1 h-4 rounded-full bg-violet-500" />
               Annonces à venir aujourd'hui
             </h4>
-            <span className="text-[11px] text-slate-500 font-mono">
-              {events.length} annonces aujourd'hui
-            </span>
+            {rawEvents !== null && !showErrorState && (
+              <span className="text-[11px] text-slate-500 font-mono">
+                {events.length} annonce{events.length > 1 ? "s" : ""} aujourd'hui
+              </span>
+            )}
           </div>
 
-          <div className="divide-y divide-[#1B2320]">
-            {events.map((item) => {
-              const isImminent = item.countdown !== null && item.minutesUntil <= 15;
-              return (
-                <div
-                  key={item.id}
-                  className="flex items-start gap-4 p-3 border border-transparent hover:border-[#1B2320] rounded-lg transition-colors"
-                >
+          {loading && rawEvents === null ? (
+            <div className="flex items-center gap-2 text-xs text-slate-500 py-6 justify-center">
+              <Loader2 className="w-4 h-4 animate-spin" /> Chargement du calendrier…
+            </div>
+          ) : showErrorState ? (
+            <div className="p-4 text-center text-xs text-slate-500 italic">
+              Impossible de charger le calendrier, réessaie plus tard.
+            </div>
+          ) : showEmptyList ? (
+            <div className="p-4 text-center text-xs text-slate-500 italic">
+              Aucune annonce prévue aujourd'hui.
+            </div>
+          ) : (
+            <div className="divide-y divide-[#1B2320]">
+              {events.map((item) => {
+                const isImminent = item.countdown !== null && item.minutesUntil <= 15;
+                return (
                   <div
-                    className={`w-14 shrink-0 font-mono text-sm font-bold pt-0.5 ${
-                      isImminent ? "text-amber-400" : "text-white"
-                    }`}
+                    key={item.id}
+                    className="flex items-start gap-4 p-3 border border-transparent hover:border-[#1B2320] rounded-lg transition-colors"
                   >
-                    {item.time}
-                  </div>
-                  <div className="w-6 shrink-0 text-center text-lg leading-none pt-0.5">{item.flag}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-slate-500" />
-                      <span className="font-bold text-white text-sm">{item.event}</span>
+                    <div
+                      className={`w-14 shrink-0 font-mono text-sm font-bold pt-0.5 ${
+                        isImminent ? "text-amber-400" : "text-white"
+                      }`}
+                    >
+                      {item.time}
                     </div>
-                    <div className="text-xs text-slate-500 font-mono mt-0.5">
-                      prév. {item.forecast} · précéd. {item.previous}
-                      {item.countdown && (
-                        <span className={isImminent ? "text-amber-400 font-semibold" : "text-slate-500"}>
-                          {" "}
-                          · {item.countdown}
-                        </span>
-                      )}
+                    <div className="w-6 shrink-0 text-center text-lg leading-none pt-0.5">{item.flag}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                            IMPACT_DOT[item.impact] ?? "bg-slate-500"
+                          }`}
+                        />
+                        <span className="font-bold text-white text-sm">{item.title}</span>
+                      </div>
+                      <div className="text-xs text-slate-500 font-mono mt-0.5">
+                        prév. {item.forecast || "-"} · précéd. {item.previous || "-"}
+                        {item.countdown && (
+                          <span className={isImminent ? "text-amber-400 font-semibold" : "text-slate-500"}>
+                            {" "}
+                            · {item.countdown}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Actualités marché */}
