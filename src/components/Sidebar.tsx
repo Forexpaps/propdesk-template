@@ -453,6 +453,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
+          {/* Bouton de dépliage, visible uniquement sidebar repliée (desktop).
+              Sans lui, le seul moyen de redéplier était de cliquer sur l'avatar
+              tout en bas — pas assez visible comme affordance de bouton. */}
+          {isCollapsed && (
+            <div className="hidden lg:flex justify-center shrink-0 py-2 border-b border-[#151D1A]">
+              <button
+                onClick={() => setIsCollapsed(false)}
+                title="Déplier le menu"
+                className="p-2 rounded-lg text-slate-400 hover:text-[#00E676] hover:bg-[#131816] transition-colors"
+              >
+                <PanelLeftOpen className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+
           {/* Navigation Items */}
           <nav className="p-3 space-y-4 flex-1 min-h-0 overflow-y-auto scrollbar-none text-xs">
             {/* Main Item: Tableau de bord */}
