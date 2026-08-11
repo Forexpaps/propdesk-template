@@ -243,8 +243,45 @@ api.put("/collections/:name", (req, res) => {
     return;
   }
 
-  replaceCollection(name, parsed.data, req.auth!.dataUserId);
-  res.json({ success: true, count: parsed.data.length });
+  // `collectionPayloadSchema` ne valide qu'un `id` et laisse tout le reste
+  // passer tel quel, et le client envoie toujours le tableau complet tel
+  // qu'il l'avait en mémoire au moment de la modification — jamais un delta.
+  // Pour `messages` côté élève, ces deux faits combinés ouvrent deux
+  // problèmes distincts si on se contente de tout remplacer tel quel :
+  //  1. Un élève pourrait fabriquer un item `sender: "coach"` de toutes
+  //     pièces, qui semblerait alors venir du coach.
+  //  2. Une réponse du coach postée par `POST .../messages` PENDANT que
+  //     l'élève avait déjà son propre tableau (sans cette réponse) chargé en
+  //     mémoire disparaîtrait silencieusement au prochain envoi de l'élève —
+  //     son tableau, ne la contenant pas, l'effacerait purement et
+  //     simplement en écrasant toute la collection.
+  //
+  // Les deux se résolvent avec la même règle : la partie « coach » du fil
+  // reste toujours autoritaire côté serveur, quoi que le client envoie —
+  // un élève ne peut qu'ajouter ou modifier SES PROPRES messages.
+  let dataToWrite = parsed.data;
+  if (req.auth!.kind === "student" && name === "messages") {
+    const existingCoachMessages = listCollection<{ id: string; sender?: string; [key: string]: unknown }>(
+      name,
+      req.auth!.dataUserId
+    ).filter((m) => m.sender === "coach");
+
+    const submittedNonCoach = (
+      parsed.data as { id: string; sender?: string; [key: string]: unknown }[]
+    ).filter((item) => item.sender !== "coach");
+
+    // Fusionnés puis triés par `timestamp` (ISO 8601 des deux côtés — voir
+    // `handleSendMessage` côté élève et la route de réponse du coach) : les
+    // `id` ne sont pas comparables entre les deux, générés différemment
+    // (horodatage brut côté élève, aléatoire côté coach).
+    const timestampOf = (m: Record<string, unknown>) => (typeof m.timestamp === "string" ? m.timestamp : "");
+    dataToWrite = [...existingCoachMessages, ...submittedNonCoach].sort((a, b) =>
+      timestampOf(a) < timestampOf(b) ? -1 : timestampOf(a) > timestampOf(b) ? 1 : 0
+    ) as typeof parsed.data;
+  }
+
+  replaceCollection(name, dataToWrite, req.auth!.dataUserId);
+  res.json({ success: true, count: dataToWrite.length });
 });
 
 api.put("/profile", (req, res) => {

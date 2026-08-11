@@ -70,6 +70,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
   const [invitingId, setInvitingId] = useState<string | null>(null);
   const [inviteResult, setInviteResult] = useState<{ email: string; temporaryPassword: string } | null>(null);
   const [realTrades, setRealTrades] = useState<Trade[] | null>(null);
+  const [realAccounts, setRealAccounts] = useState<TradingAccount[] | null>(null);
   const [loadingRealTrades, setLoadingRealTrades] = useState(false);
 
   const handleInviteStudent = async (student: EnrolledStudent) => {
@@ -118,15 +119,23 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
     setSelectedStudent(student);
     setIsReadOnlyPreview(true);
     setRealTrades(null);
+    setRealAccounts(null);
 
-    // Un compte actif rend la saisie manuelle recentTrades obsolète : on
-    // charge les vrais trades de l'élève à la place, en lecture seule.
+    // Un compte actif rend la saisie manuelle recentTrades/accounts
+    // obsolète : on charge les vrais trades et portefeuilles de l'élève à
+    // la place, en lecture seule.
     if (student.studentAccountId) {
       setLoadingRealTrades(true);
       api
         .fetchStudentTrades(student.id)
-        .then((res) => setRealTrades(res.trades))
-        .catch(() => setRealTrades([]))
+        .then((res) => {
+          setRealTrades(res.trades);
+          setRealAccounts(res.accounts);
+        })
+        .catch(() => {
+          setRealTrades([]);
+          setRealAccounts([]);
+        })
         .finally(() => setLoadingRealTrades(false));
     }
   };
@@ -752,25 +761,41 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
             {/* Accounts Section in Read-Only */}
             <div className="space-y-3">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                <Wallet className="w-4 h-4 text-[#00E676]" /> Portefeuilles & Comptes Attribués ({selectedStudent.accounts.length})
+                <Wallet className="w-4 h-4 text-[#00E676]" /> Portefeuilles & Comptes Attribués (
+                {(selectedStudent.studentAccountId ? realAccounts ?? [] : selectedStudent.accounts).length})
+                {selectedStudent.studentAccountId && (
+                  <span className="text-[10px] font-normal text-[#00E676] normal-case">
+                    (vrais portefeuilles créés par l'élève)
+                  </span>
+                )}
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {selectedStudent.accounts.map((acc) => (
-                  <div key={acc.id} className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] space-y-2 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-white">{acc.name}</span>
-                      <span className="px-2 py-0.5 rounded bg-[#00E676]/10 text-[#00E676] text-[10px] font-mono border border-[#00E676]/20">
-                        {acc.status}
-                      </span>
+              {selectedStudent.studentAccountId && loadingRealTrades ? (
+                <div className="bg-[#0D1110] p-4 rounded-xl text-center text-slate-500 text-xs italic">
+                  Chargement des portefeuilles…
+                </div>
+              ) : (selectedStudent.studentAccountId ? realAccounts ?? [] : selectedStudent.accounts).length === 0 ? (
+                <div className="bg-[#0D1110] p-4 rounded-xl text-center text-slate-500 text-xs italic">
+                  Aucun portefeuille créé par l'élève pour l'instant.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {(selectedStudent.studentAccountId ? realAccounts ?? [] : selectedStudent.accounts).map((acc) => (
+                    <div key={acc.id} className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white">{acc.name}</span>
+                        <span className="px-2 py-0.5 rounded bg-[#00E676]/10 text-[#00E676] text-[10px] font-mono border border-[#00E676]/20">
+                          {acc.status}
+                        </span>
+                      </div>
+                      <div className="text-slate-400 text-[11px]">Courtier/Prop Firm : {acc.firmOrBroker} ({acc.type})</div>
+                      <div className="flex items-center justify-between pt-2 border-t border-[#151D1A] font-mono">
+                        <span className="text-slate-500">Solde Réel:</span>
+                        <span className="font-bold text-[#00E676] text-sm">{formatCurrency(acc.currentBalance)}</span>
+                      </div>
                     </div>
-                    <div className="text-slate-400 text-[11px]">Courtier/Prop Firm : {acc.firmOrBroker} ({acc.type})</div>
-                    <div className="flex items-center justify-between pt-2 border-t border-[#151D1A] font-mono">
-                      <span className="text-slate-500">Solde Réel:</span>
-                      <span className="font-bold text-[#00E676] text-sm">{formatCurrency(acc.currentBalance)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Recent Trades Journal in Read-Only */}

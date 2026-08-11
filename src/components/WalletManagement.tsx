@@ -98,6 +98,31 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
    */
   const positionsDuCompte = (accountId: string) =>
     trades.filter((t) => t.accountId === accountId).length;
+
+  /**
+   * Perte du jour sur un compte, en % du capital initial — **calculée**
+   * depuis les trades du jour rattachés à ce compte, jamais affichée en dur.
+   *
+   * Un compte fictivement affiché « Sécurisé » quel que soit son état réel
+   * inviterait à sur-risquer une évaluation Prop Firm réelle : c'est
+   * exactement l'inverse de ce qu'un outil de gestion du risque doit faire.
+   */
+  const dailyLossPercent = (account: TradingAccount) => {
+    if (account.initialBalance <= 0) return 0;
+    const today = new Date().toISOString().split("T")[0];
+    const pnlToday = trades
+      .filter(
+        (t) => t.accountId === account.id && t.date === today && (t.pnlUnit ?? "USD") !== "PERCENT"
+      )
+      .reduce((sum, t) => sum + t.pnl, 0);
+    return (pnlToday / account.initialBalance) * 100;
+  };
+
+  /** Drawdown total depuis le capital initial, en % — mêmes principes. */
+  const totalDrawdownPercent = (account: TradingAccount) => {
+    if (account.initialBalance <= 0) return 0;
+    return ((account.initialBalance - account.equity) / account.initialBalance) * 100;
+  };
   const totalCombinedInitial = accounts.reduce((acc, a) => acc + a.initialBalance, 0);
   const totalCombinedPnl = totalCombinedEquity - totalCombinedInitial;
   const totalCombinedPnlPercent = ((totalCombinedPnl / totalCombinedInitial) * 100).toFixed(2);
@@ -357,50 +382,97 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Daily Loss Limit Card */}
-                <div className="bg-[#0D1110] p-4 rounded-xl border border-[#151D1A] space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400 font-medium flex items-center gap-1">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Drawdown Quotidien Max
-                    </span>
-                    <span className="text-amber-400 font-mono font-bold">
-                      {selectedAccount.maxDailyDrawdownPercent}% Max (
-                      {formatCurrency((selectedAccount.initialBalance * selectedAccount.maxDailyDrawdownPercent) / 100)})
-                    </span>
-                  </div>
+                {(() => {
+                  const dailyPercent = dailyLossPercent(selectedAccount);
+                  const dailyLossAbs = Math.max(0, -dailyPercent);
+                  const dailyMax = selectedAccount.maxDailyDrawdownPercent;
+                  const dailyBarPercent = dailyMax > 0 ? Math.min(100, (dailyLossAbs / dailyMax) * 100) : 0;
+                  const dailyBreached = dailyLossAbs >= dailyMax;
+                  const dailyWarning = !dailyBreached && dailyLossAbs >= dailyMax * 0.7;
+                  const dailyColor = dailyBreached ? "bg-rose-500" : dailyWarning ? "bg-amber-400" : "bg-[#00E676]";
+                  const dailyLabelColor = dailyBreached
+                    ? "text-rose-400"
+                    : dailyWarning
+                    ? "text-amber-400"
+                    : "text-[#00E676]";
 
-                  {/* Progress bar */}
-                  <div className="w-full h-3 bg-[#111615] rounded-full overflow-hidden border border-[#1B2320]">
-                    <div className="h-full bg-[#00E676] rounded-full w-[22%]" />
-                  </div>
+                  return (
+                    <div className="bg-[#0D1110] p-4 rounded-xl border border-[#151D1A] space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-400 font-medium flex items-center gap-1">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Drawdown Quotidien Max
+                        </span>
+                        <span className="text-amber-400 font-mono font-bold">
+                          {dailyMax}% Max ({formatCurrency((selectedAccount.initialBalance * dailyMax) / 100)})
+                        </span>
+                      </div>
 
-                  <div className="flex justify-between text-[11px] text-slate-400 font-mono">
-                    <span>Perte aujourd'hui: <span className="text-[#00E676] font-bold">-0.8%</span></span>
-                    <span className="text-[#00E676]">Sécurisé ✅</span>
-                  </div>
-                </div>
+                      <div className="w-full h-3 bg-[#111615] rounded-full overflow-hidden border border-[#1B2320]">
+                        <div className={`h-full ${dailyColor} rounded-full`} style={{ width: `${dailyBarPercent}%` }} />
+                      </div>
+
+                      <div className="flex justify-between text-[11px] text-slate-400 font-mono">
+                        <span>
+                          Perte aujourd'hui:{" "}
+                          <span className={`font-bold ${dailyLabelColor}`}>
+                            {dailyPercent >= 0 ? "+" : ""}
+                            {dailyPercent.toFixed(2)}%
+                          </span>
+                        </span>
+                        <span className={dailyLabelColor}>
+                          {dailyBreached ? "Limite Atteinte ⛔" : dailyWarning ? "Attention ⚠️" : "Sécurisé ✅"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Total Drawdown Limit Card */}
-                <div className="bg-[#0D1110] p-4 rounded-xl border border-[#151D1A] space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400 font-medium flex items-center gap-1">
-                      <XCircle className="w-3.5 h-3.5 text-rose-400" /> Drawdown Total Max (Invalidation)
-                    </span>
-                    <span className="text-rose-400 font-mono font-bold">
-                      {selectedAccount.maxTotalDrawdownPercent}% Max (
-                      {formatCurrency((selectedAccount.initialBalance * selectedAccount.maxTotalDrawdownPercent) / 100)})
-                    </span>
-                  </div>
+                {(() => {
+                  const totalPercent = totalDrawdownPercent(selectedAccount);
+                  const totalLossAbs = Math.max(0, totalPercent);
+                  const totalMax = selectedAccount.maxTotalDrawdownPercent;
+                  const totalBarPercent = totalMax > 0 ? Math.min(100, (totalLossAbs / totalMax) * 100) : 0;
+                  const totalBreached = totalLossAbs >= totalMax;
+                  const totalWarning = !totalBreached && totalLossAbs >= totalMax * 0.7;
+                  const totalColor = totalBreached ? "bg-rose-500" : totalWarning ? "bg-amber-400" : "bg-[#00E676]";
+                  const totalLabelColor = totalBreached
+                    ? "text-rose-400"
+                    : totalWarning
+                    ? "text-amber-400"
+                    : "text-[#00E676]";
+                  const distanceToInvalidation = totalMax - totalLossAbs;
 
-                  {/* Progress bar */}
-                  <div className="w-full h-3 bg-[#111615] rounded-full overflow-hidden border border-[#1B2320]">
-                    <div className="h-full bg-[#00E676] rounded-full w-[15%]" />
-                  </div>
+                  return (
+                    <div className="bg-[#0D1110] p-4 rounded-xl border border-[#151D1A] space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-400 font-medium flex items-center gap-1">
+                          <XCircle className="w-3.5 h-3.5 text-rose-400" /> Drawdown Total Max (Invalidation)
+                        </span>
+                        <span className="text-rose-400 font-mono font-bold">
+                          {totalMax}% Max ({formatCurrency((selectedAccount.initialBalance * totalMax) / 100)})
+                        </span>
+                      </div>
 
-                  <div className="flex justify-between text-[11px] text-slate-400 font-mono">
-                    <span>Distance de l'invalidation: <span className="text-[#00E676] font-bold">+8.5%</span></span>
-                    <span className="text-[#00E676]">Zone Sûre ✅</span>
-                  </div>
-                </div>
+                      <div className="w-full h-3 bg-[#111615] rounded-full overflow-hidden border border-[#1B2320]">
+                        <div className={`h-full ${totalColor} rounded-full`} style={{ width: `${totalBarPercent}%` }} />
+                      </div>
+
+                      <div className="flex justify-between text-[11px] text-slate-400 font-mono">
+                        <span>
+                          Distance de l'invalidation:{" "}
+                          <span className={`font-bold ${totalLabelColor}`}>
+                            {distanceToInvalidation >= 0 ? "+" : ""}
+                            {distanceToInvalidation.toFixed(2)}%
+                          </span>
+                        </span>
+                        <span className={totalLabelColor}>
+                          {totalBreached ? "Compte Invalidé ⛔" : totalWarning ? "Attention ⚠️" : "Zone Sûre ✅"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Profit Target Progress (If Prop Firm Evaluation) */}
