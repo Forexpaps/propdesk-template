@@ -51,6 +51,22 @@ export type TradeResult = "WIN" | "LOSS" | "BREAKEVEN" | "OPEN";
 export type EmotionState = "Disciplined" | "FOMO" | "Impulsive" | "Anxious" | "Calm" | "Greedy";
 export type MarketCategory = "Forex" | "Crypto" | "Indices" | "Matières Premières";
 /**
+ * Erreurs d'exécution récurrentes, taguées librement par l'élève sur un
+ * trade (0, 1 ou plusieurs à la fois). Sert uniquement à l'analyse dans
+ * Rentabilité (bloc « Erreurs les plus fréquentes ») — n'influence jamais
+ * `result`/`pnl`.
+ */
+export type TradeMistake =
+  | "Entrée anticipée"
+  | "Sortie prématurée"
+  | "SL trop serré"
+  | "SL déplacé/retiré"
+  | "Sur-risque (>1%)"
+  | "Revenge trading"
+  | "FOMO / Chasing"
+  | "Pas de plan de trade"
+  | "Sur-trading";
+/**
  * Unité du champ `Trade.pnl`. Choisie librement par qui saisit le trade,
  * jamais déduite ni convertie — voir le commentaire de `Trade.pnl`.
  */
@@ -104,6 +120,8 @@ export interface Trade {
   result: TradeResult;
   strategy: string; // e.g. "SMC Orderblock", "Breakout FVG", "Liquidity Sweep"
   emotion: EmotionState;
+  /** Optionnel : absent ou vide = aucune erreur taguée pour ce trade. */
+  mistakes?: TradeMistake[];
   notes: string;
   chartUrl?: string;
   /**

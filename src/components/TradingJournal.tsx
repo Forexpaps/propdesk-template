@@ -37,6 +37,7 @@ import {
   TradeDraft,
   TradingAccount,
   PnlUnit,
+  TradeMistake,
 } from "../types";
 import { formatCurrency } from "../lib/format";
 import { resizeChartScreenshot } from "../lib/image";
@@ -49,6 +50,19 @@ const TOUS_COMPTES = "Tous";
 
 /** Valeur du filtre isolant les trades sans compte. */
 const NON_RATTACHES = "__aucun__";
+
+/** Erreurs proposées au tag sur un trade — voir `TradeMistake` dans types.ts. */
+const MISTAKE_OPTIONS: TradeMistake[] = [
+  "Entrée anticipée",
+  "Sortie prématurée",
+  "SL trop serré",
+  "SL déplacé/retiré",
+  "Sur-risque (>1%)",
+  "Revenge trading",
+  "FOMO / Chasing",
+  "Pas de plan de trade",
+  "Sur-trading",
+];
 
 interface TradingJournalProps {
   trades: Trade[];
@@ -144,6 +158,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       "Resultat",
       "Strategie",
       "Emotion",
+      "Erreurs",
       "Notes"
     ];
     const rows = trades.map((t) => [
@@ -167,6 +182,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       t.result,
       `"${t.strategy.replace(/"/g, '""')}"`,
       t.emotion,
+      `"${(t.mistakes || []).join("; ").replace(/"/g, '""')}"`,
       `"${(t.notes || "").replace(/"/g, '""')}"`
     ]);
 
@@ -199,6 +215,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     lotSize: 1.0,
     strategy: "SMC Orderblock",
     emotion: "Disciplined" as EmotionState,
+    mistakes: [] as TradeMistake[],
     notes: "Validation FVG H1 + Chasse de liquidité.",
     chartUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=800",
   });
@@ -222,6 +239,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     lotSize: 1.0,
     strategy: "SMC Orderblock",
     emotion: "Disciplined" as EmotionState,
+    mistakes: [] as TradeMistake[],
     notes: "",
     chartUrl: "",
   });
@@ -259,6 +277,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       lotSize: trade.lotSize,
       strategy: trade.strategy,
       emotion: trade.emotion,
+      mistakes: trade.mistakes ?? [],
       notes: trade.notes ?? "",
       chartUrl: trade.chartUrl ?? "",
     });
@@ -434,6 +453,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       result,
       strategy: formData.strategy,
       emotion: formData.emotion,
+      mistakes: formData.mistakes,
       notes: formData.notes,
       chartUrl: formData.chartUrl,
     };
@@ -1065,6 +1085,38 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               </div>
 
               <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Erreurs Commises (optionnel, plusieurs possibles)
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {MISTAKE_OPTIONS.map((mistake) => {
+                    const isSelected = formData.mistakes.includes(mistake);
+                    return (
+                      <button
+                        key={mistake}
+                        type="button"
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            mistakes: isSelected
+                              ? formData.mistakes.filter((m) => m !== mistake)
+                              : [...formData.mistakes, mistake],
+                          })
+                        }
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold text-center transition-all ${
+                          isSelected
+                            ? "bg-rose-500 text-white border-rose-400 font-bold"
+                            : "bg-[#0D1110] border-[#1B2320] text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        {mistake}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Notes & Réflexion Personnelle</label>
                 <textarea
                   rows={2}
@@ -1264,6 +1316,22 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 <div>{getEmotionBadge(selectedChartTrade.emotion)}</div>
               </div>
             </div>
+
+            {selectedChartTrade.mistakes && selectedChartTrade.mistakes.length > 0 && (
+              <div className="p-4 rounded-xl bg-[#0D1110] border border-[#1B2320] space-y-2 text-xs">
+                <div className="font-bold text-rose-400 font-mono">Erreurs Commises :</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedChartTrade.mistakes.map((mistake) => (
+                    <span
+                      key={mistake}
+                      className="px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[11px] font-semibold"
+                    >
+                      {mistake}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="p-4 rounded-xl bg-[#0D1110] border border-[#1B2320] space-y-2 text-xs">
               <div className="font-bold text-[#00E676] font-mono">Reflexion & Note Technique :</div>

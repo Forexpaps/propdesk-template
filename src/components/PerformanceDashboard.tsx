@@ -127,6 +127,115 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
     student.startingCapital > 0 ? (capitalDiff / student.startingCapital) * 100 : 0;
   const isCapitalUp = capitalDiff >= 0;
 
+  // 4. Performance par Actif (paire)
+  const pairStats: Record<string, { wins: number; total: number; pnl: number }> = {};
+  trades.forEach((t) => {
+    if (!pairStats[t.pair]) pairStats[t.pair] = { wins: 0, total: 0, pnl: 0 };
+    pairStats[t.pair].total += 1;
+    if (t.result === "WIN") pairStats[t.pair].wins += 1;
+    if ((t.pnlUnit ?? "USD") !== "PERCENT") pairStats[t.pair].pnl += t.pnl;
+  });
+  const pairChartData = Object.keys(pairStats)
+    .map((pair) => ({ pair, pnl: pairStats[pair].pnl, tradesCount: pairStats[pair].total }))
+    .sort((a, b) => b.tradesCount - a.tradesCount)
+    .slice(0, 8);
+
+  // 5. Performance par Direction (Long / Short)
+  const directionStats: Record<string, { wins: number; total: number; pnl: number }> = {};
+  trades.forEach((t) => {
+    if (!directionStats[t.direction]) directionStats[t.direction] = { wins: 0, total: 0, pnl: 0 };
+    directionStats[t.direction].total += 1;
+    if (t.result === "WIN") directionStats[t.direction].wins += 1;
+    if ((t.pnlUnit ?? "USD") !== "PERCENT") directionStats[t.direction].pnl += t.pnl;
+  });
+  const directionChartData = (["LONG", "SHORT"] as const)
+    .filter((d) => directionStats[d])
+    .map((d) => ({
+      direction: d === "LONG" ? "Long" : "Short",
+      pnl: directionStats[d].pnl,
+      tradesCount: directionStats[d].total,
+    }));
+
+  // 6. Performance par Jour de la Semaine
+  // `date` (YYYY-MM-DD) parsé en composants locaux plutôt qu'en ISO, pour
+  // éviter tout décalage de jour dû au fuseau horaire du navigateur.
+  const DAY_LABELS = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+  const DAY_ORDER = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+  const getDayLabel = (dateStr: string): string => {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    return DAY_LABELS[new Date(y, (m ?? 1) - 1, d ?? 1).getDay()];
+  };
+  const dayStats: Record<string, { wins: number; total: number; pnl: number }> = {};
+  trades.forEach((t) => {
+    const day = getDayLabel(t.date);
+    if (!dayStats[day]) dayStats[day] = { wins: 0, total: 0, pnl: 0 };
+    dayStats[day].total += 1;
+    if (t.result === "WIN") dayStats[day].wins += 1;
+    if ((t.pnlUnit ?? "USD") !== "PERCENT") dayStats[day].pnl += t.pnl;
+  });
+  const dayChartData = DAY_ORDER.filter((d) => dayStats[d]).map((d) => ({
+    day: d.slice(0, 3),
+    pnl: dayStats[d].pnl,
+    tradesCount: dayStats[d].total,
+  }));
+
+  // 7. Performance par Session de Marché
+  //
+  // Approximation assumée : `Trade.time` est une chaîne "HH:MM" libre, sans
+  // fuseau horaire garanti (voir le commentaire sur `Trade.time` dans
+  // types.ts) — l'heure saisie est utilisée telle quelle. Découpage sans
+  // chevauchement (contrairement à la pastille live de TopHeader.tsx, qui
+  // peut cumuler plusieurs sessions actives) pour ne compter chaque trade
+  // qu'une seule fois dans ces statistiques.
+  const getSessionLabel = (time?: string): string | null => {
+    if (!time) return null;
+    const hour = parseInt(time.split(":")[0], 10);
+    if (Number.isNaN(hour)) return null;
+    if (hour >= 21) return "Sydney";
+    if (hour < 7) return "Tokyo";
+    if (hour < 12) return "Londres";
+    if (hour < 16) return "Londres/NY";
+    return "New York";
+  };
+  const SESSION_ORDER = ["Sydney", "Tokyo", "Londres", "Londres/NY", "New York"];
+  const sessionStats: Record<string, { wins: number; total: number; pnl: number }> = {};
+  let tradesSansHeure = 0;
+  trades.forEach((t) => {
+    const session = getSessionLabel(t.time);
+    if (!session) {
+      tradesSansHeure += 1;
+      return;
+    }
+    if (!sessionStats[session]) sessionStats[session] = { wins: 0, total: 0, pnl: 0 };
+    sessionStats[session].total += 1;
+    if (t.result === "WIN") sessionStats[session].wins += 1;
+    if ((t.pnlUnit ?? "USD") !== "PERCENT") sessionStats[session].pnl += t.pnl;
+  });
+  const sessionChartData = SESSION_ORDER.filter((s) => sessionStats[s]).map((s) => ({
+    session: s,
+    pnl: sessionStats[s].pnl,
+    tradesCount: sessionStats[s].total,
+  }));
+
+  // 8. Erreurs les plus fréquentes & leur coût total
+  //
+  // Un trade taggé de plusieurs erreurs compte dans chacune : les coûts par
+  // catégorie ne s'excluent donc pas mutuellement, exactement comme leur
+  // somme (`totalErrorsCost`) peut recompter un même trade plusieurs fois.
+  const mistakeStats: Record<string, { count: number; cost: number }> = {};
+  tradesEnDollars.forEach((t) => {
+    (t.mistakes ?? []).forEach((m) => {
+      if (!mistakeStats[m]) mistakeStats[m] = { count: 0, cost: 0 };
+      mistakeStats[m].count += 1;
+      mistakeStats[m].cost += t.pnl;
+    });
+  });
+  const mistakeChartData = Object.entries(mistakeStats)
+    .map(([mistake, s]) => ({ mistake, count: s.count, cost: s.cost }))
+    .sort((a, b) => b.count - a.count);
+  const totalErrorsCost = mistakeChartData.reduce((acc, m) => acc + m.cost, 0);
+  const netResultWithoutErrors = totalPnL - totalErrorsCost;
+
   return (
     <div className="space-y-8 pb-12">
       {/* Header Banner */}
@@ -333,6 +442,225 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Charts Row 3: Actif & Direction */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* PnL par Actif */}
+        <div className="bg-[#111615] border border-[#1B2320] p-6 rounded-2xl space-y-4 shadow-xl">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-[#00E676]" />
+              PnL Net par Actif
+            </h3>
+            <p className="text-xs text-slate-400">Rentabilité selon la paire tradée (top 8 par volume)</p>
+          </div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={pairChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
+                <XAxis dataKey="pair" stroke="#475569" fontSize={11} />
+                <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", fontSize: "12px" }}
+                  labelStyle={{ color: "#ffffff" }}
+                  itemStyle={{ color: "#ffffff" }}
+                  formatter={(value: any) => [formatCurrency(Number(value)), "PnL Total"]}
+                />
+                <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
+                  {pairChartData.map((entry, index) => (
+                    <Cell key={`cell-pair-${index}`} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* PnL par Direction */}
+        <div className="bg-[#111615] border border-[#1B2320] p-6 rounded-2xl space-y-4 shadow-xl">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <ArrowUpRight className="w-5 h-5 text-[#00E676]" />
+              PnL Net par Direction
+            </h3>
+            <p className="text-xs text-slate-400">Rentabilité Long vs Short</p>
+          </div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={directionChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
+                <XAxis dataKey="direction" stroke="#475569" fontSize={12} />
+                <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", fontSize: "12px" }}
+                  labelStyle={{ color: "#ffffff" }}
+                  itemStyle={{ color: "#ffffff" }}
+                  formatter={(value: any) => [formatCurrency(Number(value)), "PnL Total"]}
+                />
+                <Bar dataKey="pnl" radius={[6, 6, 0, 0]} barSize={80}>
+                  {directionChartData.map((entry, index) => (
+                    <Cell key={`cell-dir-${index}`} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts Row 4: Jour de la Semaine & Session de Marché */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* PnL par Jour de la Semaine */}
+        <div className="bg-[#111615] border border-[#1B2320] p-6 rounded-2xl space-y-4 shadow-xl">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Clock className="w-5 h-5 text-amber-400" />
+              PnL Net par Jour de la Semaine
+            </h3>
+            <p className="text-xs text-slate-400">Identifie tes meilleurs et pires jours de trading</p>
+          </div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dayChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
+                <XAxis dataKey="day" stroke="#475569" fontSize={12} />
+                <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", fontSize: "12px" }}
+                  labelStyle={{ color: "#ffffff" }}
+                  itemStyle={{ color: "#ffffff" }}
+                  formatter={(value: any) => [formatCurrency(Number(value)), "PnL Total"]}
+                />
+                <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
+                  {dayChartData.map((entry, index) => (
+                    <Cell key={`cell-day-${index}`} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* PnL par Session de Marché */}
+        <div className="bg-[#111615] border border-[#1B2320] p-6 rounded-2xl space-y-4 shadow-xl">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Clock className="w-5 h-5 text-amber-400" />
+              PnL Net par Session de Marché
+            </h3>
+            <p className="text-xs text-slate-400">
+              Basé sur l'heure d'entrée saisie
+              {tradesSansHeure > 0 ? ` — ${tradesSansHeure} trade(s) sans heure exclus` : ""}
+            </p>
+          </div>
+          {sessionChartData.length === 0 ? (
+            <div className="h-64 w-full flex items-center justify-center text-xs text-slate-500 italic text-center px-6">
+              Aucun trade avec une heure d'entrée renseignée pour l'instant.
+            </div>
+          ) : (
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={sessionChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
+                  <XAxis dataKey="session" stroke="#475569" fontSize={10} interval={0} angle={-15} textAnchor="end" />
+                  <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", fontSize: "12px" }}
+                    labelStyle={{ color: "#ffffff" }}
+                    itemStyle={{ color: "#ffffff" }}
+                    formatter={(value: any) => [formatCurrency(Number(value)), "PnL Total"]}
+                  />
+                  <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
+                    {sessionChartData.map((entry, index) => (
+                      <Cell key={`cell-session-${index}`} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Charts Row 5: Erreurs les plus fréquentes */}
+      {mistakeChartData.length === 0 ? (
+        <div className="bg-[#111615] border border-[#1B2320] p-6 rounded-2xl shadow-xl">
+          <h3 className="text-base font-bold text-white flex items-center gap-2 mb-2">
+            <RotateCcw className="w-5 h-5 text-rose-400" />
+            Erreurs les plus fréquentes
+          </h3>
+          <p className="text-xs text-slate-500 italic">
+            Aucune erreur taguée pour l'instant. Tague les erreurs commises directement sur un trade
+            dans le Journal (champ « Erreurs Commises ») pour voir apparaître ces statistiques.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Liste des erreurs les plus fréquentes */}
+          <div className="bg-[#111615] border border-[#1B2320] p-6 rounded-2xl space-y-4 shadow-xl">
+            <div>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-rose-400" />
+                Erreurs les plus fréquentes
+              </h3>
+              <p className="text-xs text-slate-400">Classées par nombre d'occurrences</p>
+            </div>
+            <div className="space-y-2">
+              {mistakeChartData.map((m) => (
+                <div
+                  key={m.mistake}
+                  className="p-3.5 rounded-xl bg-[#0D1110] border border-[#1B2320] flex items-center justify-between"
+                >
+                  <div>
+                    <div className="text-sm font-bold text-white">{m.mistake}</div>
+                    <div className="text-[11px] text-slate-500">{m.count} occurrence{m.count > 1 ? "s" : ""}</div>
+                  </div>
+                  <div className={`font-mono font-bold ${m.cost >= 0 ? "text-[#00E676]" : "text-rose-400"}`}>
+                    {m.cost >= 0 ? "+" : ""}
+                    {formatCurrency(m.cost)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Coût total des erreurs */}
+          <div className="bg-[#111615] border border-[#1B2320] p-6 rounded-2xl space-y-4 shadow-xl">
+            <div>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-rose-400" />
+                Coût Total des Erreurs
+              </h3>
+            </div>
+            <div className="space-y-1">
+              <div className="text-3xl font-black text-rose-400 font-mono">
+                {formatCurrency(totalErrorsCost)}
+              </div>
+              <p className="text-xs text-slate-400">
+                Sans ces erreurs, ton résultat cumulé serait de{" "}
+                <span className="text-[#00E676] font-bold">{formatCurrency(netResultWithoutErrors)}</span>{" "}
+                au lieu de {formatCurrency(totalPnL)}.
+              </p>
+            </div>
+            <div className="h-56 w-full pt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={mistakeChartData} layout="vertical" margin={{ left: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
+                  <XAxis type="number" stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
+                  <YAxis type="category" dataKey="mistake" stroke="#475569" fontSize={10} width={110} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", fontSize: "12px" }}
+                    labelStyle={{ color: "#ffffff" }}
+                    itemStyle={{ color: "#ffffff" }}
+                    formatter={(value: any) => [formatCurrency(Number(value)), "Coût"]}
+                  />
+                  <Bar dataKey="cost" radius={[0, 6, 6, 0]} fill="#f43f5e" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
