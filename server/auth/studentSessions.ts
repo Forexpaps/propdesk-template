@@ -92,6 +92,10 @@ export function destroyStudentSession(token: string): void {
   db.prepare("DELETE FROM student_sessions WHERE id = ?").run(fingerprint(token));
 }
 
+export function destroyAllStudentSessions(studentAccountId: string): void {
+  db.prepare("DELETE FROM student_sessions WHERE student_account_id = ?").run(studentAccountId);
+}
+
 export function purgeExpiredStudentSessions(): number {
   const result = db
     .prepare("DELETE FROM student_sessions WHERE expires_at <= ?")

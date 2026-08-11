@@ -84,7 +84,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   const totalTrades = trades.length;
   const winningTrades = trades.filter((t) => t.result === "WIN").length;
   const losingTrades = totalTrades - winningTrades;
-  const winRate = totalTrades > 0 ? Math.round((winningTrades / totalTrades) * 100) : 63;
+  const winRate = totalTrades > 0 ? Math.round((winningTrades / totalTrades) * 100) : 0;
 
   // Equity Curve Data
   const sortedTrades = [...trades].sort(
@@ -92,16 +92,16 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   );
 
   let tempCapital = student.startingCapital;
-  const equityData = [
-    { label: "S1", capital: 8610 },
-    { label: "S2", capital: 9400 },
-    { label: "S3", capital: 9950 },
-    { label: "S4", capital: 11100 },
-    { label: "S5", capital: 11708 },
-    { label: "S6", capital: 11500 },
-    { label: "S7", capital: 13027 },
-    { label: "S8", capital: student.currentCapital },
-  ];
+  const equityData = sortedTrades.length === 0
+    ? [{ label: "Départ", capital: student.startingCapital }]
+    : sortedTrades.map((trade, index) => {
+        const pnl = parseFloat(String(trade.pnl)) || 0;
+        tempCapital += trade.result === "WIN" ? pnl : -pnl;
+        return {
+          label: `T${index + 1}`,
+          capital: tempCapital
+        };
+      }).concat([{ label: "Actuel", capital: student.currentCapital }]);
 
   const firstName = student.name.split(" ")[0] || "Yoann";
 
@@ -146,7 +146,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
               {winRate}%
             </div>
             <p className="text-xs text-slate-400">
-              {winningTrades || 5} gagnants · {losingTrades || 3} perdants
+              {winningTrades} gagnants · {losingTrades} perdants
             </p>
           </div>
         </div>

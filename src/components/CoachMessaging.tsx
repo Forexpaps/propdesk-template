@@ -70,6 +70,14 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
   );
   const [isSending, setIsSending] = useState<boolean>(false);
 
+  if (!coaches || coaches.length === 0) {
+    return (
+      <div className="text-center py-12 text-slate-400">
+        <p>Aucun coach disponible pour le moment.</p>
+      </div>
+    );
+  }
+
   const selectedCoach = coaches.find((c) => c.id === selectedCoachId) || coaches[0];
   const activeConversation = messages.filter((m) => m.coachId === selectedCoachId);
 
