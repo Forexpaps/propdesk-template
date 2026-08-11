@@ -27,6 +27,17 @@ export interface ServerCollections {
 
 export type CollectionName = keyof ServerCollections;
 
+/** Événement du calendrier économique — voir `server/economicCalendar.ts`. */
+export interface EconomicCalendarEvent {
+  id: string;
+  title: string;
+  country: string;
+  date: string;
+  impact: string;
+  forecast: string;
+  previous: string;
+}
+
 export interface ServerState {
   bootstrapped: boolean;
   student: StudentProfile | null;
@@ -146,6 +157,10 @@ export const api = {
 
   seedDemoData: () =>
     request<{ success: true }>("/api/state/seed", { method: "POST" }),
+
+  /** Annonces économiques de la semaine — flux public ForexFactory, mis en cache côté serveur. */
+  fetchEconomicCalendar: () =>
+    request<{ events: EconomicCalendarEvent[] }>("/api/economic-calendar"),
 
   importState: (state: {
     student?: StudentProfile;

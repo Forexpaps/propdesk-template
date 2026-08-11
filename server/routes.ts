@@ -21,6 +21,7 @@ import {
 import { authRouter, staffRouter } from "./auth/routes";
 import { studentAuthRouter, studentProtectedRouter } from "./auth/studentRoutes";
 import { requireAuth } from "./auth/middleware";
+import { getEconomicCalendar } from "./economicCalendar";
 
 export const api = Router();
 
@@ -34,6 +35,24 @@ const wrap =
 api.get("/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+/**
+ * Public : donnée non sensible, identique pour tout visiteur, qu'il soit
+ * staff ou élève — pas de raison de la coupler à l'un des deux mondes
+ * d'authentification.
+ */
+api.get(
+  "/economic-calendar",
+  wrap(async (_req, res) => {
+    try {
+      const events = await getEconomicCalendar();
+      res.json({ events });
+    } catch (err) {
+      console.warn("[economic-calendar] Aucun cache disponible.", err);
+      res.status(503).json({ error: "Calendrier économique indisponible pour le moment." });
+    }
+  })
+);
 
 api.use("/auth", authRouter);
 api.use("/auth", studentAuthRouter);
