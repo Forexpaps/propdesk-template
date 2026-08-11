@@ -30,8 +30,24 @@ import {
   AlertTriangle,
   RotateCcw
 } from "lucide-react";
-import { Trade, StudentProfile } from "../types";
+import { Trade, StudentProfile, EmotionState } from "../types";
 import { formatCurrency } from "../lib/format";
+
+/**
+ * Les 6 états émotionnels saisissables dans le Journal de trading (chips
+ * `EmotionState` de `TradingJournal.tsx`) — même ordre, mêmes libellés
+ * français (sans l'emoji). Sert à préremplir le graphique « Impact
+ * Psychologique » avec toutes les émotions possibles, pas seulement celles
+ * déjà taguées sur un trade existant.
+ */
+const ALL_EMOTIONS: { id: EmotionState; label: string }[] = [
+  { id: "Disciplined", label: "Discipliné" },
+  { id: "FOMO", label: "FOMO" },
+  { id: "Impulsive", label: "Impulsif" },
+  { id: "Anxious", label: "Anxieux" },
+  { id: "Calm", label: "Calme" },
+  { id: "Greedy", label: "Avarice" },
+];
 
 interface PerformanceDashboardProps {
   student: StudentProfile;
@@ -86,29 +102,33 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
   }));
 
   // 3. Performance by Emotion Data
-  const emotionStats: Record<string, { wins: number; total: number; pnl: number }> = {};
+  //
+  // Préremplit les 6 émotions saisissables dans le Journal (`ALL_EMOTIONS`),
+  // même celles jamais taguées — sinon un élève qui n'a par exemple jamais
+  // trade "Anxieux" ne verrait jamais cette barre, alors que c'est justement
+  // l'information utile (« je n'ai jamais (encore) tradé anxieux »).
+  const emotionStats: Record<EmotionState, { wins: number; total: number; pnl: number }> = {
+    Disciplined: { wins: 0, total: 0, pnl: 0 },
+    FOMO: { wins: 0, total: 0, pnl: 0 },
+    Impulsive: { wins: 0, total: 0, pnl: 0 },
+    Anxious: { wins: 0, total: 0, pnl: 0 },
+    Calm: { wins: 0, total: 0, pnl: 0 },
+    Greedy: { wins: 0, total: 0, pnl: 0 },
+  };
   trades.forEach((t) => {
-    if (!emotionStats[t.emotion]) {
-      emotionStats[t.emotion] = { wins: 0, total: 0, pnl: 0 };
-    }
     emotionStats[t.emotion].total += 1;
     if (t.result === "WIN") emotionStats[t.emotion].wins += 1;
     if ((t.pnlUnit ?? "USD") !== "PERCENT") emotionStats[t.emotion].pnl += t.pnl;
   });
 
-  const emotionChartData = Object.keys(emotionStats).map((em) => ({
-    emotion:
-      em === "Disciplined"
-        ? "Discipliné"
-        : em === "FOMO"
-        ? "FOMO"
-        : em === "Impulsive"
-        ? "Impulsif"
-        : em === "Calm"
-        ? "Calme"
-        : em,
-    winRate: Math.round((emotionStats[em].wins / emotionStats[em].total) * 100),
-    pnl: emotionStats[em].pnl,
+  const emotionChartData = ALL_EMOTIONS.map(({ id, label }) => ({
+    emotion: label,
+    winRate:
+      emotionStats[id].total > 0
+        ? Math.round((emotionStats[id].wins / emotionStats[id].total) * 100)
+        : 0,
+    pnl: emotionStats[id].pnl,
+    tradesCount: emotionStats[id].total,
   }));
 
   // General Metrics
@@ -419,13 +439,18 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
                 contentStyle={{ backgroundColor: "#0f172a", borderColor: "#334155", borderRadius: "12px", fontSize: "12px" }}
                 labelStyle={{ color: "#ffffff" }}
                 itemStyle={{ color: "#ffffff" }}
-                formatter={(value: any) => [formatCurrency(Number(value)), "PnL Total"]}
+                formatter={(value: any, _name: any, props: any) => [
+                  `${formatCurrency(Number(value))} (${props?.payload?.tradesCount ?? 0} trade${
+                    (props?.payload?.tradesCount ?? 0) > 1 ? "s" : ""
+                  })`,
+                  "PnL Total",
+                ]}
               />
               <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
                 {emotionChartData.map((entry, index) => (
                   <Cell
                     key={`cell-emotion-${index}`}
-                    fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"}
+                    fill={entry.tradesCount === 0 ? "#475569" : entry.pnl >= 0 ? "#10b981" : "#f43f5e"}
                   />
                 ))}
               </Bar>
