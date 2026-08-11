@@ -93,7 +93,7 @@ export function destroyStudentSession(token: string): void {
 }
 
 export function destroyAllStudentSessions(studentAccountId: string): void {
-  db.prepare("DELETE FROM student_sessions WHERE student_account_id = ?").run(studentAccountId);
+  db.prepare("DELETE FROM student_sessions WHERE user_id = ?").run(studentAccountId);
 }
 
 export function purgeExpiredStudentSessions(): number {
