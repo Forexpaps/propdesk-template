@@ -145,9 +145,9 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Banner Header */}
-      <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] p-6 rounded-2xl border border-purple-500/30 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm relative overflow-hidden">
+      <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] p-6 rounded-2xl border border-[#00E676]/20 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm relative overflow-hidden">
         <div className="space-y-2 z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-mono font-bold">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20 text-xs font-mono font-bold">
             <Wallet className="w-3.5 h-3.5" /> Gestionnaire Multi-Portefeuilles & Prop Firms
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
@@ -162,7 +162,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
         {!readOnly && (
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-sm shadow-md transition-all shrink-0 cursor-pointer z-10"
+            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-sm shadow-md transition-all shrink-0 cursor-pointer z-10"
           >
             <Plus className="w-5 h-5" />
             <span>Ajouter un Portefeuille</span>
@@ -172,17 +172,17 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
 
       {/* Capital Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] p-5 rounded-2xl border border-purple-500/20 space-y-2">
+        <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] p-5 rounded-2xl border border-[#00E676]/20 space-y-2">
           <div className="text-xs font-medium text-slate-400 flex items-center justify-between">
             <span>Capital Total Cumulé</span>
-            <DollarSign className="w-4 h-4 text-purple-400" />
+            <DollarSign className="w-4 h-4 text-[#00E676]" />
           </div>
-          <div className="text-2xl font-bold font-mono text-purple-300">
+          <div className="text-2xl font-bold font-mono text-[#00E676]">
             {formatCurrency(totalCombinedEquity)}
           </div>
           <div className="text-xs text-slate-400 flex items-center gap-1 font-mono">
             {parseFloat(totalCombinedPnlPercent) >= 0 ? (
-              <span className="text-purple-300 font-bold flex items-center gap-0.5">
+              <span className="text-[#00E676] font-bold flex items-center gap-0.5">
                 <ArrowUpRight className="w-3.5 h-3.5" /> +{totalCombinedPnlPercent}%
               </span>
             ) : (
@@ -238,7 +238,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
             onClick={() => setFilterType(type)}
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
               filterType === type
-                ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
+                ? "bg-[#00E676] text-slate-950 shadow-md shadow-[#00E676]/20"
                 : "bg-[#111615] border border-[#1B2320] text-slate-400 hover:text-white"
             }`}
           >
@@ -252,7 +252,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
         {/* Left Column: List of Accounts */}
         <div className="space-y-3 lg:col-span-1">
           <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
-            <Layers className="w-4 h-4 text-purple-400" /> Sélectionner un Compte ({filteredAccounts.length})
+            <Layers className="w-4 h-4 text-[#00E676]" /> Sélectionner un Compte ({filteredAccounts.length})
           </h2>
 
           {filteredAccounts.map((acc) => {
@@ -266,13 +266,13 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 onClick={() => setSelectedAccountId(acc.id)}
                 className={`p-4 rounded-xl border transition-all cursor-pointer space-y-3 ${
                   isSelected
-                    ? "bg-gradient-to-br from-[#0D1110] to-[#111615] border-purple-500/40 shadow-lg shadow-purple-500/10"
-                    : "bg-[#0D1110] border-[#151D1A] hover:border-purple-500/20"
+                    ? "bg-gradient-to-br from-[#0D1110] to-[#111615] border-[#00E676]/40 shadow-lg shadow-[#00E676]/10"
+                    : "bg-[#0D1110] border-[#151D1A] hover:border-[#00E676]/20"
                 }`}
               >
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-500/20 border border-purple-500/30 text-purple-300">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676]">
                       {acc.firmOrBroker}
                     </span>
                     <h3 className="text-sm font-bold text-white mt-1">{acc.name}</h3>
@@ -282,7 +282,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                       acc.status === "ACTIVE"
-                        ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                        ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20"
                         : acc.status === "PAID_OUT"
                         ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
                         : "bg-blue-500/10 text-blue-300 border border-blue-500/20"
@@ -304,7 +304,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     <div className="text-[10px] text-slate-500">Performance</div>
                     <div
                       className={`text-xs font-bold font-mono ${
-                        pnl >= 0 ? "text-purple-300" : "text-rose-400"
+                        pnl >= 0 ? "text-[#00E676]" : "text-rose-400"
                       }`}
                     >
                       {pnl >= 0 ? `+${pnlPercent}%` : `${pnlPercent}%`}
@@ -318,11 +318,11 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
 
         {/* Right Column: Selected Account Deep-Dive Inspector */}
         {selectedAccount && (
-          <div className="lg:col-span-2 bg-gradient-to-br from-[#0D1110] to-[#111615] border border-purple-500/30 rounded-2xl p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-purple-500/20 pb-4 gap-4">
+          <div className="lg:col-span-2 bg-gradient-to-br from-[#0D1110] to-[#111615] border border-[#00E676]/20 rounded-2xl p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#00E676]/20 pb-4 gap-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="px-2.5 py-1 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 text-xs font-mono font-bold">
+                  <span className="px-2.5 py-1 rounded bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20 text-xs font-mono font-bold">
                     {selectedAccount.type}
                   </span>
                   <span className="text-xs text-slate-400 font-mono">
@@ -332,7 +332,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 <h2 className="text-xl font-bold text-white mt-1">{selectedAccount.name}</h2>
                 <p className="text-xs text-slate-400">
                   Fournisseur / Broker: <span className="text-slate-200 font-bold">{selectedAccount.firmOrBroker}</span> | N° Compte:{" "}
-                  <span className="text-purple-300 font-mono">{selectedAccount.accountNumber}</span>
+                  <span className="text-[#00E676] font-mono">{selectedAccount.accountNumber}</span>
                 </p>
               </div>
 
@@ -351,7 +351,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                         }
                       }
                     }}
-                    className="px-3 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 hover:text-purple-200 font-bold text-xs flex items-center gap-1.5 transition-colors"
+                    className="px-3 py-2 rounded-xl bg-[#00E676]/10 hover:bg-[#00E676]/20 text-[#00E676] hover:text-[#00E676] font-bold text-xs flex items-center gap-1.5 transition-colors"
                   >
                     <RefreshCw className="w-3.5 h-3.5" /> Ajuster le Solde
                   </button>
@@ -362,7 +362,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
             {/* Drawdown & Objectives Tracker Bars */}
             <div className="space-y-4">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-purple-400" /> Règles de Risk & Drawdown Prop Firm
+                <ShieldCheck className="w-4 h-4 text-[#00E676]" /> Règles de Risk & Drawdown Prop Firm
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -464,21 +464,21 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
               {/* `initialBalance > 0` : sert de diviseur juste en dessous — un compte
                   legacy/malformé à 0 ou négatif donnerait un pourcentage NaN/inversé. */}
               {selectedAccount.profitTargetPercent > 0 && selectedAccount.initialBalance > 0 && (
-                <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] p-4 rounded-xl border border-purple-500/30 space-y-3">
+                <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] p-4 rounded-xl border border-[#00E676]/20 space-y-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-200 font-bold flex items-center gap-1.5">
-                      <Award className="w-4 h-4 text-purple-400" /> Objectif de Validation (Profit Target)
+                      <Award className="w-4 h-4 text-[#00E676]" /> Objectif de Validation (Profit Target)
                     </span>
-                    <span className="text-purple-300 font-mono font-bold">
+                    <span className="text-[#00E676] font-mono font-bold">
                       +{selectedAccount.profitTargetPercent}% (+
                       {formatCurrency((selectedAccount.initialBalance * selectedAccount.profitTargetPercent) / 100)})
                     </span>
                   </div>
 
                   {/* Progress bar */}
-                  <div className="w-full h-3.5 bg-[#111615] rounded-full overflow-hidden border border-purple-500/20">
+                  <div className="w-full h-3.5 bg-[#111615] rounded-full overflow-hidden border border-[#00E676]/20">
                     <div
-                      className="h-full bg-gradient-to-r from-purple-500 to-purple-400 rounded-full transition-all"
+                      className="h-full bg-gradient-to-r from-[#00E676] to-teal-400 rounded-full transition-all"
                       style={{
                         width: `${Math.min(
                           100,
@@ -496,11 +496,11 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <div className="flex justify-between text-xs font-mono">
                     <span className="text-slate-400">
                       Bénéfice Actuel:{" "}
-                      <span className="text-purple-300 font-bold">
+                      <span className="text-[#00E676] font-bold">
                         +{formatCurrency(selectedAccount.equity - selectedAccount.initialBalance)}
                       </span>
                     </span>
-                    <span className="text-purple-300 font-bold">
+                    <span className="text-[#00E676] font-bold">
                       {Math.round(
                         (((selectedAccount.equity - selectedAccount.initialBalance) /
                           ((selectedAccount.initialBalance * selectedAccount.profitTargetPercent) / 100)) *
@@ -514,7 +514,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
             </div>
 
             {/* Quick Stats Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gradient-to-br from-[#0D1110] to-[#111615] p-4 rounded-xl border border-purple-500/20 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gradient-to-br from-[#0D1110] to-[#111615] p-4 rounded-xl border border-[#00E676]/20 text-xs">
               <div>
                 <div className="text-slate-400 font-mono">Jours de Trading</div>
                 <div className="text-sm font-bold text-white mt-1">
@@ -538,7 +538,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
 
               <div>
                 <div className="text-slate-400 font-mono">Solde Actuel</div>
-                <div className="text-sm font-bold text-purple-300 mt-1 font-mono">
+                <div className="text-sm font-bold text-[#00E676] mt-1 font-mono">
                   {formatCurrency(selectedAccount.equity)}
                 </div>
               </div>
@@ -550,11 +550,11 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
       {/* Modal Add Account */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] border border-purple-500/30 rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl relative">
-            <div className="flex items-center justify-between border-b border-purple-500/20 pb-4">
+          <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] border border-[#00E676]/20 rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-[#00E676]/20 pb-4">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-purple-500/20">
-                  <Wallet className="w-5 h-5 text-purple-400" />
+                <div className="p-2 rounded-lg bg-[#00E676]/10">
+                  <Wallet className="w-5 h-5 text-[#00E676]" />
                 </div>
                 <h3 className="text-base font-bold text-white">Ajouter un nouveau Portefeuille</h3>
               </div>
@@ -575,7 +575,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   placeholder="ex: FTMO $100K Phase 1"
                   value={newAccName}
                   onChange={(e) => setNewAccName(e.target.value)}
-                  className="w-full bg-[#0D1110] border border-purple-500/30 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-purple-500"
+                  className="w-full bg-[#0D1110] border border-[#00E676]/20 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]"
                 />
               </div>
 
@@ -588,7 +588,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     placeholder="FTMO, MyFundedFX, IC Markets..."
                     value={newAccFirm}
                     onChange={(e) => setNewAccFirm(e.target.value)}
-                    className="w-full bg-[#0D1110] border border-purple-500/30 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-purple-500"
+                    className="w-full bg-[#0D1110] border border-[#00E676]/20 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]"
                   />
                 </div>
 
@@ -597,7 +597,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <select
                     value={newAccType}
                     onChange={(e) => setNewAccType(e.target.value as AccountType)}
-                    className="w-full bg-[#0D1110] border border-purple-500/30 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-purple-500"
+                    className="w-full bg-[#0D1110] border border-[#00E676]/20 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]"
                   >
                     <option value="Prop Firm Evaluation">Prop Firm Evaluation</option>
                     <option value="Prop Firm Funded">Prop Firm Funded</option>
@@ -653,17 +653,17 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-purple-500/20">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#00E676]/20">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 font-bold"
+                  className="px-4 py-2.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 font-bold"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold"
+                  className="px-5 py-2.5 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-bold"
                 >
                   Créer le Portefeuille
                 </button>
