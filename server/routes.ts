@@ -139,8 +139,8 @@ interface EnrolledStudentLite {
  *
  * Masquées quoi qu'il arrive, indépendamment du réglage de visibilité du
  * fondateur — ce dernier gouverne le reste (Portefeuille, Rentabilité,
- * Examen, Exercice du jour, Replay, Sim propfirm, Module vidéo, Messagerie,
- * Audit Setup, Prop Firm, Mindset, Macro) : voir
+ * Examen, Exercice du jour, Replay, Module vidéo, Messagerie,
+ * Audit Setup, Mindset, Macro) : voir
  * la fusion dans `buildStudentProfile`.
  */
 const ALWAYS_HIDDEN_FOR_STUDENTS = ["students"];

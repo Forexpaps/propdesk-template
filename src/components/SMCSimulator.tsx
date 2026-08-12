@@ -5,16 +5,8 @@ import { PropChallengeSimulator } from "./PropChallengeSimulator";
 
 export type SimulatorMode = "REPLAY" | "MONTE_CARLO";
 
-interface SMCSimulatorProps {
-  /**
-   * Vue ouverte à l'arrivée. « Replay » et « Sim propfirm » rendent ce même
-   * composant, chacun sur sa vue.
-   */
-  initialMode?: SimulatorMode;
-}
-
-export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ initialMode = "REPLAY" }) => {
-  const [activeTab, setActiveTab] = useState<SimulatorMode>(initialMode);
+export const SMCSimulator: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<SimulatorMode>("REPLAY");
 
   // Monte Carlo state
   const [initialCapital, setInitialCapital] = useState<number>(100000);

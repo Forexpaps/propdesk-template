@@ -14,7 +14,6 @@ import {
   TrendingUp,
   Activity,
   Wallet,
-  Radio,
   Zap,
   PanelLeftClose,
   PanelLeftOpen,
@@ -59,7 +58,6 @@ export const ALL_TABS = [
   "messaging",
   "analytics",
   "exam",
-  "propfirm",
   "macro",
 ] as const;
 
@@ -79,9 +77,6 @@ export function isTabType(value: string): value is TabType {
 /**
  * Entrées que le compte fondateur peut masquer, identifiées par une clé stable.
  *
- * L'`id` d'onglet ne peut pas servir de clé : « Replay » et « Sim propfirm »
- * pointent tous deux sur `simulator`.
- *
  * « Tableau de bord » en est volontairement absent : c'est la destination de
  * repli quand l'onglet courant devient inatteignable, le masquer créerait le
  * cul-de-sac qu'on cherche à éviter.
@@ -94,7 +89,6 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
   "exam",
   "checklist",
   "replay",
-  "propfirm",
   "academy",
   "messaging",
   "audit",
@@ -120,7 +114,6 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   exam: "exam",
   checklist: null,
   replay: "simulator",
-  propfirm: "propfirm",
   academy: "academy",
   messaging: "messaging",
   audit: null,
@@ -235,7 +228,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { key: "exam", id: "exam", label: "Examen", icon: Award },
     { key: "checklist", id: null, label: "Exercice du jour", icon: Sliders, onOpen: onOpenChecklist },
     { key: "replay", id: "simulator", label: "Replay", icon: Zap },
-    { key: "propfirm", id: "propfirm", label: "Sim propfirm", icon: Radio },
   ];
 
   const formationItems: SidebarEntry[] = [
@@ -246,9 +238,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   /**
    * Section OUTILS : deux modales, sans onglet associé.
    *
-   * Le suivi de challenge Prop Firm est désormais le simulateur complet de
-   * la section PRATIQUE (« Replay » / « Sim propfirm »), plus cette modale
-   * séparée — voir SMCSimulator/PropChallengeSimulator.
+   * Le suivi de challenge Prop Firm est désormais le simulateur complet
+   * accessible depuis l'unique entrée « Replay » de la section PRATIQUE
+   * (bascule interne entre ses deux vues) — voir SMCSimulator/
+   * PropChallengeSimulator.
    *
    * « Calendrier » n'y figure plus : devenu l'onglet « Macro » (section
    * SUIVI), ce n'est plus une modale.

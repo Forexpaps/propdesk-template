@@ -622,15 +622,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
 
             {activeTab === "macro" && <MacroDashboard />}
 
-            {/* « Replay » et « Sim propfirm » partagent ce composant, comme côté
-                staff : la clé force le remontage pour que chacun s'ouvre sur sa
-                vue. Aucune donnée propre à l'élève requise (scénarios statiques). */}
-            {(activeTab === "simulator" || activeTab === "propfirm") && (
-              <SMCSimulator
-                key={activeTab}
-                initialMode={activeTab === "propfirm" ? "MONTE_CARLO" : "REPLAY"}
-              />
-            )}
+            {activeTab === "simulator" && <SMCSimulator />}
 
             {activeTab === "exam" && (
               <div className="space-y-6">
@@ -1367,8 +1359,8 @@ function AcademyApp({
           });
 
           // Masquer le dernier accès à l'onglet courant en ferait un cul-de-sac.
-          // Deux entrées pouvant mener au même onglet (« Replay » et « Sim
-          // propfirm »), on ne bascule que si plus aucune n'y conduit.
+          // Plusieurs entrées peuvent en théorie mener au même onglet, on ne
+          // bascule donc que si plus aucune n'y conduit.
           const hidden = student.hiddenSidebarItems ?? [];
           if (hidden.includes(key) || SIDEBAR_ITEM_TABS[key] !== activeTab) return;
 
@@ -1460,14 +1452,7 @@ function AcademyApp({
             />
           )}
 
-          {/* « Replay » et « Sim propfirm » partagent ce composant : la clé
-              force le remontage pour que chacun s'ouvre sur sa vue. */}
-          {(activeTab === "simulator" || activeTab === "propfirm") && (
-            <SMCSimulator
-              key={activeTab}
-              initialMode={activeTab === "propfirm" ? "MONTE_CARLO" : "REPLAY"}
-            />
-          )}
+          {activeTab === "simulator" && <SMCSimulator />}
 
           {activeTab === "signals" && (
             <CoachSignals
