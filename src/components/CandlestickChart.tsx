@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useState } from "react";
 import { Candle } from "../lib/propChallenge";
 
 interface CandlestickChartProps {
@@ -9,6 +9,10 @@ interface CandlestickChartProps {
   positionEntryPrice?: number | null;
   positionSl?: number | null;
   positionTp?: number | null;
+  /** Fournis => la ligne SL devient glissable à la souris/au doigt. */
+  onSlDrag?: (price: number) => void;
+  /** Fournis => la ligne TP devient glissable à la souris/au doigt. */
+  onTpDrag?: (price: number) => void;
 }
 
 const VIEW_WIDTH = 1000;
@@ -24,7 +28,12 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
   positionEntryPrice = null,
   positionSl = null,
   positionTp = null,
+  onSlDrag,
+  onTpDrag,
 }) => {
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [dragging, setDragging] = useState<"sl" | "tp" | null>(null);
+
   const visible = candles.slice(-visibleCount);
   if (visible.length === 0) return null;
 
@@ -56,14 +65,103 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
     return PADDING_TOP + (1 - ratio) * plotHeight;
   };
 
+  const yToPrice = (clientY: number): number => {
+    const svg = svgRef.current;
+    if (!svg) return 0;
+    const rect = svg.getBoundingClientRect();
+    const svgY = ((clientY - rect.top) / rect.height) * VIEW_HEIGHT;
+    const ratio = 1 - (svgY - PADDING_TOP) / plotHeight;
+    return minPrice + ratio * (maxPrice - minPrice);
+  };
+
   const lastClose = visible[visible.length - 1].close;
   const lastCloseY = priceToY(lastClose);
 
   const gridLines = 5;
   const gridPrices = Array.from({ length: gridLines }, (_, i) => minPrice + (span + 2 * pad) * (i / (gridLines - 1)));
 
+  const handlePointerDown = (side: "sl" | "tp") => (e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDragging(side);
+  };
+
+  const handlePointerMove = (side: "sl" | "tp", callback?: (price: number) => void) => (e: React.PointerEvent) => {
+    if (dragging !== side || !callback) return;
+    callback(yToPrice(e.clientY));
+  };
+
+  const handlePointerUp = () => setDragging(null);
+
+  const renderStopLine = (
+    price: number | null,
+    color: string,
+    side: "sl" | "tp",
+    label: string,
+    onDrag?: (price: number) => void
+  ) => {
+    if (price === null) return null;
+    const y = priceToY(price);
+    const draggable = Boolean(onDrag);
+    return (
+      <g>
+        <line x1={0} y1={y} x2={plotWidth} y2={y} stroke={color} strokeWidth={1} strokeDasharray="2,3" />
+        {draggable && (
+          <rect
+            x={0}
+            y={y - 8}
+            width={plotWidth}
+            height={16}
+            fill="transparent"
+            style={{ cursor: "ns-resize" }}
+            onPointerDown={handlePointerDown(side)}
+            onPointerMove={handlePointerMove(side, onDrag)}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+          />
+        )}
+        <rect
+          x={plotWidth + 2}
+          y={y - 9}
+          width={PADDING_RIGHT - 4}
+          height={18}
+          rx={3}
+          fill={color}
+          style={draggable ? { cursor: "ns-resize" } : undefined}
+          onPointerDown={draggable ? handlePointerDown(side) : undefined}
+          onPointerMove={draggable ? handlePointerMove(side, onDrag) : undefined}
+          onPointerUp={draggable ? handlePointerUp : undefined}
+          onPointerCancel={draggable ? handlePointerUp : undefined}
+        />
+        <text
+          x={plotWidth + PADDING_RIGHT / 2}
+          y={y + 4}
+          fontSize={10}
+          fontWeight="bold"
+          fill="#0D1110"
+          fontFamily="monospace"
+          textAnchor="middle"
+          style={{ pointerEvents: "none" }}
+        >
+          {price.toFixed(decimals)}
+        </text>
+        <text
+          x={4}
+          y={y - 3}
+          fontSize={9}
+          fontWeight="bold"
+          fill={color}
+          fontFamily="monospace"
+          style={{ pointerEvents: "none" }}
+        >
+          {label}
+        </text>
+      </g>
+    );
+  };
+
   return (
     <svg
+      ref={svgRef}
       viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
       className="w-full h-full"
       preserveAspectRatio="none"
@@ -83,23 +181,15 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       })}
 
       {positionEntryPrice !== null && (
-        <g>
-          <line
-            x1={0}
-            y1={priceToY(positionEntryPrice)}
-            x2={plotWidth}
-            y2={priceToY(positionEntryPrice)}
-            stroke="#94a3b8"
-            strokeWidth={1}
-            strokeDasharray="2,3"
-          />
-        </g>
-      )}
-      {positionSl !== null && (
-        <line x1={0} y1={priceToY(positionSl)} x2={plotWidth} y2={priceToY(positionSl)} stroke="#fb7185" strokeWidth={1} strokeDasharray="2,3" />
-      )}
-      {positionTp !== null && (
-        <line x1={0} y1={priceToY(positionTp)} x2={plotWidth} y2={priceToY(positionTp)} stroke="#00E676" strokeWidth={1} strokeDasharray="2,3" />
+        <line
+          x1={0}
+          y1={priceToY(positionEntryPrice)}
+          x2={plotWidth}
+          y2={priceToY(positionEntryPrice)}
+          stroke="#94a3b8"
+          strokeWidth={1}
+          strokeDasharray="2,3"
+        />
       )}
 
       {visible.map((candle, i) => {
@@ -127,6 +217,9 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       <text x={plotWidth + PADDING_RIGHT / 2} y={lastCloseY + 4} fontSize={10} fontWeight="bold" fill="#062012" fontFamily="monospace" textAnchor="middle">
         {lastClose.toFixed(decimals)}
       </text>
+
+      {renderStopLine(positionSl, "#fb7185", "sl", "SL", onSlDrag)}
+      {renderStopLine(positionTp, "#00E676", "tp", "TP", onTpDrag)}
     </svg>
   );
 };
