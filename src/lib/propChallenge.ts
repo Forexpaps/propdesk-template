@@ -292,6 +292,59 @@ export function potentialPnlForPips(pips: number, lots: number, asset: AssetConf
   return pips * asset.pipValuePerLot * lots;
 }
 
+/**
+ * Prix absolus de SL/TP pour un ordre pas encore ouvert (aperçu) ou à
+ * l'ouverture réelle — même formule dans les deux cas, pour ne jamais
+ * diverger entre ce que l'aperçu montre et ce qui s'exécute vraiment.
+ * `null` quand la distance en pips est nulle ou négative (pas de niveau).
+ */
+export function computeSlTpPrices(
+  price: number,
+  direction: OrderDirection,
+  slPips: number,
+  tpPips: number,
+  asset: AssetConfig
+): { sl: number | null; tp: number | null } {
+  const slDelta = pipsToPriceDelta(slPips, asset);
+  const tpDelta = pipsToPriceDelta(tpPips, asset);
+  const sl = slPips > 0 ? (direction === "BUY" ? price - slDelta : price + slDelta) : null;
+  const tp = tpPips > 0 ? (direction === "BUY" ? price + tpDelta : price - tpDelta) : null;
+  return { sl, tp };
+}
+
+/**
+ * Inverse de `computeSlTpPrices` : convertit un prix (déplacé à la souris
+ * sur le graphique) en distance de pips par rapport au prix de référence,
+ * pour le côté SL ou TP. Toujours positif ou nul — glisser un niveau du
+ * mauvais côté du prix le ramène à 0 plutôt que de produire une distance
+ * négative dénuée de sens.
+ */
+export function pipsFromDraggedPrice(
+  referencePrice: number,
+  direction: OrderDirection,
+  side: "SL" | "TP",
+  draggedPrice: number,
+  asset: AssetConfig
+): number {
+  const isAboveReference = draggedPrice >= referencePrice;
+  // SL d'un BUY et TP d'un SELL sont sous le prix ; TP d'un BUY et SL d'un
+  // SELL sont au-dessus — un glissé du mauvais côté est ignoré (borné à 0).
+  const expectedAbove = (side === "TP") === (direction === "BUY");
+  if (isAboveReference !== expectedAbove) return 0;
+  const priceDelta = Math.abs(draggedPrice - referencePrice);
+  return Math.round(priceDelta / asset.pipSize);
+}
+
+/** Modifie le SL/TP d'une position déjà ouverte (glissé sur le graphique). */
+export function updateOpenPositionStops(
+  state: ChallengeState,
+  sl: number | null,
+  tp: number | null
+): ChallengeState {
+  if (!state.openPosition || state.status !== "EN_COURS") return state;
+  return { ...state, openPosition: { ...state.openPosition, sl, tp } };
+}
+
 export function targetPercentForPhase(state: ChallengeState): number {
   return state.phase === 1 ? state.config.rules.phase1TargetPercent : state.config.rules.phase2TargetPercent;
 }
@@ -306,10 +359,7 @@ export function openPosition(
   if (state.openPosition || state.status !== "EN_COURS") return state;
   const asset = PROP_SIM_ASSETS[state.config.asset];
   const price = currentPrice(state);
-  const slDelta = pipsToPriceDelta(slPips, asset);
-  const tpDelta = pipsToPriceDelta(tpPips, asset);
-  const sl = slPips > 0 ? (direction === "BUY" ? price - slDelta : price + slDelta) : null;
-  const tp = tpPips > 0 ? (direction === "BUY" ? price + tpDelta : price - tpDelta) : null;
+  const { sl, tp } = computeSlTpPrices(price, direction, slPips, tpPips, asset);
 
   const position: OpenPosition = {
     id: nextPositionId(),

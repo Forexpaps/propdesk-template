@@ -34,6 +34,7 @@ import {
   advanceTick,
   closePositionManually,
   computeEquity,
+  computeSlTpPrices,
   createChallengeState,
   currentPrice,
   floatingPnl,
@@ -41,8 +42,10 @@ import {
   loadPersistedChallenge,
   openPosition,
   persistChallenge,
+  pipsFromDraggedPrice,
   potentialPnlForPips,
   targetPercentForPhase,
+  updateOpenPositionStops,
 } from "../lib/propChallenge";
 import { CandlestickChart } from "./CandlestickChart";
 
@@ -394,6 +397,15 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ state, setState, isPl
   const riskPercentOfAccount = equity > 0 ? (Math.abs(potentialLoss) / equity) * 100 : 0;
   const riskExceedsRule = riskPercentOfAccount > state.config.rules.maxRiskPerTradePercent;
 
+  // Aperçu SL/TP tant qu'aucune position n'est ouverte : mêmes prix que ceux
+  // qui seraient réellement utilisés à l'ouverture (computeSlTpPrices est
+  // partagé avec le moteur), pour que le graphique ne mente jamais.
+  const previewLevels = !state.openPosition
+    ? computeSlTpPrices(price, direction, slPips, tpPips, asset)
+    : null;
+  const chartSl = state.openPosition ? state.openPosition.sl : previewLevels?.sl ?? null;
+  const chartTp = state.openPosition ? state.openPosition.tp : previewLevels?.tp ?? null;
+
   const handleTick = () => setState((prev) => (prev ? advanceTick(prev) : prev));
   const handleEndOfDay = () => {
     setIsPlaying(false);
@@ -403,6 +415,26 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ state, setState, isPl
     setState((prev) => (prev ? openPosition(prev, dir, lots, slPips, tpPips) : prev));
   };
   const handleClose = () => setState((prev) => (prev ? closePositionManually(prev) : prev));
+
+  // Glisser une ligne sur le graphique : si une position est ouverte, ça
+  // modifie directement son SL/TP réel ; sinon ça recalcule slPips/tpPips
+  // (l'aperçu suit automatiquement au prochain rendu).
+  const handleSlDrag = (draggedPrice: number) => {
+    if (state.openPosition) {
+      const newSl = Math.round(draggedPrice / asset.pipSize) * asset.pipSize;
+      setState((prev) => (prev ? updateOpenPositionStops(prev, newSl, prev.openPosition?.tp ?? null) : prev));
+    } else {
+      setSlPips(pipsFromDraggedPrice(price, direction, "SL", draggedPrice, asset));
+    }
+  };
+  const handleTpDrag = (draggedPrice: number) => {
+    if (state.openPosition) {
+      const newTp = Math.round(draggedPrice / asset.pipSize) * asset.pipSize;
+      setState((prev) => (prev ? updateOpenPositionStops(prev, prev.openPosition?.sl ?? null, newTp) : prev));
+    } else {
+      setTpPips(pipsFromDraggedPrice(price, direction, "TP", draggedPrice, asset));
+    }
+  };
 
   const statusLabel = state.status === "EN_COURS" ? "En cours" : state.status === "REUSSI" ? "Réussi" : "Échoué";
   const statusColor =
@@ -528,10 +560,17 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ state, setState, isPl
               candles={state.candles}
               decimals={asset.decimals}
               positionEntryPrice={state.openPosition?.entryPrice ?? null}
-              positionSl={state.openPosition?.sl ?? null}
-              positionTp={state.openPosition?.tp ?? null}
+              positionSl={chartSl}
+              positionTp={chartTp}
+              onSlDrag={state.status === "EN_COURS" ? handleSlDrag : undefined}
+              onTpDrag={state.status === "EN_COURS" ? handleTpDrag : undefined}
             />
           </div>
+          <p className="text-[10px] text-slate-500 -mt-2">
+            {state.openPosition
+              ? "Glisse les lignes SL/TP sur le graphique pour ajuster ta position ouverte."
+              : "Les lignes SL/TP en pointillés sont un aperçu — glisse-les sur le graphique ou saisis des pips ci-dessous."}
+          </p>
 
           <div className="flex items-center justify-between text-xs">
             <span className="text-slate-500 font-mono">{formatSimTimestamp(lastCandle.timestampMs)}</span>
@@ -641,6 +680,28 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ state, setState, isPl
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs text-slate-400 mb-1.5">Sens de l'ordre</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setDirection("BUY")}
+                    className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                      direction === "BUY" ? "bg-[#00E676]/15 border border-[#00E676]/50 text-[#00E676]" : "bg-[#0D1110] border border-[#1B2320] text-slate-400"
+                    }`}
+                  >
+                    <ArrowUpRight className="w-3.5 h-3.5" /> Achat
+                  </button>
+                  <button
+                    onClick={() => setDirection("SELL")}
+                    className={`py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                      direction === "SELL" ? "bg-rose-500/15 border border-rose-500/50 text-rose-400" : "bg-[#0D1110] border border-[#1B2320] text-slate-400"
+                    }`}
+                  >
+                    <ArrowDownRight className="w-3.5 h-3.5" /> Vente
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-rose-400 mb-1.5">Stop Loss (pips)</label>
@@ -688,22 +749,18 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ state, setState, isPl
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  disabled={state.status !== "EN_COURS"}
-                  onClick={() => { setDirection("BUY"); handleOpen("BUY"); }}
-                  className="py-3 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-sm flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <ArrowUpRight className="w-4 h-4" /> Achat
-                </button>
-                <button
-                  disabled={state.status !== "EN_COURS"}
-                  onClick={() => { setDirection("SELL"); handleOpen("SELL"); }}
-                  className="py-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-sm flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <ArrowDownRight className="w-4 h-4" /> Vente
-                </button>
-              </div>
+              <button
+                disabled={state.status !== "EN_COURS"}
+                onClick={() => handleOpen(direction)}
+                className={`w-full py-3 rounded-xl font-extrabold text-sm flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${
+                  direction === "BUY"
+                    ? "bg-[#00E676] hover:bg-[#00c865] text-slate-950"
+                    : "bg-rose-500 hover:bg-rose-600 text-white"
+                }`}
+              >
+                {direction === "BUY" ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                Ouvrir {direction === "BUY" ? "l'Achat" : "la Vente"}
+              </button>
             </>
           )}
         </div>
