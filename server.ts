@@ -7,6 +7,8 @@ import dotenv from "dotenv";
 import { api, apiErrorHandler } from "./server/routes";
 import { startSessionCleanup } from "./server/auth/sessions";
 import { startStudentSessionCleanup } from "./server/auth/studentSessions";
+import { startSecurityEventCleanup } from "./server/auth/securityEvents";
+import { startLockoutCleanup } from "./server/auth/loginLockout";
 
 dotenv.config();
 
@@ -69,6 +71,10 @@ app.use("/api", apiErrorHandler);
 // Hygiène : retire les sessions expirées au démarrage puis toutes les heures.
 startSessionCleanup();
 startStudentSessionCleanup();
+// Journal de sécurité : purge RGPD à 90 jours (IP = donnée personnelle).
+startSecurityEventCleanup();
+// Verrouillages de compte : purge d'hygiène des lignes hors de toute fenêtre active.
+startLockoutCleanup();
 
 // Serve public static assets
 app.use("/public", express.static(path.join(ROOT,"public")));

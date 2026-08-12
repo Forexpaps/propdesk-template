@@ -1,9 +1,20 @@
 import type { Request, Response, NextFunction } from "express";
 import { DEFAULT_USER_ID } from "../db";
 import { getStaffById } from "./credentials";
+import { recordSecurityEvent } from "./securityEvents";
 import { readSessionToken, validateSession } from "./sessions";
 import { getStudentById } from "./studentCredentials";
 import { readStudentSessionToken, validateStudentSession } from "./studentSessions";
+
+/**
+ * Résout l'email d'une session déjà authentifiée, pour journaliser un
+ * `access_denied` — `req.auth` ne porte que l'identifiant, jamais l'email.
+ */
+function resolveAuthEmail(req: Request): string | null {
+  if (!req.auth) return null;
+  if (req.auth.kind === "staff") return getStaffById(req.auth.userId)?.email ?? null;
+  return getStudentById(req.auth.userId)?.email ?? null;
+}
 
 /**
  * Barrière d'authentification.
@@ -188,6 +199,14 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
  */
 export const requireStaffKind = (req: Request, res: Response, next: NextFunction) => {
   if (req.auth?.kind !== "staff") {
+    recordSecurityEvent({
+      eventType: "access_denied",
+      severity: "critical",
+      accountKind: req.auth?.kind ?? null,
+      accountEmail: resolveAuthEmail(req),
+      ip: req.ip,
+      detail: `réservé au staff (${req.method} ${req.path})`,
+    });
     res.status(403).json({ error: "Action réservée au staff." });
     return;
   }
@@ -197,6 +216,14 @@ export const requireStaffKind = (req: Request, res: Response, next: NextFunction
 /** Symétrique de `requireStaffKind`, pour les routes propres au monde élève. */
 export const requireStudentKind = (req: Request, res: Response, next: NextFunction) => {
   if (req.auth?.kind !== "student") {
+    recordSecurityEvent({
+      eventType: "access_denied",
+      severity: "critical",
+      accountKind: req.auth?.kind ?? null,
+      accountEmail: resolveAuthEmail(req),
+      ip: req.ip,
+      detail: `réservé à un compte élève (${req.method} ${req.path})`,
+    });
     res.status(403).json({ error: "Action réservée à un compte élève." });
     return;
   }
@@ -213,6 +240,14 @@ export const requireStudentKind = (req: Request, res: Response, next: NextFuncti
  */
 export const requireOwner = (req: Request, res: Response, next: NextFunction) => {
   if (req.auth?.isOwner !== true) {
+    recordSecurityEvent({
+      eventType: "access_denied",
+      severity: "critical",
+      accountKind: req.auth?.kind ?? null,
+      accountEmail: resolveAuthEmail(req),
+      ip: req.ip,
+      detail: `réservé au compte principal (${req.method} ${req.path})`,
+    });
     res.status(403).json({ error: "Action réservée au compte principal." });
     return;
   }

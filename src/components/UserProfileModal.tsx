@@ -18,6 +18,7 @@ import {
   Trophy,
   Star,
   Check,
+  ShieldAlert,
 } from "lucide-react";
 import { StudentProfile, TraderBadge } from "../types";
 import { resizeAvatar, AVATAR_SIZE } from "../lib/image";
@@ -32,6 +33,12 @@ interface UserProfileModalProps {
   initialTab?: "profile" | "badges";
   /** Ouvre la gestion des comptes staff. Absent : replié sur l'ancien badge statique. */
   onOpenStaffAccounts?: () => void;
+  /**
+   * Ouvre le journal de sécurité. Absent : le bouton ne s'affiche pas du
+   * tout — ce composant ne connaît pas `isOwner` lui-même, c'est son parent
+   * qui décide de fournir ou non ce callback (réservé au fondateur).
+   */
+  onOpenSecurityLog?: () => void;
 }
 
 const AVATAR_PRESETS = [
@@ -52,6 +59,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onClaimBadge,
   initialTab = "profile",
   onOpenStaffAccounts,
+  onOpenSecurityLog,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<"profile" | "badges">(initialTab);
   const [badgeFilter, setBadgeFilter] = useState<string>("ALL");
@@ -379,6 +387,30 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </span>
               )}
             </div>
+
+            {/* Journal de sécurité — réservé au compte fondateur. Le bouton
+                ne s'affiche que si le parent fournit onOpenSecurityLog
+                (conditionné par isOwner, jamais par isAdmin). */}
+            {onOpenSecurityLog && (
+              <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <ShieldAlert className="w-6 h-6 text-[#00E676] shrink-0" />
+                  <div>
+                    <div className="text-sm font-bold text-white">Journal de sécurité</div>
+                    <p className="text-xs text-slate-400">
+                      Connexions, échecs, verrouillages et accès refusés sur ton écosystème.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onOpenSecurityLog}
+                  className="px-3 py-2 rounded-xl text-[11px] font-bold text-slate-950 bg-[#00E676] hover:bg-[#00c865] shrink-0 transition-colors"
+                >
+                  Consulter
+                </button>
+              </div>
+            )}
 
             {/* Inputs Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -168,3 +168,31 @@ export const changePasswordSchema = z
     newPassword: z.string().min(PASSWORD_MIN).max(200),
   })
   .strict();
+
+/**
+ * Filtres de lecture du journal de sécurité (`GET /api/auth/security-events`).
+ * Pas de `.strict()` : une query string peut porter des paramètres
+ * additionnels sans rapport (extensions navigateur, outils de debug) — on
+ * ignore simplement ce qu'on ne connaît pas plutôt que de rejeter la requête.
+ */
+export const securityEventsQuerySchema = z.object({
+  severity: z.enum(["info", "warning", "critical"]).optional(),
+  eventType: z
+    .enum([
+      "login_success",
+      "login_failed",
+      "login_blocked",
+      "account_locked",
+      "logout",
+      "password_changed",
+      "password_change_failed",
+      "access_denied",
+      "staff_invited",
+      "staff_revoked",
+      "student_access_created",
+      "student_access_revoked",
+    ])
+    .optional(),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});

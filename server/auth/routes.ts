@@ -2,7 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { randomBytes } from "node:crypto";
 import { db, DEFAULT_USER_ID } from "../db";
 import { getProfile, saveProfile, listCollection, updateCollectionItem, replaceCollection } from "../repositories";
-import { setupSchema, loginSchema, inviteStaffSchema, changePasswordSchema } from "../schemas";
+import { setupSchema, loginSchema, inviteStaffSchema, changePasswordSchema, securityEventsQuerySchema } from "../schemas";
 import { createRateLimit } from "../middleware/rateLimit";
 import { hashPassword, verifyPassword, needsRehash, verifyAgainstDecoy } from "./password";
 import {
@@ -14,9 +14,12 @@ import {
   getStaffById,
   hasAnyStaffAccount,
   listStaffAccounts,
+  normalizeEmail,
   setPassword,
   updatePasswordHash,
 } from "./credentials";
+import { getLockoutStatus, registerFailedLogin, clearLoginFailures } from "./loginLockout";
+import { get24hStats, listSecurityEvents, recordSecurityEvent } from "./securityEvents";
 import {
   clearSessionCookie,
   createSession,
@@ -33,7 +36,7 @@ import {
   getStudentByEmail as getStudentAccountByEmail,
   getStudentByEnrolledId,
 } from "./studentCredentials";
-import { requireStaffKind } from "./middleware";
+import { requireOwner, requireStaffKind } from "./middleware";
 
 /** Routes accessibles sans session : `/me`, `/setup`, `/login`, `/logout`. */
 export const authRouter = Router();
@@ -207,6 +210,26 @@ authRouter.post(
     purgeExpiredSessions();
 
     const { email, password } = parsed.data;
+    const emailLower = normalizeEmail(email);
+
+    // Verrouillage PAR COMPTE (distinct de la limite IP ci-dessus), indexé
+    // sur l'email brut avant toute résolution — un email inconnu se heurte
+    // exactement au même verrouillage qu'un email réel avec mauvais mot de
+    // passe, pour ne jamais révéler qu'un compte existe.
+    const lockout = getLockoutStatus("staff", emailLower);
+    if (lockout.lockedUntil) {
+      recordSecurityEvent({
+        eventType: "login_blocked",
+        severity: "warning",
+        accountKind: "staff",
+        accountEmail: email.trim(),
+        ip: req.ip,
+        detail: `compte verrouillé (réessai après ${lockout.lockedUntil.toLocaleTimeString("fr-FR")})`,
+      });
+      res.status(403).json({ error: "Trop de tentatives. Réessaie dans quelques minutes.", code: "ACCOUNT_LOCKED" });
+      return;
+    }
+
     const staff = getStaffByEmail(email);
 
     // Compte inconnu : on paie quand même le coût du hachage. Sans cela, le
@@ -214,15 +237,39 @@ authRouter.post(
     // passe faux » (~80 ms), ce qui offrirait une énumération des comptes.
     if (!staff) {
       await verifyAgainstDecoy(password);
+      const { locked } = registerFailedLogin("staff", emailLower);
+      recordSecurityEvent({
+        eventType: "login_failed", severity: "warning", accountKind: "staff",
+        accountEmail: email.trim(), ip: req.ip, detail: "compte inconnu",
+      });
+      if (locked) {
+        recordSecurityEvent({
+          eventType: "account_locked", severity: "critical", accountKind: "staff",
+          accountEmail: email.trim(), ip: req.ip, detail: "5 échecs en 15 min",
+        });
+      }
       res.status(401).json({ error: "Identifiants incorrects." });
       return;
     }
 
     if (!(await verifyPassword(password, staff.passwordHash))) {
+      const { locked } = registerFailedLogin("staff", emailLower);
+      recordSecurityEvent({
+        eventType: "login_failed", severity: "warning", accountKind: "staff",
+        accountEmail: email.trim(), ip: req.ip, detail: "mot de passe incorrect",
+      });
+      if (locked) {
+        recordSecurityEvent({
+          eventType: "account_locked", severity: "critical", accountKind: "staff",
+          accountEmail: email.trim(), ip: req.ip, detail: "5 échecs en 15 min",
+        });
+      }
       // Message identique au cas précédent, délibérément.
       res.status(401).json({ error: "Identifiants incorrects." });
       return;
     }
+
+    clearLoginFailures("staff", emailLower);
 
     // Montée en robustesse transparente si les paramètres ont durci depuis.
     if (needsRehash(staff.passwordHash)) {
@@ -233,6 +280,10 @@ authRouter.post(
     // rester connectés en parallèle.
     const token = createSession(staff.id, req.headers["user-agent"]);
     setSessionCookie(res, token);
+    recordSecurityEvent({
+      eventType: "login_success", severity: "info", accountKind: "staff",
+      accountEmail: staff.email, ip: req.ip, detail: "rôle admin",
+    });
     res.json(authenticatedPayload(staff.id));
   })
 );
@@ -244,7 +295,20 @@ authRouter.post(
  */
 authRouter.post("/logout", (req, res) => {
   const token = readSessionToken(req);
-  if (token) destroySession(token);
+  if (token) {
+    // Résolu avant destruction : après, la session n'existe plus pour
+    // retrouver le compte. Rien n'est journalisé si le token est
+    // absent/déjà invalide — pas de bruit sur une déconnexion sans session.
+    const session = validateSession(token);
+    const staff = session ? getStaffById(session.userId) : null;
+    if (staff) {
+      recordSecurityEvent({
+        eventType: "logout", severity: "info", accountKind: "staff",
+        accountEmail: staff.email, ip: req.ip, detail: "",
+      });
+    }
+    destroySession(token);
+  }
   clearSessionCookie(res);
   res.status(204).end();
 });
@@ -299,6 +363,11 @@ staffRouter.post(
       invitedBy: req.auth!.userId,
     });
 
+    recordSecurityEvent({
+      eventType: "staff_invited", severity: "info", accountKind: "staff",
+      accountEmail: parsed.data.email, ip: req.ip, detail: "rôle admin",
+    });
+
     res.status(201).json({
       id,
       name: parsed.data.name,
@@ -316,6 +385,9 @@ staffRouter.post(
  * devienne fondateur par effet de bord.
  */
 staffRouter.delete("/staff/:id", requireStaffKind, (req, res) => {
+  // Capturé avant suppression : la ligne n'existe plus pour retrouver
+  // l'email une fois deleteStaffAccount passé.
+  const revokedStaff = getStaffById(req.params.id);
   const failure = deleteStaffAccount(req.params.id);
 
   if (failure === "last-account") {
@@ -339,6 +411,11 @@ staffRouter.delete("/staff/:id", requireStaffKind, (req, res) => {
   // Les sessions du compte supprimé n'ont plus lieu d'être : autant les
   // purger immédiatement plutôt que d'attendre leur expiration naturelle.
   db.prepare("DELETE FROM sessions WHERE user_id = ?").run(req.params.id);
+
+  recordSecurityEvent({
+    eventType: "staff_revoked", severity: "warning", accountKind: "staff",
+    accountEmail: revokedStaff?.email ?? req.params.id, ip: req.ip, detail: "compte révoqué",
+  });
 
   res.status(204).end();
 });
@@ -370,6 +447,10 @@ staffRouter.post(
 
     const staff = getStaffById(req.auth!.userId);
     if (!staff || !(await verifyPassword(parsed.data.currentPassword, staff.passwordHash))) {
+      recordSecurityEvent({
+        eventType: "password_change_failed", severity: "warning", accountKind: "staff",
+        accountEmail: staff?.email ?? null, ip: req.ip, detail: "mot de passe actuel incorrect",
+      });
       // 403 et non 401 : un 401 déclencherait côté client l'interception
       // générique de session expirée (`request()` dans `src/lib/api.ts`),
       // alors qu'ici la session est parfaitement valide — seul le mot de
@@ -379,7 +460,12 @@ staffRouter.post(
     }
 
     setPassword(staff.id, await hashPassword(parsed.data.newPassword));
-    destroyAllSessions(staff.id);
+    const destroyed = destroyAllSessions(staff.id);
+    recordSecurityEvent({
+      eventType: "password_changed", severity: "info", accountKind: "staff",
+      accountEmail: staff.email, ip: req.ip,
+      detail: `${Math.max(0, destroyed - 1)} autre(s) session(s) fermée(s)`,
+    });
     res.json(authenticatedPayload(staff.id));
   })
 );
@@ -500,6 +586,11 @@ staffRouter.post(
       return account;
     })();
 
+    recordSecurityEvent({
+      eventType: "student_access_created", severity: "info", accountKind: "student",
+      accountEmail: student.email, ip: req.ip, detail: `fiche : ${String(student.name ?? "")}`,
+    });
+
     res.status(201).json({
       studentAccountId: created.id,
       email: student.email,
@@ -529,6 +620,11 @@ staffRouter.delete("/students/:enrolledStudentId/access", requireStaffKind, (req
     const { studentAccountId, ...rest } = student;
     updateCollectionItem("enrolledStudents", student.id, rest);
   })();
+
+  recordSecurityEvent({
+    eventType: "student_access_revoked", severity: "warning", accountKind: "student",
+    accountEmail: student.email, ip: req.ip, detail: `fiche : ${String(student.name ?? "")}`,
+  });
 
   res.status(204).end();
 });
@@ -657,3 +753,19 @@ staffRouter.post(
     res.status(201).json({ message });
   }
 );
+
+/**
+ * Journal de sécurité — lecture réservée au compte fondateur (`requireOwner`,
+ * en plus de `requireStaffKind`). Couvre les deux mondes d'identité (staff
+ * ET élève), voir `server/auth/securityEvents.ts`.
+ */
+staffRouter.get("/security-events", requireStaffKind, requireOwner, (req, res) => {
+  const parsed = securityEventsQuerySchema.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Filtres invalides." });
+    return;
+  }
+
+  const { events, total } = listSecurityEvents(parsed.data);
+  res.json({ events, total, stats: get24hStats(), retentionDays: 90 });
+});

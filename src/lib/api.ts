@@ -98,6 +98,39 @@ export interface StaffAccountSummary {
   isOwner: boolean;
 }
 
+/** Journal de sécurité — voir `server/auth/securityEvents.ts`. */
+export type SecuritySeverity = "info" | "warning" | "critical";
+
+export interface SecurityEvent {
+  id: string;
+  createdAt: string;
+  eventType: string;
+  severity: SecuritySeverity;
+  accountKind: "staff" | "student" | null;
+  accountEmail: string | null;
+  ip: string | null;
+  detail: string;
+}
+
+export interface SecurityEventFilters {
+  severity?: SecuritySeverity;
+  eventType?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface SecurityLogResponse {
+  events: SecurityEvent[];
+  total: number;
+  retentionDays: number;
+  stats: {
+    loginSuccess: number;
+    loginFailed: number;
+    lockouts: number;
+    accessDenied: number;
+  };
+}
+
 /**
  * Événement émis dès qu'une requête revient en 401.
  *
@@ -258,6 +291,20 @@ export const api = {
         messages: CoachMessage[];
       };
     }>(`/api/auth/admin/students/${encodeURIComponent(enrolledStudentId)}/view`),
+
+  /**
+   * Journal de sécurité, réservé au compte fondateur (le serveur renvoie
+   * 403 sinon). Premier usage de `URLSearchParams` dans ce fichier : les
+   * autres routes GET n'ont aucun paramètre de filtre.
+   */
+  fetchSecurityLog: (filters: SecurityEventFilters = {}) => {
+    const params = new URLSearchParams();
+    if (filters.severity) params.set("severity", filters.severity);
+    if (filters.eventType) params.set("eventType", filters.eventType);
+    params.set("limit", String(filters.limit ?? 50));
+    params.set("offset", String(filters.offset ?? 0));
+    return request<SecurityLogResponse>(`/api/auth/security-events?${params.toString()}`);
+  },
 
   /** Envoie un message de coach dans le fil d'un élève précis. */
   sendMessageToStudent: (enrolledStudentId: string, text: string) =>
