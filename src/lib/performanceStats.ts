@@ -2,10 +2,10 @@ import { Trade, StudentProfile, EmotionState } from "../types";
 
 /**
  * Calculs purs de Rentabilité et du résumé Journal, extraits de
- * `PerformanceDashboard.tsx` et `TradingJournal.tsx` pour être partagés avec
- * l'export PDF (`src/lib/pdfReport.ts`) — une seule implémentation, jamais
- * deux qui risquent de diverger silencieusement (déjà arrivé une fois cette
- * session avec un bug de courbe d'équité dupliquée entre deux fichiers).
+ * `PerformanceDashboard.tsx` et `TradingJournal.tsx` — une seule
+ * implémentation partagée, jamais deux qui risquent de diverger
+ * silencieusement (déjà arrivé une fois cette session avec un bug de courbe
+ * d'équité dupliquée entre deux fichiers).
  */
 
 /**
