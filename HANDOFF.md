@@ -539,7 +539,11 @@ affichant le bon message, message envoyé pendant une coupure serveur perdu
 au premier essai (bug confirmé) puis correctement protégé et rejouable au
 second essai (fix confirmé) via `replayPending()`.
 
-### Export PDF personnel (Journal + Rentabilité + Portefeuille) — remplace le catalogue marketing — committé (`522b7fb`)
+### Export PDF personnel (Journal + Rentabilité + Portefeuille) — committé (`522b7fb`) PUIS RETIRÉ (`6333780`)
+
+> ⚠️ **Ce chantier a été entièrement retiré juste après**, sur demande
+> explicite de l'utilisateur — voir l'encadré qui suit cette section.
+> Détail conservé ci-dessous à titre d'historique (le code n'existe plus).
 
 Le bouton « PDF Features » du header téléchargeait un catalogue marketing
 **statique et obsolète** (`public/Fonctionnalites_Horizon_SMC.pdf`, généré
@@ -605,6 +609,56 @@ DOM non scopée à l'overlay (`document.querySelectorAll('button')` au lieu
 de `overlay.querySelectorAll(...)`) a d'abord cliqué le mauvais bouton
 (celui du staff, caché) — corrigé en scopant la recherche, confirmé
 ensuite correct.
+
+### Retrait du bouton/export PDF — committé (`6333780`)
+
+Juste après le commit ci-dessus, l'utilisateur a envoyé une capture d'écran
+d'une maquette **« Données & sauvegarde »** (export/import JSON de toutes
+les données, réinitialisation complète) en demandant que « le bouton de
+rapport PDF fonctionne comme la capture ». Avant d'implémenter quoi que ce
+soit, 3 questions de clarification ont été posées (le panneau doit-il
+remplacer le bouton PDF ou s'ajouter à côté ? périmètre exact de
+l'export ? le bouton de réinitialisation destructeur doit-il être inclus ?)
+— **l'utilisateur a fermé ces questions sans répondre** et a reformulé sa
+demande, plus radicale : **« je veux supprimer le bouton et la
+fonctionnalité qui est liée à celui-là »**. Exécuté tel quel : retrait pur
+et simple, sans rien construire à la place.
+
+**Ce qui a été retiré** : `src/lib/pdfReport.ts` (supprimé), le bouton et
+son `onClick` dans `TopHeader.tsx`, les props `trades`/`accounts` de
+`TopHeaderProps` (redevenues inutiles) et leur câblage aux 3 sites de
+montage (`App.tsx` ×2, `AdminStudentView.tsx`), les dépendances `jspdf`/
+`jspdf-autotable` (`npm uninstall`), le chunk `pdf` dédié dans
+`vite.config.ts`, la phrase README.md décrivant la fonctionnalité.
+
+**Ce qui a été conservé** : `src/lib/performanceStats.ts` et
+`src/lib/walletStats.ts` — pas spécifiques au PDF, activement consommés
+par `PerformanceDashboard.tsx`/`TradingJournal.tsx`/`WalletManagement.tsx`
+pour leurs propres calculs à l'écran (même pattern que `badges.ts`). Leurs
+en-têtes de fichier ont été corrigés pour ne plus mentionner le PDF disparu.
+
+**Piège d'environnement rencontré pendant la vérification** : après le
+retrait, la console affichait `ReferenceError: FileText is not defined`
+au chargement, alors que `grep` confirmait l'absence de toute référence à
+`FileText` dans le code. Cause : **deux processus serveur** tournaient
+simultanément sur le port 3000 (`lsof -ti:3000` en a révélé deux), l'un
+d'eux servant encore l'ancien bundle avec le bouton PDF. Corrigé en tuant
+les deux processus (`lsof -ti:3000 | xargs kill -9`) et en vidant le cache
+Vite (`rm -rf node_modules/.vite`) avant de relancer. **Effet de bord** :
+ce kill de processus a fait perdre le cookie de session du navigateur côté
+staff (la session elle-même restait valide en base, `sessions` table,
+jusqu'au 11 septembre — seul le cookie du navigateur a disparu). L'écran
+de connexion est réapparu ; **aucune tentative de reconnexion automatique
+n'a été faite** (le cookie est `httpOnly`, illisible/injectable en JS, et
+de toute façon la règle « ne jamais taper le mot de passe » s'applique) —
+la reprise nécessite que l'utilisateur se reconnecte lui-même.
+
+**Question ouverte, pas encore tranchée** : l'utilisateur a-t-il encore
+besoin d'un panneau « Données & sauvegarde » (export/import JSON,
+réinitialisation) quelque part dans l'app, sous une autre forme, à un autre
+endroit ? La demande initiale a été abandonnée en cours de clarification
+plutôt que refusée explicitement — **à reposer la question avant de la
+considérer classée**, ne pas supposer qu'elle n'intéresse plus l'utilisateur.
 
 ---
 
@@ -887,24 +941,37 @@ voir l'historique git.)*
 
 ## 10. État à la reprise
 
-- Branche `main`, dernier commit réel `522b7fb` (export PDF dynamique
-  personnel, remplace le catalogue marketing ✓ — voir §4). Avant : `d43a10f`
-  (affichage badges staff), `36d5ce5` (rate limiting), `8a49988` (courbe
-  d'équité), `ecbbce6` (badges/notifications).
-- Code clean (`npm run lint` et `npm run build` ok).
+- Branche `main`, dernier commit réel `6333780` (retrait complet du bouton/
+  export PDF — voir §4, le chantier `522b7fb` qui l'avait introduit a été
+  annulé dans la foulée). Avant : `d43a10f` (affichage badges staff),
+  `36d5ce5` (rate limiting), `8a49988` (courbe d'équité), `ecbbce6`
+  (badges/notifications).
+- Code clean (`npm run lint` et `npm run build` ok), aucune référence
+  résiduelle à `jspdf`/`pdfReport`.
 - Aucune tâche en attente de commit.
-- Le compte staff est actuellement connecté dans le navigateur (Browser
-  pane). Le compte de test élève temporaire (Lucas Martin, `stud-3`, invité
-  pour vérifier l'export PDF) a été **révoqué** immédiatement après test —
-  plus de session active. Camille Dupont (`stud-2`) reste révoqué depuis une
-  session antérieure.
+- **⚠️ Le compte staff N'EST PLUS connecté dans le navigateur (Browser
+  pane)** — écran de connexion affiché. Cause : un `lsof -ti:3000 | xargs
+  kill -9` lancé pour tuer un processus serveur dupliqué (voir §4) a fait
+  perdre le cookie de session `pd_session` (`httpOnly`, non restaurable en
+  JS). La session elle-même reste valide en base (`sessions`, jusqu'au
+  2026-09-11) — c'est uniquement le cookie du navigateur qui a disparu.
+  **Demande à l'utilisateur de se reconnecter lui-même** (règle stricte :
+  ne jamais taper de mot de passe à sa place) avant toute vérification
+  visuelle nécessitant une session staff.
+- Le compte de test élève temporaire (Lucas Martin, `stud-3`, invité pour
+  vérifier l'export PDF depuis disparu) a été **révoqué** immédiatement
+  après test. Camille Dupont (`stud-2`) reste révoqué depuis une session
+  antérieure.
 
 ### Par où commencer
 
-**Aucune autre tâche de code en attente.** L'application est stable et
-fonctionnelle. Badges, rate limiting, courbe d'équité, export PDF — tous
-corrigés/livrés et testés. Seule demande restante : module Examen (en
-attente de décision produit).
+**Aucune tâche de code en attente.** Mais une **question produit non
+tranchée** reste ouverte : l'utilisateur a montré une maquette « Données &
+sauvegarde » (export/import JSON, réinitialisation) puis a fait marche
+arrière avant d'avoir répondu aux questions de clarification — à reposer la
+question plutôt qu'à considérer le sujet clos (voir §4, dernière section).
+Sinon, l'application est stable. Seule autre demande en attente : module
+Examen (décision produit).
 
 > Ce document est la **seule** source de reprise fiable. S'il existe un
 > écart entre ce document et le code, **fais confiance au code** — vérifie
