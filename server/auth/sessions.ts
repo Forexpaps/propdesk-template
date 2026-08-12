@@ -142,9 +142,14 @@ export function destroySession(token: string): void {
   db.prepare("DELETE FROM sessions WHERE id = ?").run(fingerprint(token));
 }
 
-/** Révoque toutes les sessions d'un compte. Pour un changement de mot de passe. */
-export function destroyAllSessions(userId: string): void {
-  db.prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
+/**
+ * Révoque toutes les sessions d'un compte. Pour un changement de mot de
+ * passe. Renvoie le nombre de sessions détruites (inclut la session
+ * courante de l'appelant) — utilisé par le journal de sécurité pour
+ * afficher combien d'AUTRES sessions ont été fermées.
+ */
+export function destroyAllSessions(userId: string): number {
+  return db.prepare("DELETE FROM sessions WHERE user_id = ?").run(userId).changes;
 }
 
 /**

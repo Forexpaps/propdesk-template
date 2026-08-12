@@ -1,7 +1,10 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { loginSchema, changePasswordSchema } from "../schemas";
 import { createRateLimit } from "../middleware/rateLimit";
+import { normalizeEmail } from "./credentials";
+import { getLockoutStatus, registerFailedLogin, clearLoginFailures } from "./loginLockout";
 import { hashPassword, verifyPassword, needsRehash, verifyAgainstDecoy } from "./password";
+import { recordSecurityEvent } from "./securityEvents";
 import {
   getStudentByEmail,
   getStudentById,
@@ -83,20 +86,60 @@ studentAuthRouter.post(
     purgeExpiredStudentSessions();
 
     const { email, password } = parsed.data;
+    const emailLower = normalizeEmail(email);
+
+    const lockout = getLockoutStatus("student", emailLower);
+    if (lockout.lockedUntil) {
+      recordSecurityEvent({
+        eventType: "login_blocked",
+        severity: "warning",
+        accountKind: "student",
+        accountEmail: email.trim(),
+        ip: req.ip,
+        detail: `compte verrouillé (réessai après ${lockout.lockedUntil.toLocaleTimeString("fr-FR")})`,
+      });
+      res.status(403).json({ error: "Trop de tentatives. Réessaie dans quelques minutes.", code: "ACCOUNT_LOCKED" });
+      return;
+    }
+
     const student = getStudentByEmail(email);
 
     // Même anti-énumération que le login staff : payer le coût du hachage
     // même sur un compte inconnu, message identique dans les deux cas.
     if (!student) {
       await verifyAgainstDecoy(password);
+      const { locked } = registerFailedLogin("student", emailLower);
+      recordSecurityEvent({
+        eventType: "login_failed", severity: "warning", accountKind: "student",
+        accountEmail: email.trim(), ip: req.ip, detail: "compte inconnu",
+      });
+      if (locked) {
+        recordSecurityEvent({
+          eventType: "account_locked", severity: "critical", accountKind: "student",
+          accountEmail: email.trim(), ip: req.ip, detail: "5 échecs en 15 min",
+        });
+      }
       res.status(401).json({ error: "Identifiants incorrects." });
       return;
     }
 
     if (!(await verifyPassword(password, student.passwordHash))) {
+      const { locked } = registerFailedLogin("student", emailLower);
+      recordSecurityEvent({
+        eventType: "login_failed", severity: "warning", accountKind: "student",
+        accountEmail: email.trim(), ip: req.ip, detail: "mot de passe incorrect",
+      });
+      if (locked) {
+        recordSecurityEvent({
+          eventType: "account_locked", severity: "critical", accountKind: "student",
+          accountEmail: email.trim(), ip: req.ip, detail: "5 échecs en 15 min",
+        });
+      }
       res.status(401).json({ error: "Identifiants incorrects." });
       return;
     }
+
+    clearLoginFailures("student", emailLower);
 
     if (needsRehash(student.passwordHash)) {
       updateStudentPasswordHash(student.id, await hashPassword(password));
@@ -104,13 +147,27 @@ studentAuthRouter.post(
 
     const token = createStudentSession(student.id, req.headers["user-agent"]);
     setStudentSessionCookie(res, token);
+    recordSecurityEvent({
+      eventType: "login_success", severity: "info", accountKind: "student",
+      accountEmail: student.email, ip: req.ip, detail: "rôle student",
+    });
     res.json(authenticatedStudentPayload(student.id));
   })
 );
 
 studentAuthRouter.post("/student-logout", (req, res) => {
   const token = readStudentSessionToken(req);
-  if (token) destroyStudentSession(token);
+  if (token) {
+    const session = validateStudentSession(token);
+    const student = session ? getStudentById(session.userId) : null;
+    if (student) {
+      recordSecurityEvent({
+        eventType: "logout", severity: "info", accountKind: "student",
+        accountEmail: student.email, ip: req.ip, detail: "",
+      });
+    }
+    destroyStudentSession(token);
+  }
   clearStudentSessionCookie(res);
   res.status(204).end();
 });
@@ -134,12 +191,21 @@ studentProtectedRouter.post(
 
     const student = getStudentById(req.auth!.userId);
     if (!student || !(await verifyPassword(parsed.data.currentPassword, student.passwordHash))) {
+      recordSecurityEvent({
+        eventType: "password_change_failed", severity: "warning", accountKind: "student",
+        accountEmail: student?.email ?? null, ip: req.ip, detail: "mot de passe actuel incorrect",
+      });
       res.status(403).json({ error: "Mot de passe actuel incorrect." });
       return;
     }
 
     setStudentPassword(student.id, await hashPassword(parsed.data.newPassword));
-    destroyAllStudentSessions(student.id);
+    const destroyed = destroyAllStudentSessions(student.id);
+    recordSecurityEvent({
+      eventType: "password_changed", severity: "info", accountKind: "student",
+      accountEmail: student.email, ip: req.ip,
+      detail: `${Math.max(0, destroyed - 1)} autre(s) session(s) fermée(s)`,
+    });
     res.json(authenticatedStudentPayload(student.id));
   })
 );

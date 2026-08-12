@@ -201,6 +201,39 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_student_sessions_user    ON student_sessions(user_id);
   CREATE INDEX IF NOT EXISTS idx_student_sessions_expires ON student_sessions(expires_at);
+
+  -- Journal de sécurité, lecture réservée au fondateur (requireOwner). Couvre
+  -- les deux mondes (staff ET élève) — account_kind distingue lequel. Purge à
+  -- 90 jours (les IP sont des données personnelles), jamais de mot de passe
+  -- ni de jeton de session stocké ici. Pas de FK vers staff_accounts/
+  -- student_accounts : un événement doit rester lisible même après
+  -- révocation du compte concerné.
+  CREATE TABLE IF NOT EXISTS security_events (
+    id            TEXT PRIMARY KEY,
+    created_at    TEXT NOT NULL,
+    event_type    TEXT NOT NULL,
+    severity      TEXT NOT NULL,          -- 'info' | 'warning' | 'critical'
+    account_kind  TEXT,                   -- 'staff' | 'student' | NULL
+    account_email TEXT,
+    ip_address    TEXT,
+    detail        TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at);
+  CREATE INDEX IF NOT EXISTS idx_security_events_email   ON security_events(account_email);
+
+  -- État opérationnel du verrouillage de compte, PAR (monde, email) — une
+  -- seule ligne par compte, écrasée à chaque tentative de connexion.
+  -- Distinct du journal ci-dessus (durée de vie et fréquence d'accès très
+  -- différentes) : voir server/auth/loginLockout.ts.
+  CREATE TABLE IF NOT EXISTS login_lockouts (
+    kind               TEXT NOT NULL,     -- 'staff' | 'student'
+    email_lower        TEXT NOT NULL,
+    failed_count       INTEGER NOT NULL DEFAULT 0,
+    window_started_at  TEXT NOT NULL,
+    locked_until       TEXT,
+    updated_at         TEXT NOT NULL,
+    PRIMARY KEY (kind, email_lower)
+  );
 `);
 
 /**

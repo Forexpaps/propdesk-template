@@ -13,6 +13,7 @@ import { MacroDashboard } from "./components/MacroDashboard";
 import { UserProfileModal } from "./components/UserProfileModal";
 import { PendingChangesBanner } from "./components/PendingChangesBanner";
 import { StaffAccountsModal } from "./components/StaffAccountsModal";
+import { SecurityLogModal } from "./components/SecurityLogModal";
 import { NotificationModal } from "./components/NotificationModal";
 import { PropFirmRulesModal } from "./components/PropFirmRulesModal";
 import { MindsetJournalModal } from "./components/MindsetJournalModal";
@@ -797,6 +798,7 @@ function AcademyApp({
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [isStaffAccountsOpen, setIsStaffAccountsOpen] = useState(false);
+  const [isSecurityLogOpen, setIsSecurityLogOpen] = useState(false);
 
   // Bandeau d'avertissement immédiat quand une sauvegarde échoue en
   // arrière-plan alors que l'app se croit en ligne — la donnée elle-même est
@@ -1579,6 +1581,14 @@ function AcademyApp({
               }
             : undefined
         }
+        onOpenSecurityLog={
+          isOwner
+            ? () => {
+                setIsProfileModalOpen(false);
+                setIsSecurityLogOpen(true);
+              }
+            : undefined
+        }
       />
 
       {/* Gestion des comptes staff — nécessite une identité vérifiée, absente
@@ -1589,6 +1599,12 @@ function AcademyApp({
           onClose={() => setIsStaffAccountsOpen(false)}
           currentUserId={currentStaffId}
         />
+      )}
+
+      {/* Journal de sécurité — réservé au compte fondateur (isOwner), pas à
+          tout le staff, contrairement à StaffAccountsModal ci-dessus. */}
+      {isOwner && (
+        <SecurityLogModal isOpen={isSecurityLogOpen} onClose={() => setIsSecurityLogOpen(false)} />
       )}
 
       {/* Position Calculator Modal */}

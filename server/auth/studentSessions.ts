@@ -92,8 +92,9 @@ export function destroyStudentSession(token: string): void {
   db.prepare("DELETE FROM student_sessions WHERE id = ?").run(fingerprint(token));
 }
 
-export function destroyAllStudentSessions(studentAccountId: string): void {
-  db.prepare("DELETE FROM student_sessions WHERE user_id = ?").run(studentAccountId);
+/** Renvoie le nombre de sessions détruites (inclut la session courante). */
+export function destroyAllStudentSessions(studentAccountId: string): number {
+  return db.prepare("DELETE FROM student_sessions WHERE user_id = ?").run(studentAccountId).changes;
 }
 
 export function purgeExpiredStudentSessions(): number {
