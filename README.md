@@ -98,11 +98,6 @@ Trois limitations de débit par IP : `/api/auth/login` 10 par quart d'heure,
 `/api/auth/setup` 5 par quart d'heure, `/api/auth/staff` (invitation) 10 par
 quart d'heure.
 
-Chaque utilisateur peut exporter son propre rapport de trading (Journal,
-Rentabilité, Portefeuille) en PDF depuis le bouton du header — généré à la
-volée côté client (`src/lib/pdfReport.ts`, `jsPDF` + `jspdf-autotable`),
-aucun fichier statique ni route serveur dédiée.
-
 ## Authentification
 
 Plusieurs comptes staff peuvent se connecter, chacun avec son propre email et

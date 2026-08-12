@@ -186,13 +186,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
         />
 
         <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isCollapsed ? "lg:pl-20" : "lg:pl-64"}`}>
-          <TopHeader
-            activeTab={activeTab}
-            student={readOnlyStudent}
-            trades={studentData.trades}
-            accounts={studentData.accounts}
-            setMobileOpen={setMobileOpen}
-          />
+          <TopHeader activeTab={activeTab} student={readOnlyStudent} setMobileOpen={setMobileOpen} />
 
           <main className="p-4 sm:p-8 flex-1 max-w-7xl w-full mx-auto">
             {activeTab === "dashboard" && (

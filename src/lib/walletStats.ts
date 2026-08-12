@@ -1,10 +1,9 @@
 import { Trade, TradingAccount } from "../types";
 
 /**
- * Calculs purs de portefeuille, extraits de `WalletManagement.tsx` (où ils
- * étaient des closures internes fermées sur `trades`) pour être partagés
- * avec l'export PDF (`src/lib/pdfReport.ts`) — `trades` devient un paramètre
- * explicite plutôt qu'une closure.
+ * Calculs purs de portefeuille, extraits de `WalletManagement.tsx` où ils
+ * étaient des closures internes fermées sur `trades` — `trades` devient un
+ * paramètre explicite, plus facile à tester et à réutiliser ailleurs.
  */
 
 /**

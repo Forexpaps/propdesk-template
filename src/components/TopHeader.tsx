@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { Menu, Activity, ShieldCheck, Bell, TrendingUp, Clock, Calculator, CheckSquare, Award, User, Crown, Sliders, FileText, Download } from "lucide-react";
-import { StudentProfile, Trade, TradingAccount } from "../types";
+import { Menu, Activity, ShieldCheck, Bell, TrendingUp, Clock, Calculator, CheckSquare, Award, User, Crown, Sliders } from "lucide-react";
+import { StudentProfile } from "../types";
 import { formatCurrency } from "../lib/format";
-import { generateTradingReportPdf } from "../lib/pdfReport";
 
 import { TabType } from "./Sidebar";
 
@@ -59,14 +58,6 @@ function getActiveSessionLabel(date: Date): string | null {
 interface TopHeaderProps {
   activeTab: TabType;
   student: StudentProfile;
-  /**
-   * Obligatoires (pas optionnelles) : sert de garde-fou pour le bouton
-   * d'export PDF (`generateTradingReportPdf`) — `tsc --noEmit` échoue sur
-   * tout site de montage qui oublierait de les fournir, plutôt que de
-   * laisser un export silencieusement vide en production.
-   */
-  trades: Trade[];
-  accounts: TradingAccount[];
   setMobileOpen: (open: boolean) => void;
   onOpenProfileModal?: () => void;
   onOpenNotifications?: () => void;
@@ -76,8 +67,6 @@ interface TopHeaderProps {
 export const TopHeader: React.FC<TopHeaderProps> = ({
   activeTab,
   student,
-  trades,
-  accounts,
   setMobileOpen,
   onOpenProfileModal,
   onOpenNotifications,
@@ -169,24 +158,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             {formatCurrency(student.currentCapital)}
           </span>
         </div>
-
-        {/* Export du rapport personnel (Journal + Rentabilité + Portefeuille) */}
-        <button
-          onClick={() => {
-            try {
-              generateTradingReportPdf(student, trades, accounts);
-            } catch (err) {
-              console.error("[propdesk] Génération du rapport PDF échouée.", err);
-              alert("La génération du rapport PDF a échoué. Réessaie, ou recharge la page.");
-            }
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#00E676]/10 hover:bg-[#00E676]/20 border border-[#00E676]/30 text-[#00E676] transition-all text-[11px] font-mono font-bold"
-          title="Télécharger mon rapport de trading (Journal, Rentabilité, Portefeuille)"
-        >
-          <FileText className="w-3.5 h-3.5 text-[#00E676]" />
-          <span className="hidden sm:inline">Mon Rapport PDF</span>
-          <Download className="w-3 h-3 ml-0.5" />
-        </button>
 
         {/* Profile & Badges Button */}
         {onOpenProfileModal && (
