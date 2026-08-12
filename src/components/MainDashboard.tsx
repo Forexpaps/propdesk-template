@@ -97,7 +97,9 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
     ? [{ label: "Départ", capital: student.startingCapital }]
     : sortedTrades.map((trade, index) => {
         const pnl = parseFloat(String(trade.pnl)) || 0;
-        tempCapital += trade.result === "WIN" ? pnl : -pnl;
+        if (trade.result === "WIN" || trade.result === "LOSS") {
+          tempCapital += pnl;
+        }
         return {
           label: `T${index + 1}`,
           capital: tempCapital
