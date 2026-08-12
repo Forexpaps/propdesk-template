@@ -572,6 +572,12 @@ second essai (fix confirmé) via `replayPending()`.
 
 ### ✅ Corrigés cette session
 
+6. **Affichage des badges côté staff** (`server/routes.ts`, commit `d43a10f`) :
+   Le serveur retournait `badges: []` vide au lieu de `undefined`, empêchant
+   le client de tomber sur le fallback (mockData). Résultat : "0/0 badges" et
+   aucun affichage. Corrigé : retourner `undefined` pour les collections vides
+   (`badges`, `modules`), permettant au client de charger les 9 badges mockData.
+   Utilisateur peut maintenant voir les badges, filtrer "Tous/Débloqués/En cours".
 7. **Rate limiting** sur 5 routes (`server/routes.ts`, commit `36d5ce5`) :
    ajouté. Fenêtre glissante de 15 minutes, limites : 60 pour `/collections`,
    30 pour `/profile` et `/quiz-results`, 10 pour `/state/import`, 5 pour
@@ -803,9 +809,9 @@ voir l'historique git.)*
 
 ## 10. État à la reprise
 
-- Branche `main`, dernier commit réel `36d5ce5` (rate limiting ✓).
-  Avant : `8a49988` (courbe d'équité), avant : `ecbbce6` (badges/notifications),
-  avant : `af78c14` (4 bugs audit).
+- Branche `main`, dernier commit réel `d43a10f` (affichage badges staff ✓).
+  Avant : `36d5ce5` (rate limiting), avant : `8a49988` (courbe d'équité),
+  avant : `ecbbce6` (badges/notifications).
 - Code clean (`npm run lint` ok).
 - Aucune tâche en attente de commit.
 - Le compte staff est actuellement connecté dans le navigateur (Browser
@@ -814,9 +820,9 @@ voir l'historique git.)*
 
 ### Par où commencer
 
-**Aucune autre tâche de code en attente.** L'application a atteint un bon état
-de stabilité. Les seules demandes restantes sont produit (module Examen). Si tu
-reprends : vérifier que le rate limiting fonctionne en conditions réelles.
+**Aucune autre tâche de code en attente.** L'application est stable et
+fonctionnelle. Badges, rate limiting, courbe d'équité — tous corrigés et
+testés. Seule demande restante : module Examen (en attente de décision produit).
 
 > Ce document est la **seule** source de reprise fiable. S'il existe un
 > écart entre ce document et le code, **fais confiance au code** — vérifie
