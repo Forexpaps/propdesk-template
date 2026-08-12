@@ -7,9 +7,9 @@ directe de tous les modules) — pas une simple compilation de notes de
 session.
 
 > **État à la dernière mise à jour de ce document**
-> Branche `main`, dernier commit : **`18ff5c4`** (« Remplace le Simulateur
-> Replay et la modale Prop Firm Rules par un vrai simulateur de challenge
-> Prop Firm »). Voir §0 bis pour le détail de ce chantier.
+> Branche `main`, dernier commit : **`ceafafa`** (« Retire le bouton "Sim
+> propfirm" de la sidebar »), suite du chantier Simulateur de Challenge
+> Prop Firm (`18ff5c4`) — voir §0 bis pour le détail complet.
 > `npm run lint` et `npm run build` passent tous les deux.
 
 ---
@@ -147,11 +147,25 @@ trading, dans `src/lib/propChallenge.ts` (logique pure, sans React) :
   contrôles Tick Suivant/Lecture Rapide/Fin de Journée, panneau
   d'exécution avec calculateur de risque, historique des trades).
 - `src/components/SMCSimulator.tsx` : **simplifié**, ne gère plus que le
-  choix d'onglet interne. Le Monte Carlo (`MONTE_CARLO`, déjà réel avant ce
-  chantier) est **inchangé**. L'onglet `REPLAY` rend désormais
-  `<PropChallengeSimulator />`. Les 2 entrées sidebar « Replay » et « Sim
-  propfirm » pointent toujours vers ce même composant, comme avant — seul
-  le contenu de la vue `REPLAY` a changé.
+  choix d'onglet interne (bascule `REPLAY`/`MONTE_CARLO` par boutons
+  internes, plus de prop `initialMode` — un seul point d'entrée sidebar
+  désormais, voir plus bas). Le Monte Carlo (déjà réel avant ce chantier)
+  est **inchangé** dans sa logique, seulement renommé à l'écran
+  « Simulateur Rentabilité PropFirm » (était « Simulateur Monte Carlo &
+  Compounding », demande de suivi). L'onglet `REPLAY` rend désormais
+  `<PropChallengeSimulator />`.
+
+**Suivi demandé après coup, committé séparément** :
+- Bouton "Simulateur Monte Carlo & Compounding" renommé en "Simulateur
+  Rentabilité PropFirm" (commit `11f1118`).
+- Entrée sidebar "Sim propfirm" (section PRATIQUE) **entièrement retirée**
+  (commit `ceafafa`) — les 2 entrées ("Replay"/"Sim propfirm") pointaient
+  vers le même composant avec juste une vue initiale différente ; la vue
+  Monte Carlo reste accessible via l'onglet interne de "Replay", donc
+  aucune fonctionnalité perdue. Nettoyage complet côté code (pas un simple
+  masquage) : `propfirm` retiré de `ALL_TABS`/`SIDEBAR_ITEM_TABS`/
+  `SIDEBAR_TOGGLEABLE_KEYS` (`Sidebar.tsx`), de la branche de rendu dédiée
+  dans `App.tsx` (x2, staff + élève), du libellé dans `TopHeader.tsx`.
 
 **Simplifications assumées par rapport à la maquette de référence** (pas
 reproduites, pour contenir la portée du chantier à la boucle fonctionnelle
@@ -175,13 +189,18 @@ en conséquence → jour de trading incrémenté après suffisamment de bougies
 "Reconfigurer" ramène proprement à l'écran de configuration → Monte Carlo
 toujours fonctionnel, aucune régression.
 
-**Piège opérationnel rencontré pendant la vérification** : "Replay" et
-"Sim propfirm" étaient déjà masqués dans la sidebar de l'utilisateur avant
-ce chantier (réglage `hiddenSidebarItems` préexistant, sans rapport avec
-ce travail). Il a fallu les réafficher temporairement via le réglage de
-visibilité du fondateur pour tester, puis les remasquer à l'identique
-après coup — ne pas s'étonner si ces deux entrées restent invisibles dans
-la sidebar par défaut, ce n'est pas un bug introduit par ce chantier.
+**Piège opérationnel rencontré pendant la vérification** : "Replay" (et,
+à l'époque, "Sim propfirm") étaient déjà masqués dans la sidebar de
+l'utilisateur avant ce chantier (réglage `hiddenSidebarItems` préexistant,
+sans rapport avec ce travail). Il a fallu les réafficher temporairement
+via le réglage de visibilité du fondateur pour tester, puis les remasquer
+à l'identique après coup — ne pas s'étonner si "Replay" reste invisible
+dans la sidebar par défaut, ce n'est pas un bug introduit par ce chantier.
+Depuis le retrait de "Sim propfirm" (voir "Suivi" ci-dessus), la clé
+`"propfirm"` peut subsister comme résidu inoffensif dans
+`hiddenSidebarItems` en base pour d'anciens profils — elle ne correspond
+plus à aucune entrée de `SIDEBAR_TOGGLEABLE_KEYS`, donc silencieusement
+ignorée, pas la peine de la nettoyer en base.
 
 ---
 
@@ -1053,17 +1072,20 @@ fausse — voir l'historique git.)*
 
 ---
 
-## 10. État après refonte du Simulateur de Challenge Prop Firm
+## 10. État après nettoyage de la sidebar du Simulateur Prop Firm
 
-- Branche `main`, dernier commit : `18ff5c4` (« Remplace le Simulateur
-  Replay et la modale Prop Firm Rules par un vrai simulateur de challenge
-  Prop Firm »).
-- **Quatre chantiers terminés et committés** :
+- Branche `main`, dernier commit : `ceafafa` (« Retire le bouton "Sim
+  propfirm" de la sidebar »).
+- **Six chantiers terminés et committés** :
   - `0939553` : Journal de sécurité + verrouillage (COMMITTÉ + vérifié)
   - `72645ee` : Refonte Portefeuille (style Mindset modal, violet)
   - `3f7e6f0` : Changement Portefeuille violet → vert (COMMITTÉ + vérifié)
   - `18ff5c4` : Simulateur de Challenge Prop Firm complet (COMMITTÉ +
     vérifié) — voir §0 bis pour le détail
+  - `11f1118` : Renommage "Simulateur Monte Carlo & Compounding" →
+    "Simulateur Rentabilité PropFirm"
+  - `ceafafa` : Retrait complet de l'entrée sidebar "Sim propfirm"
+    (COMMITTÉ + vérifié) — voir §0 bis, section "Suivi demandé après coup"
 - `npm run lint` et `npm run build` passent.
 - Répertoire de travail propre (tous les changements sont committés).
 - Aucun compte de test/verrouillage actif.
