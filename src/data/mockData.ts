@@ -1,4 +1,4 @@
-import { Module, Trade, Coach, CoachMessage, StudentProfile, ForumTopic, TradingAccount, CoachSignal, BacktestScenario, TraderBadge, EnrolledStudent, AppNotification } from "../types";
+import { Module, Trade, Coach, CoachMessage, StudentProfile, ForumTopic, TradingAccount, CoachSignal, TraderBadge, EnrolledStudent, AppNotification } from "../types";
 
 export const initialStudentProfile: StudentProfile = {
   name: "Alexandre Vance",
@@ -972,57 +972,6 @@ export const initialCoachSignals: CoachSignal[] = [
     date: "26 Juillet 2026",
     smcNotes: "Divergence institutionnelle (SMT) avec EUR/USD. Rupture de structure H4 validée avec volume.",
     pnlResultPips: +118,
-  },
-];
-
-export const initialBacktestScenarios: BacktestScenario[] = [
-  {
-    id: "scen-1",
-    title: "Session NY: Liquidity Sweep & Order Block sur EUR/USD",
-    pair: "EUR/USD",
-    timeframe: "M5",
-    difficulty: "Intermédiaire",
-    smcPattern: "Order Block + Liquidity Sweep + FVG",
-    description: "Le marché vient d'attraper la liquidité des vendeurs au-dessus de la session de Londres. Analyse la structure M5 et identifie la prise de position optimale.",
-    chartUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=800",
-    suggestedDirection: "SHORT",
-    suggestedEntry: 1.08950,
-    suggestedSL: 1.09080,
-    suggestedTP: 1.08550,
-    explanation: "Le balayage de la liquidité acheteuse (BSL) est suivi d'une cassure de structure (MSB). L'entrée optimale s'effectue sur le FVG laissé par le bougie de rejet M5 avec un Risk/Reward de 1:3.08.",
-    marketCategory: "Forex",
-  },
-  {
-    id: "scen-2",
-    title: "Gold XAU/USD: Retracement FVG H1 après CPI News",
-    pair: "XAU/USD",
-    timeframe: "M15",
-    difficulty: "Expert",
-    smcPattern: "Fair Value Gap (FVG) + Displace Momentum",
-    description: "Une annonce CPI a créé un déséquilibre massif de 400 pips sur l'Or. Quel est le comportement institutionnel lors du premier test de l'invalidation ?",
-    chartUrl: "https://images.unsplash.com/photo-1642543492481-44e81e3914a7?auto=format&fit=crop&q=80&w=800",
-    suggestedDirection: "LONG",
-    suggestedEntry: 2408.00,
-    suggestedSL: 2398.00,
-    suggestedTP: 2438.00,
-    explanation: "Les algorithmes interbancaires (IPDA) comblent systématiquement 50% de l'imbalance (Consequent Encroachment). L'achat se déclenche à la mitigation exacte avec un Stop sous l'OB de départ.",
-    marketCategory: "Matières Premières",
-  },
-  {
-    id: "scen-3",
-    title: "Nasdaq (NAS100): Judasprom & Open de New York à 15h30",
-    pair: "NAS100",
-    timeframe: "M3",
-    difficulty: "Expert",
-    smcPattern: "Judas Swing + Session Open Manipulation",
-    description: "À 15h30 précises, le Nasdaq effectue un faux départ haussier avant d'inverser complètement la tendance. Comment éviter le piège FOMO ?",
-    chartUrl: "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&q=80&w=800",
-    suggestedDirection: "SHORT",
-    suggestedEntry: 19820,
-    suggestedSL: 19860,
-    suggestedTP: 19700,
-    explanation: "Le Judas Swing a purgé les Stops au-dessus du plus haut du pré-market. Dès que la bougie M3 réintègre le range avec rejet puissant, l'entrée en Short offre un Ratio R/R exceptionnel de 1:3.0.",
-    marketCategory: "Indices",
   },
 ];
 

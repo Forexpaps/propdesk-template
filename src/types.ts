@@ -262,23 +262,6 @@ export interface TradingAccount {
   accountNumber?: string;
 }
 
-export interface BacktestScenario {
-  id: string;
-  title: string;
-  pair: string;
-  timeframe: string;
-  difficulty: "Débutant" | "Intermédiaire" | "Expert";
-  smcPattern: string;
-  description: string;
-  chartUrl: string;
-  suggestedDirection: TradeDirection;
-  suggestedEntry: number;
-  suggestedSL: number;
-  suggestedTP: number;
-  explanation: string;
-  marketCategory: MarketCategory;
-}
-
 export interface CoachSignal {
   id: string;
   coachName: string;

@@ -26,7 +26,6 @@ import {
   EyeOff,
   Settings2,
   Check,
-  Trophy,
   Brain,
   Calendar,
   Target,
@@ -99,7 +98,6 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
   "academy",
   "messaging",
   "audit",
-  "propfirmrules",
   "mindset",
   "calendar",
 ] as const;
@@ -126,7 +124,6 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   academy: "academy",
   messaging: "messaging",
   audit: null,
-  propfirmrules: null,
   mindset: null,
   calendar: "macro",
 };
@@ -169,7 +166,6 @@ interface SidebarProps {
   onOpenChecklist?: () => void;
   // Section OUTILS : chaque entrée ouvre une modale.
   onOpenSetupAnalyzer?: () => void;
-  onOpenPropFirmRules?: () => void;
   onOpenMindset?: () => void;
   /** Masque ou réaffiche une entrée. Réservé au compte fondateur. */
   onToggleSidebarItem?: (key: SidebarItemKey) => void;
@@ -198,7 +194,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   onOpenChecklist,
   onOpenSetupAnalyzer,
-  onOpenPropFirmRules,
   onOpenMindset,
   onToggleSidebarItem,
   canManageSidebar = false,
@@ -249,17 +244,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   /**
-   * Section OUTILS : trois modales, sans onglet associé.
+   * Section OUTILS : deux modales, sans onglet associé.
    *
-   * `propfirmrules` et non `propfirm` : cette dernière clé est déjà prise par
-   * « Sim propfirm ».
+   * Le suivi de challenge Prop Firm est désormais le simulateur complet de
+   * la section PRATIQUE (« Replay » / « Sim propfirm »), plus cette modale
+   * séparée — voir SMCSimulator/PropChallengeSimulator.
    *
    * « Calendrier » n'y figure plus : devenu l'onglet « Macro » (section
    * SUIVI), ce n'est plus une modale.
    */
   const outilsItems: SidebarEntry[] = [
     { key: "audit", id: null, label: "Audit Setup", icon: Target, onOpen: onOpenSetupAnalyzer },
-    { key: "propfirmrules", id: null, label: "Prop Firm", icon: Trophy, onOpen: onOpenPropFirmRules },
     { key: "mindset", id: null, label: "Mindset", icon: Brain, onOpen: onOpenMindset },
   ];
 
