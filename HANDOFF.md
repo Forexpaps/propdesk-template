@@ -570,11 +570,18 @@ second essai (fix confirmé) via `replayPending()`.
 
 ### ✅ Corrigés et vérifiés (tout, y compris le chantier badges/notifications/sync — voir §4)
 
-### 🟡 Connus, non corrigés (priorité après le commit de §0)
+### ✅ Corrigés cette session
+
+8. **Courbe d'équité** (`MainDashboard.tsx`, commit `8a49988`) : corrigé.
+   L'ancienne logique inversait le signe pour LOSS et BREAKEVEN, faussant le
+   cumul.
+
+### 🟡 Connus, non corrigés
 
 1. **Forum inaccessible depuis l'UI.** `ForumSection.tsx` complet côté
    code, mais aucun onglet de sidebar ni notification n'y mène. Décision
-   produit à prendre : l'exposer ? Si oui, corriger d'abord le point suivant.
+   produit prise : rester inaccessible (priorité donnée à rate limiting et
+   module Examen).
 2. **Usurpation d'identité possible dans le forum par un compte staff.**
    `authorName`/`authorRole`/`isCoachCertified` non vérifiés contre
    `req.auth`. Impact borné aujourd'hui (forum inaccessible côté élève).
@@ -588,10 +595,6 @@ second essai (fix confirmé) via `replayPending()`.
    outil mono-instance.
 7. **Absence de flux de récupération de mot de passe.** Discussion produit,
    pas un bug de code.
-8. **Courbe d'équité (`MainDashboard.tsx`, `equityData`) traite tout
-   résultat non-WIN comme une perte** (`tempCapital += trade.result ===
-   "WIN" ? pnl : -pnl`) — un trade `BREAKEVEN` ou un `LOSS` déjà négatif
-   fausse le cumul. Repéré en passant, pas corrigé.
 
 ### Piège opérationnel : deux `PRATIQUE`/sections identiques dans le DOM
 
@@ -660,29 +663,15 @@ agressif (`dangerouslyDisableSandbox` testé, n'a pas résolu le problème).
 
 ## 7. Prochaines tâches, dans l'ordre
 
-### 1. Committer le chantier badges/notifications/sync
-
-Voir §0 — commande prête, il ne reste qu'à l'exécuter (toi si ton Bash
-fonctionne, sinon demande à l'utilisateur).
-
-### 2. Décider du sort du Forum
-
-Discussion produit : l'exposer dans la navigation ou le laisser
-inaccessible ? Si exposé, corriger d'abord l'usurpation d'identité staff
-(§6, point 2) et `forum_replies` (§6, point 4).
-
-### 3. Rate limiting sur les routes de collection restantes
+### 1. Rate limiting sur les routes de collection restantes
 
 `PUT /api/collections/:name`, `/profile`, `/quiz-results`, `/state/import`,
-`/state/seed`.
+`/state/seed` (voir §6, point 3 pour plus de détails).
 
-### 4. Corriger le bug de la courbe d'équité (`MainDashboard.tsx`)
+### 2. Remplir le module « Examen »
 
-Voir §6, point 8.
-
-### 5. Remplir le module « Examen »
-
-Toujours en attente d'une décision produit. Débloquerait aussi le badge-9.
+En attente d'une décision produit. Débloquerait aussi le badge-9 (« Score
+Examen » affiche « — » en attente de cette implémentation).
 
 ### Ce qui n'est PAS une tâche
 
@@ -813,18 +802,20 @@ voir l'historique git.)*
 
 ## 10. État à la reprise
 
-- Branche `main`, dernier commit réel `ecbbce6` (badges/notifications/sync
-  committé ✓). Code clean (`npm run lint` ok).
-- Aucune tâche en attente.
+- Branche `main`, dernier commit réel `8a49988` (courbe d'équité corrigée ✓).
+  Avant : `ecbbce6` (badges/notifications/sync), avant : `af78c14` (4 bugs
+  audit).
+- Code clean (`npm run lint` ok).
+- Aucune tâche en attente de commit.
 - Le compte staff est actuellement connecté dans le navigateur (Browser
   pane). Le compte de test élève (Camille Dupont) a été **révoqué** —
-  plus de session active pour ce compte.
+  plus de session active.
 
 ### Par où commencer
 
-Pas de commit en attente. Poursuis avec §7 : **priorité n°1 = décision
-produit sur le Forum** (exposer dans la navigation ou laisser inaccessible ?).
-Puis rate limiting, bug courbe d'équité, module Examen.
+Poursuis avec §7 : **priorité n°1 = rate limiting** sur 5 routes, puis
+module Examen (en attente de décision produit sur les graphiques et les
+règles de notation).
 
 > Ce document est la **seule** source de reprise fiable. S'il existe un
 > écart entre ce document et le code, **fais confiance au code** — vérifie
