@@ -18,6 +18,7 @@ import {
   XCircle,
   Info,
   X,
+  Clock,
 } from "lucide-react";
 import { formatCurrency } from "../lib/format";
 import {
@@ -28,8 +29,13 @@ import {
   ChallengeConfig,
   ChallengeRules,
   ChallengeState,
+  DEFAULT_TIMEFRAME_MINUTES,
+  MAX_TIMEFRAME_MINUTES,
+  MIN_TIMEFRAME_MINUTES,
   OrderDirection,
   PROP_SIM_ASSETS,
+  TIMEFRAME_PRESETS,
+  TimeframeMinutes,
   advanceDay,
   advanceTick,
   closePositionManually,
@@ -39,6 +45,7 @@ import {
   currentPrice,
   floatingPnl,
   formatSimTimestamp,
+  formatTimeframeLabel,
   loadPersistedChallenge,
   openPosition,
   persistChallenge,
@@ -111,6 +118,18 @@ const ChallengeConfigScreen: React.FC<ChallengeConfigScreenProps> = ({ onStart }
   const [asset, setAsset] = useState<AssetSymbol>("XAUUSD");
   const [presetIndex, setPresetIndex] = useState<number>(0);
   const [rules, setRules] = useState<ChallengeRules>({ ...CHALLENGE_PRESETS[0].rules });
+
+  const [presetTimeframeMinutes, setPresetTimeframeMinutes] = useState<TimeframeMinutes>(DEFAULT_TIMEFRAME_MINUTES);
+  const [isCustomTimeframe, setIsCustomTimeframe] = useState(false);
+  const [customValue, setCustomValue] = useState<number>(15);
+  const [customUnit, setCustomUnit] = useState<"m" | "H" | "D">("m");
+
+  const customUnitMultiplier = customUnit === "m" ? 1 : customUnit === "H" ? 60 : 1440;
+  const customMinutes = Math.min(
+    MAX_TIMEFRAME_MINUTES,
+    Math.max(MIN_TIMEFRAME_MINUTES, Math.round((customValue || 0) * customUnitMultiplier))
+  );
+  const timeframeMinutes = isCustomTimeframe ? customMinutes : presetTimeframeMinutes;
 
   const applyPreset = (index: number) => {
     setPresetIndex(index);
@@ -234,6 +253,70 @@ const ChallengeConfigScreen: React.FC<ChallengeConfigScreenProps> = ({ onStart }
         </div>
       </div>
 
+      {/* Timeframe */}
+      <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-5 space-y-4">
+        <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-2">
+          <Clock className="w-4 h-4 text-[#00E676]" /> Timeframe (Unité de Temps)
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {TIMEFRAME_PRESETS.map((tf) => (
+            <button
+              key={tf.minutes}
+              onClick={() => {
+                setPresetTimeframeMinutes(tf.minutes);
+                setIsCustomTimeframe(false);
+              }}
+              className={`py-2.5 rounded-xl text-sm font-bold font-mono transition-all ${
+                !isCustomTimeframe && presetTimeframeMinutes === tf.minutes
+                  ? "bg-[#00E676]/15 border border-[#00E676]/50 text-white"
+                  : "bg-[#0D1110] border border-[#1B2320] text-slate-400 hover:text-white"
+              }`}
+            >
+              {tf.label}
+            </button>
+          ))}
+          <button
+            onClick={() => setIsCustomTimeframe(true)}
+            className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
+              isCustomTimeframe
+                ? "bg-[#00E676]/15 border border-[#00E676]/50 text-white"
+                : "bg-[#0D1110] border border-[#1B2320] text-slate-400 hover:text-white"
+            }`}
+          >
+            Personnalisé
+          </button>
+        </div>
+
+        {isCustomTimeframe && (
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              value={customValue}
+              onChange={(e) => setCustomValue(Math.max(1, Number(e.target.value)))}
+              className="w-24 bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white font-mono font-bold focus:outline-none focus:border-[#00E676]"
+            />
+            <select
+              value={customUnit}
+              onChange={(e) => setCustomUnit(e.target.value as "m" | "H" | "D")}
+              className="bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-[#00E676]"
+            >
+              <option value="m">Minutes</option>
+              <option value="H">Heures</option>
+              <option value="D">Jours</option>
+            </select>
+            <span className="text-xs text-slate-500">
+              (de 1m à 1 Jour — bornes appliquées automatiquement)
+            </span>
+          </div>
+        )}
+
+        <div className="text-xs text-slate-400">
+          Timeframe sélectionnée :{" "}
+          <span className="text-[#00E676] font-mono font-bold">{formatTimeframeLabel(timeframeMinutes)}</span>
+        </div>
+      </div>
+
       {/* Réglages avancés éditables */}
       <details className="bg-[#111615] border border-[#1B2320] rounded-2xl p-5 group">
         <summary className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono cursor-pointer select-none flex items-center gap-2">
@@ -309,6 +392,11 @@ const ChallengeConfigScreen: React.FC<ChallengeConfigScreenProps> = ({ onStart }
             <span className="text-white font-bold">{asset}</span>
           </div>
           <div className="flex items-center gap-1.5">
+            <Clock className="w-4 h-4 text-[#00E676]" />
+            <span className="text-slate-400">Timeframe:</span>
+            <span className="text-white font-bold">{formatTimeframeLabel(timeframeMinutes)}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
             <Trophy className="w-4 h-4 text-[#00E676]" />
             <span className="text-slate-400">Cible Phase 1:</span>
             <span className="text-[#00E676] font-bold">{formatCurrency(targetBalance)}</span>
@@ -316,7 +404,7 @@ const ChallengeConfigScreen: React.FC<ChallengeConfigScreenProps> = ({ onStart }
         </div>
 
         <button
-          onClick={() => onStart({ asset, initialCapital: capital, rules })}
+          onClick={() => onStart({ asset, initialCapital: capital, rules, timeframeMinutes })}
           className="w-full sm:w-auto px-6 py-3 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-sm shadow-md flex items-center justify-center gap-2"
         >
           Démarrer le Challenge <ArrowUpRight className="w-4 h-4" />
@@ -550,7 +638,9 @@ const TradingTerminal: React.FC<TradingTerminalProps> = ({ state, setState, isPl
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-bold text-white">{state.config.asset} · {asset.label}</div>
-              <div className="text-[11px] text-slate-500 font-mono">Bougies 1m · marché simulé</div>
+              <div className="text-[11px] text-slate-500 font-mono">
+                Bougies {formatTimeframeLabel(state.config.timeframeMinutes)} · marché simulé
+              </div>
             </div>
             <div className="text-lg font-black text-white font-mono">{price.toFixed(asset.decimals)}</div>
           </div>
