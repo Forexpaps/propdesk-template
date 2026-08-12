@@ -258,6 +258,17 @@ src/
                             clés élève `horizon_student_*` (non committé,
                             correctif d'un bug réel trouvé cette session,
                             voir §4/§8)
+    performanceStats.ts    NOUVEAU : computePerformanceStats(),
+                            computeJournalSummary() — calculs de Rentabilité
+                            et du Journal extraits pour être partagés entre
+                            l'UI et l'export PDF, source unique de vérité
+    walletStats.ts          NOUVEAU : positionsDuCompte(), dailyLossPercent(),
+                            totalDrawdownPercent() — extraits de
+                            WalletManagement.tsx, mêmes raisons
+    pdfReport.ts             NOUVEAU : generateTradingReportPdf() — génère et
+                            télécharge côté client un PDF personnel (Journal
+                            + Rentabilité + Portefeuille), remplace l'ancien
+                            catalogue marketing statique. Voir §4
   components/
     Sidebar.tsx            source de vérité des onglets. Une section
                             entièrement masquée ne disparaît plus QUE pour un
@@ -284,7 +295,7 @@ src/
     SyncErrorBanner.tsx     NOUVEAU (non committé) : bandeau discret en bas à
                             droite quand une sauvegarde échoue en arrière-plan
 public/
-  icon.png / logo-auth.jpg / logo.png / Fonctionnalites_Horizon_SMC.pdf
+  icon.png / logo-auth.jpg / logo.png
 ```
 
 **Autres composants existants** (stables, non retouchés récemment) :
@@ -527,6 +538,73 @@ progression (71%/0% au lieu de valeurs figées), badge non calculable
 affichant le bon message, message envoyé pendant une coupure serveur perdu
 au premier essai (bug confirmé) puis correctement protégé et rejouable au
 second essai (fix confirmé) via `replayPending()`.
+
+### Export PDF personnel (Journal + Rentabilité + Portefeuille) — remplace le catalogue marketing — committé (`522b7fb`)
+
+Le bouton « PDF Features » du header téléchargeait un catalogue marketing
+**statique et obsolète** (`public/Fonctionnalites_Horizon_SMC.pdf`, généré
+hors-ligne par `scripts/generate_pdf.js`) : il vantait des fonctionnalités
+d'IA (« Gemini 3.6 Flash », « AI Trade Review ») entièrement retirées de
+l'app sur décision produit, et affichait des montants en `€` alors que
+l'app n'utilise que `$`. Décision explicite de l'utilisateur : abandonner
+ce document, le remplacer par un **export PDF dynamique et personnel**
+généré à la demande côté client.
+
+- **`src/lib/pdfReport.ts`** (nouveau) : `generateTradingReportPdf(student,
+  trades, accounts)`, construit un PDF 3 pages via `jsPDF` +
+  `jspdf-autotable` (nouvelle dépendance) — Journal de trading (5 cartes de
+  stats + tableau complet des trades), Rentabilité (KPIs + un tableau par
+  dimension : stratégie/émotion/actif/direction/jour/session/erreurs
+  fréquentes), Portefeuille (cumuls + tableau détaillé par compte). Pas de
+  graphiques recharts capturés (le bouton doit fonctionner depuis
+  n'importe quel onglet, pas seulement Rentabilité) — uniquement du texte
+  et des tableaux. États vides honnêtes (« Aucun trade enregistré », etc.)
+  plutôt que des tableaux cassés.
+- **`src/lib/performanceStats.ts`** et **`src/lib/walletStats.ts`**
+  (nouveaux) : extraction pure des calculs jusque-là dupliqués dans
+  `PerformanceDashboard.tsx`/`TradingJournal.tsx`/`WalletManagement.tsx` —
+  même pattern que `badges.ts`. Le PDF et l'écran partagent désormais
+  exactement la même logique, pour ne plus jamais diverger silencieusement
+  (déjà arrivé une fois cette session avec la courbe d'équité dupliquée
+  entre `MainDashboard.tsx` et `PerformanceDashboard.tsx`, voir §6).
+- **`TopHeader.tsx`** : `trades`/`accounts` ajoutés en props
+  **obligatoires** (pas optionnelles) — sert de garde-fou : `tsc --noEmit`
+  a immédiatement révélé un **3ᵉ site de montage insoupçonné**
+  (`AdminStudentView.tsx`, la « Vue Complète » admin d'un élève), en plus
+  des deux connus dans `App.tsx`. Corrigé aux trois endroits ; en Vue
+  Complète, le bouton exporte désormais le rapport de l'élève consulté.
+- **Nettoyage complet de l'ancien pipeline** :
+  `public/Fonctionnalites_Horizon_SMC.pdf` et `scripts/generate_pdf.js`
+  supprimés, route `GET /api/download-features-pdf` retirée de
+  `server/routes.ts` (+ imports `fs`/`path` devenus inutiles),
+  `README.md` et `vite.config.ts` mis à jour (`jspdf`/`jspdf-autotable`
+  rejoignent désormais un chunk `pdf` dédié — ils entrent réellement dans
+  le bundle client, contrairement à avant).
+
+**Vérifié** : `npm run lint` et `npm run build` passent (`jspdf-autotable`
+résolu correctement, isolé dans son propre chunk de 373 Ko). Aucune
+régression visuelle sur Rentabilité/Journal/Portefeuille après extraction
+des calculs (mêmes chiffres à l'écran avant/après). PDF testé avec les
+**vraies données de production**, reproduites côté Node (script jetable,
+supprimé après usage) pour lire le contenu exact du PDF généré :
+- Cas avec données (ForexPaps, 6 trades, 4 comptes) : tous les totaux se
+  recoupent exactement entre sections (PnL $2 450 retrouvé identique par
+  stratégie/émotion/actif/direction/jour/session), aucun `€`, aucune
+  mention d'IA.
+- Cas vide (Julien Moreau, 0 trade, 1 compte) : KPIs à zéro corrects,
+  messages honnêtes (« Aucun trade enregistré… », « Pas encore assez de
+  données… ») plutôt que des tableaux cassés.
+
+Testé aux **3 sites de montage réels** dans le navigateur (staff, Vue
+Complète admin d'un élève) : taille de PDF généré identique **au byte
+près** à la reproduction Node correspondante, confirmant qu'aucune donnée
+ne fuite d'un bureau à l'autre. **Piège rencontré pendant ce test** :
+`AdminStudentView.tsx` étant un overlay qui laisse l'ancien `TopHeader` du
+staff dans le DOM en arrière-plan (piège déjà documenté §6), une recherche
+DOM non scopée à l'overlay (`document.querySelectorAll('button')` au lieu
+de `overlay.querySelectorAll(...)`) a d'abord cliqué le mauvais bouton
+(celui du staff, caché) — corrigé en scopant la recherche, confirmé
+ensuite correct.
 
 ---
 
@@ -809,20 +887,24 @@ voir l'historique git.)*
 
 ## 10. État à la reprise
 
-- Branche `main`, dernier commit réel `d43a10f` (affichage badges staff ✓).
-  Avant : `36d5ce5` (rate limiting), avant : `8a49988` (courbe d'équité),
-  avant : `ecbbce6` (badges/notifications).
-- Code clean (`npm run lint` ok).
+- Branche `main`, dernier commit réel `522b7fb` (export PDF dynamique
+  personnel, remplace le catalogue marketing ✓ — voir §4). Avant : `d43a10f`
+  (affichage badges staff), `36d5ce5` (rate limiting), `8a49988` (courbe
+  d'équité), `ecbbce6` (badges/notifications).
+- Code clean (`npm run lint` et `npm run build` ok).
 - Aucune tâche en attente de commit.
 - Le compte staff est actuellement connecté dans le navigateur (Browser
-  pane). Le compte de test élève (Camille Dupont) a été **révoqué** —
-  plus de session active.
+  pane). Le compte de test élève temporaire (Lucas Martin, `stud-3`, invité
+  pour vérifier l'export PDF) a été **révoqué** immédiatement après test —
+  plus de session active. Camille Dupont (`stud-2`) reste révoqué depuis une
+  session antérieure.
 
 ### Par où commencer
 
 **Aucune autre tâche de code en attente.** L'application est stable et
-fonctionnelle. Badges, rate limiting, courbe d'équité — tous corrigés et
-testés. Seule demande restante : module Examen (en attente de décision produit).
+fonctionnelle. Badges, rate limiting, courbe d'équité, export PDF — tous
+corrigés/livrés et testés. Seule demande restante : module Examen (en
+attente de décision produit).
 
 > Ce document est la **seule** source de reprise fiable. S'il existe un
 > écart entre ce document et le code, **fais confiance au code** — vérifie
