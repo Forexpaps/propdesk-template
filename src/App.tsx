@@ -15,7 +15,6 @@ import { PendingChangesBanner } from "./components/PendingChangesBanner";
 import { StaffAccountsModal } from "./components/StaffAccountsModal";
 import { SecurityLogModal } from "./components/SecurityLogModal";
 import { NotificationModal } from "./components/NotificationModal";
-import { PropFirmRulesModal } from "./components/PropFirmRulesModal";
 import { MindsetJournalModal } from "./components/MindsetJournalModal";
 import { SetupAnalyzerModal } from "./components/SetupAnalyzerModal";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
@@ -31,7 +30,6 @@ import {
   initialForumTopics,
   initialTradingAccounts,
   initialCoachSignals,
-  initialBacktestScenarios,
   initialTraderBadges,
   initialEnrolledStudents,
   initialNotifications,
@@ -428,7 +426,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isSetupAnalyzerOpen, setIsSetupAnalyzerOpen] = useState(false);
-  const [isPropFirmRulesOpen, setIsPropFirmRulesOpen] = useState(false);
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
@@ -562,7 +559,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         onLogout={handleLogout}
         onOpenChecklist={() => setIsChecklistOpen(true)}
         onOpenSetupAnalyzer={() => setIsSetupAnalyzerOpen(true)}
-        onOpenPropFirmRules={() => setIsPropFirmRulesOpen(true)}
         onOpenMindset={() => setIsMindsetModalOpen(true)}
         canManageSidebar={false}
       />
@@ -632,7 +628,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
             {(activeTab === "simulator" || activeTab === "propfirm") && (
               <SMCSimulator
                 key={activeTab}
-                scenarios={initialBacktestScenarios}
                 initialMode={activeTab === "propfirm" ? "MONTE_CARLO" : "REPLAY"}
               />
             )}
@@ -671,12 +666,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       </div>
 
       <SetupAnalyzerModal isOpen={isSetupAnalyzerOpen} onClose={() => setIsSetupAnalyzerOpen(false)} />
-      <PropFirmRulesModal
-        isOpen={isPropFirmRulesOpen}
-        onClose={() => setIsPropFirmRulesOpen(false)}
-        student={studentProfile}
-        trades={syncedTrades}
-      />
       <MindsetJournalModal isOpen={isMindsetModalOpen} onClose={() => setIsMindsetModalOpen(false)} />
       <TradingPlanModal isOpen={isChecklistOpen} onClose={() => setIsChecklistOpen(false)} />
       <NotificationModal
@@ -923,7 +912,6 @@ function AcademyApp({
   // Ébauche de trade poussée vers le Journal par le calculateur ou l'analyseur de setup
   const [journalDraft, setJournalDraft] = useState<TradeDraft | null>(null);
 
-  const [isPropFirmRulesOpen, setIsPropFirmRulesOpen] = useState<boolean>(false);
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState<boolean>(false);
   const [isSetupAnalyzerOpen, setIsSetupAnalyzerOpen] = useState<boolean>(false);
 
@@ -1355,7 +1343,6 @@ function AcademyApp({
         onLogout={handleLogout}
         onOpenChecklist={() => setIsChecklistOpen(true)}
         onOpenSetupAnalyzer={() => setIsSetupAnalyzerOpen(true)}
-        onOpenPropFirmRules={() => setIsPropFirmRulesOpen(true)}
         onOpenMindset={() => setIsMindsetModalOpen(true)}
         canManageSidebar={isOwner}
         onToggleSidebarItem={(key) => {
@@ -1478,7 +1465,6 @@ function AcademyApp({
           {(activeTab === "simulator" || activeTab === "propfirm") && (
             <SMCSimulator
               key={activeTab}
-              scenarios={initialBacktestScenarios}
               initialMode={activeTab === "propfirm" ? "MONTE_CARLO" : "REPLAY"}
             />
           )}
@@ -1632,14 +1618,6 @@ function AcademyApp({
       <TradingPlanModal
         isOpen={isChecklistOpen}
         onClose={() => setIsChecklistOpen(false)}
-      />
-
-      {/* Prop Firm Rules & Challenge Modal */}
-      <PropFirmRulesModal
-        isOpen={isPropFirmRulesOpen}
-        onClose={() => setIsPropFirmRulesOpen(false)}
-        student={student}
-        trades={trades}
       />
 
       {/* Mindset & Tilt Radar Modal */}
