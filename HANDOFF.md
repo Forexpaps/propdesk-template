@@ -572,6 +572,10 @@ second essai (fix confirmé) via `replayPending()`.
 
 ### ✅ Corrigés cette session
 
+7. **Rate limiting** sur 5 routes (`server/routes.ts`, commit `36d5ce5`) :
+   ajouté. Fenêtre glissante de 15 minutes, limites : 60 pour `/collections`,
+   30 pour `/profile` et `/quiz-results`, 10 pour `/state/import`, 5 pour
+   `/state/seed`.
 8. **Courbe d'équité** (`MainDashboard.tsx`, commit `8a49988`) : corrigé.
    L'ancienne logique inversait le signe pour LOSS et BREAKEVEN, faussant le
    cumul.
@@ -580,20 +584,17 @@ second essai (fix confirmé) via `replayPending()`.
 
 1. **Forum inaccessible depuis l'UI.** `ForumSection.tsx` complet côté
    code, mais aucun onglet de sidebar ni notification n'y mène. Décision
-   produit prise : rester inaccessible (priorité donnée à rate limiting et
-   module Examen).
+   produit prise : rester inaccessible.
 2. **Usurpation d'identité possible dans le forum par un compte staff.**
    `authorName`/`authorRole`/`isCoachCertified` non vérifiés contre
    `req.auth`. Impact borné aujourd'hui (forum inaccessible côté élève).
-3. **`PUT /api/collections/:name` toujours sans rate limit.** Le correctif
-   critique bloque la collision d'id, pas le volume. `/profile`,
-   `/quiz-results`, `/state/import`, `/state/seed` ont le même trou.
-4. **`forum_replies` sans vérification de propriété.** Latent, pas
+3. **`forum_replies` sans vérification de propriété.** Latent, pas
    exploitable aujourd'hui (un seul bureau staff possède des forumTopics).
-5. **`quizResultsSchema` non borné.** Mineur, borné par la limite globale 8 Mo.
-6. **Rate limiter en mémoire, par processus.** Compromis accepté pour un
-   outil mono-instance.
-7. **Absence de flux de récupération de mot de passe.** Discussion produit,
+4. **`quizResultsSchema` non borné.** Mineur, borné par la limite globale 8 Mo.
+5. **Rate limiter en mémoire, par processus.** Compromis accepté pour un
+   outil mono-instance (aucune redistribution pour multi-instance sans
+   demande explicite).
+6. **Absence de flux de récupération de mot de passe.** Discussion produit,
    pas un bug de code.
 
 ### Piège opérationnel : deux `PRATIQUE`/sections identiques dans le DOM
@@ -661,17 +662,17 @@ agressif (`dangerouslyDisableSandbox` testé, n'a pas résolu le problème).
 
 ---
 
-## 7. Prochaines tâches, dans l'ordre
+## 7. Prochaines tâches
 
-### 1. Rate limiting sur les routes de collection restantes
+### 1. Remplir le module « Examen »
 
-`PUT /api/collections/:name`, `/profile`, `/quiz-results`, `/state/import`,
-`/state/seed` (voir §6, point 3 pour plus de détails).
+Décision produit en attente : specs des graphiques, règles de notation,
+nombre de questions, durée limite, etc. Cette implémentation débloquerait aussi
+le badge-9 (actuellement « Score Examen » affiche « — »).
 
-### 2. Remplir le module « Examen »
+### Aucune autre tâche en attente de code
 
-En attente d'une décision produit. Débloquerait aussi le badge-9 (« Score
-Examen » affiche « — » en attente de cette implémentation).
+Forum restera inaccessible, rate limiting complété, courbe d'équité corrigée.
 
 ### Ce qui n'est PAS une tâche
 
@@ -802,9 +803,9 @@ voir l'historique git.)*
 
 ## 10. État à la reprise
 
-- Branche `main`, dernier commit réel `8a49988` (courbe d'équité corrigée ✓).
-  Avant : `ecbbce6` (badges/notifications/sync), avant : `af78c14` (4 bugs
-  audit).
+- Branche `main`, dernier commit réel `36d5ce5` (rate limiting ✓).
+  Avant : `8a49988` (courbe d'équité), avant : `ecbbce6` (badges/notifications),
+  avant : `af78c14` (4 bugs audit).
 - Code clean (`npm run lint` ok).
 - Aucune tâche en attente de commit.
 - Le compte staff est actuellement connecté dans le navigateur (Browser
@@ -813,9 +814,9 @@ voir l'historique git.)*
 
 ### Par où commencer
 
-Poursuis avec §7 : **priorité n°1 = rate limiting** sur 5 routes, puis
-module Examen (en attente de décision produit sur les graphiques et les
-règles de notation).
+**Aucune autre tâche de code en attente.** L'application a atteint un bon état
+de stabilité. Les seules demandes restantes sont produit (module Examen). Si tu
+reprends : vérifier que le rate limiting fonctionne en conditions réelles.
 
 > Ce document est la **seule** source de reprise fiable. S'il existe un
 > écart entre ce document et le code, **fais confiance au code** — vérifie
