@@ -40,6 +40,16 @@ const LABELS: Record<string, string> = {
   horizon_badges: "Badges",
   horizon_modules: "Modules vidéo",
   horizon_quiz_results: "Résultats de quiz",
+  // Bureau élève — mêmes collections, clés locales préfixées (voir
+  // `StudentAuthenticatedApp` dans src/App.tsx). Sans ces entrées, une
+  // sauvegarde échouée côté élève n'était jamais protégée : `markPending`
+  // ignore silencieusement toute clé absente de cette liste blanche.
+  horizon_student_trades: "Journal de trading",
+  horizon_student_accounts: "Portefeuilles",
+  horizon_student_modules: "Modules vidéo",
+  horizon_student_messages: "Messagerie",
+  horizon_student_badges: "Badges",
+  horizon_student_quiz_results: "Résultats de quiz",
 };
 
 /** Clé `localStorage` → collection serveur. Absent pour profil et quiz. */
@@ -53,6 +63,11 @@ const COLLECTION_BY_KEY: Record<string, CollectionName> = {
   horizon_notifications: "notifications",
   horizon_badges: "badges",
   horizon_modules: "modules",
+  horizon_student_trades: "trades",
+  horizon_student_accounts: "accounts",
+  horizon_student_modules: "modules",
+  horizon_student_messages: "messages",
+  horizon_student_badges: "badges",
 };
 
 function read(): string[] {
@@ -120,7 +135,7 @@ async function pushOne(localKey: string): Promise<void> {
     return;
   }
 
-  if (localKey === "horizon_quiz_results") {
+  if (localKey === "horizon_quiz_results" || localKey === "horizon_student_quiz_results") {
     await api.saveQuizResults(value as Record<string, ModuleQuizResult>);
     return;
   }

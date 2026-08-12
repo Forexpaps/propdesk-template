@@ -54,6 +54,7 @@ import {
   CoachMessage,
 } from "../types";
 import { TabType, SidebarItemKey } from "./Sidebar";
+import { computeDisciplineStreak } from "../lib/badges";
 
 interface MainDashboardProps {
   student: StudentProfile;
@@ -103,6 +104,15 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         };
       }).concat([{ label: "Actuel", capital: student.currentCapital }]);
 
+  // Trades en $ uniquement : un trade en % n'est pas une somme d'argent,
+  // même principe que dans PerformanceDashboard.tsx.
+  const totalPnL = trades
+    .filter((t) => (t.pnlUnit ?? "USD") !== "PERCENT")
+    .reduce((acc, t) => acc + t.pnl, 0);
+  const isPnLPositive = totalPnL >= 0;
+
+  const disciplineStreak = computeDisciplineStreak(trades);
+
   const firstName = student.name.split(" ")[0] || "Yoann";
 
   return (
@@ -119,20 +129,17 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
 
       {/* 2. Top 4 KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Score Examen */}
+        {/* Card 1: Score Examen — module Examen pas encore disponible dans l'app */}
         <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-5 space-y-4 flex flex-col justify-between shadow-sm hover:border-[#00E676]/30 transition-all">
           <div className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
             SCORE EXAMEN
           </div>
           <div className="space-y-2">
             <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold text-white">78</span>
+              <span className="text-3xl font-bold text-slate-500">—</span>
               <span className="text-xs text-slate-500 font-medium">/100</span>
             </div>
-            {/* Progress Bar */}
-            <div className="w-full h-1.5 bg-[#1B2320] rounded-full overflow-hidden">
-              <div className="bg-[#00E676] h-full rounded-full w-[78%]" />
-            </div>
+            <p className="text-xs text-slate-500">Bientôt disponible</p>
           </div>
         </div>
 
@@ -151,14 +158,15 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           </div>
         </div>
 
-        {/* Card 3: R Cumulé */}
+        {/* Card 3: PnL Cumulé */}
         <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-5 space-y-4 flex flex-col justify-between shadow-sm hover:border-[#00E676]/30 transition-all">
           <div className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-            R CUMULÉ
+            PNL CUMULÉ
           </div>
           <div className="flex items-end justify-between">
-            <div className="text-3xl font-bold text-[#00E676]">
-              +10.8R
+            <div className={`text-3xl font-bold ${isPnLPositive ? "text-[#00E676]" : "text-rose-400"}`}>
+              {isPnLPositive ? "+" : ""}
+              {formatCurrency(totalPnL)}
             </div>
             {/* Sparkline SVG */}
             <div className="w-20 h-8">
@@ -182,11 +190,15 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           </div>
           <div className="space-y-1">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-3xl font-bold text-[#FFB800]">12</span>
-              <span className="text-xs text-slate-400 font-medium">jours</span>
+              <span className="text-3xl font-bold text-[#FFB800]">{disciplineStreak}</span>
+              <span className="text-xs text-slate-400 font-medium">
+                {disciplineStreak > 1 ? "jours" : "jour"}
+              </span>
             </div>
             <p className="text-xs text-slate-400">
-              Plan respecté sans écart
+              {disciplineStreak > 0
+                ? "Jours de trading sans écart émotionnel"
+                : "Aucune série en cours"}
             </p>
           </div>
         </div>

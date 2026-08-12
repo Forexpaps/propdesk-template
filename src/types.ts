@@ -311,6 +311,13 @@ export interface TraderBadge {
   unit?: string;
   unlockedAt?: string;
   rewardXP?: number;
+  /**
+   * `false` quand ce badge repose sur une donnée qu'on ne suit pas encore
+   * (ex. % de risque par trade, résultats du simulateur, examen final) —
+   * calculé côté client à l'affichage, jamais persisté tel quel. Absent ou
+   * `true` : suivi normalement. Voir `src/lib/badges.ts`.
+   */
+  trackable?: boolean;
 }
 
 
