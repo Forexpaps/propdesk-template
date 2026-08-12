@@ -7,10 +7,10 @@ directe de tous les modules) — pas une simple compilation de notes de
 session.
 
 > **État à la dernière mise à jour de ce document**
-> Branche `main`, dernier commit : **`f24d53e`** (« Ajoute l'aperçu SL/TP
-> en direct et le glisser-déposer sur le graphique du simulateur Prop
-> Firm »), suite du chantier Simulateur de Challenge Prop Firm (`18ff5c4`)
-> — voir §0 bis pour le détail complet.
+> Branche `main`, dernier commit : **`4a61b81`** (« Ajoute le choix de la
+> timeframe (5m/15m/1H/4H + personnalisée) au simulateur Prop Firm »),
+> suite du chantier Simulateur de Challenge Prop Firm (`18ff5c4`) — voir
+> §0 bis pour le détail complet.
 > `npm run lint` et `npm run build` passent tous les deux.
 
 ---
@@ -183,6 +183,26 @@ trading, dans `src/lib/propChallenge.ts` (logique pure, sans React) :
   (`pipsFromDraggedPrice()`, inverse de `computeSlTpPrices()`), glisser une
   fois la position ouverte modifie directement son SL/TP réel
   (`updateOpenPositionStops()`, nouvelle fonction du moteur).
+- **Choix de la timeframe** (commit `4a61b81`) : nouvelle carte "Timeframe"
+  sur l'écran de configuration — 4 presets (5m/15m/1H/4H) + "Personnalisé"
+  (nombre + unité Minutes/Heures/Jours, borné automatiquement de 1m à 1D).
+  Fixée à la configuration, comme le capital/l'actif/les règles — pas de
+  changement à la volée une fois le challenge démarré (nécessiterait de
+  rééchantillonner l'historique des bougies déjà générées, hors scope).
+  `timeframeMinutes` fait désormais partie de `ChallengeConfig`. La
+  volatilité par bougie est mise à l'échelle en **racine du temps**
+  (`volatilityPips * sqrt(timeframeMinutes)`, cohérent avec une marche
+  aléatoire — une bougie 4H a des mèches proportionnellement plus larges
+  qu'une bougie 1m, pas identiques) et le pas de temps entre bougies suit
+  la timeframe choisie. Le rollover de "jour de trading" reposait sur un
+  nombre fixe de bougies (`CANDLES_PER_DAY = 26`, arbitraire, correct
+  seulement pour 1m) ; remplacé par un suivi du **temps simulé réellement
+  écoulé** (`dayStartTimestampMs`, seuil 24h), indépendant de la timeframe.
+  **Migration automatique** (`migrateChallengeState()`) pour tout challenge
+  déjà persisté avant ce chantier (pas de `timeframeMinutes` ni de
+  `dayStartTimestampMs` dans l'ancien format) — migré silencieusement vers
+  1m à la lecture, sans quoi la reprise d'un ancien challenge aurait cassé
+  (NaN dans la génération de bougies).
 
 **Simplifications assumées par rapport à la maquette de référence** (pas
 reproduites, pour contenir la portée du chantier à la boucle fonctionnelle
@@ -1089,12 +1109,11 @@ fausse — voir l'historique git.)*
 
 ---
 
-## 10. État après ajout de l'aperçu SL/TP glissable
+## 10. État après ajout du choix de la timeframe
 
-- Branche `main`, dernier commit : `f24d53e` (« Ajoute l'aperçu SL/TP en
-  direct et le glisser-déposer sur le graphique du simulateur Prop
-  Firm »).
-- **Sept chantiers terminés et committés** :
+- Branche `main`, dernier commit : `4a61b81` (« Ajoute le choix de la
+  timeframe (5m/15m/1H/4H + personnalisée) au simulateur Prop Firm »).
+- **Huit chantiers terminés et committés** :
   - `0939553` : Journal de sécurité + verrouillage (COMMITTÉ + vérifié)
   - `72645ee` : Refonte Portefeuille (style Mindset modal, violet)
   - `3f7e6f0` : Changement Portefeuille violet → vert (COMMITTÉ + vérifié)
@@ -1106,6 +1125,8 @@ fausse — voir l'historique git.)*
     (COMMITTÉ + vérifié) — voir §0 bis, section "Suivi demandé après coup"
   - `f24d53e` : Aperçu SL/TP en direct + glisser-déposer sur le graphique
     (COMMITTÉ + vérifié) — voir §0 bis, section "Suivi demandé après coup"
+  - `4a61b81` : Choix de la timeframe, presets + personnalisée (COMMITTÉ +
+    vérifié) — voir §0 bis, section "Suivi demandé après coup"
 - `npm run lint` et `npm run build` passent.
 - Répertoire de travail propre (tous les changements sont committés).
 - Aucun compte de test/verrouillage actif.
