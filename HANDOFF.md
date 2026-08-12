@@ -736,35 +736,39 @@ problème persiste.
 
 ---
 
-## 7. Prochaines tâches, dans l'ordre
+## 7. Tâches complétées et prochaines
 
-### 1. Committer le chantier Journal de sécurité (§0)
+### ✅ 1. Chantier Journal de sécurité + verrouillage (COMMITTÉ `0939553`)
 
-Prêt, testé, `npm run lint`/`npm run build` passent. Il ne reste que le
-commit, et la vérification visuelle finale (bouton + modale dans un vrai
-navigateur avec session staff active — bloquée à la rédaction de ce
-document faute de session, voir §10).
+Entièrement committé et testé. Vérification visuelle confirmée en session
+staff active : ✅ bouton dans le profil (foundateur-only), ✅ modale
+SecurityLogModal affiche les événements réels, ✅ filtres déclenchent
+appels réseau.
 
-### 2. Clarifier la demande "Portefeuille" en attente
+### ✅ 2. Refonte visuelle du Portefeuille (COMMITTÉ `72645ee`)
 
-L'utilisateur a envoyé un message ambigu (« Je veux [que le] Portefeuille
-[ait] un rendu visuel similaire à celui que je t'ai envoyé en pièce
-jointe ») accompagné d'une capture d'écran qui montrait en réalité la
-modale Mindset/Tilt, pas une page Portefeuille — mismatch texte/image
-non résolu au moment de la rédaction de ce document. **Ne pas supposer ce
-qu'il voulait dire** : reposer la question (quelle référence visuelle
-exacte ? qu'est-ce qui doit changer sur le Portefeuille actuel ?) avant
-d'entreprendre quoi que ce soit.
+L'utilisateur a clarifié : "Je veux uniquement le visuel (couleur, mise en
+forme, typographie) du Mindset modal, en gardant les données et
+fonctionnalités du Portefeuille."
+
+**Refonte complétée**, commit `72645ee` :
+- Accent principal : **Violet/Magenta** (`purple-600`, `purple-500`, `purple-400`)
+- Gradients : `from-[#0D1110] to-[#111615]`
+- Bordures : `border-purple-500/30` ou `/20`
+- Badges : Couleurs variées (violet ACTIVE, amber PAID_OUT, bleu autres)
+- Formulaire & boutons : Violets
+- **Données & fonctionnalités : 100% conservées**
+
+Vérification visuelle : ✅ en-tête, ✅ cartes résumé (4 couleurs variées),
+✅ listes comptes (bordures violettes), ✅ détails compte (drawdown, profit
+target, stats) ✅ modale d'ajout.
 
 ### 3. Revenir sur la demande "Données & sauvegarde" si elle refait surface
 
-Une maquette externe (export/import JSON de toutes les données,
-réinitialisation complète) a été montrée, puis la demande a été abandonnée
-en cours de clarification (l'utilisateur a préféré retirer complètement le
-bouton PDF plutôt que de répondre aux questions). **Ne pas considérer le
-sujet clos** — si l'utilisateur le remmentionne, reprendre les questions
-de clarification (emplacement, périmètre exact des données, inclusion ou
-non d'un bouton de réinitialisation destructeur).
+Une maquette externe (export/import JSON, réinitialisation) a été montrée,
+puis abandonnée (l'utilisateur a préféré retirer le PDF plutôt que de
+répondre). **Ne pas considérer clos** — si remmentionne, poser les questions
+de clarification (emplacement, périmètre, bouton réinitialisation).
 
 ### 4. Remplir le module « Examen »
 
@@ -944,32 +948,23 @@ fausse — voir l'historique git.)*
 
 ---
 
-## 10. État après reprise du chantier sécurité
+## 10. État après refonte du Portefeuille
 
-- Branche `main`, dernier commit : `0939553` (« Ajoute le journal de
-  sécurité et le verrouillage de compte »). Le chantier Journal de
-  sécurité est **maintenant COMMITTÉ**.
-- `npm run lint` et `npm run build` passent tous les deux.
+- Branche `main`, dernier commit : `72645ee` (« Refonte visuelle du
+  Portefeuille : style Mindset modal »).
+- **Deux chantiers terminés et committés** :
+  - `0939553` : Journal de sécurité + verrouillage (COMMITTÉ + vérifié)
+  - `72645ee` : Refonte Portefeuille (COMMITTÉ)
+- `npm run lint` et `npm run build` passent.
 - Répertoire de travail propre (tous les changements sont committés).
-- **Session staff potentiellement absente dans le navigateur** — demander
-  à l'utilisateur de se reconnecter lui-même pour la vérification visuelle
-  (règle stricte : jamais de mot de passe tapé à sa place).
-- Aucun compte de test élève actif — tous révoqués après vérification.
-  Aucun verrouillage de compte actif — nettoyé après test.
-- **Deux threads utilisateur en attente de réponse** (voir §7, points 2 et
-  3) : la demande "Portefeuille" ambiguë (image/texte non concordants),
-  et la question "Données & sauvegarde" laissée sans réponse.
+- Aucun compte de test/verrouillage actif.
 
 ### Prochaines tâches
 
-1. **Vérification visuelle finale** (bonus) — bouton "Journal de sécurité"
-   dans le profil (fondateur-only), modale affichant les événements réels.
-   À tester une fois connecté en session staff dans le navigateur.
-2. Vérifier si l'utilisateur a répondu aux deux questions en attente
-   (Portefeuille, Données & sauvegarde) — sinon, les reposer plutôt que
-   de supposer une réponse.
-3. Poursuivre avec §7 dans l'ordre (module Examen en dernier, décision
-   produit en attente).
+1. **Clarifier la demande "Données & sauvegarde"** si elle refait surface
+   (voir §7.3 pour les questions préalables).
+2. Remplir le module « Examen » — décision produit en attente (specs,
+   règles, nombre de questions, durée).
 
 > Ce document est la **seule** source de reprise fiable. S'il existe un
 > écart entre ce document et le code, **fais confiance au code** — vérifie
