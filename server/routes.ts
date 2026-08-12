@@ -207,13 +207,25 @@ api.get("/state", (req, res) => {
     return;
   }
 
+  const collections = Object.fromEntries(
+    COLLECTION_NAMES.map((name) => {
+      const collection = listCollection(name, dataUserId);
+      // Collections initialement vides (badges, modules) : retourner undefined
+      // pour que le client tombe sur le fallback (mockData) au démarrage.
+      // Les autres collections (trades, accounts, etc.) retournent l'array même
+      // s'il est vide — c'est l'état correct.
+      if (collection.length === 0 && (name === "badges" || name === "modules")) {
+        return [name, undefined];
+      }
+      return [name, collection];
+    })
+  );
+
   res.json({
     bootstrapped: isBootstrapped(),
     student: getProfile(dataUserId),
     quizResults: getQuizResults(dataUserId),
-    collections: Object.fromEntries(
-      COLLECTION_NAMES.map((name) => [name, listCollection(name, dataUserId)])
-    ),
+    collections,
   });
 });
 
