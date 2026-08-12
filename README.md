@@ -89,7 +89,6 @@ La base vit dans `DATA_DIR` (`./data` par défaut), hors du dépôt.
 | PUT | `/api/quiz-results` | résultats de quiz |
 | POST | `/api/state/seed` | amorce avec le jeu de démonstration |
 | POST | `/api/state/import` | reprend un état venu de `localStorage` |
-| GET | `/api/download-features-pdf` | catalogue PDF des fonctionnalités |
 
 Toutes les routes exigent une session valide, **sauf** `/api/health`,
 `/api/auth/me`, `/api/auth/setup`, `/api/auth/login` et `/api/auth/logout`.
@@ -99,7 +98,10 @@ Trois limitations de débit par IP : `/api/auth/login` 10 par quart d'heure,
 `/api/auth/setup` 5 par quart d'heure, `/api/auth/staff` (invitation) 10 par
 quart d'heure.
 
-Le PDF est généré hors ligne par `node scripts/generate_pdf.js`.
+Chaque utilisateur peut exporter son propre rapport de trading (Journal,
+Rentabilité, Portefeuille) en PDF depuis le bouton du header — généré à la
+volée côté client (`src/lib/pdfReport.ts`, `jsPDF` + `jspdf-autotable`),
+aucun fichier statique ni route serveur dédiée.
 
 ## Authentification
 

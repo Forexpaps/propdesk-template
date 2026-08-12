@@ -570,6 +570,8 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         <TopHeader
           activeTab={activeTab}
           student={studentProfile}
+          trades={syncedTrades}
+          accounts={syncedAccounts}
           setMobileOpen={setMobileOpen}
           onOpenNotifications={() => setIsNotificationsModalOpen(true)}
           unreadNotificationsCount={studentNotifications.filter((n) => !n.read).length}
@@ -1408,6 +1410,8 @@ function AcademyApp({
         <TopHeader
           activeTab={activeTab}
           student={student}
+          trades={trades}
+          accounts={accounts}
           setMobileOpen={setMobileOpen}
           onOpenProfileModal={() => {
             setProfileModalTab("profile");

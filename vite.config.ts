@@ -31,9 +31,10 @@ export default defineConfig({
          * `react-dom/client`) produisaient des blocs **vides**. On teste donc
          * le chemin réel dans `node_modules`.
          *
-         * `jspdf` n'apparaît volontairement pas ici : il n'est utilisé que par
-         * `scripts/generate_pdf.js`, exécuté hors ligne sous Node. Il n'entre
-         * pas dans le bundle client, l'y déclarer ne créait qu'un bloc vide.
+         * `jspdf`/`jspdf-autotable` (export du rapport de trading, voir
+         * `src/lib/pdfReport.ts`) rejoignent leur propre bloc : utilisées sur
+         * un clic occasionnel, pas au chargement initial, les isoler évite
+         * d'alourdir le chunk `vendor` principal.
          */
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined;
@@ -42,6 +43,9 @@ export default defineConfig({
           // regrouper évite un éparpillement en une dizaine de requêtes.
           if (/node_modules\/(recharts|d3-|victory-|internmap|delaunator|robust-predicates)/.test(id)) {
             return 'charts';
+          }
+          if (/node_modules\/(jspdf|jspdf-autotable)/.test(id)) {
+            return 'pdf';
           }
           if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) {
             return 'react';

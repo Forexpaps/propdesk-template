@@ -41,6 +41,7 @@ import {
 } from "../types";
 import { formatCurrency } from "../lib/format";
 import { resizeChartScreenshot } from "../lib/image";
+import { computeJournalSummary } from "../lib/performanceStats";
 
 /** Valeur du sélecteur de compte quand aucun n'est choisi. */
 const SANS_COMPTE = "";
@@ -322,24 +323,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     onPrefillConsumed?.();
   }, [prefillDraft, onPrefillConsumed]);
 
-  // Calculate Summary Statistics
-  const totalTrades = trades.length;
-  const winTrades = trades.filter((t) => t.result === "WIN").length;
-  const lossTrades = trades.filter((t) => t.result === "LOSS").length;
-  const winRate = totalTrades > 0 ? Math.round((winTrades / totalTrades) * 100) : 0;
-  
-  // Les trades saisis en % sont hors de portée de tout total en $ : leur
-  // valeur n'est pas une somme d'argent, l'additionner fausserait le total.
-  const tradesEnDollars = trades.filter((t) => (t.pnlUnit ?? "USD") !== "PERCENT");
-  const totalPnL = tradesEnDollars.reduce((acc, t) => acc + t.pnl, 0);
-  const totalGains = tradesEnDollars.filter((t) => t.pnl > 0).reduce((acc, t) => acc + t.pnl, 0);
-  const totalLosses = Math.abs(tradesEnDollars.filter((t) => t.pnl < 0).reduce((acc, t) => acc + t.pnl, 0));
-  const profitFactor = totalLosses > 0 ? (totalGains / totalLosses).toFixed(2) : "N/A";
-
-  const avgRR =
-    totalTrades > 0
-      ? (trades.reduce((acc, t) => acc + t.riskRewardRatio, 0) / totalTrades).toFixed(1)
-      : "0";
+  // Calculate Summary Statistics — partagé avec l'export PDF, voir
+  // src/lib/performanceStats.ts.
+  const { totalTrades, winTrades, lossTrades, winRate, totalPnL, profitFactor, avgRR, disciplineEmoPercent } =
+    computeJournalSummary(trades);
 
   // Filtering
   const filteredTrades = trades.filter((t) => {
@@ -561,9 +548,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         <div className="col-span-2 md:col-span-1 bg-[#111615]/90 border border-[#1B2320] p-4 rounded-xl space-y-1 shadow-md">
           <div className="text-xs text-slate-400 font-medium">Discipline Émotionnelle</div>
           <div className="text-2xl font-black text-[#00E676] font-mono">
-            {totalTrades > 0
-              ? `${Math.round((trades.filter((t) => t.emotion === "Disciplined" || t.emotion === "Calm").length / totalTrades) * 100)}%`
-              : "100%"}
+            {disciplineEmoPercent}%
           </div>
           <div className="text-[11px] text-slate-500">Respect du plan de trading</div>
         </div>
