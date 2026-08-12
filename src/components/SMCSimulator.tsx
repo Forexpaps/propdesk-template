@@ -88,7 +88,7 @@ export const SMCSimulator: React.FC<SMCSimulatorProps> = ({ initialMode = "REPLA
               : "bg-[#111615] border border-[#1B2320] text-slate-400 hover:text-white"
           }`}
         >
-          <BarChart3 className="w-4 h-4" /> Simulateur Monte Carlo & Compounding
+          <BarChart3 className="w-4 h-4" /> Simulateur Rentabilité PropFirm
         </button>
       </div>
 
