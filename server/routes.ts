@@ -22,6 +22,7 @@ import {
 import { authRouter, staffRouter } from "./auth/routes";
 import { studentAuthRouter, studentProtectedRouter } from "./auth/studentRoutes";
 import { requireAuth } from "./auth/middleware";
+import { createRateLimit } from "./middleware/rateLimit";
 import { getEconomicCalendar } from "./economicCalendar";
 import { getMarketData } from "./marketData";
 import { getStudentById } from "./auth/studentCredentials";
@@ -219,7 +220,13 @@ api.get("/state", (req, res) => {
 /** Collections que seul un administrateur peut écrire. */
 const ADMIN_ONLY_COLLECTIONS = new Set<CollectionName>(["enrolledStudents"]);
 
-api.put("/collections/:name", (req, res) => {
+const collectionsRateLimit = createRateLimit({
+  windowMs: 15 * 60_000,
+  max: 60,
+  message: "Trop d'écritures à la base de données. Réessaie dans quelques minutes.",
+});
+
+api.put("/collections/:name", collectionsRateLimit, (req, res) => {
   const name = req.params.name as CollectionName;
   if (!COLLECTION_NAMES.includes(name)) {
     res.status(404).json({ error: `Collection inconnue : ${req.params.name}` });
@@ -301,7 +308,13 @@ api.put("/collections/:name", (req, res) => {
   res.json({ success: true, count: dataToWrite.length });
 });
 
-api.put("/profile", (req, res) => {
+const profileRateLimit = createRateLimit({
+  windowMs: 15 * 60_000,
+  max: 30,
+  message: "Trop de mises à jour du profil. Réessaie dans quelques minutes.",
+});
+
+api.put("/profile", profileRateLimit, (req, res) => {
   // Le profil élève n'existe pas en tant que tel dans ce chantier (pas de
   // capital, pas d'avatar à gérer côté élève) — cette route reste réservée au
   // bureau staff.
@@ -353,7 +366,13 @@ api.put("/profile", (req, res) => {
   res.json({ success: true });
 });
 
-api.put("/quiz-results", (req, res) => {
+const quizResultsRateLimit = createRateLimit({
+  windowMs: 15 * 60_000,
+  max: 30,
+  message: "Trop de mises à jour de résultats. Réessaie dans quelques minutes.",
+});
+
+api.put("/quiz-results", quizResultsRateLimit, (req, res) => {
   const parsed = quizResultsSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Résultats de quiz invalides.", details: parsed.error.issues });
@@ -366,12 +385,18 @@ api.put("/quiz-results", (req, res) => {
   res.json({ success: true });
 });
 
+const stateImportRateLimit = createRateLimit({
+  windowMs: 15 * 60_000,
+  max: 10,
+  message: "Trop de tentatives d'import d'état. Réessaie dans quelques minutes.",
+});
+
 /**
  * Reprise des données qu'un utilisateur avait dans son localStorage avant que
  * la persistance serveur existe. Refusée si la base est déjà amorcée, pour que
  * deux onglets ouverts ne puissent pas réimporter et dupliquer.
  */
-api.post("/state/import", (req, res) => {
+api.post("/state/import", stateImportRateLimit, (req, res) => {
   if (req.auth!.kind === "student") {
     res.status(403).json({ error: "Action réservée au staff." });
     return;
@@ -403,11 +428,17 @@ api.post("/state/import", (req, res) => {
   res.json({ success: true, imported: Object.keys(collections) });
 });
 
+const stateSeedRateLimit = createRateLimit({
+  windowMs: 15 * 60_000,
+  max: 5,
+  message: "Trop de tentatives d'amorçage. Réessaie dans quelques minutes.",
+});
+
 /**
  * Amorce la base avec le jeu de démonstration. Appelé par le client quand il
  * découvre une base vierge et qu'il n'a rien à reprendre de son localStorage.
  */
-api.post("/state/seed", (req, res) => {
+api.post("/state/seed", stateSeedRateLimit, (req, res) => {
   if (req.auth!.kind === "student") {
     res.status(403).json({ error: "Action réservée au staff." });
     return;
