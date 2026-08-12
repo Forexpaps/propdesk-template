@@ -1,6 +1,4 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
-import fs from "fs";
-import path from "path";
 import {
   listCollection,
   replaceCollection,
@@ -463,15 +461,6 @@ api.post("/state/seed", stateSeedRateLimit, (req, res) => {
 
   seedDemoData();
   res.json({ success: true });
-});
-
-api.get("/download-features-pdf", (_req, res) => {
-  const pdfPath = path.join(process.cwd(), "public", "Fonctionnalites_Horizon_SMC.pdf");
-  if (fs.existsSync(pdfPath)) {
-    res.download(pdfPath, "Fonctionnalites_Horizon_SMC.pdf");
-  } else {
-    res.status(404).json({ error: "Fichier PDF non trouvé." });
-  }
 });
 
 /**

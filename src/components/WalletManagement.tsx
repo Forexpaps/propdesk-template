@@ -22,6 +22,11 @@ import {
 } from "lucide-react";
 import { TradingAccount, AccountType, Trade } from "../types";
 import { formatCurrency } from "../lib/format";
+import {
+  positionsDuCompte as computePositionsDuCompte,
+  dailyLossPercent as computeDailyLossPercent,
+  totalDrawdownPercent as computeTotalDrawdownPercent,
+} from "../lib/walletStats";
 
 /**
  * Une prop `onSelectAccountForJournal?: (accountId: string) => void` figurait
@@ -83,46 +88,18 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   const totalCombinedEquity = accounts.reduce((acc, a) => acc + a.equity, 0);
 
   /**
-   * Nombre de positions journalisées sur un compte, **calculé** depuis les
-   * trades qui lui sont rattachés.
-   *
-   * Remplace le champ `TradingAccount.tradesCount`, qui était figé à 0 depuis
-   * la création de chaque compte et n'a jamais été mis à jour : il affichait
-   * donc « 0 positions » quel que soit le journal. Le champ subsiste dans le
-   * type pour ne pas casser les données existantes, mais **ne t'y fie pas** —
-   * c'est ce calcul qui fait foi à l'écran.
+   * Wrappers courts sur `src/lib/walletStats.ts` (partagé avec l'export PDF) :
+   * referment `trades`, déjà disponible dans ce composant, pour garder les
+   * mêmes appels `positionsDuCompte(id)` / `dailyLossPercent(account)` /
+   * `totalDrawdownPercent(account)` utilisés plus bas.
    *
    * L'equity, elle, reste saisie à la main volontairement : elle intègre des
    * mouvements absents du journal (dépôts, retraits, frais, trades non
    * journalisés) qu'un calcul depuis le PnL écraserait.
    */
-  const positionsDuCompte = (accountId: string) =>
-    trades.filter((t) => t.accountId === accountId).length;
-
-  /**
-   * Perte du jour sur un compte, en % du capital initial — **calculée**
-   * depuis les trades du jour rattachés à ce compte, jamais affichée en dur.
-   *
-   * Un compte fictivement affiché « Sécurisé » quel que soit son état réel
-   * inviterait à sur-risquer une évaluation Prop Firm réelle : c'est
-   * exactement l'inverse de ce qu'un outil de gestion du risque doit faire.
-   */
-  const dailyLossPercent = (account: TradingAccount) => {
-    if (account.initialBalance <= 0) return 0;
-    const today = new Date().toISOString().split("T")[0];
-    const pnlToday = trades
-      .filter(
-        (t) => t.accountId === account.id && t.date === today && (t.pnlUnit ?? "USD") !== "PERCENT"
-      )
-      .reduce((sum, t) => sum + t.pnl, 0);
-    return (pnlToday / account.initialBalance) * 100;
-  };
-
-  /** Drawdown total depuis le capital initial, en % — mêmes principes. */
-  const totalDrawdownPercent = (account: TradingAccount) => {
-    if (account.initialBalance <= 0) return 0;
-    return ((account.initialBalance - account.equity) / account.initialBalance) * 100;
-  };
+  const positionsDuCompte = (accountId: string) => computePositionsDuCompte(trades, accountId);
+  const dailyLossPercent = (account: TradingAccount) => computeDailyLossPercent(trades, account);
+  const totalDrawdownPercent = (account: TradingAccount) => computeTotalDrawdownPercent(account);
   const totalCombinedInitial = accounts.reduce((acc, a) => acc + a.initialBalance, 0);
   const totalCombinedPnl = totalCombinedEquity - totalCombinedInitial;
   const totalCombinedPnlPercent = totalCombinedInitial > 0 ? ((totalCombinedPnl / totalCombinedInitial) * 100).toFixed(2) : "0.00";
