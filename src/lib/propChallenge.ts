@@ -64,6 +64,32 @@ export const PROP_SIM_ASSETS: Record<AssetSymbol, AssetConfig> = {
 
 export const ASSET_LIST: AssetSymbol[] = ["XAUUSD", "EURUSD", "GBPUSD", "NAS100"];
 
+/** Unité de temps d'une bougie, en minutes. */
+export type TimeframeMinutes = number;
+
+export interface TimeframePreset {
+  label: string;
+  minutes: TimeframeMinutes;
+}
+
+export const TIMEFRAME_PRESETS: TimeframePreset[] = [
+  { label: "5m", minutes: 5 },
+  { label: "15m", minutes: 15 },
+  { label: "1H", minutes: 60 },
+  { label: "4H", minutes: 240 },
+];
+
+export const DEFAULT_TIMEFRAME_MINUTES: TimeframeMinutes = 15;
+export const MIN_TIMEFRAME_MINUTES = 1;
+export const MAX_TIMEFRAME_MINUTES = 1440; // Daily
+
+/** Libellé lisible ("5m", "4H", "1D") à partir d'une valeur en minutes. */
+export function formatTimeframeLabel(minutes: TimeframeMinutes): string {
+  if (minutes % 1440 === 0) return `${minutes / 1440}D`;
+  if (minutes % 60 === 0) return `${minutes / 60}H`;
+  return `${minutes}m`;
+}
+
 export interface ChallengeRules {
   dailyLossPercent: number;
   totalDrawdownPercent: number;
@@ -187,6 +213,7 @@ export interface ChallengeConfig {
   asset: AssetSymbol;
   initialCapital: number;
   rules: ChallengeRules;
+  timeframeMinutes: TimeframeMinutes;
 }
 
 export interface ChallengeState {
@@ -203,10 +230,13 @@ export interface ChallengeState {
   dayIndex: number;
   dayStartBalance: number;
   peakEquity: number;
-  candlesElapsedToday: number;
+  /** Horodatage simulé du début du jour de trading courant — le rollover
+   *  se déclenche sur le temps simulé écoulé, pas sur un nombre de bougies,
+   *  pour rester correct quelle que soit la timeframe choisie. */
+  dayStartTimestampMs: number;
 }
 
-const CANDLES_PER_DAY = 26;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const SIM_START_MS = Date.UTC(2026, 7, 1, 8, 0, 0);
 const STORAGE_KEY = "horizon_propchallenge_state_v1";
 
@@ -216,9 +246,19 @@ function nextPositionId(): string {
   return `pos-${Date.now()}-${positionCounter}`;
 }
 
-export function generateNextCandle(prevClose: number, index: number, asset: AssetConfig): Candle {
+export function generateNextCandle(
+  prevClose: number,
+  prevTimestampMs: number,
+  index: number,
+  asset: AssetConfig,
+  timeframeMinutes: TimeframeMinutes
+): Candle {
   const stepCount = 6;
-  const stepSize = (asset.volatilityPips * asset.pipSize) / Math.sqrt(stepCount);
+  // Volatilité calibrée pour 1 minute, mise à l'échelle en racine du temps
+  // (variance d'une marche aléatoire ∝ temps) : une bougie 4H a des mèches
+  // proportionnellement plus larges qu'une bougie 1m, pas identiques.
+  const scaledVolatilityPips = asset.volatilityPips * Math.sqrt(timeframeMinutes);
+  const stepSize = (scaledVolatilityPips * asset.pipSize) / Math.sqrt(stepCount);
   let price = prevClose;
   let high = prevClose;
   let low = prevClose;
@@ -230,7 +270,7 @@ export function generateNextCandle(prevClose: number, index: number, asset: Asse
   }
   return {
     index,
-    timestampMs: SIM_START_MS + index * 60_000,
+    timestampMs: prevTimestampMs + timeframeMinutes * 60_000,
     open: prevClose,
     high,
     low,
@@ -261,7 +301,7 @@ export function createChallengeState(config: ChallengeConfig): ChallengeState {
     dayIndex: 1,
     dayStartBalance: config.initialCapital,
     peakEquity: config.initialCapital,
-    candlesElapsedToday: 0,
+    dayStartTimestampMs: SIM_START_MS,
   };
 }
 
@@ -492,44 +532,76 @@ export function advanceTick(state: ChallengeState): ChallengeState {
   if (state.status !== "EN_COURS") return state;
   const asset = PROP_SIM_ASSETS[state.config.asset];
   const lastCandle = state.candles[state.candles.length - 1];
-  const newCandle = generateNextCandle(lastCandle.close, lastCandle.index + 1, asset);
+  const newCandle = generateNextCandle(
+    lastCandle.close,
+    lastCandle.timestampMs,
+    lastCandle.index + 1,
+    asset,
+    state.config.timeframeMinutes
+  );
 
   // Fenêtre glissante : garder au plus 180 bougies en mémoire, largement assez pour l'affichage.
   const candles = [...state.candles, newCandle].slice(-180);
 
-  let next: ChallengeState = { ...state, candles, candlesElapsedToday: state.candlesElapsedToday + 1 };
+  let next: ChallengeState = { ...state, candles };
   next = checkStopsAgainstCandle(next, newCandle);
   next = evaluateAfterTick(next);
 
-  if (next.status === "EN_COURS" && next.candlesElapsedToday >= CANDLES_PER_DAY) {
+  if (next.status === "EN_COURS" && newCandle.timestampMs - next.dayStartTimestampMs >= ONE_DAY_MS) {
     const equity = computeEquity(next);
     next = {
       ...next,
       dayIndex: next.dayIndex + 1,
       dayStartBalance: equity,
-      candlesElapsedToday: 0,
+      dayStartTimestampMs: newCandle.timestampMs,
     };
   }
 
   return next;
 }
 
+/** Avance jusqu'au prochain jour de trading. Borné : à 1440 (Daily), un
+ *  seul tick suffit ; en dessous, ça peut prendre beaucoup de bougies. */
 export function advanceDay(state: ChallengeState): ChallengeState {
   let next = state;
-  const remaining = CANDLES_PER_DAY - (state.candlesElapsedToday % CANDLES_PER_DAY || CANDLES_PER_DAY);
-  const steps = remaining <= 0 ? CANDLES_PER_DAY : remaining;
-  for (let i = 0; i < steps; i++) {
-    if (next.status !== "EN_COURS") break;
+  const startDayIndex = state.dayIndex;
+  let guard = 0;
+  const maxSteps = Math.ceil(ONE_DAY_MS / (state.config.timeframeMinutes * 60_000)) + 2;
+  while (next.status === "EN_COURS" && next.dayIndex === startDayIndex && guard < maxSteps) {
     next = advanceTick(next);
+    guard += 1;
   }
   return next;
+}
+
+/**
+ * Migre un état persisté antérieur à l'ajout de la timeframe et au
+ * remplacement de `candlesElapsedToday` par `dayStartTimestampMs` — sans
+ * ça, un ancien challenge repris casserait silencieusement (NaN dans la
+ * génération de bougies, jour de trading qui ne progresse plus jamais).
+ */
+function migrateChallengeState(raw: unknown): ChallengeState {
+  const parsed = raw as ChallengeState & { candlesElapsedToday?: number };
+  const config: ChallengeConfig = {
+    ...parsed.config,
+    // Comportement d'origine avant ce chantier : une bougie par minute.
+    timeframeMinutes:
+      typeof parsed.config?.timeframeMinutes === "number" ? parsed.config.timeframeMinutes : 1,
+  };
+  const dayStartTimestampMs =
+    typeof parsed.dayStartTimestampMs === "number"
+      ? parsed.dayStartTimestampMs
+      : parsed.candles?.[0]?.timestampMs ?? SIM_START_MS;
+  const { candlesElapsedToday, ...rest } = parsed;
+  void candlesElapsedToday;
+  return { ...rest, config, dayStartTimestampMs };
 }
 
 export function loadPersistedChallenge(): ChallengeState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as ChallengeState;
+    return migrateChallengeState(JSON.parse(raw));
   } catch {
     return null;
   }
