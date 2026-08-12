@@ -7,9 +7,10 @@ directe de tous les modules) — pas une simple compilation de notes de
 session.
 
 > **État à la dernière mise à jour de ce document**
-> Branche `main`, dernier commit : **`ceafafa`** (« Retire le bouton "Sim
-> propfirm" de la sidebar »), suite du chantier Simulateur de Challenge
-> Prop Firm (`18ff5c4`) — voir §0 bis pour le détail complet.
+> Branche `main`, dernier commit : **`f24d53e`** (« Ajoute l'aperçu SL/TP
+> en direct et le glisser-déposer sur le graphique du simulateur Prop
+> Firm »), suite du chantier Simulateur de Challenge Prop Firm (`18ff5c4`)
+> — voir §0 bis pour le détail complet.
 > `npm run lint` et `npm run build` passent tous les deux.
 
 ---
@@ -166,6 +167,22 @@ trading, dans `src/lib/propChallenge.ts` (logique pure, sans React) :
   masquage) : `propfirm` retiré de `ALL_TABS`/`SIDEBAR_ITEM_TABS`/
   `SIDEBAR_TOGGLEABLE_KEYS` (`Sidebar.tsx`), de la branche de rendu dédiée
   dans `App.tsx` (x2, staff + élève), du libellé dans `TopHeader.tsx`.
+- **Aperçu SL/TP en direct + glisser-déposer sur le graphique** (commit
+  `f24d53e`) : les lignes SL/TP s'affichent désormais dès qu'on saisit des
+  pips dans le formulaire, **avant** d'ouvrir la position — `computeSlTpPrices()`
+  (`propChallenge.ts`) est partagé entre l'aperçu et l'ouverture réelle,
+  jamais deux calculs qui pourraient diverger. Un sélecteur "Sens de
+  l'ordre" (Achat/Vente, ne trade rien tant qu'on ne valide pas) contrôle
+  de quel côté du prix l'aperçu se place ; il a remplacé les deux boutons
+  Achat/Vente auparavant seuls déclencheurs de la direction — désormais un
+  seul bouton d'exécution contextuel en bas ("Ouvrir l'Achat"/"Ouvrir la
+  Vente", coloré selon le sens choisi). Les lignes SL/TP du graphique
+  (`CandlestickChart.tsx`) sont **glissables** à la souris/au doigt (Pointer
+  Events + `setPointerCapture`, zone de clic élargie invisible par-dessus
+  le trait visible) : glisser avant l'ouverture met à jour les champs pips
+  (`pipsFromDraggedPrice()`, inverse de `computeSlTpPrices()`), glisser une
+  fois la position ouverte modifie directement son SL/TP réel
+  (`updateOpenPositionStops()`, nouvelle fonction du moteur).
 
 **Simplifications assumées par rapport à la maquette de référence** (pas
 reproduites, pour contenir la portée du chantier à la boucle fonctionnelle
@@ -1072,11 +1089,12 @@ fausse — voir l'historique git.)*
 
 ---
 
-## 10. État après nettoyage de la sidebar du Simulateur Prop Firm
+## 10. État après ajout de l'aperçu SL/TP glissable
 
-- Branche `main`, dernier commit : `ceafafa` (« Retire le bouton "Sim
-  propfirm" de la sidebar »).
-- **Six chantiers terminés et committés** :
+- Branche `main`, dernier commit : `f24d53e` (« Ajoute l'aperçu SL/TP en
+  direct et le glisser-déposer sur le graphique du simulateur Prop
+  Firm »).
+- **Sept chantiers terminés et committés** :
   - `0939553` : Journal de sécurité + verrouillage (COMMITTÉ + vérifié)
   - `72645ee` : Refonte Portefeuille (style Mindset modal, violet)
   - `3f7e6f0` : Changement Portefeuille violet → vert (COMMITTÉ + vérifié)
@@ -1085,6 +1103,8 @@ fausse — voir l'historique git.)*
   - `11f1118` : Renommage "Simulateur Monte Carlo & Compounding" →
     "Simulateur Rentabilité PropFirm"
   - `ceafafa` : Retrait complet de l'entrée sidebar "Sim propfirm"
+    (COMMITTÉ + vérifié) — voir §0 bis, section "Suivi demandé après coup"
+  - `f24d53e` : Aperçu SL/TP en direct + glisser-déposer sur le graphique
     (COMMITTÉ + vérifié) — voir §0 bis, section "Suivi demandé après coup"
 - `npm run lint` et `npm run build` passent.
 - Répertoire de travail propre (tous les changements sont committés).
