@@ -18,99 +18,13 @@ précédente, ni à autre chose que ce dépôt.
 
 ---
 
-## 0. À committer — priorité n°1, rien d'autre à coder avant
+## 0. ✅ Chantier badges/notifications/sync — COMMITTÉ
 
-Tout le travail décrit dans ce document jusqu'à la section « Points 2/3/4 »
-inclus (§4) est **déjà committé** (jusqu'au commit `af78c146`). Le chantier
-suivant est **fait, testé, mais pas committé** :
+Commit `ecbbce6` : « Ajoute badges calculés en direct, notifications élève,
+bandeau anti-perte de sync ». Détail complet en §4, section « Points 2/3/4 ».
 
-**Badges calculés en direct + notifications élève + bandeau anti-perte de
-synchronisation**, plus un bug réel trouvé et corrigé pendant la
-vérification (protection anti-perte absente côté élève). Détail complet en
-§4, section « Points 2/3/4 ».
-
-### Fichiers concernés (non committés)
-
-```
-Nouveaux :
-  src/lib/badges.ts
-  src/components/SyncErrorBanner.tsx
-
-Modifiés :
-  src/App.tsx
-  src/hooks/useServerSync.ts
-  src/lib/pendingChanges.ts
-  src/components/UserProfileModal.tsx
-  src/components/MainDashboard.tsx
-  server/routes.ts
-  server/auth/routes.ts
-```
-
-### Comment committer
-
-**Le Bash tool de cette session a perdu l'accès au répertoire du projet**
-(`process.cwd()` lève `EPERM` — voir §6, piège d'environnement). Impossible
-donc de lancer `git`/`npm` directement. **Contournement qui fonctionne** :
-lire `.git/logs/HEAD` avec l'outil Read (pas besoin de `cwd`) pour
-consulter l'historique réel — c'est comme ça que ce document a été mis à
-jour avec précision malgré le blocage. Mais **committer** nécessite
-toujours un shell fonctionnel : soit ton Bash tool n'a pas ce problème,
-soit demande à l'utilisateur de lancer la commande lui-même. Message de
-commit suggéré (déjà rédigé et proposé à l'utilisateur, pas encore
-confirmé exécuté) :
-
-```bash
-cd "/Users/forexpaps/Desktop/Business/Académie Trading/08 - Saas" && git add -A && git commit -m "$(cat <<'EOF'
-Ajoute badges calculés en direct, notifications élève, bandeau anti-perte de sync
-
-Trois chantiers demandés (points 2/3/4 d'un audit fonctionnel antérieur) :
-
-- Badges (src/lib/badges.ts, nouveau) : computeBadgeProgress() recalcule la
-  progression de 5 des 9 badges depuis les vraies données (trades, modules),
-  jamais depuis mockData.ts. Les 4 badges reposant sur une donnée non suivie
-  (% risque par trade, résultats simulateur, cumul en R, score examen)
-  affichent honnêtement "Suivi pas encore disponible" au lieu d'une fausse
-  progression. computeDisciplineStreak() réutilisé aussi dans
-  MainDashboard.tsx (remplace un faux "12 jours" figé).
-
-- Notifications élève (StudentAuthenticatedApp) : dérivées des messages
-  coach non lus + déblocages de badge, remplace un panneau vide en
-  permanence malgré un compteur non-lu bien réel. Découverte annexe
-  corrigée : le bouton "Badges & Profil" ne faisait rien côté élève
-  (onOpenProfileModal jamais câblé, ni sur la Sidebar ni sur le TopHeader)
-  — ouvre désormais UserProfileModal des deux endroits.
-
-- Bandeau de sync (SyncErrorBanner.tsx, nouveau) : avertit immédiatement
-  en cas d'échec de sauvegarde en arrière-plan. useSyncedState appelle
-  désormais markPending() aussi sur échec "en ligne", pas seulement hors
-  ligne.
-
-Bug trouvé et corrigé PENDANT la vérification en direct côté élève : le
-registre pendingChanges.ts (liste blanche de clés localStorage protégées)
-ne reconnaissait pas les clés préfixées horizon_student_*, et
-StudentAuthenticatedApp n'avait aucun mécanisme pour respecter ce registre
-au chargement (contrairement à AcademyApp/seed()) — une modification
-échouée était donc réellement perdue au rechargement suivant côté élève,
-malgré le bandeau d'alerte immédiat qui, lui, s'affichait correctement.
-Corrigé : clés élève ajoutées à pendingChanges.ts, nouveau helper
-resolveStudentValue() qui fait primer le cache local sur la réponse
-serveur pour toute clé en attente.
-
-Vérifié de bout en bout côté staff ET élève (compte de test Camille
-Dupont, accès révoqué après vérification) : badges avec vraie progression
-(71%/0% au lieu de valeurs figées), badge non calculable affichant le bon
-message, notifications fonctionnelles, bandeau de sync déclenché par un
-arrêt serveur réel, message de test protégé au rechargement puis
-correctement renvoyé une fois le serveur revenu.
-
-Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>
-EOF
-)"
-```
-
-Après ce commit, **il n'y a plus aucune tâche en cours** — passe directement
-à §7 pour la suite (Forum, rate limiting, bug courbe d'équité, module
-Examen).
+**Aucune tâche en attente de commit.** La nouvelle priorité n°1 est la
+décision produit sur le Forum — voir §7, point 1 ci-après.
 
 ---
 
@@ -899,28 +813,18 @@ voir l'historique git.)*
 
 ## 10. État à la reprise
 
-- Branche `main`, dernier commit réel `af78c146` (vérifié via
-  `.git/logs/HEAD`, le `git` CLI étant inaccessible en toute fin de
-  session — voir §6). **Le chantier badges/notifications/sync est fait et
-  entièrement vérifié, mais pas committé** — §0 en priorité absolue.
-- `npm run lint` : n'a pas pu être relancé après les tout derniers
-  changements (blocage Bash) — **revérifie en tout premier réflexe**. Le
-  code a néanmoins été testé de bout en bout dans le navigateur (aucune
-  erreur console, ni côté staff ni côté élève) et relu manuellement.
+- Branche `main`, dernier commit réel `ecbbce6` (badges/notifications/sync
+  committé ✓). Code clean (`npm run lint` ok).
+- Aucune tâche en attente.
 - Le compte staff est actuellement connecté dans le navigateur (Browser
   pane). Le compte de test élève (Camille Dupont) a été **révoqué** —
   plus de session active pour ce compte.
 
 ### Par où commencer
 
-1. Vérifie si le commit de §0 a été exécuté (`.git/logs/HEAD` via Read, ou
-   `git log` si ton Bash fonctionne). S'il manque, committe-le en premier
-   — rien d'autre n'est bloqué derrière, mais c'est le travail le plus
-   récent et le plus à risque d'être perdu s'il traîne.
-2. Une fois committé, relance `npm run lint` pour confirmer que tout est
-   toujours propre.
-3. Poursuis avec §7 dans l'ordre (Forum, rate limiting, bug de la courbe
-   d'équité, module Examen).
+Pas de commit en attente. Poursuis avec §7 : **priorité n°1 = décision
+produit sur le Forum** (exposer dans la navigation ou laisser inaccessible ?).
+Puis rate limiting, bug courbe d'équité, module Examen.
 
 > Ce document est la **seule** source de reprise fiable. S'il existe un
 > écart entre ce document et le code, **fais confiance au code** — vérifie
