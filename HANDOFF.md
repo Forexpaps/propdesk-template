@@ -745,23 +745,25 @@ staff active : ✅ bouton dans le profil (foundateur-only), ✅ modale
 SecurityLogModal affiche les événements réels, ✅ filtres déclenchent
 appels réseau.
 
-### ✅ 2. Refonte visuelle du Portefeuille (COMMITTÉ `72645ee`)
+### ✅ 2. Refonte visuelle du Portefeuille — VERT (COMMITTÉ `3f7e6f0`)
 
-L'utilisateur a clarifié : "Je veux uniquement le visuel (couleur, mise en
-forme, typographie) du Mindset modal, en gardant les données et
-fonctionnalités du Portefeuille."
+L'utilisateur a d'abord demandé le style Mindset modal (violet), puis a demandé
+que la couleur soit changée du violet au vert.
 
-**Refonte complétée**, commit `72645ee` :
-- Accent principal : **Violet/Magenta** (`purple-600`, `purple-500`, `purple-400`)
+**Refonte complétée** : Commit `72645ee` (style Mindset modal avec violet) +
+Commit `3f7e6f0` (changement violet → vert).
+
+**Style actuel** :
+- Accent principal : **Vert fluorescent** (`#00E676`)
 - Gradients : `from-[#0D1110] to-[#111615]`
-- Bordures : `border-purple-500/30` ou `/20`
-- Badges : Couleurs variées (violet ACTIVE, amber PAID_OUT, bleu autres)
-- Formulaire & boutons : Violets
+- Bordures : `border-[#00E676]/20`
+- Badges : Vert ACTIVE, amber PAID_OUT, bleu autres
+- Boutons & formulaire : Vert
 - **Données & fonctionnalités : 100% conservées**
 
-Vérification visuelle : ✅ en-tête, ✅ cartes résumé (4 couleurs variées),
-✅ listes comptes (bordures violettes), ✅ détails compte (drawdown, profit
-target, stats) ✅ modale d'ajout.
+Vérification visuelle : ✅ en-tête vert, ✅ cartes résumé (capital vert, autres
+couleurs variées), ✅ comptes (bordures vertes), ✅ détails (drawdown, profit
+target vert, stats) ✅ modale d'ajout vert.
 
 ### 3. Revenir sur la demande "Données & sauvegarde" si elle refait surface
 
@@ -948,13 +950,14 @@ fausse — voir l'historique git.)*
 
 ---
 
-## 10. État après refonte du Portefeuille
+## 10. État après refonte du Portefeuille (version VERT)
 
-- Branche `main`, dernier commit : `72645ee` (« Refonte visuelle du
-  Portefeuille : style Mindset modal »).
-- **Deux chantiers terminés et committés** :
+- Branche `main`, dernier commit : `3f7e6f0` (« Change les couleurs du
+  Portefeuille du violet au vert »).
+- **Trois chantiers terminés et committés** :
   - `0939553` : Journal de sécurité + verrouillage (COMMITTÉ + vérifié)
-  - `72645ee` : Refonte Portefeuille (COMMITTÉ)
+  - `72645ee` : Refonte Portefeuille (style Mindset modal, violet)
+  - `3f7e6f0` : Changement Portefeuille violet → vert (COMMITTÉ + vérifié)
 - `npm run lint` et `npm run build` passent.
 - Répertoire de travail propre (tous les changements sont committés).
 - Aucun compte de test/verrouillage actif.
