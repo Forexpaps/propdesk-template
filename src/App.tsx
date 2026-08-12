@@ -17,6 +17,9 @@ import { NotificationModal } from "./components/NotificationModal";
 import { PropFirmRulesModal } from "./components/PropFirmRulesModal";
 import { MindsetJournalModal } from "./components/MindsetJournalModal";
 import { SetupAnalyzerModal } from "./components/SetupAnalyzerModal";
+import { SyncErrorBanner } from "./components/SyncErrorBanner";
+import { computeBadgeProgress } from "./lib/badges";
+import { listPending } from "./lib/pendingChanges";
 
 import {
   initialStudentProfile,
@@ -253,6 +256,25 @@ export default function App() {
 }
 
 /**
+ * Résout la valeur à charger pour une collection élève au retour du fetch
+ * serveur : si cette clé a une modification non envoyée en attente
+ * (`listPending`, voir src/lib/pendingChanges.ts), le cache local prime sur
+ * la réponse serveur — sinon une sauvegarde échouée pendant la session
+ * précédente serait silencieusement écrasée dès ce chargement, exactement
+ * le trou que `markPending` dans `useSyncedState` est censé combler.
+ */
+function resolveStudentValue<T>(serverValue: T, localKey: string): T {
+  if (!listPending().includes(localKey)) return serverValue;
+  try {
+    const cached = localStorage.getItem(localKey);
+    if (cached !== null) return JSON.parse(cached) as T;
+  } catch {
+    // Cache illisible : on retombe sur le serveur.
+  }
+  return serverValue;
+}
+
+/**
  * Espace personnel d'un élève — jamais `AcademyApp` (le bureau staff). Un
  * élève ne voit et ne modifie que ses propres données : son Journal, sa
  * copie personnelle du programme de formation, son fil de messagerie avec
@@ -261,38 +283,60 @@ export default function App() {
  * hors périmètre de l'accès élève.
  */
 function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
-  const { status, trades, accounts, modules, messages, quizResults, student } = useStudentBootstrap();
+  const { status, trades, accounts, modules, messages, badges, quizResults, student } = useStudentBootstrap();
   const syncEnabled = status === "online";
+
+  // Bandeau d'avertissement immédiat quand une sauvegarde échoue en
+  // arrière-plan alors que l'app se croit en ligne — la donnée elle-même est
+  // protégée par `markPending` dans `useSyncedState`, ce bandeau n'est qu'un
+  // signal visible pendant la session en cours.
+  const [syncErrorMessage, setSyncErrorMessage] = useState<string | null>(null);
+  const reportSyncError = React.useCallback(
+    (message?: string) => setSyncErrorMessage(message || "Vérifie ta connexion et réessaie."),
+    []
+  );
 
   const [syncedTrades, setSyncedTrades] = useSyncedState<Trade[]>(
     "horizon_student_trades",
     trades,
     (v) => api.saveCollection("trades", v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
   const [syncedAccounts, setSyncedAccounts] = useSyncedState<TradingAccount[]>(
     "horizon_student_accounts",
     accounts,
     (v) => api.saveCollection("accounts", v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
   const [syncedModules, setSyncedModules] = useSyncedState<Module[]>(
     "horizon_student_modules",
     modules,
     (v) => api.saveCollection("modules", v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
   const [syncedMessages, setSyncedMessages] = useSyncedState<CoachMessage[]>(
     "horizon_student_messages",
     messages,
     (v) => api.saveCollection("messages", v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
+  );
+  const [syncedBadges, setSyncedBadges] = useSyncedState<TraderBadge[]>(
+    "horizon_student_badges",
+    badges,
+    (v) => api.saveCollection("badges", v),
+    syncEnabled,
+    reportSyncError
   );
   const [syncedQuizResults, setSyncedQuizResults] = useSyncedState<Record<string, ModuleQuizResult>>(
     "horizon_student_quiz_results",
     quizResults,
     (v) => api.saveQuizResults(v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
 
   // `useSyncedState` initialise sa valeur une seule fois, au montage — tant
@@ -300,13 +344,84 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   // que la valeur par défaut figée avant que les données ne soient connues.
   useEffect(() => {
     if (status !== "online") return;
-    setSyncedTrades(trades);
-    setSyncedAccounts(accounts);
-    setSyncedModules(modules);
-    setSyncedMessages(messages);
-    setSyncedQuizResults(quizResults);
+    setSyncedTrades(resolveStudentValue(trades, "horizon_student_trades"));
+    setSyncedAccounts(resolveStudentValue(accounts, "horizon_student_accounts"));
+    setSyncedModules(resolveStudentValue(modules, "horizon_student_modules"));
+    setSyncedMessages(resolveStudentValue(messages, "horizon_student_messages"));
+    setSyncedBadges(resolveStudentValue(badges, "horizon_student_badges"));
+    setSyncedQuizResults(resolveStudentValue(quizResults, "horizon_student_quiz_results"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
+
+  // Progression recalculée en direct depuis les vraies données — jamais
+  // persistée telle quelle, voir `src/lib/badges.ts`.
+  const liveBadges = computeBadgeProgress(syncedBadges, syncedTrades, syncedModules);
+
+  const handleClaimBadge = (badgeId: string) => {
+    setSyncedBadges((prev) =>
+      prev.map((b) =>
+        b.id === badgeId
+          ? { ...b, unlocked: true, unlockedAt: new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }) }
+          : b
+      )
+    );
+  };
+
+  // Badges déjà signalés dans le panneau de notifications — un débloquage ne
+  // doit apparaître "non lu" qu'une fois, pas à chaque rendu. Purement local
+  // (pas de collection dédiée côté serveur pour cette seule marque de lecture).
+  const [readBadgeNotificationIds, setReadBadgeNotificationIds] = usePersistentState<string[]>(
+    "horizon_student_read_badge_notifications",
+    []
+  );
+
+  // Notifications élève : messages du coach + débloquages de badge. Dérivées
+  // à chaque rendu depuis des données déjà synchronisées — pas de collection
+  // `notifications` dédiée côté élève (hors périmètre de l'accès élève).
+  const messageNotifications: AppNotification[] = syncedMessages
+    .filter((m) => m.sender === "coach")
+    .map((m) => ({
+      id: `msg-notif-${m.id}`,
+      title: "Nouveau message du coach",
+      message: m.text.length > 120 ? `${m.text.slice(0, 120)}…` : m.text,
+      time: m.timestamp,
+      type: "system",
+      read: m.status === "read",
+      targetTab: "messaging",
+    }));
+  const badgeNotifications: AppNotification[] = liveBadges
+    .filter((b) => b.unlocked && b.unlockedAt)
+    .map((b) => ({
+      id: `badge-notif-${b.id}`,
+      title: "Badge débloqué !",
+      message: b.title,
+      time: b.unlockedAt!,
+      type: "academy",
+      read: readBadgeNotificationIds.includes(b.id),
+    }));
+  const studentNotifications: AppNotification[] = [...messageNotifications, ...badgeNotifications].sort(
+    (a, b) => (a.time < b.time ? 1 : a.time > b.time ? -1 : 0)
+  );
+
+  /**
+   * Marque une notification comme lue. Aucune collection dédiée à ce statut
+   * côté élève : un message se marque via son propre champ `status`
+   * (persisté, déjà synchronisé), un badge via le registre local ci-dessus.
+   */
+  const handleMarkStudentNotificationAsRead = (id: string) => {
+    if (id.startsWith("msg-notif-")) {
+      const msgId = id.slice("msg-notif-".length);
+      setSyncedMessages((prev) => prev.map((m) => (m.id === msgId ? { ...m, status: "read" } : m)));
+    } else if (id.startsWith("badge-notif-")) {
+      const badgeId = id.slice("badge-notif-".length);
+      setReadBadgeNotificationIds((prev) => (prev.includes(badgeId) ? prev : [...prev, badgeId]));
+    }
+  };
+
+  const handleMarkAllStudentNotificationsAsRead = () => {
+    setSyncedMessages((prev) => prev.map((m) => (m.sender === "coach" ? { ...m, status: "read" } : m)));
+    setReadBadgeNotificationIds(liveBadges.filter((b) => b.unlocked).map((b) => b.id));
+  };
 
   const [activeTab, setActiveTab] = useState<TabType>("journal");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -316,6 +431,8 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileModalTab, setProfileModalTab] = useState<"profile" | "badges">("profile");
   const [prefilledLessonTitle, setPrefilledLessonTitle] = useState<string | undefined>();
 
   const handleAddTrade = (newTrade: Omit<Trade, "id">) => {
@@ -437,7 +554,10 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         setMobileOpen={setMobileOpen}
         isCollapsed={isCollapsed}
         setIsCollapsed={setIsCollapsed}
-        onOpenProfileModal={() => {}}
+        onOpenProfileModal={() => {
+          setProfileModalTab("badges");
+          setIsProfileModalOpen(true);
+        }}
         onLogout={handleLogout}
         onOpenChecklist={() => setIsChecklistOpen(true)}
         onOpenSetupAnalyzer={() => setIsSetupAnalyzerOpen(true)}
@@ -452,7 +572,11 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
           student={studentProfile}
           setMobileOpen={setMobileOpen}
           onOpenNotifications={() => setIsNotificationsModalOpen(true)}
-          unreadNotificationsCount={syncedMessages.filter((m) => m.sender === "coach" && m.status !== "read").length}
+          unreadNotificationsCount={studentNotifications.filter((n) => !n.read).length}
+          onOpenProfileModal={() => {
+            setProfileModalTab("badges");
+            setIsProfileModalOpen(true);
+          }}
         />
 
         <main className="p-4 sm:p-8 flex-1 max-w-7xl w-full mx-auto">
@@ -557,11 +681,31 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       <NotificationModal
         isOpen={isNotificationsModalOpen}
         onClose={() => setIsNotificationsModalOpen(false)}
-        notifications={[]}
-        onMarkAsRead={() => {}}
-        onMarkAllAsRead={() => {}}
-        onClearAll={() => {}}
+        notifications={studentNotifications}
+        onMarkAsRead={handleMarkStudentNotificationAsRead}
+        onMarkAllAsRead={handleMarkAllStudentNotificationsAsRead}
+        // Pas de suppression réelle possible : ces notifications sont dérivées
+        // des messages/badges, pas une collection à part — « tout effacer »
+        // revient donc à tout marquer lu, seule action équivalente sensée ici.
+        onClearAll={handleMarkAllStudentNotificationsAsRead}
+        onNavigateToTab={(tab) => {
+          if (isTabType(tab)) setActiveTab(tab);
+        }}
       />
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        student={studentProfile}
+        badges={liveBadges}
+        initialTab={profileModalTab}
+        onClaimBadge={handleClaimBadge}
+        onSaveProfile={() =>
+          alert(
+            "Ton profil (nom, avatar, niveau) est géré par ton coach — contacte-le via la Messagerie pour une modification."
+          )
+        }
+      />
+      <SyncErrorBanner message={syncErrorMessage} onDismiss={() => setSyncErrorMessage(null)} />
     </div>
   );
 }
@@ -654,6 +798,16 @@ function AcademyApp({
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [isStaffAccountsOpen, setIsStaffAccountsOpen] = useState(false);
 
+  // Bandeau d'avertissement immédiat quand une sauvegarde échoue en
+  // arrière-plan alors que l'app se croit en ligne — la donnée elle-même est
+  // protégée par `markPending` dans `useSyncedState`, ce bandeau n'est qu'un
+  // signal visible pendant la session en cours.
+  const [syncErrorMessage, setSyncErrorMessage] = useState<string | null>(null);
+  const reportSyncError = React.useCallback(
+    (message?: string) => setSyncErrorMessage(message || "Vérifie ta connexion et réessaie."),
+    []
+  );
+
   // Valeur de départ d'une collection : le serveur fait autorité quand il a
   // répondu ; sinon on repart du cache local, et en dernier recours du seed.
   function seed<T>(fromServer: T | undefined, localKey: string, fallback: T): T {
@@ -672,77 +826,88 @@ function AcademyApp({
     "horizon_notifications",
     seed(server?.notifications, "horizon_notifications", initialNotifications),
     (v) => api.saveCollection("notifications", v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
 
   const [student, setStudent] = useSyncedState<StudentProfile>(
     "horizon_student",
     seed(initialState?.student ?? undefined, "horizon_student", initialStudentProfile),
     (v) => api.saveProfile(v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
 
   const [enrolledStudents, setEnrolledStudents] = useSyncedState<EnrolledStudent[]>(
     "horizon_enrolled_students",
     seed(server?.enrolledStudents, "horizon_enrolled_students", initialEnrolledStudents),
     (v) => api.saveCollection("enrolledStudents", v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
 
   const [accounts, setAccounts] = useSyncedState<TradingAccount[]>(
     "horizon_accounts",
     seed(server?.accounts, "horizon_accounts", initialTradingAccounts),
     (v) => api.saveCollection("accounts", v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
 
   const [signals, setSignals] = useSyncedState<CoachSignal[]>(
     "horizon_signals",
     seed(server?.signals, "horizon_signals", initialCoachSignals),
     (v) => api.saveCollection("signals", v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
 
   const [modules, setModules] = useSyncedState<Module[]>(
     "horizon_modules",
     seed(server?.modules, "horizon_modules", initialModules),
     (v) => api.saveCollection("modules", v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
 
   const [trades, setTrades] = useSyncedState<Trade[]>(
     "horizon_trades",
     seed(server?.trades, "horizon_trades", initialTrades),
     (v) => api.saveCollection("trades", v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
 
   const [messages, setMessages] = useSyncedState<CoachMessage[]>(
     "horizon_messages",
     seed(server?.messages, "horizon_messages", initialMessages),
     (v) => api.saveCollection("messages", v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
 
   const [forumTopics, setForumTopics] = useSyncedState<ForumTopic[]>(
     "horizon_forum_topics",
     seed(server?.forumTopics, "horizon_forum_topics", initialForumTopics),
     (v) => api.saveCollection("forumTopics", v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
 
   const [quizResults, setQuizResults] = useSyncedState<Record<string, ModuleQuizResult>>(
     "horizon_quiz_results",
     seed(initialState?.quizResults, "horizon_quiz_results", {}),
     (v) => api.saveQuizResults(v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
 
   const [badges, setBadges] = useSyncedState<TraderBadge[]>(
     "horizon_badges",
     seed(server?.badges, "horizon_badges", initialTraderBadges),
     (v) => api.saveCollection("badges", v),
-    syncEnabled
+    syncEnabled,
+    reportSyncError
   );
 
   // Pre-filled Messaging Navigation state
@@ -1402,7 +1567,7 @@ function AcademyApp({
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
         student={student}
-        badges={badges}
+        badges={computeBadgeProgress(badges, trades, modules)}
         onSaveProfile={handleSaveProfile}
         onClaimBadge={handleClaimBadge}
         initialTab={profileModalTab}
@@ -1493,6 +1658,8 @@ function AcademyApp({
           setActiveTab("journal");
         }}
       />
+
+      <SyncErrorBanner message={syncErrorMessage} onDismiss={() => setSyncErrorMessage(null)} />
     </div>
   );
 }

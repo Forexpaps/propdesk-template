@@ -476,6 +476,27 @@ staffRouter.post(
         replaceCollection("modules", personalModules, account.userId);
       }
 
+      // Même principe pour les badges : copie des DÉFINITIONS partagées
+      // (titre, description, critère), mais jamais de leur état de
+      // réclamation — un nouvel élève n'a évidemment rien débloqué. Les `id`
+      // sont remappés pour la même raison que `modules` : clé primaire
+      // globale de la table, pas composite avec `user_id` (sans ça, le
+      // contrôle anti-collision de `replaceCollection` rejetterait la copie
+      // dès le second élève inscrit, "badge-1" existant déjà chez le premier).
+      const sharedBadges = listCollection<{ id: string; [key: string]: unknown }>(
+        "badges",
+        DEFAULT_USER_ID
+      );
+      if (sharedBadges.length > 0) {
+        const personalBadges = sharedBadges.map((badge) => ({
+          ...badge,
+          id: `${account.userId}-${badge.id}`,
+          unlocked: false,
+          unlockedAt: undefined,
+        }));
+        replaceCollection("badges", personalBadges, account.userId);
+      }
+
       return account;
     })();
 

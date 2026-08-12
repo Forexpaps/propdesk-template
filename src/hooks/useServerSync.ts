@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type ServerState } from "../lib/api";
 import { clearPending, listPending, markPending } from "../lib/pendingChanges";
-import type { Trade, TradingAccount, Module, CoachMessage, ModuleQuizResult, StudentProfile } from "../types";
+import type { Trade, TradingAccount, Module, CoachMessage, ModuleQuizResult, StudentProfile, TraderBadge } from "../types";
 
 export type SyncStatus = "loading" | "online" | "offline";
 
@@ -174,8 +174,10 @@ export function useBootstrap() {
  * élève). `GET /api/state` est déjà filtré côté serveur pour une session
  * élève — il ne renvoie que les collections listées dans
  * `STUDENT_ALLOWED_COLLECTIONS` (voir `server/routes.ts`) : trades, accounts
- * (ses propres portefeuilles), modules (sa copie personnelle du programme)
- * et messages (son fil avec le coach).
+ * (ses propres portefeuilles), modules (sa copie personnelle du programme),
+ * messages (son fil avec le coach) et badges (son état de réclamation
+ * personnel — la progression elle-même est recalculée en direct depuis
+ * trades/modules, voir `src/lib/badges.ts`).
  */
 export function useStudentBootstrap() {
   const [status, setStatus] = useState<SyncStatus>("loading");
@@ -183,6 +185,7 @@ export function useStudentBootstrap() {
   const [accounts, setAccounts] = useState<TradingAccount[]>([]);
   const [modules, setModules] = useState<Module[]>([]);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
+  const [badges, setBadges] = useState<TraderBadge[]>([]);
   const [quizResults, setQuizResults] = useState<Record<string, ModuleQuizResult>>({});
   const [student, setStudent] = useState<StudentProfile | null>(null);
 
@@ -197,6 +200,7 @@ export function useStudentBootstrap() {
           setAccounts(serverState.collections.accounts ?? []);
           setModules(serverState.collections.modules ?? []);
           setMessages(serverState.collections.messages ?? []);
+          setBadges(serverState.collections.badges ?? []);
           setQuizResults(serverState.quizResults ?? {});
           setStudent((serverState.student as StudentProfile | null) ?? null);
           setStatus("online");
@@ -212,7 +216,7 @@ export function useStudentBootstrap() {
     };
   }, []);
 
-  return { status, trades, accounts, modules, messages, quizResults, student };
+  return { status, trades, accounts, modules, messages, badges, quizResults, student };
 }
 
 /**
@@ -228,7 +232,7 @@ export function useSyncedState<T>(
   initialValue: T,
   push: (value: T) => Promise<unknown>,
   enabled: boolean,
-  onSyncError?: () => void
+  onSyncError?: (message?: string) => void
 ): [T, React.Dispatch<React.SetStateAction<T>>] {
   const [value, setValue] = useState<T>(initialValue);
 
@@ -261,7 +265,13 @@ export function useSyncedState<T>(
     const timer = setTimeout(() => {
       stablePush(value).catch((err) => {
         console.warn(`[horizon] Synchronisation de "${localKey}" échouée.`, err);
-        stableOnError();
+        // Échec ponctuel (réseau, conflit 409) alors que l'app se croit en
+        // ligne : sans cette marque, le prochain rechargement écraserait
+        // silencieusement cette modification avec la version serveur — le
+        // même trou que le mode hors ligne comblait déjà. Le bandeau
+        // `PendingChangesBanner` existant la proposera au prochain démarrage.
+        markPending(localKey);
+        stableOnError((err as Error)?.message);
       });
     }, 400);
 

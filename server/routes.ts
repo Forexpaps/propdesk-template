@@ -108,15 +108,17 @@ api.use("/auth", studentProtectedRouter);
 /**
  * Collections qu'une session élève peut lire/écrire : son Journal, ses
  * propres portefeuilles (comptes Prop Firm / broker), sa copie personnelle
- * du programme de formation (leçons vues), et son fil de messagerie avec
- * le coach — jamais les collections du bureau staff (fiches élèves) ni
- * celles d'un autre élève.
+ * du programme de formation (leçons vues), son fil de messagerie avec
+ * le coach, et son état de badges (réclamation — la progression elle-même
+ * est recalculée en direct côté client, voir `src/lib/badges.ts`) — jamais
+ * les collections du bureau staff (fiches élèves) ni celles d'un autre élève.
  */
 const STUDENT_ALLOWED_COLLECTIONS = new Set<CollectionName>([
   "trades",
   "accounts",
   "modules",
   "messages",
+  "badges",
 ]);
 
 interface EnrolledStudentLite {

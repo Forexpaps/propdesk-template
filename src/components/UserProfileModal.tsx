@@ -550,7 +550,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             {/* Badges Cards Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[420px] overflow-y-auto pr-1">
               {filteredBadges.map((badge) => {
-                const canClaim = !badge.unlocked && badge.progressPercentage >= 100;
+                const isTrackable = badge.trackable !== false;
+                const canClaim = isTrackable && !badge.unlocked && badge.progressPercentage >= 100;
 
                 return (
                   <div
@@ -620,6 +621,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                         >
                           <Sparkles className="w-4 h-4" /> Réclamer le Badge (+{badge.rewardXP} XP)
                         </button>
+                      ) : !isTrackable ? (
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 italic">
+                          <Lock className="w-3.5 h-3.5 shrink-0" />
+                          Suivi pas encore disponible pour ce badge
+                        </div>
                       ) : (
                         <div className="space-y-1">
                           <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
