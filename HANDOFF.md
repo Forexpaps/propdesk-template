@@ -7,10 +7,12 @@ directe de tous les modules) — pas une simple compilation de notes de
 session.
 
 > **État à la dernière mise à jour de ce document**
-> Branche `main`, dernier commit : **`4a61b81`** (« Ajoute le choix de la
-> timeframe (5m/15m/1H/4H + personnalisée) au simulateur Prop Firm »),
-> suite du chantier Simulateur de Challenge Prop Firm (`18ff5c4`) — voir
-> §0 bis pour le détail complet.
+> Branche `main`, dernier commit : **`4a50d74`** (« Retire entièrement le
+> module Replay (simulateur + Monte Carlo) »). Le module "Replay" —
+> plusieurs chantiers successifs (simulateur de challenge maison, aperçu
+> SL/TP glissable, choix de la timeframe, tentative d'intégration d'un
+> outil externe de backtest) — **n'existe plus du tout**, sur demande
+> explicite. Voir §0 bis pour le contexte complet de ce retrait.
 > `npm run lint` et `npm run build` passent tous les deux.
 
 ---
@@ -93,151 +95,55 @@ connecté en session staff active dans le navigateur.
 
 ---
 
-## 0 bis. Simulateur de challenge Prop Firm — COMMITTÉ (`18ff5c4`)
+## 0 bis. Module Replay — ENTIÈREMENT RETIRÉ (`4a50d74`)
 
-Refonte complète de ce qui était derrière le mot "Prop Firm" dans l'app,
-sur demande explicite de l'utilisateur (captures d'écran d'une maquette
-externe "PropSim" à reproduire fonctionnellement, avec le design system
-existant : vert `#00E676`, thème sombre, pas les couleurs de la maquette).
+**N'existe plus du tout.** Historique pour comprendre le git log si besoin,
+mais aucune trace ne doit subsister dans le code actuel — si tu en trouves,
+c'est un oubli de nettoyage, pas une fonctionnalité à préserver.
 
-**Ce qui a été retiré** (n'existe plus) :
-- L'ancien "Simulateur Replay" (onglet PRATIQUE → "Replay") : ce n'était
-  **pas** un vrai replay — juste un quiz de direction LONG/SHORT sur une
-  **image statique Unsplash**, sans exécution d'ordre ni P&L. 3 scénarios
-  fixes (EUR/USD, XAU/USD, NAS100) codés en dur dans `mockData.ts`.
-- La modale "Prop Firm Rules" (menu OUTILS) : jauges de drawdown calculées
-  à partir de 3 champs saisis **à la main** par l'utilisateur, aucune
-  connexion aux vraies données. `src/components/PropFirmRulesModal.tsx`
-  supprimé, avec tout son câblage (`App.tsx` x2 — staff et élève —,
-  `Sidebar.tsx`).
-- Le type `BacktestScenario` et `initialBacktestScenarios` (`types.ts`,
-  `mockData.ts`) : devenus morts, retirés.
+**Ce qui s'est passé, dans l'ordre** (tout dans la même session) :
+1. Construction d'un simulateur de challenge Prop Firm maison (marché
+   simulé par marche aléatoire, exécution SL/TP, règles de drawdown/
+   objectif, aperçu SL/TP glissable sur le graphique, choix de timeframe
+   5m/15m/1H/4H + personnalisée) — plusieurs commits successifs,
+   fonctionnel et vérifié à chaque étape.
+2. L'utilisateur a fourni un projet externe complet ("Replay FX", HTML/CSS/
+   JS vanilla, à `Académie Trading/11 - Visuel/Benjamin/forex-replay/`) —
+   outil de backtest manuel sur **vraies données historiques** HistData.com
+   2024 (7 paires forex, 1m à Daily), avec outils de tracé, RSI, journal,
+   exports PDF/Excel — en demandant de l'utiliser à la place du simulateur
+   maison.
+3. Tentative d'intégration par iframe (fichiers copiés tels quels dans
+   `public/replay-fx/`, CSS recoloré en vert PropDesk `#00E676` via ses
+   variables `:root`, composant `ReplayFxEmbed.tsx`) : le fichier de
+   données `market-data.js` pesait **25 Mo**. Résultat : `npm run build`
+   restait bloqué **plusieurs minutes à 100% CPU** (confirmé reproductible
+   deux fois, tué manuellement les deux fois) — cause exacte dans le
+   pipeline Vite/Rollup **non investiguée en détail** (hypothèse la plus
+   probable : quelque chose dans la phase de bundling/reporting traite ce
+   fichier autrement qu'une simple copie d'asset statique, à vérifier si le
+   sujet revient).
+4. Plutôt que de poursuivre le diagnostic, l'utilisateur a demandé de
+   **tout retirer** — le simulateur maison ET le Monte Carlo (qui
+   partageait le même point d'entrée sidebar "Replay" mais n'avait aucun
+   rapport avec le problème de build).
 
-**Ce qui existe maintenant** — un vrai moteur de marché simulé et de
-trading, dans `src/lib/propChallenge.ts` (logique pure, sans React) :
-- **Génération de prix par marche aléatoire** (random walk), par actif —
-  XAUUSD/EURUSD/GBPUSD/NAS100, chacun avec sa volatilité et sa valeur de
-  pip (`PROP_SIM_ASSETS`). "Marché simulé" explicitement affiché à l'écran
-  — aucune vraie donnée de marché, décision assumée (voir §7 pour le
-  contexte de ce choix parmi les options posées).
-- **Ouverture/clôture de position** avec détection réelle du SL/TP contre
-  le high/low de chaque nouvelle bougie générée (`checkStopsAgainstCandle`),
-  calcul du P&L flottant et réalisé.
-- **Évaluation continue des règles** à chaque tick : perte journalière max,
-  drawdown total (fixe ou trailing selon le réglage), objectif de profit en
-  **2 phases** (les deux configurables), jours de trading minimum, "règle
-  de régularité" (le meilleur trade ne doit pas dépasser X% des profits
-  bruts — bloque la validation sans faire échouer le compte, comme chez un
-  vrai prop firm).
-- **4 presets** repris et adaptés de l'ancienne modale (FTMO Standard,
-  FundedNext Stellar, Alpha Capital, Horizon Compte Réel), plus réglages
-  avancés éditables (repliables, `<details>`).
-- **Persistance locale uniquement** (`localStorage`, clé
-  `horizon_propchallenge_state_v1`) : un challenge est une session de
-  pratique jetable, **pas** synchronisé serveur — décision explicite (voir
-  §7), cohérente avec le Journal de mindset qui fonctionne pareil.
+**Si le sujet revient** (l'utilisateur a dit vouloir repartir sur un
+module Replay, sans préciser lequel des deux repartir) : reposer la
+question plutôt que de supposer — reprendre le simulateur maison (déjà
+conçu, code à récupérer dans l'historique git avant `4a50d74` si besoin),
+ou retenter l'intégration de Replay FX (dans ce cas, **investiguer
+d'abord** pourquoi `market-data.js` bloque le build avant de recopier les
+fichiers — piste à tester : servir ce fichier depuis une route Express
+dédiée plutôt que `public/`, ou le découper par paire/timeframe pour
+réduire sa taille, ou fetch à la demande plutôt qu'un `<script>` unique de
+25 Mo).
 
-**Composants** :
-- `src/components/CandlestickChart.tsx` : rendu **SVG fait maison** du
-  graphique en chandelier (aucune lib candlestick dans le projet — seul
-  `recharts` est installé, pas adapté à l'OHLC). Lignes pointillées pour
-  entrée/SL/TP quand une position est ouverte.
-- `src/components/PropChallengeSimulator.tsx` : écran de configuration
-  (capital/actif/règles/presets) → terminal de trading (barre solde/
-  équité/P&L/phase/statut, 4 cartes de règles en direct, graphique +
-  contrôles Tick Suivant/Lecture Rapide/Fin de Journée, panneau
-  d'exécution avec calculateur de risque, historique des trades).
-- `src/components/SMCSimulator.tsx` : **simplifié**, ne gère plus que le
-  choix d'onglet interne (bascule `REPLAY`/`MONTE_CARLO` par boutons
-  internes, plus de prop `initialMode` — un seul point d'entrée sidebar
-  désormais, voir plus bas). Le Monte Carlo (déjà réel avant ce chantier)
-  est **inchangé** dans sa logique, seulement renommé à l'écran
-  « Simulateur Rentabilité PropFirm » (était « Simulateur Monte Carlo &
-  Compounding », demande de suivi). L'onglet `REPLAY` rend désormais
-  `<PropChallengeSimulator />`.
-
-**Suivi demandé après coup, committé séparément** :
-- Bouton "Simulateur Monte Carlo & Compounding" renommé en "Simulateur
-  Rentabilité PropFirm" (commit `11f1118`).
-- Entrée sidebar "Sim propfirm" (section PRATIQUE) **entièrement retirée**
-  (commit `ceafafa`) — les 2 entrées ("Replay"/"Sim propfirm") pointaient
-  vers le même composant avec juste une vue initiale différente ; la vue
-  Monte Carlo reste accessible via l'onglet interne de "Replay", donc
-  aucune fonctionnalité perdue. Nettoyage complet côté code (pas un simple
-  masquage) : `propfirm` retiré de `ALL_TABS`/`SIDEBAR_ITEM_TABS`/
-  `SIDEBAR_TOGGLEABLE_KEYS` (`Sidebar.tsx`), de la branche de rendu dédiée
-  dans `App.tsx` (x2, staff + élève), du libellé dans `TopHeader.tsx`.
-- **Aperçu SL/TP en direct + glisser-déposer sur le graphique** (commit
-  `f24d53e`) : les lignes SL/TP s'affichent désormais dès qu'on saisit des
-  pips dans le formulaire, **avant** d'ouvrir la position — `computeSlTpPrices()`
-  (`propChallenge.ts`) est partagé entre l'aperçu et l'ouverture réelle,
-  jamais deux calculs qui pourraient diverger. Un sélecteur "Sens de
-  l'ordre" (Achat/Vente, ne trade rien tant qu'on ne valide pas) contrôle
-  de quel côté du prix l'aperçu se place ; il a remplacé les deux boutons
-  Achat/Vente auparavant seuls déclencheurs de la direction — désormais un
-  seul bouton d'exécution contextuel en bas ("Ouvrir l'Achat"/"Ouvrir la
-  Vente", coloré selon le sens choisi). Les lignes SL/TP du graphique
-  (`CandlestickChart.tsx`) sont **glissables** à la souris/au doigt (Pointer
-  Events + `setPointerCapture`, zone de clic élargie invisible par-dessus
-  le trait visible) : glisser avant l'ouverture met à jour les champs pips
-  (`pipsFromDraggedPrice()`, inverse de `computeSlTpPrices()`), glisser une
-  fois la position ouverte modifie directement son SL/TP réel
-  (`updateOpenPositionStops()`, nouvelle fonction du moteur).
-- **Choix de la timeframe** (commit `4a61b81`) : nouvelle carte "Timeframe"
-  sur l'écran de configuration — 4 presets (5m/15m/1H/4H) + "Personnalisé"
-  (nombre + unité Minutes/Heures/Jours, borné automatiquement de 1m à 1D).
-  Fixée à la configuration, comme le capital/l'actif/les règles — pas de
-  changement à la volée une fois le challenge démarré (nécessiterait de
-  rééchantillonner l'historique des bougies déjà générées, hors scope).
-  `timeframeMinutes` fait désormais partie de `ChallengeConfig`. La
-  volatilité par bougie est mise à l'échelle en **racine du temps**
-  (`volatilityPips * sqrt(timeframeMinutes)`, cohérent avec une marche
-  aléatoire — une bougie 4H a des mèches proportionnellement plus larges
-  qu'une bougie 1m, pas identiques) et le pas de temps entre bougies suit
-  la timeframe choisie. Le rollover de "jour de trading" reposait sur un
-  nombre fixe de bougies (`CANDLES_PER_DAY = 26`, arbitraire, correct
-  seulement pour 1m) ; remplacé par un suivi du **temps simulé réellement
-  écoulé** (`dayStartTimestampMs`, seuil 24h), indépendant de la timeframe.
-  **Migration automatique** (`migrateChallengeState()`) pour tout challenge
-  déjà persisté avant ce chantier (pas de `timeframeMinutes` ni de
-  `dayStartTimestampMs` dans l'ancien format) — migré silencieusement vers
-  1m à la lecture, sans quoi la reprise d'un ancien challenge aurait cassé
-  (NaN dans la génération de bougies).
-
-**Simplifications assumées par rapport à la maquette de référence** (pas
-reproduites, pour contenir la portée du chantier à la boucle fonctionnelle
-essentielle) :
-- Pas de navigation multi-pages façon app-dans-l'app (Analytique/Journal &
-  historique/Paramètres/Centre d'aide séparés) : tout est sur un seul écran
-  de trading, avec l'historique des trades affiché en ligne dans le
-  terminal.
-- Le toggle "Trading pendant les actualités" est stocké mais **purement
-  informatif** — aucun calendrier économique n'est simulé, donc rien à
-  appliquer dessus concrètement.
-
-**Vérifié en conditions réelles** (session staff, `data/horizon.db`) :
-configuration → démarrage → bougies qui défilent (Tick Suivant et Lecture
-Rapide) → position BUY ouverte avec SL/TP visibles sur le graphique → TP
-touché **automatiquement**, +$400 (cohérent avec le calculateur de risque
-affiché avant l'ouverture) → solde et carte "Objectif Phase 1" mis à jour
-en conséquence → jour de trading incrémenté après suffisamment de bougies
-→ **persistance confirmée après rechargement complet de la page**
-(`navigate`, pas juste un changement d'onglet React) → bouton
-"Reconfigurer" ramène proprement à l'écran de configuration → Monte Carlo
-toujours fonctionnel, aucune régression.
-
-**Piège opérationnel rencontré pendant la vérification** : "Replay" (et,
-à l'époque, "Sim propfirm") étaient déjà masqués dans la sidebar de
-l'utilisateur avant ce chantier (réglage `hiddenSidebarItems` préexistant,
-sans rapport avec ce travail). Il a fallu les réafficher temporairement
-via le réglage de visibilité du fondateur pour tester, puis les remasquer
-à l'identique après coup — ne pas s'étonner si "Replay" reste invisible
-dans la sidebar par défaut, ce n'est pas un bug introduit par ce chantier.
-Depuis le retrait de "Sim propfirm" (voir "Suivi" ci-dessus), la clé
-`"propfirm"` peut subsister comme résidu inoffensif dans
-`hiddenSidebarItems` en base pour d'anciens profils — elle ne correspond
-plus à aucune entrée de `SIDEBAR_TOGGLEABLE_KEYS`, donc silencieusement
-ignorée, pas la peine de la nettoyer en base.
+**Fichiers qui n'existent plus** (supprimés en `4a50d74`, ne pas chercher à
+les réparer/réutiliser sans re-décision produit) : `src/lib/propChallenge.ts`,
+`src/components/CandlestickChart.tsx`, `src/components/PropChallengeSimulator.tsx`,
+`src/components/SMCSimulator.tsx`. La section PRATIQUE de la sidebar ne
+contient plus que "Examen" et "Exercice du jour".
 
 ---
 
@@ -281,14 +187,6 @@ réglage de visibilité que le fondateur utilise pour lui-même. Seul
   (proxy Yahoo Finance / ForexFactory côté serveur, sans clé API, avec
   cache). Sentiment de risque = indicateur maison indicatif (VIX/DXY), pas
   une vraie mesure officielle — le composant le dit lui-même à l'écran.
-- **Simulateur Monte Carlo** — calcul probabiliste réel, recalculé à
-  chaque paramètre changé.
-- **Simulateur de Challenge Prop Firm** (onglet "Replay") — marché simulé
-  (random walk) réellement animé bougie par bougie, exécution d'ordres
-  réelle avec détection SL/TP, règles de drawdown/objectif évaluées en
-  continu. "Simulé" au sens où le prix n'est pas une vraie donnée de
-  marché (affiché comme tel à l'écran), mais tout le reste — exécution,
-  P&L, règles — est un vrai calcul, pas un scénario scripté. Voir §0 bis.
 - **Modules vidéo** avec quiz réels (seuil 70%) et progression persistée
   serveur (survit à une reconnexion).
 - **Système de badges** — 5 des 9 badges calculés en direct depuis les
@@ -326,11 +224,12 @@ totalement fonctionnel sans le préciser** :
   incohérence : `TopHeader.tsx` mappe encore `case "forum"` vers le
   libellé « Badges & paliers », signe d'un repurposing jamais nettoyé.
 
-**Ordres de grandeur** (lignes de code, vérifié à l'instant) : `src/App.tsx`
+**Ordres de grandeur** (lignes de code, approximatif — dépassé par les
+chantiers successifs, ne pas s'y fier sans revérifier) : `src/App.tsx`
 1682, `TradingJournal.tsx` 1342, `mockData.ts` 1460, `StudentTracking.tsx`
 901, `ForumSection.tsx` 764, `VideoAcademy.tsx` 756, `server/auth/routes.ts`
 771, `UserProfileModal.tsx` 689, `WalletManagement.tsx` 675, `Sidebar.tsx`
-599, `SMCSimulator.tsx` 488, `PerformanceDashboard.tsx` 501.
+599, `PerformanceDashboard.tsx` 501.
 
 **État de la base** : `data/horizon.db` contient un mélange de données
 réelles et de démonstration. Julien Moreau (`stud-1`) a un compte élève
@@ -528,9 +427,6 @@ src/
                                unique de vérité partagée entre composants
     walletStats.ts                 positionsDuCompte(), dailyLossPercent(),
                                totalDrawdownPercent() — calculs de portefeuille
-    propChallenge.ts               moteur pur du simulateur de challenge Prop
-                               Firm (génération de prix, exécution d'ordres,
-                               règles) — voir §0 bis
     image.ts                       redimensionnement des avatars avant stockage
   components/
     Sidebar.tsx (599)             source de vérité des onglets, réglage de
@@ -556,13 +452,10 @@ src/
     PendingChangesBanner.tsx       modifications hors ligne non envoyées
     ForumSection.tsx (764)         complet mais inaccessible depuis l'UI (§6)
     VideoAcademy.tsx (756)         curriculum, quiz réels, vidéos placeholder
-    SMCSimulator.tsx               Monte Carlo réel ; Replay = PropChallengeSimulator
-    PropChallengeSimulator.tsx     simulateur de challenge Prop Firm complet (§0 bis)
-    CandlestickChart.tsx           rendu SVG du graphique en chandelier
     CoachMessaging.tsx (336)       messagerie bidirectionnelle, sans IA
     CoachSignals.tsx (217)         affichage + import ; création non câblée
     NotificationModal.tsx (246)    centre d'alertes, statut "Live" factice
-    MindsetJournalModal.tsx (316)  non synchronisée serveur (comme le challenge Prop Firm)
+    MindsetJournalModal.tsx (316)  persistance localStorage uniquement, pas synchronisée serveur
     SetupAnalyzerModal.tsx, TradingPlanModal.tsx,
     PositionCalculatorModal.tsx    outils déterministes (aucune IA)
     auth/                          AuthShell, LoginScreen, SetupScreen,
@@ -801,9 +694,9 @@ Commit `0939553` inclut tous ces changements. Tous les commits jusqu'à
    seul l'affichage/import existe.
 8. **`NotificationModal.tsx` : statut "Push Server Live" factice**, bouton
    "Simuler alerte" jamais câblé dans `App.tsx`.
-9. **`MindsetJournalModal.tsx` et `PropChallengeSimulator.tsx` : persistance
-   `localStorage` uniquement**, pas synchronisée serveur — décision
-   assumée pour les deux (sessions de pratique jetables), pas un oubli.
+9. **`MindsetJournalModal.tsx` : persistance `localStorage` uniquement**,
+   pas synchronisée serveur — décision assumée (session de pratique
+   jetable), pas un oubli.
 10. **Modules vidéo : vidéo placeholder unique**, pas de vrai contenu hébergé.
 
 ### Piège opérationnel : `AdminStudentView.tsx` est un overlay
@@ -888,9 +781,7 @@ problème persiste.
 | Verrouillage de compte | 5 échecs / 15 min → verrouillage 15 min, par compte (choix recommandé, validé par l'utilisateur) |
 | Emplacement du Journal de sécurité | Modale dédiée (gabarit StaffAccountsModal), pas un onglet de sidebar (choix recommandé, validé) |
 | Compte de test Camille Dupont / Lucas Martin | Systématiquement révoqués après vérification |
-| Portée de la refonte Prop Firm | Remplace Replay + modale Prop Firm Rules (pas un 3ᵉ module ajouté à côté) |
-| Persistance du challenge Prop Firm | Locale (`localStorage`), pas de synchronisation serveur |
-| Génération de prix du challenge Prop Firm | Marche aléatoire simulée, pas de vraie donnée de marché historique |
+| Module Replay (toutes versions successives) | Entièrement retiré — voir §0 bis pour l'historique complet |
 
 ---
 
@@ -952,8 +843,10 @@ Examen » affiche actuellement « — »).
   notifications** — ce sont des limitations connues et acceptées, pas des
   bugs à corriger de ta propre initiative. Si l'utilisateur les signale,
   c'est un nouveau sujet de discussion produit, pas une correction
-  évidente. (Le Simulateur Replay, lui, **a** été refait sur demande
-  explicite — voir §0 bis — ce n'est plus dans cette liste.)
+  évidente.
+- **Reconstruire un module Replay** sans demande explicite — retiré
+  volontairement après plusieurs tentatives, voir §0 bis pour le contexte
+  complet avant d'y retoucher.
 
 ---
 
@@ -1109,25 +1002,22 @@ fausse — voir l'historique git.)*
 
 ---
 
-## 10. État après ajout du choix de la timeframe
+## 10. État après retrait complet du module Replay
 
-- Branche `main`, dernier commit : `4a61b81` (« Ajoute le choix de la
-  timeframe (5m/15m/1H/4H + personnalisée) au simulateur Prop Firm »).
-- **Huit chantiers terminés et committés** :
+- Branche `main`, dernier commit : `4a50d74` (« Retire entièrement le
+  module Replay (simulateur + Monte Carlo) »).
+- **Chantiers du module Replay/Prop Firm — construits PUIS entièrement
+  retirés dans la même session** (voir §0 bis pour l'historique complet,
+  ne pas s'étonner de la trace dans `git log` sans équivalent dans le
+  code actuel) : `18ff5c4`, `11f1118`, `ceafafa`, `f24d53e`, `4a61b81`
+  (construction) → `4a50d74` (retrait total, y compris le Monte Carlo).
+- **Autres chantiers de cette session, toujours en place** :
   - `0939553` : Journal de sécurité + verrouillage (COMMITTÉ + vérifié)
-  - `72645ee` : Refonte Portefeuille (style Mindset modal, violet)
-  - `3f7e6f0` : Changement Portefeuille violet → vert (COMMITTÉ + vérifié)
-  - `18ff5c4` : Simulateur de Challenge Prop Firm complet (COMMITTÉ +
-    vérifié) — voir §0 bis pour le détail
-  - `11f1118` : Renommage "Simulateur Monte Carlo & Compounding" →
-    "Simulateur Rentabilité PropFirm"
-  - `ceafafa` : Retrait complet de l'entrée sidebar "Sim propfirm"
-    (COMMITTÉ + vérifié) — voir §0 bis, section "Suivi demandé après coup"
-  - `f24d53e` : Aperçu SL/TP en direct + glisser-déposer sur le graphique
-    (COMMITTÉ + vérifié) — voir §0 bis, section "Suivi demandé après coup"
-  - `4a61b81` : Choix de la timeframe, presets + personnalisée (COMMITTÉ +
-    vérifié) — voir §0 bis, section "Suivi demandé après coup"
-- `npm run lint` et `npm run build` passent.
+  - `72645ee` / `3f7e6f0` : Refonte puis recoloration du Portefeuille
+    (COMMITTÉ + vérifié)
+- `npm run lint` et `npm run build` passent (build revenu à ~2.5s après
+  retrait du fichier de données de 25 Mo qui le bloquait plusieurs
+  minutes — voir §0 bis).
 - Répertoire de travail propre (tous les changements sont committés).
 - Aucun compte de test/verrouillage actif.
 - Rappel : `src/data/` est couvert par un pattern `.gitignore` non ancré
@@ -1137,9 +1027,12 @@ fausse — voir l'historique git.)*
 
 ### Prochaines tâches
 
-1. **Clarifier la demande "Données & sauvegarde"** si elle refait surface
+1. **Si le sujet Replay revient** : reposer la question de quelle version
+   reprendre (simulateur maison vs Replay FX) plutôt que de supposer —
+   voir §0 bis, section "Si le sujet revient".
+2. **Clarifier la demande "Données & sauvegarde"** si elle refait surface
    (voir §7.3 pour les questions préalables).
-2. Remplir le module « Examen » — décision produit en attente (specs,
+3. Remplir le module « Examen » — décision produit en attente (specs,
    règles, nombre de questions, durée).
 
 > Ce document est la **seule** source de reprise fiable. S'il existe un
