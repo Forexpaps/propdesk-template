@@ -47,37 +47,64 @@ const PROMOTED: Partial<Record<CollectionName, string[]>> = {
   trades: ["date", "pair", "direction", "result", "pnl"],
 };
 
+/**
+ * `JSON.parse` défensif : une ligne dont le `payload` est corrompu (édition
+ * manuelle ratée, bug de migration futur) ne doit jamais faire échouer la
+ * lecture de toute une collection pour tout le monde — elle est ignorée et
+ * journalisée, le reste de la collection reste lisible normalement.
+ */
+function safeParsePayload<T>(payload: string, context: string): T | null {
+  try {
+    return JSON.parse(payload) as T;
+  } catch (err) {
+    console.warn(
+      `[propdesk] Ligne ignorée, payload JSON invalide (${context}) :`,
+      (err as Error).message
+    );
+    return null;
+  }
+}
+
 export function listCollection<T extends WithId>(
   name: CollectionName,
   userId: string = DEFAULT_USER_ID
 ): T[] {
   const rows = db
     .prepare(
-      `SELECT payload FROM ${TABLES[name]} WHERE user_id = ? ORDER BY position ASC`
+      `SELECT id, payload FROM ${TABLES[name]} WHERE user_id = ? ORDER BY position ASC`
     )
-    .all(userId) as { payload: string }[];
+    .all(userId) as { id: string; payload: string }[];
 
-  const items = rows.map((r) => JSON.parse(r.payload) as T);
+  const items = rows
+    .map((r) => safeParsePayload<T>(r.payload, `${TABLES[name]}#${r.id}`))
+    .filter((item): item is T => item !== null);
 
   // Les réponses du forum vivent dans leur propre table : on les recompose
   // pour que le client retrouve exactement la forme ForumTopic qu'il attend.
   if (name === "forumTopics") {
     return items.map((topic) => ({
       ...topic,
-      replies: listForumReplies(topic.id),
+      replies: listForumReplies(topic.id, userId),
     })) as T[];
   }
 
   return items;
 }
 
-function listForumReplies(topicId: string): unknown[] {
+/**
+ * `AND user_id = ?` en plus de `topic_id = ?` : vérification de propriété au
+ * niveau de la table elle-même, pas seulement via le `topic_id` déjà vérifié
+ * par l'appelant — défense en profondeur (voir migration dans `db.ts`).
+ */
+function listForumReplies(topicId: string, userId: string): unknown[] {
   const rows = db
     .prepare(
-      "SELECT payload FROM forum_replies WHERE topic_id = ? ORDER BY position ASC"
+      "SELECT id, payload FROM forum_replies WHERE topic_id = ? AND user_id = ? ORDER BY position ASC"
     )
-    .all(topicId) as { payload: string }[];
-  return rows.map((r) => JSON.parse(r.payload));
+    .all(topicId, userId) as { id: string; payload: string }[];
+  return rows
+    .map((r) => safeParsePayload(r.payload, `forum_replies#${r.id}`))
+    .filter((item) => item !== null);
 }
 
 /**
@@ -158,7 +185,7 @@ export function replaceCollection<T extends WithId>(
         // pour éviter d'avoir la même donnée à deux endroits.
         const { replies, ...topic } = item as T & { replies?: WithId[] };
         upsert.run(...values, JSON.stringify(topic));
-        replaceForumReplies(item.id, replies ?? []);
+        replaceForumReplies(item.id, replies ?? [], userId);
       } else {
         upsert.run(...values, JSON.stringify(item));
       }
@@ -200,13 +227,13 @@ export function updateCollectionItem<T extends WithId>(
   );
 }
 
-function replaceForumReplies(topicId: string, replies: WithId[]): void {
+function replaceForumReplies(topicId: string, replies: WithId[], userId: string): void {
   db.prepare("DELETE FROM forum_replies WHERE topic_id = ?").run(topicId);
   const insert = db.prepare(
-    "INSERT INTO forum_replies (id, topic_id, position, payload) VALUES (?, ?, ?, ?)"
+    "INSERT INTO forum_replies (id, topic_id, user_id, position, payload) VALUES (?, ?, ?, ?, ?)"
   );
   replies.forEach((reply, index) => {
-    insert.run(reply.id, topicId, index, JSON.stringify(reply));
+    insert.run(reply.id, topicId, userId, index, JSON.stringify(reply));
   });
 }
 
@@ -214,7 +241,8 @@ export function getProfile<T>(userId: string = DEFAULT_USER_ID): T | null {
   const row = db.prepare("SELECT payload FROM users WHERE id = ?").get(userId) as
     | { payload: string }
     | undefined;
-  return row ? (JSON.parse(row.payload) as T) : null;
+  if (!row) return null;
+  return safeParsePayload<T>(row.payload, `users#${userId}`);
 }
 
 export function saveProfile(profile: unknown, userId: string = DEFAULT_USER_ID): void {
@@ -231,9 +259,14 @@ export function getQuizResults<T>(
     .prepare("SELECT module_id, payload FROM quiz_results WHERE user_id = ?")
     .all(userId) as { module_id: string; payload: string }[];
 
-  return Object.fromEntries(
-    rows.map((r) => [r.module_id, JSON.parse(r.payload) as T])
-  );
+  const entries = rows
+    .map((r): [string, T] | null => {
+      const parsed = safeParsePayload<T>(r.payload, `quiz_results#${r.module_id}`);
+      return parsed === null ? null : [r.module_id, parsed];
+    })
+    .filter((entry): entry is [string, T] => entry !== null);
+
+  return Object.fromEntries(entries);
 }
 
 export function replaceQuizResults(

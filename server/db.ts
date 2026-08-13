@@ -81,9 +81,14 @@ db.exec(`
     payload  TEXT NOT NULL
   );
 
+  -- user_id n'est indexée qu'après migrateForumRepliesUserId() plus bas :
+  -- sur une base déjà existante, CREATE TABLE IF NOT EXISTS est un no-op
+  -- (la table garde son ancien schéma sans user_id), un index dessus ici
+  -- échouerait donc avant que la migration n'ait eu la main.
   CREATE TABLE IF NOT EXISTS forum_replies (
     id       TEXT PRIMARY KEY,
     topic_id TEXT NOT NULL REFERENCES forum_topics(id) ON DELETE CASCADE,
+    user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     position INTEGER NOT NULL,
     payload  TEXT NOT NULL
   );
@@ -340,6 +345,52 @@ function migrateToStaffAccounts(): void {
 }
 
 migrateToStaffAccounts();
+
+/**
+ * Migration ponctuelle : ajoute `user_id` à `forum_replies`, absente à la
+ * création de la table. Sans cette colonne, aucune vérification de propriété
+ * n'est possible au niveau de la table elle-même — latent, jamais exploité
+ * en pratique (le Forum est exclu de STUDENT_ALLOWED_COLLECTIONS et
+ * `replaceForumReplies` n'est appelée que pour un `topic_id` déjà vérifié
+ * appartenir à l'appelant), mais une vraie lacune structurelle à combler.
+ *
+ * Rétrocompatible par construction (backfill via jointure sur `forum_topics`,
+ * qui porte déjà `user_id`) : idempotente par simple vérification de la
+ * colonne, pas besoin de clé `meta` dédiée.
+ */
+function migrateForumRepliesUserId(): void {
+  const columns = db.pragma("table_info(forum_replies)") as { name: string }[];
+  const hasUserId = columns.some((c) => c.name === "user_id");
+  if (hasUserId) return;
+
+  db.transaction(() => {
+    db.exec(`
+      CREATE TABLE forum_replies_new (
+        id       TEXT PRIMARY KEY,
+        topic_id TEXT NOT NULL REFERENCES forum_topics(id) ON DELETE CASCADE,
+        user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        position INTEGER NOT NULL,
+        payload  TEXT NOT NULL
+      );
+
+      INSERT INTO forum_replies_new (id, topic_id, user_id, position, payload)
+      SELECT r.id, r.topic_id, t.user_id, r.position, r.payload
+      FROM forum_replies r
+      JOIN forum_topics t ON t.id = r.topic_id;
+
+      DROP TABLE forum_replies;
+      ALTER TABLE forum_replies_new RENAME TO forum_replies;
+      CREATE INDEX IF NOT EXISTS idx_replies_topic ON forum_replies(topic_id, position);
+      CREATE INDEX IF NOT EXISTS idx_replies_user  ON forum_replies(user_id);
+    `);
+  })();
+}
+
+migrateForumRepliesUserId();
+
+// Colonne garantie présente à ce stade (création fraîche ou migration
+// ci-dessus) : l'index peut être posé sans risque, dans les deux cas.
+db.exec("CREATE INDEX IF NOT EXISTS idx_replies_user ON forum_replies(user_id);");
 
 export function getMeta(key: string): string | null {
   const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as
