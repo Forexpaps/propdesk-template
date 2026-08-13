@@ -131,7 +131,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
     totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
   // Onglets pour lesquels cette vue a un rendu dédié. Le reste (Module
-  // vidéo, Examen, Replay) reste accessible depuis la sidebar
+  // vidéo, Examen) reste accessible depuis la sidebar
   // dès que le réglage de visibilité les autorise pour les élèves (fusionné
   // plus haut), mais n'a pas d'équivalent lecture seule ici — un clic
   // affichait auparavant une page vide plutôt qu'un message explicite.

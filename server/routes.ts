@@ -139,7 +139,7 @@ interface EnrolledStudentLite {
  *
  * Masquées quoi qu'il arrive, indépendamment du réglage de visibilité du
  * fondateur — ce dernier gouverne le reste (Portefeuille, Rentabilité,
- * Examen, Exercice du jour, Replay, Module vidéo, Messagerie,
+ * Examen, Exercice du jour, Module vidéo, Messagerie,
  * Audit Setup, Mindset, Macro) : voir
  * la fusion dans `buildStudentProfile`.
  */

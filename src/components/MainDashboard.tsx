@@ -248,17 +248,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             textHover: "group-hover:text-blue-400",
           },
           {
-            key: "replay",
-            tab: "simulator",
-            letter: "R",
-            title: "Replay",
-            description: "Décider bougie par bougie, sans voir la suite.",
-            glow: "bg-[radial-gradient(circle_at_0%_0%,rgba(168,85,247,0.20),transparent_65%)]",
-            badgeClasses: "text-purple-400 bg-purple-500/15 border-purple-500/30",
-            borderHover: "hover:border-purple-500/40",
-            textHover: "group-hover:text-purple-400",
-          },
-          {
             key: "academy",
             tab: "academy",
             letter: "V",
