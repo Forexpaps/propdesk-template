@@ -91,7 +91,29 @@ export const profileSchema = z
     return cleaned;
   });
 
-export const quizResultsSchema = z.record(z.string().min(1), z.unknown());
+/**
+ * Un seul résultat de quiz de module — voir `ModuleQuizResult` dans
+ * `src/types.ts`. Bornée (au lieu de `z.unknown()`) : la seule protection
+ * précédente était la limite globale de 8 Mo sur le corps de la requête,
+ * largement au-dessus de ce qu'un vrai résultat de quiz pèse jamais.
+ */
+const quizResultEntrySchema = z.object({
+  scorePercentage: z.number().min(0).max(100),
+  totalQuestions: z.number().int().min(0).max(500),
+  correctAnswers: z.number().int().min(0).max(500),
+  passed: z.boolean(),
+  completedAt: z.string().max(100),
+});
+
+/**
+ * Une clé par module — le programme réel en compte une poignée, 200 laisse
+ * une marge généreuse sans autoriser un payload de milliers d'entrées.
+ */
+export const quizResultsSchema = z
+  .record(z.string().min(1).max(200), quizResultEntrySchema)
+  .refine((results) => Object.keys(results).length <= 200, {
+    message: "Trop de résultats de quiz dans la même requête.",
+  });
 
 export const importStateSchema = z.object({
   student: profileSchema.optional(),
