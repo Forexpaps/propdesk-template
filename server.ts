@@ -79,6 +79,15 @@ startLockoutCleanup();
 // Serve public static assets
 app.use("/public", express.static(path.join(ROOT,"public")));
 
+// Module Replay FX : appli statique autonome (HTML/CSS/JS vanilla, ~27 Mo dont
+// un `market-data.js` de 25 Mo de bougies HistData embarquées). Servi ici,
+// hors de `public/` (donc invisible pour Vite/Rollup), pour ne jamais
+// reproduire le blocage de `npm run build` (plusieurs minutes à 100% CPU)
+// rencontré quand ce même fichier vivait dans `public/replay-fx/` (voir
+// HANDOFF.md §4ter). Monté avant le middleware Vite/le statique de prod :
+// une requête sur `/replay-fx/*` est donc toujours servie ici en premier.
+app.use("/replay-fx", express.static(path.join(ROOT, "replay-fx")));
+
 async function startServer() {
   // Le serveur HTTP est créé explicitement, au lieu de laisser `app.listen()`
   // le faire : en développement, Vite a besoin d'une référence dessus pour y
