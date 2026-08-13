@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/*
+ * Exclut le module Replay FX (HTML/CSS/JS vanilla autonome, ~27 Mo dont un
+ * `market-data.js` de 25 Mo) du scan automatique de contenu de Tailwind v4.
+ * Sans `content` explicite, Tailwind v4 scanne tout le projet à la recherche
+ * de classes — y compris ce fichier de données, ce qui bloquait `npm run
+ * build` plusieurs minutes (même symptôme que le blocage historique quand ce
+ * fichier vivait dans `public/`, voir HANDOFF.md §4ter). Aucune classe
+ * Tailwind n'est utilisée dans Replay FX (CSS vanilla séparé), rien n'est
+ * perdu à l'exclure.
+ */
+@source not "../replay-fx";
+
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;

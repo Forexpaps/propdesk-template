@@ -27,7 +27,8 @@ import {
   Brain,
   Calendar,
   Target,
-  LogOut
+  LogOut,
+  CandlestickChart
 } from "lucide-react";
 import { StudentProfile } from "../types";
 
@@ -57,6 +58,7 @@ export const ALL_TABS = [
   "analytics",
   "exam",
   "macro",
+  "replay",
 ] as const;
 
 export type TabType = (typeof ALL_TABS)[number];
@@ -91,6 +93,7 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
   "audit",
   "mindset",
   "calendar",
+  "replay",
 ] as const;
 
 export type SidebarItemKey = (typeof SIDEBAR_TOGGLEABLE_KEYS)[number];
@@ -115,6 +118,7 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   audit: null,
   mindset: null,
   calendar: "macro",
+  replay: "replay",
 };
 
 /**
@@ -221,6 +225,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // « Badges & paliers » ne figure plus ici : les badges restent accessibles par
   // le profil (UserProfileModal, onglet Badges).
   const pratiqueItems: SidebarEntry[] = [
+    { key: "replay", id: "replay", label: "Replay", icon: CandlestickChart },
     { key: "exam", id: "exam", label: "Examen", icon: Award },
     { key: "checklist", id: null, label: "Exercice du jour", icon: Sliders, onOpen: onOpenChecklist },
   ];
