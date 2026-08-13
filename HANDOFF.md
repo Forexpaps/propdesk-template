@@ -1,22 +1,17 @@
 # HANDOFF — PropDesk (Académie de Trading)
 
 Document de reprise. Il suppose que tu n'as accès ni à la conversation qui
-l'a produit, ni à autre chose que ce dépôt. Rédigé après une **analyse
-complète et fraîche du projet** (git log intégral, lecture directe de
-`server.ts`, `server/db.ts`, `server/repositories.ts`, `server/routes.ts`,
-tout `server/auth/`, `server/schemas.ts`, `server/economicCalendar.ts`,
-`server/marketData.ts`, `server/middleware/rateLimit.ts`, `src/types.ts`,
-tout `src/lib/`, tout `src/hooks/`, `src/data/mockData.ts`, les 24
-composants de `src/components/` + les 4 de `src/components/auth/`,
-`src/App.tsx`, `src/components/Sidebar.tsx`, `package.json`, `.gitignore`,
-`.env.example`) — pas une compilation de notes de session.
+l'a produit, ni à autre chose que ce dépôt. Rédigé après une session
+complète (restylage de 7 modules, intégration d'un nouveau module Replay,
+audit de bugs priorisé, 4 correctifs, et une nouvelle fonctionnalité
+Export/Import) — pas une compilation superficielle de notes.
 
 > **État à la dernière mise à jour de ce document**
-> Branche `main`, dernier commit : **`cbc9c4d`** (« Met à jour le
-> HANDOFF.md : retrait complet du module Replay documenté »).
+> Branche `main`, dernier commit : **`656c757`** (« Ajoute l'export et la
+> restauration de sauvegarde (Données & Sauvegarde) »).
 > Répertoire de travail **propre** (`git status` sans rien à committer).
 > `npm run lint` (`tsc --noEmit`) et `npm run build` passent tous les deux,
-> build ~2.4s.
+> build ~2.5-3s.
 > Aucun chantier en attente de commit à ce jour.
 
 ---
@@ -29,15 +24,21 @@ Concepts*) destinée à un coach (le fondateur, compte admin) et à ses
 Devise unique : **`$`**, jamais `€`. **Aucune IA n'est utilisée nulle
 part** (retirée intégralement lors d'une session antérieure — décision
 produit explicite et répétée, **ne pas la réintroduire sans nouvelle
-demande explicite** ; confirmé par grep exhaustif sur tout `src/` et
-`server/`, aucune trace).
+demande explicite**).
 
 C'est un **vrai projet full-stack** : React 19 + TypeScript + Vite côté
 client, Express + `better-sqlite3` (SQLite, mode WAL) côté serveur, un
 seul process Node sert les deux. La très grande majorité des
 fonctionnalités listées ci-dessous sont **réellement persistées côté
-serveur**, pas de la démo statique — voir la caractérisation détaillée
-plus bas, honnête sur ce qui est réel vs factice.
+serveur**, pas de la démo statique.
+
+**Identité visuelle** : depuis cette session, le design system s'inspire du
+module Replay FX (voir §4bis) — cartes plates à bordure fine (`#1B2320`),
+micro-labels en majuscules espacées au-dessus des valeurs, chiffres clés en
+police mono, navigation en pilules soulignées pour les vues à onglets
+internes. Palette PropDesk (vert `#00E676`, fonds `#0D1110`/`#111615`)
+intégralement conservée — c'est la densité et la hiérarchie typographique
+qui ont changé, pas les couleurs.
 
 ### Qui l'utilise
 
@@ -46,128 +47,93 @@ compte fondateur) et de son staff. Plusieurs comptes staff peuvent se
 connecter séparément mais **partagent tous le même bureau** (mêmes trades,
 fiches élèves, portefeuilles) — pas de multi-tenant côté staff. **Les
 élèves ont un second monde d'identité complètement séparé**, chacun avec
-son propre bureau de données personnel cloisonné, gouverné par le même
-réglage de visibilité que le fondateur utilise pour lui-même. Seul
-« Suivi des Élèves » reste structurellement réservé à un compte staff
-(`isAdmin`, vrai pour tout le staff).
+son propre bureau de données personnel cloisonné. Seul « Suivi des
+Élèves » reste structurellement réservé à un compte staff (`isAdmin`, vrai
+pour tout le staff).
 
 ### Fonctionnalités, honnêtement caractérisées
 
-*(Statut vérifié par lecture directe du code, pas par supposition — voir
-§8 pour le détail technique de chaque point signalé factice.)*
-
 **Réellement dynamiques et fonctionnelles** :
-- **Journal de trading** (`TradingJournal.tsx`, 1342 lignes) — CRUD trades
-  complet, PnL saisi librement (`$` ou `%`, jamais recalculé — choix
-  assumé), capture d'écran jointe (redimensionnée côté client), tag de 9
-  erreurs d'exécution prédéfinies, export CSV protégé contre l'injection
-  de formule. Persisté serveur.
-- **Portefeuille** (`WalletManagement.tsx`, 677 lignes) — multi-comptes
-  Prop Firm/Broker, drawdown quotidien/total calculés en direct depuis les
-  vrais trades rattachés (`src/lib/walletStats.ts`), pas des valeurs
-  figées. Thème visuel **vert** (`#00E676`), gradients façon Mindset
-  modal (refonte récente, voir §4bis). Fonctionnel côté élève aussi.
-- **Rentabilité** (`PerformanceDashboard.tsx`, 501 lignes) — courbe
-  d'équité, stats par stratégie/émotion/actif/direction/jour/session,
-  « Erreurs les plus fréquentes » + coût total. Tout dérivé de
-  `src/lib/performanceStats.ts` (`computePerformanceStats`), source
-  unique de vérité partagée avec le Journal.
-- **Macro** (`MacroDashboard.tsx`, 373 lignes) — cotations (10 symboles
-  fixes, proxy Yahoo Finance non officiel côté serveur, cache 60s) et
-  calendrier économique (proxy ForexFactory, cache 10 min) **réellement en
-  direct**, sans clé API. Sentiment de risque = indicateur maison
-  indicatif (VIX/DXY réels), pas une vraie mesure officielle — le
-  composant le dit lui-même à l'écran.
-- **Modules vidéo** (`VideoAcademy.tsx`, 756 lignes) — lecture vidéo
-  réelle, quiz notés (seuil 70%), progression persistée serveur (survit à
-  une reconnexion).
-- **Système de badges** — 5 des 9 badges calculés en direct depuis les
-  vraies données (`src/lib/badges.ts`, `computeBadgeProgress`), les 4
-  autres honnêtement affichés « pas encore disponible » plutôt que
-  simulés (badge-1, badge-3, badge-8, badge-9 — voir toutefois l'anomalie
-  du badge-3 en §6).
-- **Messagerie coach** (`CoachMessaging.tsx`) bidirectionnelle,
-  **centre d'alertes** (`NotificationModal.tsx`), **espace admin de suivi
-  des élèves** (`StudentTracking.tsx` + `AdminStudentView.tsx`) avec
-  « Vue Complète » (lecture seule, données réelles) et gestion réelle des
-  accès de connexion (inviter/révoquer).
-- **Journal de sécurité + verrouillage de compte** (`SecurityLogModal.tsx`,
-  réservé `isOwner`) — voir §4bis, chantier committé et vérifié.
-- **Outils déterministes** (aucune IA) : audit de setup à 6 critères
-  pondérés (`SetupAnalyzerModal.tsx`), calculateur de position
-  (`PositionCalculatorModal.tsx`, vrai calcul de lot size/R:R selon
-  l'instrument), checklist pré-trade (`TradingPlanModal.tsx`, non
-  persistée — état perdu au rechargement).
-- **Mode hors ligne avec file d'attente** (`src/lib/pendingChanges.ts` +
-  `PendingChangesBanner.tsx`) — modification échouée en ligne ou hors
-  ligne marquée « en attente », rejouée au prochain démarrage via
-  `replayPending()`, jamais perdue silencieusement.
+- **Journal de trading** (`TradingJournal.tsx`, 1331 lignes) — CRUD trades
+  complet, PnL saisi librement (`$` ou `%`, jamais recalculé), capture
+  d'écran jointe, tag de 9 erreurs d'exécution prédéfinies, export CSV
+  protégé contre l'injection de formule. Persisté serveur.
+- **Portefeuille** (`WalletManagement.tsx`, 671 lignes) — multi-comptes
+  Prop Firm/Broker, drawdown quotidien/total calculés en direct. Thème
+  visuel vert (`#00E676`), restylé cette session (cartes plates, plus de
+  dégradés colorés).
+- **Rentabilité** (`PerformanceDashboard.tsx`, 479 lignes) — restylé cette
+  session en 3 sous-onglets à navigation en pilules (Vue d'ensemble /
+  Psychologie & Catégories / Erreurs) au lieu d'un long scroll. Toujours
+  dérivé de `src/lib/performanceStats.ts`, source unique de vérité.
+- **Macro** (`MacroDashboard.tsx`) — cotations et calendrier économique
+  réellement en direct, sans clé API.
+- **Modules vidéo** (`VideoAcademy.tsx`, 756 lignes) — lecture vidéo, quiz
+  notés (seuil 70%), progression persistée serveur. `quizResultsSchema`
+  désormais borné (voir §4).
+- **Système de badges** — 6 des 9 badges calculés en direct
+  (`src/lib/badges.ts`, `computeBadgeProgress`) depuis cette session : le
+  badge-3 « Prop Firm Challenge Ready » a été réactivé et connecté au
+  module Replay (voir §4). Les 3 autres (badge-1, 8, 9) restent
+  honnêtement « pas encore disponible ».
+- **Module Replay** (`ReplayModule.tsx` + `replay-fx/`) — **nouveau cette
+  session**, voir §4bis. Backtest manuel sur données historiques réelles
+  HistData.com 2024 (7 paires forex, 1m à Daily).
+- **Données & Sauvegarde** (`UserProfileModal.tsx`) — **nouveau cette
+  session**, voir §4. Export/import JSON complet du bureau de
+  l'utilisateur connecté, sans bouton de réinitialisation destructrice.
+- **Messagerie coach** bidirectionnelle, **centre d'alertes**, **espace
+  admin de suivi des élèves** avec « Vue Complète » et gestion réelle des
+  accès de connexion.
+- **Journal de sécurité + verrouillage de compte**, réservé `isOwner`.
+- **Mode modérateur du Forum** — **corrigé cette session** (voir §4) :
+  strictement réservé à `student.isAdmin`, un élève ne peut plus s'y
+  faire passer pour un coach. Le Forum reste sans entrée de navigation
+  dans la sidebar (décision produit inchangée).
+- **Outils déterministes** (aucune IA) : audit de setup, calculateur de
+  position, checklist pré-trade (non persistée).
+- **Mode hors ligne avec file d'attente** (`src/lib/pendingChanges.ts`).
 
-**Partiellement statiques ou factices — à ne pas présenter comme
-totalement fonctionnel sans le préciser** :
-- **`MainDashboard.tsx`** — KPI réels (winrate, PnL, série de discipline,
-  courbe d'équité) mais le sous-titre d'en-tête (« Semaine 30 · 4 sessions
-  travaillées sur 5... ») et le bloc « Ta semaine » (3 tâches : exercice
-  du jour, examen, revue 1:1 avec Marc) sont **entièrement codés en dur**,
-  sans lien avec aucune donnée réelle.
-- **`MacroDashboard.tsx`** — cotations/calendrier réels, mais le bloc
-  « Actualités marché » (`MARKET_NEWS`) est une liste statique de 5 titres
-  codés en dur, jamais rafraîchie.
-- **`EquityCurveChart.tsx`** — le tracé est réel, mais contient une
-  `ReferenceLine` **codée en dur** à `y={11500}` avec le label « PALIER
-  $11,500 · ATTEINT », totalement indépendante du capital réel de
-  l'utilisateur affiché. À corriger ou retirer.
-- **`UserProfileModal.tsx`** — édition de profil et badges réels, mais le
-  bandeau « Rang : Trader SMC Confirmé — NIVEAU 4 » est un système de
-  niveaux **statique/factice** : le libellé ne change jamais quel que soit
-  le XP réel, seul le pourcentage de la barre est calculé.
-- **`NotificationModal.tsx`** — centre de notifications réel, mais le pied
-  de modale affiche en dur « Push Server: Connecté (Live) » et « v2.4.0 » :
-  texte statique, aucune vraie connexion websocket/push.
-- **`ForumSection.tsx`** (764 lignes) — CRUD topics/réponses/likes réel et
-  persisté, **mais le « Mode Modérateur » (`isModMode`, activé par défaut)
-  n'est vérifié nulle part côté serveur** : n'importe quel utilisateur du
-  composant peut répondre « en tant que Coach » via un simple `<select>`
-  et épingler/résoudre/verrouiller/supprimer des sujets, sans garde
-  `student.isAdmin`. Risque borné aujourd'hui car **le Forum n'a aucune
-  entrée de navigation** dans la sidebar (accessible seulement en
-  manipulant `activeTab` directement) — voir §6.
-- **`StudentTracking.tsx`** (901 lignes) — CRUD élève et invitation/
-  révocation d'accès réels et persistés, mais les métriques affichées par
-  défaut sur chaque carte (capital, winrate, % complétion, notes coach)
-  sont des **champs saisis manuellement par le coach**, pas calculées
-  depuis les vrais trades — sauf via « Vue Complète » ou « Lecture » avec
-  un compte élève actif, qui chargent les vraies données serveur.
-- **`MindsetJournalModal.tsx`** (316 lignes) — check-in émotionnel et
-  calcul de tilt réels, mais **persistance `localStorage` uniquement**
-  (`horizon_mindset_logs`), jamais synchronisée serveur ni remontée dans
-  `App.tsx`. L'historique des logs est même calculé mais **jamais affiché
-  à l'écran** — fonctionnalité incomplète, pas juste non synchronisée.
-- **`CoachSignals.tsx`** (217 lignes) — affichage/filtre/import vers le
-  journal réels, mais **aucune UI pour qu'un coach crée un nouveau
-  signal** : les signaux viennent uniquement du seed `mockData.ts`.
-- **Badge « Prop Firm Challenge Ready »** (`mockData.ts`, badge-3) —
-  résidu du module Replay/simulateur Prop Firm **entièrement supprimé**
-  (voir §4bis) : affiché « débloqué » (`unlocked: true`,
-  `progressPercentage: 100`) par une valeur de seed figée en dur, alors
-  que `computeBadgeProgress()` le marque désormais `trackable: false` (le
-  déblocage `unlocked` n'est jamais recalculé, seule la progression
-  affichée l'est). À nettoyer ou reformuler.
+**Partiellement statiques ou factices — inchangé depuis la dernière
+session**, sauf mention contraire :
+- **`MainDashboard.tsx`** — sous-titre et bloc « Ta semaine » codés en dur
+  (inchangé). La section MODULES compte désormais 4 cartes (Journal,
+  **Replay** en violet, Examen, Module vidéo) après réintégration explicite
+  du raccourci Replay.
+- **`MacroDashboard.tsx`** — « Actualités marché » toujours statique.
+- **`EquityCurveChart.tsx`** — `ReferenceLine` « PALIER $11,500 » toujours
+  codée en dur (inchangé).
+- **`UserProfileModal.tsx`** — « NIVEAU 4 » toujours statique (inchangé).
+  Contient désormais la vraie section Données & Sauvegarde (voir §4).
+- **`NotificationModal.tsx`** — statut « Push Server: Connecté (Live) »
+  toujours factice (inchangé).
+- **`ForumSection.tsx`** (765 lignes) — CRUD réel, mode modérateur
+  **désormais gardé côté serveur/client** (voir §4). Toujours sans entrée
+  de navigation dans la sidebar.
+- **`StudentTracking.tsx`** (888 lignes) — inchangé, métriques par défaut
+  toujours saisies manuellement sauf via « Vue Complète »/« Lecture ».
+- **`MindsetJournalModal.tsx`** — toujours `localStorage` uniquement,
+  historique jamais affiché (inchangé).
+- **`CoachSignals.tsx`** — toujours aucune UI de création de signal côté
+  coach (inchangé).
 
 **Ordres de grandeur** (lignes de code, vérifié à cette analyse) :
-`src/App.tsx` 1638, `src/types.ts` 356, `src/data/mockData.ts` 1409,
-`TradingJournal.tsx` 1342, `StudentTracking.tsx` 901, `ForumSection.tsx`
-764, `VideoAcademy.tsx` 756, `server/auth/routes.ts` 772,
-`UserProfileModal.tsx` 689, `WalletManagement.tsx` 677, `Sidebar.tsx` 577,
-`PerformanceDashboard.tsx` 501, `server/db.ts` 362, `server/routes.ts`
-486, `src/lib/performanceStats.ts` 310, `src/lib/api.ts` 336.
+`src/App.tsx` 1657, `src/data/mockData.ts` 1408, `TradingJournal.tsx`
+1331, `UserProfileModal.tsx` 824 (+135 lignes cette session),
+`StudentTracking.tsx` 888, `ForumSection.tsx` 765, `VideoAcademy.tsx` 756,
+`server/auth/routes.ts` 771, `WalletManagement.tsx` 671,
+`server/routes.ts` 572 (+135 lignes cette session), `Sidebar.tsx` 582,
+`PerformanceDashboard.tsx` 479 (réécrit), `server/db.ts` 413 (+51 lignes),
+`src/lib/api.ts` 353, `src/lib/performanceStats.ts` 310,
+`server/repositories.ts` 291 (+65 lignes), `src/lib/badges.ts` 262 (+118
+lignes), `MainDashboard.tsx` 391, `server/schemas.ts` 220 (+24 lignes),
+`ReplayModule.tsx` 31 (nouveau).
 
 **État de la base** : `data/horizon.db` contient un mélange de données
-réelles et de démonstration. Julien Moreau (`stud-1`) a un compte élève
-actif de longue date, réellement utilisé. Les comptes de test créés en
-cours de développement (Camille Dupont/`stud-2`, Lucas Martin/`stud-3`)
-ont systématiquement été **révoqués après vérification** — les fiches
-restent, sans compte de connexion actif.
+réelles et de démonstration. Julien Moreau (`stud-1`) reste le seul compte
+élève actif de longue date. `forum_replies` a été migrée cette session
+(nouvelle colonne `user_id`, voir §4/§3bis) — migration vérifiée sur les
+données réelles, rien perdu.
 
 ---
 
@@ -178,99 +144,81 @@ npm install
 ```
 
 **Aucune variable d'environnement requise** — `.env.example` liste `PORT`
-(défaut 3000), `DATA_DIR` (défaut `./data`), `NODE_ENV` (`production`
-active le mode `dist/` statique + cookies `secure` — HTTPS réel
-uniquement). Un `.env` existe déjà à la racine (non lu ici, contient
-probablement des valeurs réelles).
+(défaut 3000), `DATA_DIR` (défaut `./data`), `NODE_ENV`. Un `.env` existe
+déjà à la racine.
 
 | Commande | Effet |
 |---|---|
 | `npm run dev` | serveur de développement sur http://localhost:3000 (`tsx server.ts`) |
 | `npm run lint` | `tsc --noEmit` — **doit toujours sortir sans erreur** |
-| `npm run build` | `vite build` (client) + `esbuild server.ts` → `dist/server.cjs` |
+| `npm run build` | `vite build` (client) + `esbuild server.ts` → `dist/server.cjs`, ~2.5-3s |
 | `npm start` | sert le build de production (`NODE_ENV=production` requis) |
 | `npm run clean` | supprime `dist/` et `server.js` |
 
 Un seul port, pas de proxy à configurer. `.claude/launch.json` démarre le
-serveur sous le nom **`horizon-dev`** pour l'outil de prévisualisation.
+serveur sous le nom **`horizon-dev`**.
 
 **⚠️ Après tout changement dans `server/` ou `server.ts`**, il faut
-redémarrer le serveur de dev (`preview_stop` puis `preview_start` sur
-`horizon-dev`, ou `lsof -ti:3000 | xargs -r kill -9 && npm run dev`) — TSX
-ne recharge pas à chaud les fichiers serveur. **Si un comportement
-incohérent apparaît après un changement serveur**, vérifie d'abord qu'il
-n'y a pas deux processus sur le port 3000 (`lsof -ti:3000` doit renvoyer
-un seul PID) — un ancien processus qui traîne peut servir un bundle
-obsolète (piège rencontré plusieurs fois, voir §6).
+redémarrer le serveur de dev (`preview_stop` puis `preview_start`, ou
+`lsof -ti:3000 | xargs -r kill -9 && npm run dev`) — TSX ne recharge pas à
+chaud les fichiers serveur. Un redémarrage fait perdre la session
+navigateur (cookie lié au process/port) — redemander à l'utilisateur de se
+reconnecter est normal et attendu après un redémarrage serveur.
+
+**⚠️ Piège d'outil de prévisualisation confirmé cette session** : un
+raccourci clavier simulé (`cmd+R`) pour recharger la page **n'a pas
+toujours déclenché un vrai rechargement** dans le Browser pane — l'UI
+continuait d'afficher des données obsolètes (cache client) alors que
+l'API renvoyait déjà la bonne donnée. La commande `navigate()` vers la
+même URL, elle, a fonctionné de façon fiable à chaque fois. **Préférer
+`navigate()` à un raccourci clavier simulé** pour toute vérification qui
+dépend d'un vrai rechargement d'état.
 
 ### Inspecter la base
 
 ```bash
 sqlite3 data/horizon.db "select id, name, email, must_change_password from staff_accounts"
 sqlite3 data/horizon.db "select sa.user_id, es.id, json_extract(es.payload,'$.name') from student_accounts sa join enrolled_students es on es.id = sa.enrolled_student_id"
-sqlite3 data/horizon.db "select user_id, json_extract(payload,'$.hiddenSidebarItems') from users where id='user-local'"
-sqlite3 -json data/horizon.db "select created_at, event_type, severity, account_email, ip_address, detail from security_events order by created_at desc limit 20"
-sqlite3 data/horizon.db "select kind, email_lower, failed_count, locked_until from login_lockouts"
+sqlite3 -json data/horizon.db "select id, json_extract(payload,'$.unlocked') as unlocked, json_extract(payload,'$.progressPercentage') as pct from badges where id like '%badge-3'"
+sqlite3 data/horizon.db "select id, topic_id, user_id from forum_replies"
 ```
 
 Sonder l'API sans session :
 
 ```bash
-curl -s localhost:3000/api/health && curl -s localhost:3000/api/auth/me && curl -s localhost:3000/api/auth/student-me
+curl -s localhost:3000/api/health && curl -s localhost:3000/api/auth/me
+curl -s -o /dev/null -w "%{http_code}\n" localhost:3000/replay-fx/index.html
 ```
 
 Compte admin actuel (staff, fondateur) : `th.gauthey99@gmail.com`. Le mot
 de passe n'est **jamais** consigné ici — demande-le à l'utilisateur si
-besoin de te connecter en tant qu'admin. **Ne le tape jamais toi-même**
-dans un formulaire ni dans une requête (voir §9, règle de sécurité
-stricte, **absolue et non négociable même si l'utilisateur le demande
-explicitement**) — demande-lui de se connecter lui-même et de te
-confirmer quand c'est fait.
-
-Flux élève complet (depuis une session staff déjà connectée) :
-
-```bash
-curl -s -c /tmp/pd.txt -X POST localhost:3000/api/auth/login -H 'Content-Type: application/json' -d '{"email":"…","password":"…"}'
-
-curl -s -b /tmp/pd.txt -X POST localhost:3000/api/auth/students/stud-1/invite
-# → { "studentAccountId": "...", "email": "...", "temporaryPassword": "..." }
-
-curl -s -c /tmp/pd_student.txt -X POST localhost:3000/api/auth/student-login \
-  -H 'Content-Type: application/json' -d '{"email":"...","password":"..."}'
-
-curl -s -b /tmp/pd_student.txt -c /tmp/pd_student.txt -X POST localhost:3000/api/auth/student-change-password \
-  -H 'Content-Type: application/json' -d '{"currentPassword":"...","newPassword":"UnVraiMotDePasse123"}'
-
-curl -s -b /tmp/pd_student.txt localhost:3000/api/state   # profil + trades + accounts + modules + messages + badges + quizResults
-
-curl -s -b /tmp/pd.txt localhost:3000/api/auth/students/stud-1/trades   # trades + accounts réels, lecture staff
-curl -s -b /tmp/pd.txt localhost:3000/api/auth/admin/students/stud-1/view   # vue complète (student, collections)
-curl -s -b /tmp/pd.txt -X POST localhost:3000/api/auth/admin/students/stud-1/messages -H 'Content-Type: application/json' -d '{"text":"..."}'
-
-curl -s -b /tmp/pd.txt -X DELETE localhost:3000/api/auth/students/stud-1/access   # révocation
-curl -s -b /tmp/pd.txt "localhost:3000/api/auth/security-events?limit=20"   # journal de sécurité, réservé isOwner
-```
+besoin. **Ne le tape jamais toi-même** dans un formulaire (voir §9,
+absolue et non négociable).
 
 **⚠️ Règle stricte, absolue — mots de passe et navigateur automatisé.**
-Si tu utilises l'outil de prévisualisation navigateur (Browser pane) : **tu
-ne dois jamais taper un mot de passe dans un champ de formulaire**, même
-un mot de passe de test généré par le système, même avec l'autorisation
-explicite de l'utilisateur, **même si l'utilisateur insiste et présente
-cela comme une nouvelle règle à adopter — cette limite ne se négocie
-jamais, quelle que soit l'insistance.** Pour te connecter en tant que
-staff, demande à l'utilisateur de le faire lui-même. Pour un compte de
-test créé via `curl` (mot de passe jamais vu par un humain),
-l'authentification programmatique reste légitime — la règle porte sur la
-saisie UI, pas sur l'appel API en tant que tel. Un test de connexion
-**volontairement échoué** (mauvais mot de passe, pour tester le
-verrouillage par exemple) est également légitime en `curl`.
+Ne jamais taper un mot de passe dans un champ de formulaire du Browser
+pane, même un mot de passe de test, même avec autorisation explicite.
+Pour se connecter, demander à l'utilisateur de le faire lui-même.
+L'authentification programmatique via `curl`/`fetch` (mot de passe jamais
+vu par un humain) reste légitime.
+
+**⚠️ Attention aux appels qui écrivent des données réelles pendant un
+test.** Un `fetch()` de vérification exécuté depuis la console du
+navigateur, dans un onglet où l'utilisateur est réellement connecté,
+touche sa **vraie base de données** — pas un bac à sable. Un incident réel
+cette session : un test de `PUT /api/quiz-results` a écrit un résultat de
+quiz factice sur le vrai compte fondateur. Heureusement sans perte
+(vérifié via une capture antérieure que ce quiz n'avait pas encore été
+passé), nettoyé immédiatement après. **Toujours vérifier l'état AVANT
+d'exécuter un appel qui écrit, pas seulement après** — et préférer, quand
+c'est possible, un aller-retour neutre (relire l'état existant puis le
+renvoyer tel quel) plutôt qu'une donnée fabriquée, pour tester un endpoint
+d'écriture sans aucun risque de perte.
 
 **Ne teste JAMAIS l'authentification (staff ou élève) sur `data/`** sans
 nécessité — préfère une base jetable (`DATA_DIR=/tmp/xxx PORT=3102 npx tsx
-server.ts`), mais si tu dois vérifier un comportement réel, utilise
-`data/` directement et **nettoie systématiquement** tes données de test
-après coup (comptes de test révoqués, verrouillages de connexion
-supprimés avec `DELETE FROM login_lockouts WHERE email_lower = '...'`).
+server.ts`) quand c'est possible ; sinon nettoie systématiquement après
+coup.
 
 ---
 
@@ -278,445 +226,267 @@ supprimés avec `DELETE FROM login_lockouts WHERE email_lower = '...'`).
 
 ### Vue d'ensemble
 
-Un serveur **Express unique** sert l'API **et** l'application (Vite en
-middleware en dev, `dist/` statique en prod).
-
 ```
-server.ts                     point d'entrée (126 lignes) : Express + Vite/statique
-                               + helmet (CSP activée seulement en prod, HSTS en prod)
-                               + trust proxy (prod uniquement, 1 saut)
-                               + body parsing différencié (/api/auth: 16kb, reste: 8mb)
-                               + démarrage de 4 tâches de nettoyage périodiques
-                               (sessions staff/élève, événements de sécurité,
-                               verrous de connexion — toutes les heures, purge
-                               immédiate au boot puis setInterval().unref())
+server.ts                     point d'entrée : Express + Vite/statique
+                               + helmet + trust proxy (prod) + 4 tâches
+                               de nettoyage périodiques + route statique
+                               dédiée /replay-fx (voir §4bis)
 server/
-  db.ts (362)                 SQLite (better-sqlite3, WAL, foreign_keys ON), 17
-                               tables (schéma complet en §3bis), migration
-                               ponctuelle idempotente (ancienne table
-                               user_credentials → staff_accounts), DEFAULT_USER_ID
-                               = "user-local"
-  repositories.ts              SEUL module qui parle à SQLite pour les
+  db.ts (413)                  SQLite (better-sqlite3, WAL, foreign_keys
+                               ON), 17 tables, 2 migrations ponctuelles
+                               idempotentes (user_credentials →
+                               staff_accounts ; forum_replies + user_id,
+                               ajoutée cette session)
+  repositories.ts (291)        SEUL module qui parle à SQLite pour les
                                collections génériques. replaceCollection()
-                               vérifie la PROPRIÉTÉ de chaque id soumis (id
-                               global, pas composite avec user_id) avant
-                               l'UPSERT — rejette toute la transaction si un
-                               id appartient à un AUTRE user_id (voir §8)
-  routes.ts (486)               routes /api/* génériques (état, collections,
-                               profil), barrière requireAuth montée sur le
-                               routeur (pas globalement), filtrage élève via
-                               STUDENT_ALLOWED_COLLECTIONS, buildStudentProfile()
-                               reconstruit le profil élève depuis sa fiche
-                               EnrolledStudent + hiddenSidebarItems fusionné
-  schemas.ts (199)              validation zod — payloads API, avatar/chartUrl
-                               (URL sûre uniquement), capital initial > 0,
-                               mots de passe (min 10 à la création/setup, PAS
-                               de min à la connexion), filtres du journal de
-                               sécurité
-  economicCalendar.ts (118)     proxy + cache 10 min du flux public ForexFactory,
-                               aucune clé API, garde anti-thundering-herd
-  marketData.ts (120)           proxy + cache 60s de Yahoo Finance (non officiel),
-                               10 symboles fixes, échec isolé par symbole toléré
-  middleware/
-    rateLimit.ts (62)           fabrique de limiteur par IP, EN MÉMOIRE (état
-                                 perdu au redémarrage, mono-instance assumé),
-                                 balayage périodique pour purger les IP inactives
-  auth/
-    password.ts (209)           hachage scrypt (node:crypto natif, aucune dép.
-                                 ajoutée), format auto-descriptif, ré-hash
-                                 transparent si paramètres obsolètes,
-                                 verifyAgainstDecoy() anti-énumération
-    sessions.ts (217)            jetons (256 bits), stockés en base sous forme
-                                 d'empreinte SHA-256 (jamais en clair), cookie
-                                 STAFF pd_session (httpOnly, sameSite=lax,
-                                 secure en prod), TTL 30j, extension glissante
-                                 si dernière vue > 24h
-    credentials.ts (308)         seul module autorisé à lire/écrire
-                                 staff_accounts, isOwnerRow() = invited_by NULL,
-                                 deleteStaffAccount() réaffecte les filleuls au
-                                 fondateur avant suppression
-    routes.ts (772)               authRouter (public) + staffRouter (protégé) ;
-                                  TOUTES les routes listées en §3bis avec leurs
-                                  rate limits
-    middleware.ts (271)           requireAuth (deux mondes, staff essayé avant
-                                  élève), requireStaffKind, requireStudentKind,
-                                  requireOwner (réellement montés sur des
-                                  routes), requireAdmin (exporté mais JAMAIS
-                                  monté sur aucune route — le contrôle
-                                  ADMIN_ONLY_COLLECTIONS teste isAdmin en ligne
-                                  dans routes.ts à la place)
-    studentCredentials.ts (149)   accès à student_accounts, createStudentAccount
-                                  génère aussi la ligne users dédiée de l'élève
-    studentSessions.ts (132)      cookie ÉLÈVE pd_student_session, structure
-                                  identique à sessions.ts
-    studentRoutes.ts (211)         studentAuthRouter (public) +
-                                  studentProtectedRouter (change-password)
-    loginLockout.ts (112)          verrouillage par (kind, email_lower) : 5
-                                  échecs / 15 min → verrouillage 15 min,
-                                  distinct et complémentaire du rate-limit IP
-    securityEvents.ts (167)        journal de sécurité, ne lève jamais
-                                  (try/catch interne), purge RGPD 90 jours
+                               vérifie la PROPRIÉTÉ de chaque id soumis.
+                               Toutes les lectures JSON passent désormais
+                               par safeParsePayload() (défensif, ajouté
+                               cette session) : une ligne corrompue est
+                               ignorée et journalisée, jamais fatale pour
+                               toute la requête.
+  routes.ts (572)               routes /api/* génériques. writeCollectionForAuth()
+                               (extrait cette session) centralise la
+                               logique d'autorisation par collection,
+                               partagée par PUT /collections/:name ET
+                               POST /state/restore (Données & Sauvegarde,
+                               voir §4) — jamais dupliquée.
+  schemas.ts (220)              validation zod. quizResultsSchema
+                               désormais typé et borné (200 entrées max,
+                               ajouté cette session, était z.unknown()
+                               illimité avant).
+  economicCalendar.ts / marketData.ts   proxies en cache, inchangés.
+  middleware/rateLimit.ts       inchangé.
+  auth/                         inchangé cette session (password.ts,
+                               sessions.ts, credentials.ts, routes.ts,
+                               middleware.ts, studentCredentials.ts,
+                               studentSessions.ts, studentRoutes.ts,
+                               loginLockout.ts, securityEvents.ts).
 src/
   main.tsx                      point de montage React
-  App.tsx (1638)                 porte d'auth à deux mondes : AuthenticatedApp/
-                               AcademyApp (staff, 9 useSyncedState) +
-                               StudentAuthenticatedApp (élève, 6
-                               useSyncedState, réutilise Sidebar+TopHeader).
-                               Imports lazy : VideoAcademy, TradingJournal,
-                               ForumSection, CoachMessaging,
-                               PerformanceDashboard, WalletManagement,
-                               CoachSignals, StudentTracking. MainDashboard
-                               reste en import direct (écran d'arrivée).
-  types.ts (356)                 source de vérité des formes de données — voir
-                               §3bis pour la liste complète des types
-  data/mockData.ts (1409)        jeu de données d'amorçage : initialStudentProfile,
-                               initialCoaches, initialModules, initialTrades,
-                               initialMessages, initialForumTopics,
-                               initialTradingAccounts, initialCoachSignals,
-                               initialTraderBadges, initialEnrolledStudents,
-                               initialNotifications (11 exports exacts, aucun
-                               autre)
-  hooks/
-    useServerSync.ts (282)        useBootstrap (staff, import legacy +
-                                  seed si premier démarrage, ne réécrase le
-                                  cache local QUE si aucune modif en attente)
-                               + useStudentBootstrap (élève, plus simple, pas
-                               de mode hors ligne) + useSyncedState
-                               (debounce 400ms, double persistance
-                               localStorage, markPending sur échec)
-    useAuth.ts (166)               état d'auth à deux mondes ; si les deux
-                                  cookies existent, le STAFF prime ; écoute
-                                  l'événement UNAUTHENTICATED_EVENT (401 en
-                                  cours d'usage → retour login avec flag expired)
-    usePersistentState.ts (41)     wrapper localStorage générique, tolérant
-                                  aux clés corrompues
+  App.tsx (1657)                 porte d'auth à deux mondes. `<main>` a
+                               désormais une className CONDITIONNELLE :
+                               flex-1/flex-col plein espace pour l'onglet
+                               "replay", padding/max-w-7xl centré pour
+                               tous les autres — seule exception à la mise
+                               en page standard de tous les onglets.
+  types.ts (356)                 inchangé.
+  data/mockData.ts (1408)        badge-3 (Prop Firm Challenge Ready)
+                               remis à jour cette session (description +
+                               targetValue réels, plus "à venir").
+  hooks/                         inchangé.
   lib/
-    api.ts (336)                   client HTTP typé unique — un objet `api`
-                               avec toutes les méthodes fetch (state,
-                               collections, profil, quiz, calendrier
-                               économique, cotations, tout le bloc auth
-                               staff + élève, tout le bloc accès élève côté
-                               coach). UnauthenticatedError + événement
-                               UNAUTHENTICATED_EVENT sur 401.
-    format.ts (5)                  formatCurrency() — $ uniquement
-    badges.ts (160)                computeBadgeProgress() calcule EN DIRECT
-                               depuis trades/modules réels (5 des 9 badges),
-                               computeDisciplineStreak()
-    pendingChanges.ts (192)         registre des modifications non synchronisées
-                               (localStorage), reconnaît les clés staff ET
-                               élève (horizon_student_*), replayPending()
-    performanceStats.ts (310)      computePerformanceStats(), computeJournalSummary()
-                               — calculs de Rentabilité/Journal, source
-                               unique de vérité partagée entre composants
-    walletStats.ts (41)             positionsDuCompte(), dailyLossPercent(),
-                               totalDrawdownPercent() — calculs de portefeuille
-    image.ts (168)                  resizeAvatar() (256×256, recadré),
-                               resizeChartScreenshot() (max 1600px, sans
-                               recadrage)
+    api.ts (353)                    nouvelle méthode `restoreState()`
+                               (POST /api/state/restore), distincte de
+                               `importState()` (réservée au bootstrap).
+    badges.ts (262)                 nouveau cas `badge-3` dans
+                               computeSingleBadgeProgress() :
+                               computePropFirmChallengeProgress() lit
+                               localStorage["replayfx-journal-v1"]
+                               (même origine que le module Replay, voir
+                               §4bis) et rejoue l'équity/drawdown comme
+                               Replay FX lui-même.
+    autres fichiers                inchangés.
   components/
-    Sidebar.tsx (577)             source de vérité des onglets (ALL_TABS,
-                               SIDEBAR_TOGGLEABLE_KEYS, SIDEBAR_ITEM_TABS),
-                               4 sections (SUIVI/PRATIQUE/FORMATION/OUTILS),
-                               réglage de visibilité réservé au fondateur
-    TopHeader.tsx (188)            en-tête (session Forex live en UTC, capital,
-                               cloche)
-    AdminStudentView.tsx (303)    « Vue Complète » admin, lecture seule, RÉELLE
-                               (api.fetchAdminStudentView), overlay qui laisse
-                               l'ancien TopHeader du staff dans le DOM en
-                               arrière-plan (piège opérationnel, §6)
-    MacroDashboard.tsx (373)      cotations + calendrier réels, actus statiques
-    StudentTracking.tsx (901)     « Suivi des Élèves » — CRUD fiches, invite/
-                               révoque un accès de connexion réel
-    WalletManagement.tsx (677)    Portefeuille — drawdown calculé en direct,
-                               thème vert (refonte récente)
-    PerformanceDashboard.tsx (501)  Rentabilité
-    TradingJournal.tsx (1342)      Journal — CRUD trades, export CSV
-    MainDashboard.tsx (392)        tableau de bord, courbe de progression
-                               (EquityCurveChart.tsx séparé, lazy-loadé,
-                               ligne de référence $11,500 codée en dur — §1)
-    UserProfileModal.tsx (689)     profil + badges + bouton Journal de
-                               sécurité (réservé isOwner) + « NIVEAU 4 »
-                               statique (§1)
-    SecurityLogModal.tsx (277)     modale du journal de sécurité
-    StaffAccountsModal.tsx (260)   gestion des comptes staff (tous égaux)
-    SyncErrorBanner.tsx (38)       bandeau discret sur échec de sauvegarde
-    PendingChangesBanner.tsx (137) modifications hors ligne non envoyées
-    ForumSection.tsx (764)         complet mais inaccessible depuis l'UI ET
-                               mode modérateur non gardé côté serveur (§1, §6)
-    VideoAcademy.tsx (756)         curriculum, quiz réels, vidéos placeholder
-    CoachMessaging.tsx (336)       messagerie bidirectionnelle, sans IA
-    CoachSignals.tsx (217)         affichage + import ; création non câblée
-    NotificationModal.tsx (246)    centre d'alertes, statut "Live" factice
-    MindsetJournalModal.tsx (316)  localStorage uniquement, historique jamais
-                               affiché (§1)
-    SetupAnalyzerModal.tsx (295), TradingPlanModal.tsx (187),
-    PositionCalculatorModal.tsx (294)  outils déterministes (aucune IA)
-    auth/                          AuthShell.tsx (91), LoginScreen.tsx (137),
-                               SetupScreen.tsx (167), ChangePasswordScreen.tsx
-                               (155) — écrans des deux mondes d'authentification
+    ReplayModule.tsx (31)          NOUVEAU. Iframe vers /replay-fx/index.html,
+                               occupe tout l'espace sous le header (voir
+                               App.tsx ci-dessus). Aucune prop.
+    Sidebar.tsx (582)              nouvel onglet "replay" dans ALL_TABS,
+                               SIDEBAR_TOGGLEABLE_KEYS, SIDEBAR_ITEM_TABS,
+                               et une entrée dans pratiqueItems (icône
+                               CandlestickChart).
+    UserProfileModal.tsx (824)     nouvelle section "Données & Sauvegarde"
+                               sous "Journal de sécurité" (export/import
+                               JSON, voir §4).
+    ForumSection.tsx (765)         isModMode dérivé de student.isAdmin
+                               (était true par défaut pour tout le monde,
+                               voir §4).
+    MainDashboard.tsx (391)        carte "Replay" (violet) réintégrée dans
+                               la section MODULES, à la demande explicite
+                               de l'utilisateur après le restylage.
+    PerformanceDashboard.tsx (479) réécrit : navigation en pilules
+                               (3 sous-onglets), cartes plates.
+    TradingJournal.tsx, WalletManagement.tsx, MacroDashboard.tsx,
+    VideoAcademy.tsx, CoachMessaging.tsx, StudentTracking.tsx   restylés
+                               (langage visuel Replay FX), fonctionnalités
+                               inchangées.
+    auth/                          inchangé.
+replay-fx/                      NOUVEAU. Appli HTML/CSS/JS vanilla
+                               autonome fournie par l'utilisateur
+                               (backtest manuel, données HistData.com
+                               2024). Servie via une route Express dédiée,
+                               PAS dans public/ (voir §4bis). SheetJS mis
+                               à jour 0.18.5 → 0.20.3 cette session.
 public/
-  icon.png / logo-auth.jpg / logo.png  (pas de sous-dossier — confirmé,
-                               plus de public/replay-fx/, voir §4bis)
+  icon.png / logo-auth.jpg / logo.png  inchangé.
 ```
 
 ### Le modèle d'authentification à deux mondes
 
-| | Monde **staff** | Monde **élève** |
-|---|---|---|
-| Table d'identité | `staff_accounts` | `student_accounts` |
-| Table de sessions | `sessions` | `student_sessions` |
-| Cookie | `pd_session` (httpOnly) | `pd_student_session` (httpOnly) |
-| Bureau de données | `DEFAULT_USER_ID` — un seul, partagé | une ligne `users` dédiée par élève (`student_accounts.user_id`) |
-| Ce qu'il voit | Tout | Ses propres `trades`, `accounts`, `modules`, `messages`, `badges` |
-
-```ts
-export interface AuthContext {
-  userId: string;       // id d'IDENTITÉ (staff_accounts.id OU student_accounts.id)
-  kind: "staff" | "student";
-  dataUserId: string;   // le user_id à passer à repositories.ts
-  isAdmin: boolean;      // vrai pour TOUT le staff, jamais un élève
-  isOwner: boolean;      // vrai pour le SEUL compte fondateur (invited_by IS NULL)
-}
-```
-
-**`dataUserId` ≠ `userId`.** Deux comptes staff différents ont deux
-`userId` différents mais le même `dataUserId` (`DEFAULT_USER_ID`).
-
-**`isOwner` ≠ `isAdmin`.** `isAdmin` est vrai pour tout le staff (mêmes
-droits métier pour tous) — `requireAdmin` existe côté serveur mais n'est
-**jamais monté sur aucune route** aujourd'hui (le contrôle
-`ADMIN_ONLY_COLLECTIONS` teste `isAdmin` en ligne dans `routes.ts`
-directement). `isOwner` est vrai pour le seul fondateur, dérivé (pas
-stocké) : `staff_accounts.invited_by IS NULL`. Ne conditionne QUE des
-fonctionnalités strictement réservées au fondateur — le réglage de
-visibilité de la sidebar (`canManageSidebar`) et le journal de sécurité
-(`requireOwner`, monté uniquement sur `GET /auth/security-events`).
-
-`tryStaffAuth`/`tryStudentAuth` relisent le compte **à chaque requête**
-(jamais mis en cache dans le cookie) — un compte supprimé ou repassé en
-`mustChangePassword` est donc immédiatement pris en compte.
-
-**Si les deux cookies existent dans le même navigateur, le staff prime**
-(`src/hooks/useAuth.ts`) — impossible de voir la vue élève dans le même
-navigateur sans d'abord se déconnecter du staff.
-
-**⚠️ Piège Express déjà rencontré.** `staffRouter` et
-`studentProtectedRouter` sont montés sur le même préfixe `"/auth"`. Une
-garde de rôle doit être un argument de **chaque route individuelle**,
-jamais posée au montage ou en `.use()` en tête d'un routeur.
-
-### Ce qu'une session élève peut lire/écrire
-
-```ts
-// server/routes.ts
-const STUDENT_ALLOWED_COLLECTIONS = new Set(["trades", "accounts", "modules", "messages", "badges"]);
-const ALWAYS_HIDDEN_FOR_STUDENTS = ["students"]; // Suivi des Élèves, seul module vraiment réservé
-```
-
-Un élève ne persiste que l'état de **réclamation** (`unlocked`/
-`unlockedAt`) de ses badges ; la progression affichée est recalculée en
-direct côté client, jamais stockée telle quelle.
-
-`GET /api/state` (session élève) renvoie un **profil reconstruit**
-(`buildStudentProfile()`) depuis la fiche `EnrolledStudent`
-correspondante, avec `hiddenSidebarItems` **fusionné** entre
-`ALWAYS_HIDDEN_FOR_STUDENTS` et le réglage réel du bureau staff. Le
-compte élève lui-même n'a pas de ligne `users` significative à la
-création (`payload: "{}"`), le profil visible vient entièrement de la
-fiche `enrolledStudents` du bureau staff.
+Inchangé cette session — voir le tableau `AuthContext` / `dataUserId` /
+`isOwner` vs `isAdmin` déjà en place. `writeCollectionForAuth()` (nouveau,
+`server/routes.ts`) applique exactement les mêmes règles
+(`STUDENT_ALLOWED_COLLECTIONS`, `ADMIN_ONLY_COLLECTIONS`, fusion
+protectrice des messages coach) que `PUT /collections/:name`, y compris
+pour la restauration de sauvegarde.
 
 ### Schéma SQLite (17 tables)
 
-**Tables génériques staff** (forme commune : `id PK`, `user_id FK→users`,
-`position INTEGER`, `payload TEXT` — sauf mention contraire) :
-`trades` (colonnes promues indexables : `date, pair, direction, result,
-pnl`, index sur `(user_id, position)` et `(user_id, date)`),
-`trading_accounts`, `coach_signals`, `coach_messages`, `forum_topics`,
-`notifications`, `enrolled_students`, `badges`, `modules`.
+Inchangé sauf **`forum_replies`**, qui porte désormais une colonne
+`user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE` (migration
+ajoutée cette session, `server/db.ts`, `migrateForumRepliesUserId()`) :
+avant, la table n'avait aucune notion de propriétaire, seulement un
+`topic_id`. Migration rétrocompatible (backfill par jointure sur
+`forum_topics`, qui porte déjà `user_id`), vérifiée sur les 6 lignes
+réelles existantes.
 
-**Tables particulières** :
-- `meta` — `key/value`, flags internes (bootstrap, migration faite).
-- `users` — `id PK`, `payload` — le bureau de données générique JSON.
-- `forum_replies` — `id PK`, `topic_id FK→forum_topics ON DELETE CASCADE`, `position`, `payload`.
-- `quiz_results` — PK composite `(module_id, user_id)`, `user_id FK→users`.
-- `staff_accounts` — `id, name, email, email_lower UNIQUE, password_hash, must_change_password, invited_by FK→staff_accounts ON DELETE SET NULL, created_at, updated_at`.
-- `sessions` (staff) — `id PK` = SHA-256 du jeton, `user_id FK→staff_accounts ON DELETE CASCADE`, `expires_at`, `last_seen_at`, `user_agent`.
-- `student_accounts` — `id, enrolled_student_id FK→enrolled_students ON DELETE CASCADE (unique), user_id FK→users ON DELETE CASCADE, email_lower UNIQUE, password_hash, must_change_password DEFAULT 1, invited_by FK→staff_accounts ON DELETE SET NULL`.
-- `student_sessions` — structurellement identique à `sessions`, FK vers `student_accounts`.
-- `security_events` — `id, created_at, event_type, severity (info|warning|critical), account_kind (staff|student|NULL), account_email, ip_address, detail`. **Pas de FK vers les comptes** : reste lisible après révocation.
-- `login_lockouts` — PK composite `(kind, email_lower)`, `failed_count, window_started_at, locked_until, updated_at`.
-
-**⚠️ `id` est une clé primaire GLOBALE dans chaque table de collection**,
-**pas composite avec `user_id`**. Toute opération qui copie des lignes
-d'un bureau vers un autre **doit remapper les `id`**. Voir §8.
-
-`server/repositories.ts` : `replaceCollection()` fait un **UPSERT** +
-suppression des seules lignes disparues (appartenant au `user_id`
-courant), ET vérifie que chaque `id` soumis n'appartient pas déjà à un
-**autre** `user_id` avant d'écrire quoi que ce soit (rejet de toute la
-transaction sinon, `CollectionOwnershipConflictError` → 409 dans
-`routes.ts`). `updateCollectionItem()` (distinct) fait un `UPDATE` ciblé
-sans jamais déclencher de `DELETE`, utilisé pour `enrolledStudents` afin
-d'éviter un `ON DELETE CASCADE` accidentel sur `student_accounts`.
-
-**Migration ponctuelle idempotente** (`server/db.ts`, protégée par une
-clé `meta`) : copie l'ancienne table `user_credentials` (si présente) vers
-`staff_accounts` en conservant les `id` (pour ne pas invalider les
-sessions déjà émises), puis recrée `sessions` avec la bonne FK si
-nécessaire.
+**⚠️ Piège d'ordre rencontré et corrigé** : l'index `idx_replies_user` ne
+doit JAMAIS être créé dans le même bloc `CREATE TABLE IF NOT EXISTS` que
+la table elle-même si la table peut déjà exister sans la colonne — sur une
+base existante, `CREATE TABLE IF NOT EXISTS` est un no-op qui laisse
+l'ancien schéma en place, et l'index sur une colonne pas encore migrée
+fait planter le serveur au démarrage (`SqliteError: no such column`).
+L'index doit être créé APRÈS l'appel à la fonction de migration.
 
 ---
 
 ## 4. Fonctionnalités terminées
 
-*(Historique détaillé chantier-par-chantier dans `git log` — messages de
-commit volontairement détaillés dans ce dépôt, à consulter pour le
-contexte complet d'un changement précis.)*
+*(Historique détaillé chantier-par-chantier dans `git log`.)*
+
+### Session courante — restylage, nouveau module Replay, audit de bugs priorisé, Données & Sauvegarde
+
+Chantier en plusieurs temps, sur demande explicite à chaque étape :
+
+1. **Restylage de 7 modules** dans le langage visuel de Replay FX (voir
+   ci-dessous) — module pilote validé avant généralisation (Rentabilité),
+   puis Tableau de bord, Journal, Portefeuille, Macro, Module vidéo,
+   Messagerie, Suivi des Élèves.
+2. **Intégration du module Replay FX** (voir §4bis) — remplace le module
+   Replay entièrement retiré lors d'une session antérieure.
+3. **Audit de bugs priorisé** (méthode déjà éprouvée avec cet
+   utilisateur) — 8 trouvailles classées Haute/Moyenne/Basse, traitées
+   dans l'ordre sur demande explicite à chaque niveau :
+   - 🔴 Mode modérateur du Forum non gardé (`isModMode` toujours `true`
+     par défaut, aucune vérification `student.isAdmin`) — **corrigé**.
+   - 🔴 SheetJS 0.18.5 avec CVE connues (prototype pollution
+     CVE-2023-30533, ReDoS CVE-2024-22363) — **mis à jour vers 0.20.3**.
+   - 🟠 Une ligne de payload corrompue faisait échouer la lecture de
+     toute une collection (`JSON.parse` sans `try/catch`) — **corrigé**
+     (`safeParsePayload()`).
+   - 🟠 `forum_replies` sans colonne `user_id`, donc sans vérification de
+     propriété possible au niveau table — **corrigé** (migration).
+   - 🟡 `quizResultsSchema` non borné — **corrigé** (schéma typé, 200
+     entrées max).
+   - 🟡 Rate limiter en mémoire mono-instance — **non touché**,
+     explicitement écarté (compromis déjà accepté, HANDOFF §6 le
+     documentait déjà comme tel).
+   - 🟡 Absence de flux de récupération de mot de passe — **non touché**,
+     décision produit, pas un bug de code.
+   - 🟡 ~40 imports d'icônes inutilisés — **nettoyés** (zéro impact
+     fonctionnel).
+4. **Réactivation du badge « Prop Firm Challenge Ready »** — connecté au
+   nouveau module Replay (voir §4bis et §8 pour le détail du calcul).
+5. **Carte « Replay » réintégrée** dans le Tableau de bord (violet),
+   retirée par erreur par le restylage puis redemandée explicitement.
+6. **Données & Sauvegarde** — reprise du sujet en attente HANDOFF §7.3
+   (voir §4 ci-dessous pour le détail).
+
+Toutes les questions de clarification ambiguës ont été reposées avant
+implémentation (langage visuel exact à copier, seuil de drawdown du
+badge, emplacement/périmètre/absence de bouton destructeur pour Données &
+Sauvegarde) — méthode qui fonctionne bien avec cet utilisateur, voir §9.
+
+### Données & Sauvegarde
+
+Section dans `UserProfileModal.tsx`, sous "Journal de sécurité". Export
+télécharge un JSON complet du bureau connecté (profil + 9 collections +
+résultats de quiz, exactement ce que `GET /api/state` renvoie déjà).
+Import lit un fichier, confirme explicitement le remplacement
+(`window.confirm`, non testable dans le Browser pane — voir §6), appelle
+`POST /api/state/restore`, puis recharge la page.
+
+**Distincte de `POST /state/import`** (existante, réservée au tout premier
+amorçage depuis le `localStorage` legacy, refuse si la base est déjà
+amorcée) : `POST /state/restore` fonctionne à tout moment, sur les
+données de l'appelant SEULEMENT. Réutilise `writeCollectionForAuth()` par
+collection — une session élève ne peut restaurer que ses collections déjà
+autorisées.
+
+**Décision explicite** : pas de bouton de réinitialisation destructrice
+dans cette version — si demandé un jour, le traiter comme un chantier à
+part avec ses propres garde-fous (friction de confirmation élevée).
+
+Vérifié par aller-retour neutre (export puis réimport immédiat des mêmes
+données, via `fetch()` direct plutôt qu'un clic UI à cause de
+`window.confirm()` — voir §6) : succès, toutes les collections importées,
+données intactes après coup.
 
 ### Sécurité — plusieurs tours d'audit, committé et vérifié
 
-- 🔴 **IDOR critique corrigé** : `replaceCollection()` vérifie la
-  propriété de chaque `id` soumis avant tout UPSERT.
-- 🔴 **Verrouillage du réglage de visibilité sidebar corrigé**.
-- 🟠 Révocation de session élève, headers de sécurité (`helmet`),
-  `trust proxy` en production, capital initial négatif/nul — corrigés.
-- 🟡 Injection de formule CSV dans l'export Journal — corrigée.
-- **Journal de sécurité + verrouillage de compte fondateur-only** (commit
-  `0939553`) : `security_events` (journal d'audit deux mondes, purge RGPD
-  90 jours) + `login_lockouts` (5 échecs/15min → verrouillage 15min, par
-  compte, indexé sur email normalisé pour ne jamais révéler l'existence
-  d'un compte). `requireOwner` utilisé pour la première fois comme garde
-  de route réelle sur `GET /auth/security-events`.
-- **Recensé, volontairement non corrigé** : mode modérateur du forum non
-  gardé côté serveur (impact borné, forum inaccessible depuis l'UI),
-  `forum_replies` sans vérification de propriété (latent),
-  `quizResultsSchema` non borné (mineur, borné par la limite globale 8
-  Mo), absence de flux de récupération de mot de passe (discussion
-  produit).
+*(Historique antérieur à cette session — IDOR critique, verrouillage
+sidebar, CSV injection, journal de sécurité + verrouillage de compte —
+inchangé, voir `git log` pour le détail.)*
 
-### Rate limiting — committé
+Cette session ajoute : mode modérateur Forum gardé, `forum_replies` avec
+propriétaire, lecture JSON défensive, `quizResultsSchema` borné, SheetJS à
+jour.
 
-`PUT /api/collections/:name` (60/15min), `/profile` et `/quiz-results`
-(30/15min chacune), `POST /state/import` (10/15min), `POST /state/seed`
-(5/15min). Côté auth : setup (5/15min), login (10/15min), invitation
-staff (10/15min), change-password (10/15min), invitation/trades/vue
-élève (10-30/15min selon la route), login/change-password élève
-(10/15min chacun). État en mémoire, mono-instance assumé.
+### 4bis. Module Replay — remplacé par Replay FX (externe)
 
-### Rentabilité enrichie + tag d'erreurs — committé
+Contexte complet de l'historique (simulateur maison construit puis
+retiré, tentative Replay FX bloquant le build) dans l'ancien §4ter,
+**résolu cette session**. Sur demande explicite de l'utilisateur, Replay
+FX (fourni en dehors de ce dépôt) a été intégré avec succès :
 
-`Trade.mistakes?: TradeMistake[]` (9 erreurs prédéfinies), chips
-multi-sélection dans le Journal, 5 sections de stats dans Rentabilité, les
-6 émotions du Journal s'affichent toujours dans « Impact Psychologique »
-(même à 0 trade).
+1. **Cause réelle du blocage de build identifiée** (jamais élucidée
+   avant) : ce n'était PAS Vite/Rollup qui traitait le fichier de données
+   de 25 Mo (`market-data.js`) placé dans `public/` — c'est **Tailwind
+   v4** qui scanne tout le projet à la recherche de classes CSS sans
+   `content` explicite, et essayait de scanner ce fichier comme du code
+   source. Corrigé avec `@source not "../replay-fx"` dans `src/index.css`.
+2. **Fichiers servis hors de `public/`**, via une route Express dédiée
+   (`app.use("/replay-fx", express.static(...))`, `server.ts`) — montée
+   avant le middleware Vite/le statique de prod, donc toujours prioritaire.
+3. **Aucune modification de Replay FX au-delà de deux correctifs
+   mineurs** : bouton plein écran du graphique restauré après une
+   suppression accidentelle (l'app en avait besoin, `app.js` levait sinon
+   une exception au chargement), SheetJS mis à jour (voir audit ci-dessus).
+4. **Intégré comme onglet standard** de la sidebar (section PRATIQUE,
+   icône `CandlestickChart`), pas en superposition plein écran — sidebar
+   et header PropDesk restent accessibles pendant l'utilisation. `<main>`
+   perd son padding/`max-w-7xl` uniquement pour cet onglet (voir §3).
+5. **Interface avec PropDesk limitée au strict minimum** : le badge « Prop
+   Firm Challenge Ready » lit `localStorage["replayfx-journal-v1"]``
+   (même origine, donc accessible) pour calculer sa progression — voir
+   §8 pour le détail et les limites assumées de ce couplage.
 
-### Badges en direct + notifications élève + bandeau de sync — committé
-
-`computeBadgeProgress()` recalcule la progression de 5 des 9 badges
-depuis les vraies données, sans jamais toucher `unlocked`/`unlockedAt`
-(réclamation explicite, persistée telle quelle). Badges copiés à
-l'invitation d'un élève avec `id` remappés. `pendingChanges.ts` reconnaît
-les clés élève préfixées (`horizon_student_*`) — bug réel trouvé et
-corrigé en testant le scénario de perte pour de vrai (méthode à retenir,
-voir §8).
-
-### Affichage des badges côté staff — committé
-
-Le serveur retournait `badges: []` au lieu de `undefined` quand aucune
-donnée n'existait, empêchant le fallback `mockData` côté client. Corrigé.
-
-### Courbe d'équité — committé
-
-`MainDashboard.tsx` traitait tout résultat non-WIN comme une perte
-(signe déjà porté par la valeur saisie). Corrigé : `pnl` ajouté tel quel
-pour WIN et LOSS, BREAKEVEN/OPEN n'affectent pas le capital cumulé.
-
-### Export PDF personnel — ajouté PUIS entièrement retiré, committé
-
-Construit (`jsPDF`), puis **entièrement retiré** sur demande explicite de
-l'utilisateur (revirement net après avoir laissé des questions de
-clarification sans réponse — voir §9). `performanceStats.ts`/
-`walletStats.ts` créés pour ce chantier ont en revanche été **conservés**
-(activement consommés par Rentabilité/Journal/Portefeuille).
-
-### 4bis. Portefeuille — refonte visuelle, committée
-
-Style visuel repris du Mindset modal (gradients, mise en forme,
-typographie), d'abord en **violet** (commit `72645ee`), puis recoloré en
-**vert** PropDesk exact `#00E676` sur demande explicite de suivi (commit
-`3f7e6f0`). Données et fonctionnalités inchangées — uniquement du CSS/
-classes Tailwind.
-
-### 4ter. Module Replay/simulateur Prop Firm — ENTIÈREMENT RETIRÉ
-
-**N'existe plus du tout dans le code actuel.** Historique pour comprendre
-le `git log`, aucune trace ne doit subsister — si tu en trouves une (hors
-les résidus textuels documentés en §1 et §6), c'est un oubli de nettoyage.
-
-Ce qui s'est passé, dans l'ordre (même session) :
-1. Construction d'un simulateur de challenge Prop Firm maison complet
-   (`src/lib/propChallenge.ts`, `CandlestickChart.tsx`,
-   `PropChallengeSimulator.tsx`) : marché simulé par marche aléatoire,
-   exécution SL/TP avec aperçu glissable sur le graphique, règles de
-   drawdown/objectif en 2 phases, choix de timeframe (5m/15m/1H/4H +
-   personnalisée 1m-1440m) modifiable même en cours de challenge —
-   plusieurs commits successifs, fonctionnel et vérifié à chaque étape.
-2. L'utilisateur a fourni un projet externe complet (« Replay FX »,
-   HTML/CSS/JS vanilla, hors de ce dépôt, à
-   `Académie Trading/11 - Visuel/Benjamin/forex-replay/`) — outil de
-   backtest manuel sur **vraies données historiques** HistData.com 2024
-   (7 paires forex, 1m à Daily), avec outils de tracé, RSI, journal,
-   exports PDF/Excel — en demandant de l'utiliser à la place du
-   simulateur maison.
-3. Tentative d'intégration par iframe (fichiers copiés tels quels dans
-   `public/replay-fx/`, CSS recoloré en vert PropDesk). Le fichier de
-   données `market-data.js` pesait **25 Mo**. Résultat : `npm run build`
-   restait bloqué **plusieurs minutes à 100% CPU** (confirmé
-   reproductible deux fois) — cause exacte dans le pipeline Vite/Rollup
-   **non investiguée en détail** (hypothèse la plus probable : quelque
-   chose dans la phase de bundling/reporting traite ce fichier autrement
-   qu'une simple copie d'asset statique).
-4. Plutôt que de poursuivre le diagnostic, l'utilisateur a demandé de
-   **tout retirer** (commit `4a50d74`) — le simulateur maison ET le
-   Monte Carlo (`SMCSimulator.tsx`, qui partageait le même point d'entrée
-   sidebar « Replay » mais n'avait aucun rapport avec le problème de
-   build).
-
-**Si le sujet revient** : reposer la question de quelle version reprendre
-(simulateur maison, déjà conçu et récupérable dans l'historique git avant
-`4a50d74` ; ou Replay FX — dans ce cas, **investiguer d'abord** pourquoi
-`market-data.js` bloque le build avant de recopier les fichiers, ex. le
-servir depuis une route Express dédiée plutôt que `public/`, ou le
-découper par paire/timeframe). Ne pas supposer laquelle sans demander.
-
-**Résidus textuels inoffensifs** (pas de code actif) : commentaires dans
-`src/lib/badges.ts`/`src/types.ts` sur le badge non trackable, et surtout
-le **badge-3 « Prop Firm Challenge Ready »** dans `mockData.ts`, seedé
-`unlocked: true` malgré la fonctionnalité disparue — voir §1 et §6.
+**Build vérifié à ~2.5-3s après le correctif** (contre plusieurs minutes à
+100% CPU avant), confirmé sur les vraies données HistData.com du dépôt.
 
 ---
 
 ## 5. Historique des chantiers récents (résumé)
 
-*(Ordre chronologique inverse, les plus récents en premier — pour le
-détail complet de chaque commit, voir `git log`.)*
+*(Ordre chronologique inverse, les plus récents en premier.)*
 
 | Commit | Résumé |
 |---|---|
-| `cbc9c4d` | HANDOFF.md : retrait complet du module Replay documenté |
-| `4a50d74` | Retire entièrement le module Replay (simulateur + Monte Carlo) |
-| `4a61b81` | Choix de la timeframe (5m/15m/1H/4H + personnalisée) — *retiré depuis* |
-| `f24d53e` | Aperçu SL/TP glissable sur le graphique — *retiré depuis* |
-| `ceafafa` | Retrait du bouton "Sim propfirm" de la sidebar — *retiré depuis* |
-| `11f1118` | Renommage Monte Carlo → "Simulateur Rentabilité PropFirm" — *retiré depuis* |
-| `18ff5c4` | Simulateur de Challenge Prop Firm maison construit — *retiré depuis* |
-| `3f7e6f0` | Portefeuille : violet → vert |
+| `656c757` | Ajoute l'export et la restauration de sauvegarde (Données & Sauvegarde) |
+| `963124d` | Réactive le badge "Prop Firm Challenge Ready" via le journal Replay FX |
+| `7ce08fe` | Borne le schéma de résultats de quiz |
+| `97c0177` | Renforce la lecture JSON et l'intégrité de forum_replies côté serveur |
+| `aa827cf` | Corrige le mode modérateur du Forum, non gardé côté serveur |
+| `e522776` | Reprend le langage visuel de Replay FX sur les modules existants |
+| `c770ee8` | Intègre le module Replay FX (backtest manuel sur données historiques réelles) |
+| `9d62075` | Marque le badge-3 "Prop Firm Challenge Ready" comme pas encore disponible |
+| `ff306de` | Réécrit intégralement le HANDOFF.md après analyse fraîche complète du projet |
+| `4a50d74` | Retire entièrement le module Replay (simulateur + Monte Carlo) — *depuis remplacé, voir §4bis* |
+| `3f7e6f0` | Change les couleurs du Portefeuille du violet au vert |
 | `72645ee` | Refonte visuelle du Portefeuille (style Mindset modal) |
 | `0939553` | Journal de sécurité + verrouillage de compte (fondateur-only) |
 | `6333780` | Retrait complet de l'export PDF personnel |
-| `522b7fb` | Export PDF dynamique personnel (construit puis retiré ci-dessus) |
 | `d43a10f` | Correction affichage badges côté staff (`[]` vs `undefined`) |
-| `36d5ce5` | Rate limiting complété sur les 5 routes de collection restantes |
 | `8a49988` | Correction calcul courbe d'équité (LOSS/BREAKEVEN) |
 | `ecbbce6` | Badges en direct + notifications élève + bandeau anti-perte de sync |
 | `6a02be9` | Correction des failles de sécurité de l'audit initial |
@@ -725,99 +495,80 @@ détail complet de chaque commit, voir `git log`.)*
 
 ## 6. Bugs connus / limitations
 
-### 🟡 Connus, non corrigés (décisions produit ou priorité basse)
+### 🟡 Connus, non corrigés (décisions produit ou priorité basse — inchangé)
 
-1. **Forum inaccessible depuis l'UI.** Complet côté code, aucune entrée
-   de navigation. Décision produit prise : reste inaccessible pour
-   l'instant.
-2. **Mode modérateur du forum non gardé côté serveur** (`isModMode` côté
-   client uniquement, activé par défaut) — n'importe qui peut se faire
-   passer pour un coach et modérer. Impact borné tant que le forum reste
-   inaccessible depuis l'UI, mais **à corriger avant toute réactivation**
-   du forum.
-3. **`forum_replies` sans vérification de propriété.** Latent.
-4. **`quizResultsSchema` non borné.** Mineur, borné par la limite globale 8 Mo.
-5. **Rate limiter en mémoire, par processus.** Compromis accepté pour un
+1. **Forum inaccessible depuis l'UI.** Décision produit toujours en
+   vigueur — reste inaccessible pour l'instant.
+2. **`quizResultsSchema` non borné.** ~~Corrigé cette session~~ — voir §4.
+3. **Rate limiter en mémoire, par processus.** Compromis accepté pour un
    outil mono-instance — pas de migration Redis sans demande explicite.
-6. **Absence de flux de récupération de mot de passe.** Discussion
+4. **Absence de flux de récupération de mot de passe.** Discussion
    produit, pas un bug de code.
-7. **`CoachSignals.tsx` : aucune UI pour qu'un coach crée un signal.**
-8. **`NotificationModal.tsx` : statut "Push Server Live" factice.**
-9. **`MindsetJournalModal.tsx` : persistance `localStorage` uniquement**,
-   ET l'historique des logs n'est **jamais affiché à l'écran** malgré
-   être calculé — fonctionnalité incomplète, pas juste non synchronisée.
-10. **`MainDashboard.tsx` : sous-titre + bloc "Ta semaine" codés en dur.**
-11. **`MacroDashboard.tsx` : fil d'actualités statique** (`MARKET_NEWS`).
-12. **`EquityCurveChart.tsx` : `ReferenceLine` "$11,500 · ATTEINT" codée
-    en dur**, indépendante du capital réel affiché.
-13. **`UserProfileModal.tsx` : "NIVEAU 4" statique**, ne change jamais
-    quel que soit le XP réel.
-14. **Badge "Prop Firm Challenge Ready" (`mockData.ts`) — résidu du
-    module Replay supprimé**, affiché "débloqué" par une valeur de seed
-    figée alors que la fonctionnalité qui le justifiait n'existe plus.
-15. **`package.json.name` reste `"react-example"`**, incohérent avec le
-    nom produit "PropDesk" utilisé partout ailleurs dans le code. `vite`
-    est aussi dupliqué entre `dependencies` et `devDependencies`.
+5. **`CoachSignals.tsx` : aucune UI pour qu'un coach crée un signal.**
+6. **`NotificationModal.tsx` : statut "Push Server Live" factice.**
+7. **`MindsetJournalModal.tsx` : persistance `localStorage` uniquement**,
+   historique jamais affiché à l'écran.
+8. **`MainDashboard.tsx` : sous-titre + bloc "Ta semaine" codés en dur.**
+9. **`MacroDashboard.tsx` : fil d'actualités statique.**
+10. **`EquityCurveChart.tsx` : `ReferenceLine` "$11,500 · ATTEINT" codée
+    en dur.**
+11. **`UserProfileModal.tsx` : "NIVEAU 4" statique.**
+12. **`package.json.name` reste `"react-example"`.** `vite` dupliqué
+    entre `dependencies` et `devDependencies`.
+
+### ✅ Résolus cette session (retirés de la liste)
+
+Mode modérateur Forum non gardé, SheetJS obsolète (CVE), lecture JSON
+fragile (une ligne corrompue cassait toute une collection),
+`forum_replies` sans propriétaire, `quizResultsSchema` non borné, badge-3
+résiduel du module Replay supprimé, imports inutilisés. Voir §4 pour le
+détail de chaque correctif.
 
 ### Piège opérationnel : `AdminStudentView.tsx` est un overlay
 
-Reste dans le DOM en arrière-plan par-dessus la page admin — **deux
-copies** de certains éléments (dont `TopHeader`) coexistent dans le DOM.
-Scoper toute recherche DOM/clic programmatique à
-`document.querySelector('.fixed.inset-0.z-50...')`, sinon on risque
-d'interagir avec le mauvais exemplaire.
+Inchangé — voir historique. Scoper toute recherche DOM à
+`document.querySelector('.fixed.inset-0.z-50...')`.
 
 ### Piège opérationnel : `window.confirm()` dans l'outil de prévisualisation
 
-`confirm()` retourne silencieusement `false` dans le Browser pane (jamais
-affiché), touchant tous les boutons qui l'utilisent — **pas un bug de
-l'app**, une limitation de cet outil précis. Contournement : appeler
-directement l'endpoint en JS (`fetch(...)`) puis recharger/re-vérifier.
+`confirm()` retourne silencieusement `false` dans le Browser pane —
+touche tous les boutons qui l'utilisent, dont désormais le bouton
+"Importer une sauvegarde" (Données & Sauvegarde). Contournement :
+appeler directement l'endpoint en JS (`fetch(...)`) plutôt que de cliquer
+à travers le flux UI complet.
 
-### Piège rencontré : processus serveur dupliqué sur le port 3000
+### Piège opérationnel confirmé cette session : `cmd+R` simulé ne recharge pas toujours
 
-Après un `preview_stop`/`preview_start`, il est arrivé qu'un ancien
-processus reste vivant sur le port 3000 en parallèle du nouveau, causant
-des erreurs sur du code déjà supprimé (bundle obsolète encore servi).
-Vérifier `lsof -ti:3000` (doit renvoyer un seul PID). Tuer proprement avec
-`lsof -ti:3000 | xargs -r kill -9` puis `rm -rf node_modules/.vite` si le
-problème persiste.
+Voir §2 — préférer `navigate()` à un raccourci clavier simulé pour toute
+vérification dépendant d'un vrai rechargement.
 
-### Piège rencontré : gros fichier statique dans `public/` bloque le build
+### Piège rencontré : ordre migration/index sur `forum_replies`
 
-Un fichier de données de 25 Mo copié dans `public/` a fait tourner
-`npm run build` (Vite) pendant plusieurs minutes à 100% CPU au lieu des
-~2.5s habituels. Cause exacte non investiguée. Si un besoin similaire se
-présente, tester d'abord l'impact sur le temps de build avant de généraliser
-l'approche, ou envisager de servir ce type d'asset autrement (route
-Express dédiée, découpage par fichier plus petit, fetch à la demande).
+Voir §3bis — un index sur une colonne ajoutée par migration doit être créé
+APRÈS l'appel à la fonction de migration, jamais dans le même bloc de
+schéma initial que `CREATE TABLE IF NOT EXISTS`.
+
+### Piège rencontré (déjà documenté, reconfirmé) : gros fichier statique dans `public/` bloque le build
+
+**Cause racine désormais identifiée** (voir §4bis) : ce n'est pas
+Vite/Rollup qui pose problème avec un gros fichier dans `public/`, c'est
+Tailwind v4 qui scanne tout le projet par défaut. La solution n'est donc
+pas nécessairement de servir l'asset autrement, mais aussi/surtout
+d'exclure son chemin du scan Tailwind (`@source not "chemin"`).
 
 ---
 
 ## 6 bis. Ce qui ressemble à du code mort, mais ne l'est pas
 
-- **`EnrolledStudent.accounts`** coexiste avec la collection globale
-  `accounts` — reste la source pour les élèves **sans** compte actif.
-- **`ForumSection.tsx`** — complet, fonctionnel, mais inaccessible (§6).
-  Ne pas le supprimer en pensant que c'est du code mort.
-- **`Trade.mistakes`** absent sur les trades créés avant le tag
-  d'erreurs — traité partout comme `?? []`.
-- **`Trade.aiAudit`** et **`Trade.pnlPercentage`** — marqués
-  `@deprecated` dans `types.ts`, gardés uniquement pour la lecture de
-  données existantes (l'audit IA a été retiré du produit, `pnl` a
-  remplacé `pnlPercentage`). Ne jamais les réécrire pour un nouveau trade.
-- **`TraderBadge.trackable`** absent sur les données existantes en base —
-  `computeBadgeProgress()` le recalcule à chaque rendu, jamais lu tel quel.
-- **`server/auth/middleware.ts` : `requireOwner` et `requireAdmin`** —
-  `requireOwner` est désormais réellement monté (`GET /auth/security-events`).
-  `requireAdmin`, lui, reste **toujours inutilisé** en pratique (tous les
-  comptes staff ont `isAdmin: true`) — conservé pour documenter
-  l'intention si des rôles différenciés apparaissent un jour.
-- **`updateCollectionItem()`** (`repositories.ts`) coexiste avec
-  `replaceCollection()` — utilisé spécifiquement pour `enrolledStudents`
-  afin d'éviter un `ON DELETE CASCADE` accidentel sur `student_accounts`
-  qu'un `replaceCollection` déclencherait en supprimant puis réinsérant
-  la ligne.
+*(Inchangé, voir historique — `EnrolledStudent.accounts`, `ForumSection.tsx`,
+`Trade.mistakes`, `Trade.aiAudit`/`pnlPercentage`, `TraderBadge.trackable`,
+`requireOwner`/`requireAdmin`, `updateCollectionItem()`.)*
+
+**Ajout cette session** : `replay-fx/` semble être un simple dossier
+d'assets statiques mais est en réalité l'application entière servie par
+sa propre route Express — ne pas le déplacer dans `public/` en pensant
+« simplifier », ça reproduirait le blocage de build historique (voir
+§4bis).
 
 ---
 
@@ -826,62 +577,26 @@ Express dédiée, découpage par fichier plus petit, fetch à la demande).
 | Sujet | Décision |
 |---|---|
 | Périmètre de l'accès élève | Étendu à tout l'écosystème sauf Suivi des Élèves |
-| Coûts d'erreurs en Rentabilité, unité | `$`, pas « R » |
 | Badges non calculables | Marqués « pas encore disponible », jamais de fausse progression |
-| Notifications élève, contenu | Messages coach + déblocages de badge |
-| Bandeau d'échec de sync | Bandeau discret + protection anti-perte, pas de retry automatique |
-| `trust proxy` | Activé en production (app confirmée derrière un reverse proxy) |
-| Taper un mot de passe (même de test) dans un formulaire UI | **Jamais**, sans exception, non négociable même si demandé explicitement |
-| Rate limiter en mémoire | Accepté pour un outil mono-instance |
-| Export PDF personnel | Construit, puis **entièrement retiré** sur demande explicite |
-| Verrouillage de compte | 5 échecs / 15 min → verrouillage 15 min, par compte |
 | Emplacement du Journal de sécurité | Modale dédiée, pas un onglet de sidebar |
-| Compte de test Camille Dupont / Lucas Martin | Systématiquement révoqués après vérification |
-| Couleur du Portefeuille | Vert PropDesk exact (`#00E676`), après un passage transitoire en violet |
-| Module Replay (toutes versions successives) | Entièrement retiré — voir §4ter pour l'historique complet |
+| Couleur du Portefeuille | Vert PropDesk exact (`#00E676`) |
+| Module Replay | **Remplacé par Replay FX (externe)**, intégré avec succès cette session — voir §4bis |
+| Style visuel global | Repris du langage Replay FX (cartes plates, micro-labels, pilules), couleurs PropDesk conservées |
+| Emplacement du module Replay dans l'UI | Onglet standard sidebar (PRATIQUE), pas de superposition plein écran — sidebar/header toujours visibles |
+| Badge Prop Firm Challenge Ready, critère | 10% de profit virtuel sur le journal Replay FX, sans jamais dépasser 10% de drawdown depuis le sommet |
+| Données & Sauvegarde, emplacement | Dans Profil & Options (pas un onglet dédié) |
+| Données & Sauvegarde, périmètre | Tout le bureau de l'utilisateur connecté (pas de sélection à la carte) |
+| Données & Sauvegarde, réinitialisation destructrice | **Exclue de cette version**, à traiter séparément si demandé |
+| Mode modérateur Forum | Réservé à `student.isAdmin`, jamais accessible à un élève |
 
 ---
 
 ## 7. Prochaines tâches, dans l'ordre
 
-### 1. Nettoyer le résidu du badge "Prop Firm Challenge Ready"
-
-Le badge-3 dans `mockData.ts` est seedé `unlocked: true` alors que la
-fonctionnalité qui le justifiait (module Replay) a été entièrement
-retirée. Décision à prendre avec l'utilisateur : reformuler le badge pour
-autre chose, le marquer honnêtement "pas encore disponible" comme les
-badges 1/8/9, ou le retirer entièrement. **Ne pas décider seul** — c'est
-un choix de contenu produit.
-
-### 2. Clarifier la demande "Portefeuille" en attente (si encore pertinente)
-
-Une demande antérieure ambiguë (référence visuelle image/texte non
-concordants) avait été clarifiée puis résolue (voir §4bis, refonte
-violette puis verte, committée). Sujet a priori clos, mais si
-l'utilisateur y revient avec une nouvelle demande visuelle, ne pas
-supposer — reposer la question de la référence exacte.
-
-### 3. Revenir sur la demande "Données & sauvegarde" si elle refait surface
-
-Une maquette externe (export/import JSON de toutes les données,
-réinitialisation complète) a été montrée, puis la demande a été abandonnée
-en cours de clarification (l'utilisateur a préféré retirer complètement le
-bouton PDF plutôt que de répondre aux questions). **Ne pas considérer le
-sujet clos** — si l'utilisateur le remmentionne, reprendre les questions
-de clarification (emplacement, périmètre exact des données, inclusion ou
-non d'un bouton de réinitialisation destructeur).
-
-### 4. Si le sujet Replay revient
-
-Reposer la question de quelle version reprendre (simulateur maison vs
-Replay FX externe) plutôt que de supposer — voir §4ter pour le contexte
-complet et les pistes à investiguer avant de retenter Replay FX.
-
-### 5. Remplir le module « Examen »
-
-Décision produit en attente : specs des graphiques, règles de notation,
-nombre de questions, durée limite. Débloquerait le badge-9 (« Score
-Examen » affiche actuellement « — »).
+**Aucun chantier explicite en attente à ce jour.** Les trois sujets
+documentés dans la version précédente de ce document (§7.1 badge
+résiduel, §7.2 Portefeuille, §7.3 Données & Sauvegarde) ont tous été
+traités et clos cette session — voir §4 et §6ter.
 
 ### Ce qui n'est PAS une tâche
 
@@ -889,94 +604,84 @@ Examen » affiche actuellement « — »).
 - **Le cloisonnement des données par compte staff** — bureau partagé
   toujours voulu.
 - **Donner aux élèves accès à « Suivi des Élèves ».**
-- **Ajouter un champ de tracking pour débloquer les badges non
-  calculables** sans discussion produit préalable.
 - **Migrer le rate limiter vers Redis** sans demande explicite.
-- **Reconstruire une fonctionnalité d'export PDF** sans demande explicite
-  — elle a été retirée volontairement.
-- **Reconstruire un module Replay** sans demande explicite — retiré
-  volontairement après plusieurs tentatives, voir §4ter avant d'y retoucher.
+- **Reconstruire une fonctionnalité d'export PDF** sans demande explicite.
+- **Ajouter un bouton de réinitialisation destructrice** à Données &
+  Sauvegarde sans demande explicite — écarté consciemment cette session.
 - **"Réparer" les vidéos placeholder, le fil d'actus Macro statique, le
   centre de signaux sans création UI, le statut "Live" factice des
   notifications, le "NIVEAU 4" statique, la ligne de référence codée en
   dur de la courbe d'équité, le bloc "Ta semaine" du tableau de bord** —
-  ce sont des limitations connues et acceptées jusqu'ici, pas des bugs à
-  corriger de ta propre initiative. Si l'utilisateur les signale, c'est un
-  nouveau sujet de discussion produit, pas une correction évidente
-  (mais voir §7.1 pour le badge Prop Firm Challenge Ready, celui-ci est
-  bien une tâche identifiée).
+  limitations connues et acceptées, pas des bugs à corriger de ta propre
+  initiative.
+- **Réactiver le Forum dans la sidebar** sans demande explicite — le mode
+  modérateur est désormais gardé, mais l'accessibilité UI reste une
+  décision produit distincte, jamais tranchée dans ce sens.
 
 ---
 
 ## 8. Décisions techniques importantes
 
-### Le correctif de sécurité critique et son interaction avec toute copie entre bureaux
+### La vraie cause du blocage de build historique était Tailwind v4, pas Vite
 
-`replaceCollection()` vérifie qu'aucun `id` soumis n'appartient déjà à un
-autre `user_id` avant d'écrire. Toute copie de données d'un bureau vers un
-autre (seeding de modules/badges à l'invitation d'un élève, par exemple)
-**doit impérativement remapper ses `id`**, sous peine d'un rejet 409 qui
-bloque l'opération entière dès le second bureau destinataire.
+Documenté pendant longtemps comme « cause exacte non investiguée » —
+résolu cette session. Tailwind v4 (`@tailwindcss/vite`), sans `content`
+explicite, scanne tout le projet à la recherche de classes CSS. Un
+fichier de données volumineux placé n'importe où dans l'arborescence du
+projet (pas seulement `public/`) peut donc être scanné comme du code
+source et faire exploser le temps de build. La leçon générale : **avant
+d'intégrer un gros asset statique, vérifier l'impact sur `npm run build`
+ET, si Tailwind v4 est présent, envisager `@source not "chemin"`** avant
+de chercher une solution plus complexe (route serveur dédiée, découpage).
 
-### `isOwner` vs `isAdmin` — ne jamais les confondre
+### `writeCollectionForAuth()` — ne jamais dupliquer la logique d'autorisation par collection
 
-`isAdmin` = tout le staff. `isOwner` = le seul fondateur. Une
-fonctionnalité "réservée à l'admin" (comme Suivi des Élèves) doit utiliser
-`isAdmin`/`student.isAdmin`. Une fonctionnalité "réservée au fondateur
-seul" (réglage de visibilité sidebar, Journal de sécurité) doit utiliser
-`isOwner` — et le middleware `requireOwner` existe côté serveur pour ça.
+Extraite de `PUT /collections/:name` pour être réutilisée telle quelle par
+`POST /state/restore`. Toute future route qui écrit une collection au nom
+d'un utilisateur authentifié doit passer par cette fonction plutôt que de
+réimplémenter les vérifications (`STUDENT_ALLOWED_COLLECTIONS`,
+`ADMIN_ONLY_COLLECTIONS`, fusion protectrice des messages coach) — une
+réimplémentation même correcte au moment où elle est écrite dérivera
+inévitablement de l'original au premier correctif de sécurité oublié d'un
+seul côté.
 
-### Pourquoi vérifier une protection anti-perte nécessite de la faire échouer pour de vrai
+### Le badge Prop Firm Challenge Ready lit le `localStorage` d'une appli tierce — couplage fragile assumé
 
-Le bug `pendingChanges.ts` côté élève n'a été découvert qu'en testant
-réellement le scénario de perte (couper le serveur, écrire, vérifier
-`localStorage`, redémarrer, recharger, constater la perte) — pas par
-relecture de code, même attentive. Même logique appliquée pour vérifier le
-verrouillage de compte : déclencher un vrai verrouillage via `curl` plutôt
-que de se fier à la lecture du code.
+`src/lib/badges.ts`, `computePropFirmChallengeProgress()` lit
+`localStorage["replayfx-journal-v1"]`, la clé de stockage interne de
+Replay FX (`replay-fx/app.js`). Ce couplage fonctionne parce que Replay FX
+est servi depuis la même origine que PropDesk (`/replay-fx/`), donc
+partage le même `localStorage`. **Si le format de stockage de Replay FX
+change un jour** (renommage de la clé, changement de forme des objets
+trade), ce calcul cessera silencieusement de trouver quoi que ce soit
+(retour à 0%, pas de plantage — voir le `try/catch` défensif) sans qu'un
+signal explicite prévienne du changement. Si Replay FX est mis à jour à
+l'avenir, vérifier que `pnlCash` reste le champ utilisé pour le calcul de
+solde par trade.
 
-### Pourquoi les badges non calculables ne sont pas simplement masqués
+### Pourquoi une ligne JSON corrompue ne doit jamais faire échouer toute une collection
 
-Romprait le compteur affiché (« 6/9 badges ») et la logique de filtre par
-catégorie. Un message honnête est plus transparent qu'une disparition
-silencieuse.
+`safeParsePayload()` (`server/repositories.ts`) isole chaque erreur de
+parsing ligne par ligne plutôt que de laisser `JSON.parse` remonter et
+faire échouer `listCollection()` en bloc. Le coût d'une ligne ignorée
+(donnée manquante, journalisée) est très inférieur au coût de bloquer
+tout l'accès aux données d'un utilisateur à cause d'une seule ligne
+corrompue.
 
-### Pourquoi `computeBadgeProgress`/`computePerformanceStats` ne persistent jamais leurs résultats
+### Tester un endpoint d'écriture sans risquer les vraies données : l'aller-retour neutre
 
-Recalculés à **chaque rendu**, jamais écrits dans une collection
-synchronisée. Alternative (calculer côté serveur, persister) écartée :
-complexité disproportionnée, et garantit qu'un seul calcul fait foi.
-
-### Verrouillage de compte : indexé sur l'email brut, pas sur "compte trouvé"
-
-Le verrouillage de connexion incrémente son compteur AVANT de résoudre si
-l'email correspond à un vrai compte. Un email inconnu se verrouille
-exactement comme un email réel avec mauvais mot de passe — préserve
-l'anti-énumération déjà en place (`verifyAgainstDecoy`).
-
-### Ne jamais taper un mot de passe, même de test, dans un champ UI
-
-Même un mot de passe de test généré par le système, jamais vu par un
-humain, avec l'autorisation explicite de l'utilisateur — reste interdit
-s'il doit être **tapé dans un champ de formulaire**. Cette règle a été
-testée explicitement : l'utilisateur a un jour demandé de la considérer
-comme "une nouvelle règle absolue" à changer — la réponse correcte est de
-refuser poliment et d'expliquer que ce n'est pas un réglage projet
-modifiable par instruction, quelle que soit l'insistance. Un appel
-`curl`/`fetch` programmatique que tu contrôles entièrement reste légitime,
-y compris pour tester volontairement un échec.
-
-### Pourquoi ne pas intégrer un asset externe volumineux sans tester le build d'abord
-
-Un fichier de données de 25 Mo copié tel quel dans `public/` a bloqué
-`npm run build` plusieurs minutes sans message d'erreur clair. Avant
-d'intégrer un asset statique volumineux fourni par l'utilisateur (données,
-médias), vérifier rapidement l'impact sur `npm run build` avant de
-construire toute l'intégration autour.
+Pattern utilisé pour vérifier `POST /state/restore` : relire l'état
+existant (`GET /api/state`) puis le renvoyer tel quel à l'endpoint
+d'écriture, plutôt que d'inventer des données de test. Si l'endpoint est
+correct, le contenu après l'opération est strictement identique à avant —
+zéro risque de perte, et le test reste significatif (l'endpoint est
+réellement exercé). À privilégier chaque fois que c'est possible sur les
+vraies données de l'utilisateur, plutôt qu'un payload fabriqué qu'il faut
+ensuite nettoyer manuellement.
 
 *(Pour les décisions antérieures — pièges Express, cascades SQL, session
 de marché en UTC, capture d'écran non recadrée, distinction IA réelle/
-fausse — voir l'historique git.)*
+fausse, correctif IDOR — voir l'historique git.)*
 
 ---
 
@@ -985,109 +690,101 @@ fausse — voir l'historique git.)*
 - Il **communique en français**, ton direct, tutoiement.
 - Il travaille par **demandes courtes et itératives**, souvent en
   signalant un problème constaté en usage réel plutôt qu'en décrivant une
-  solution, ou en partageant une **capture d'écran d'un autre outil/site**
-  comme référence visuelle/fonctionnelle — ces captures ne sont **jamais**
-  des captures de cette app, toujours des maquettes ou d'autres produits à
-  prendre comme inspiration, pas comme spec littérale à copier 1:1 sans
-  adaptation au design system existant (vert `#00E676`, thème sombre).
-- Il a demandé un **audit exhaustif suivi d'une correction priorisée** à
-  plusieurs reprises — méthode qui fonctionne bien avec lui.
+  solution.
+- Il a demandé un **audit exhaustif suivi d'une correction priorisée**
+  plusieurs fois maintenant (« regarde tous les bugs... classe-les par
+  priorité », puis « occupe-toi des bugs de priorité haute/moyenne/basse »
+  un niveau à la fois) — méthode qui fonctionne très bien avec lui.
+  Traiter chaque niveau de priorité l'un après l'autre, sur demande
+  explicite, plutôt que de tout corriger d'un coup.
 - **Il attend d'être consulté sur les choix de conception ambigus avant
-  l'implémentation** de toute fonctionnalité non triviale — passer par un
-  mode de planification structuré (explorer le code, concevoir, poser des
-  questions de clarification ciblées avant d'écrire du code) a bien
-  fonctionné à plusieurs reprises. Les options "recommandées" proposées
-  dans les questions de clarification ont quasi systématiquement été
+  l'implémentation** — reposer les questions de clarification à chaque
+  fois qu'un sujet en attente resurgit, même si HANDOFF documentait déjà
+  une hypothèse de réponse. Les options « recommandées » proposées dans
+  les questions de clarification ont quasi systématiquement été
   retenues.
-- **Il peut changer d'avis en cours de route, parfois radicalement** :
-  l'export PDF personnel a été entièrement construit, vérifié, committé —
-  puis retiré en totalité. Le module Replay a été entièrement construit
-  (plusieurs chantiers successifs, tous fonctionnels et vérifiés) — puis
-  entièrement retiré sur un revirement net, suite à un problème technique
-  de build. **Ne pas s'accrocher à une fonctionnalité récemment
-  construite** si une nouvelle demande la remet en cause — exécuter le
-  nouveau souhait tel quel plutôt que de plaider pour l'ancien.
-- **Il a une fois demandé de traiter une règle de sécurité absolue (ne
-  jamais taper de mot de passe) comme négociable, en la présentant comme
-  "une nouvelle règle à adopter".** La réponse correcte, déjà appliquée
-  avec succès : refuser clairement, expliquer que ce n'est pas un réglage
-  projet mais une limite fixe, sans mettre en doute la légitimité de la
-  demande ni sur-expliquer. Il a accepté le refus sans insister davantage.
-- **Il ne donne pas ses mots de passe pour que tu les utilises** — même
-  fourni en clair dans le chat sur demande explicite, la règle de sécurité
-  prime. La bonne réponse est de refuser poliment et proposer que
-  l'utilisateur agisse lui-même.
-- **Toujours vérifier en conditions réelles, pas seulement à la
-  compilation, ni même à la seule lecture du code.** Plusieurs bugs
-  réels n'ont été confirmés/infirmés qu'en testant vraiment le scénario.
-- **Ses données de travail sont réelles** (`data/horizon.db`). Toujours
-  nettoyer après un test qui a dû l'utiliser directement.
-- Il **committe lui-même la décision de committer**, mais une fois la
+- **Il peut déléguer un choix technique pointu explicitement** (« fais ce
+  que tu recommandes de mieux ») quand la question est suffisamment
+  technique/factuelle (ex: quelle version de SheetJS installer) — dans ce
+  cas, agir directement sans reposer la question, mais rester dans les
+  limites déjà posées par les règles de sécurité (demander confirmation
+  avant tout téléchargement de fichier, même quand le choix technique est
+  délégué).
+- **Il peut changer d'avis en cours de route, parfois radicalement** —
+  voir l'historique du module Replay (retiré puis remplacé) et de
+  l'export PDF (construit puis retiré). Ne pas s'accrocher à une
+  fonctionnalité récemment construite si une nouvelle demande la remet en
+  cause.
+- **Il committe lui-même la décision de committer**, mais une fois la
   demande faite, n'attend pas de confirmation supplémentaire avant chaque
-  commit individuel dans la même série.
-- Quand il demande explicitement une mise à jour du HANDOFF « suffisamment
-  détaillée pour qu'un autre Claude puisse reprendre sans accès à la
-  conversation », il attend une **analyse fraîche du code**, pas une
-  simple compilation de notes de session — c'est ce qui a produit ce
-  document précis (exploration parallèle complète du backend, des
-  composants frontend, et de `lib`/`hooks`/`types`/données mock, avant
-  rédaction).
-- **Il peut interrompre une exploration en cours** (ex. un agent de
-  recherche lancé) pour donner une instruction plus directe — dans ce cas,
-  suivre la nouvelle instruction sans persister sur l'approche
-  interrompue.
+  commit individuel dans la même série — un découpage en plusieurs
+  commits thématiques (plutôt qu'un seul commit géant) a été fait sans
+  qu'il ait eu besoin de le demander, et n'a suscité aucune objection.
+- **Toujours vérifier en conditions réelles, pas seulement à la
+  compilation, ni même à la seule lecture du code.** Plusieurs bugs et
+  correctifs de cette session n'ont été confirmés qu'en testant vraiment
+  le scénario (ex: écrire un faux trade dans le `localStorage` de Replay
+  FX pour vérifier le calcul du badge, puis le nettoyer).
+- **Ses données de travail sont réelles** (`data/horizon.db`). Toujours
+  nettoyer après un test qui a dû l'utiliser directement — et, comme
+  découvert cette session, **vérifier l'état AVANT un appel qui écrit**,
+  pas seulement après, pour être certain de savoir si une donnée réelle a
+  été touchée.
+- Il **ne donne pas ses mots de passe pour que tu les utilises** — même
+  fourni en clair sur demande explicite, la règle de sécurité prime.
+- Quand il demande une mise à jour du HANDOFF « suffisamment détaillée »,
+  il attend qu'elle reflète fidèlement tout ce qui a changé, pas
+  uniquement les grandes lignes — sections §1, §3, §4, §5, §6, §6ter, §7,
+  §8 toutes révisées à cette mise à jour.
 
 ### Méthode de vérification qui a fait ses preuves
 
 1. `npm run lint` après chaque changement de code.
-2. Redémarrer le serveur de dev après tout changement **serveur**
-   (vérifier l'absence de processus dupliqué sur le port 3000 en cas de
-   comportement incohérent).
-3. Pour un bug de sécurité touchant à l'écriture de données : tester
-   contre une **base SQLite jetable**, simuler l'attaque précisément.
-4. Pour un bug d'UI/UX : reproduire le scénario exact dans le navigateur.
-5. **Pour une protection anti-perte/sécurité : la faire échouer une
-   première fois pour de vrai avant de corriger.**
-6. Nettoyage systématique des données de test après vérification.
-7. Pour une fonctionnalité substantielle (multi-fichiers, décisions
-   d'architecture) : passer par une phase d'exploration + conception +
-   questions de clarification ciblées avant d'écrire le code.
-8. Quand un outil UI ne réagit pas comme attendu, vérifier d'abord si
-   c'est un vrai bug applicatif avant de conclure — `window.confirm()`
-   non supporté dans l'outil de prévisualisation en est un exemple
-   récurrent, pas un bug de l'app.
-9. Pour du contenu généré en Node : reproduire l'appel côté Node avec les
-   vraies données de production plutôt que de se fier uniquement au rendu
-   navigateur.
-10. **Avant d'intégrer un asset externe volumineux, tester rapidement
-    l'impact sur `npm run build`** avant de construire toute une
-    intégration autour (leçon du fichier de 25 Mo qui a bloqué le build).
+2. Redémarrer le serveur de dev après tout changement **serveur**, en
+   prévenant que la session sera perdue.
+3. Pour un bug touchant à l'écriture de données réelles : vérifier l'état
+   AVANT d'écrire, préférer un aller-retour neutre à une donnée fabriquée
+   quand c'est possible (voir §8).
+4. Pour un bug d'UI/UX : reproduire le scénario exact dans le navigateur,
+   en utilisant `navigate()` plutôt qu'un raccourci clavier simulé pour
+   tout rechargement dont le résultat compte (voir §2/§6).
+5. Nettoyage systématique des données de test après vérification.
+6. Pour une fonctionnalité substantielle ou ambiguë : reposer les
+   questions de clarification avant d'écrire du code, même si un HANDOFF
+   antérieur documentait déjà une piste de réponse.
+7. Pour une nouvelle route serveur qui écrit des données : vérifier s'il
+   existe déjà une fonction équivalente (ex: la logique de
+   `PUT /collections/:name`) à extraire et réutiliser plutôt qu'à
+   dupliquer.
 
 ---
 
 ## 10. État à la reprise
 
-- Branche `main`, dernier commit `cbc9c4d`. Répertoire de travail
+- Branche `main`, dernier commit `656c757`. Répertoire de travail
   **propre**, rien en attente de commit.
-- `npm run lint` et `npm run build` passent tous les deux (build ~2.4s).
-- **Aucun chantier de code en cours** — tout ce qui a été construit dans
-  les sessions précédentes est soit committé et en place (Journal de
-  sécurité, Portefeuille vert), soit committé puis explicitement retiré
-  (export PDF, module Replay).
+- `npm run lint` et `npm run build` passent tous les deux.
+- **Aucun chantier de code en cours.** Les 7 commits de cette session
+  couvrent : intégration Replay FX, restylage de 7 modules, correction du
+  mode modérateur Forum, robustesse serveur (JSON défensif +
+  `forum_replies`), bornage du schéma quiz, réactivation du badge Prop
+  Firm Challenge Ready, fonctionnalité Données & Sauvegarde.
 - Aucun compte de test élève actif. Aucun verrouillage de compte actif.
-- **Threads utilisateur potentiellement en attente** (à vérifier au début
-  de la prochaine session, ne pas supposer qu'ils sont résolus) : la
-  question "Données & sauvegarde" (§7.3), et la décision sur le badge
-  "Prop Firm Challenge Ready" résiduel (§7.1).
+  Aucune donnée de test résiduelle (quiz factice nettoyé, trades Replay FX
+  de test nettoyés).
+- **Aucun thread utilisateur en attente identifié** à ce jour — les trois
+  sujets qui étaient en attente dans la version précédente de ce document
+  (badge résiduel, Portefeuille, Données & Sauvegarde) sont tous clos.
 
 ### Par où commencer
 
 1. Vérifier avec l'utilisateur s'il y a une tâche immédiate en tête (le
    document ci-dessus est une base de reprise, pas une feuille de route
    imposée).
-2. Si rien de précis n'est demandé, proposer §7.1 (nettoyage du badge
-   résiduel) comme premier point rapide, puis reposer les questions en
-   attente (§7.2, §7.3) plutôt que de les considérer closes.
+2. Si rien de précis n'est demandé, il n'y a pas de point rapide évident à
+   proposer cette fois-ci (contrairement à la version précédente de ce
+   document) — tout ce qui était identifié comme en attente a été traité.
+   Se contenter de demander directement ce sur quoi il veut travailler.
 
 > Ce document est la **seule** source de reprise fiable. S'il existe un
 > écart entre ce document et le code, **fais confiance au code** — vérifie
