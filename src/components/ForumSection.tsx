@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  MessageSquare,
   Search,
   PlusCircle,
   Pin,
@@ -10,16 +9,12 @@ import {
   MessageCircle,
   Eye,
   ShieldCheck,
-  User,
   Award,
   Sparkles,
   ChevronLeft,
   Trash2,
   AlertCircle,
-  Check,
-  Tag,
   Filter,
-  Flame,
   Send
 } from "lucide-react";
 import {
@@ -76,8 +71,12 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
   const [replyAsCoach, setReplyAsCoach] = useState<boolean>(false);
   const [selectedCoachId, setSelectedCoachId] = useState<string>(coaches[0]?.id || "coach-thomas");
 
-  // Moderator Mode Toggle (Allows simulating Coach/Moderator management actions)
-  const [isModMode, setIsModMode] = useState<boolean>(true);
+  // Outils de modération (épingler/résoudre/verrouiller/supprimer, répondre
+  // en tant que coach) — strictement réservés au staff (`student.isAdmin`).
+  // Un élève n'a jamais accès à la bascule ni à son état : impossible de se
+  // faire passer pour un coach depuis ce composant, quel que soit l'état.
+  const [isModMode, setIsModMode] = useState<boolean>(Boolean(student.isAdmin));
+  const canModerate = Boolean(student.isAdmin) && isModMode;
 
   // Filter Categories
   const categories: string[] = [
@@ -132,7 +131,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
     e.preventDefault();
     if (!selectedTopicId || !replyText.trim()) return;
 
-    if (replyAsCoach) {
+    if (replyAsCoach && canModerate) {
       const coach = coaches.find((c) => c.id === selectedCoachId) || coaches[0];
       onAddReply(selectedTopicId, replyText, "Head Coach", coach.name, true);
     } else {
@@ -199,31 +198,33 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
             </p>
           </div>
 
-          {/* Action Header & Moderator Mode Control */}
+          {/* Action Header & Moderator Mode Control — réservé au staff */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-            <div className="p-3 bg-[#0D1110]/80 border border-[#1B2320] rounded-xl flex items-center gap-3">
-              <div className="text-left">
-                <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-[#00E676]" />
-                  Espace Modération
+            {student.isAdmin && (
+              <div className="p-3 bg-[#0D1110]/80 border border-[#1B2320] rounded-xl flex items-center gap-3">
+                <div className="text-left">
+                  <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-[#00E676]" />
+                    Espace Modération
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    {isModMode ? "Outils de gestion activés" : "Vue élève standard"}
+                  </div>
                 </div>
-                <div className="text-[10px] text-slate-400">
-                  {isModMode ? "Outils de gestion activés" : "Vue élève standard"}
-                </div>
-              </div>
-              <button
-                onClick={() => setIsModMode(!isModMode)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  isModMode ? "bg-[#00E676]" : "bg-[#232D29]"
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-[#0D1110] transition-transform ${
-                    isModMode ? "translate-x-6" : "translate-x-1"
+                <button
+                  onClick={() => setIsModMode(!isModMode)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    isModMode ? "bg-[#00E676]" : "bg-[#232D29]"
                   }`}
-                />
-              </button>
-            </div>
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-[#0D1110] transition-transform ${
+                      isModMode ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+            )}
 
             <button
               onClick={() => setShowNewTopicModal(true)}
@@ -251,7 +252,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
             </button>
 
             {/* Moderator Action Toolbar for Topic */}
-            {isModMode && (
+            {canModerate && (
               <div className="flex items-center gap-2 bg-[#111615]/90 p-1.5 rounded-xl border border-[#1B2320]">
                 <span className="text-[10px] font-mono text-slate-400 px-2">Modération:</span>
                 <button
@@ -458,7 +459,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                 </h3>
 
                 {/* Switch to Reply as Coach if Mod Mode */}
-                {isModMode && (
+                {canModerate && (
                   <div className="flex items-center gap-2 text-xs bg-[#0D1110] p-1.5 rounded-lg border border-[#1B2320]">
                     <span className="text-slate-400">Poste en tant que :</span>
                     <select
