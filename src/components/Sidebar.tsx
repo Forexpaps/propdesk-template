@@ -14,7 +14,6 @@ import {
   TrendingUp,
   Activity,
   Wallet,
-  Zap,
   PanelLeftClose,
   PanelLeftOpen,
   Crown,
@@ -52,7 +51,6 @@ export const ALL_TABS = [
   "wallets",
   "academy",
   "journal",
-  "simulator",
   "signals",
   "forum",
   "messaging",
@@ -88,7 +86,6 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
   "students",
   "exam",
   "checklist",
-  "replay",
   "academy",
   "messaging",
   "audit",
@@ -113,7 +110,6 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   students: "students",
   exam: "exam",
   checklist: null,
-  replay: "simulator",
   academy: "academy",
   messaging: "messaging",
   audit: null,
@@ -227,7 +223,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const pratiqueItems: SidebarEntry[] = [
     { key: "exam", id: "exam", label: "Examen", icon: Award },
     { key: "checklist", id: null, label: "Exercice du jour", icon: Sliders, onOpen: onOpenChecklist },
-    { key: "replay", id: "simulator", label: "Replay", icon: Zap },
   ];
 
   const formationItems: SidebarEntry[] = [
@@ -237,11 +232,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   /**
    * Section OUTILS : deux modales, sans onglet associé.
-   *
-   * Le suivi de challenge Prop Firm est désormais le simulateur complet
-   * accessible depuis l'unique entrée « Replay » de la section PRATIQUE
-   * (bascule interne entre ses deux vues) — voir SMCSimulator/
-   * PropChallengeSimulator.
    *
    * « Calendrier » n'y figure plus : devenu l'onglet « Macro » (section
    * SUIVI), ce n'est plus une modale.

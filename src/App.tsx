@@ -92,9 +92,6 @@ const PerformanceDashboard = React.lazy(() =>
 const WalletManagement = React.lazy(() =>
   import("./components/WalletManagement").then((m) => ({ default: m.WalletManagement }))
 );
-const SMCSimulator = React.lazy(() =>
-  import("./components/SMCSimulator").then((m) => ({ default: m.SMCSimulator }))
-);
 const CoachSignals = React.lazy(() =>
   import("./components/CoachSignals").then((m) => ({ default: m.CoachSignals }))
 );
@@ -621,8 +618,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
             )}
 
             {activeTab === "macro" && <MacroDashboard />}
-
-            {activeTab === "simulator" && <SMCSimulator />}
 
             {activeTab === "exam" && (
               <div className="space-y-6">
@@ -1451,8 +1446,6 @@ function AcademyApp({
               onUpdateAccountBalance={handleUpdateAccountBalance}
             />
           )}
-
-          {activeTab === "simulator" && <SMCSimulator />}
 
           {activeTab === "signals" && (
             <CoachSignals
