@@ -6,20 +6,9 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Trash2,
-  ExternalLink,
   MessageSquare,
-  BarChart3,
-  CheckCircle2,
-  XCircle,
-  Clock,
   Zap,
-  TrendingUp,
-  Brain,
-  ShieldCheck,
   Tag,
-  Smile,
-  AlertTriangle,
-  Award,
   Calculator,
   Download,
   Eye,
@@ -471,7 +460,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   return (
     <div className="space-y-8 pb-12">
       {/* Header & New Trade Trigger */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#111615] p-6 rounded-2xl border border-[#1B2320] shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#111615] p-6 rounded-xl border border-[#1B2320]">
         <div className="space-y-1">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00E676]/10 text-[#00E676] text-xs font-semibold border border-[#00E676]/20">
             <Zap className="w-3.5 h-3.5" />
@@ -519,34 +508,34 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
       {/* Metric Cards Bar */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1 shadow-sm">
-          <div className="text-xs text-slate-400 font-medium">Taux de Réussite</div>
+        <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Taux de Réussite</div>
           <div className="text-2xl font-black text-[#00E676] font-mono">{winRate}%</div>
           <div className="text-[11px] text-slate-500">{winTrades} W / {lossTrades} L</div>
         </div>
 
-        <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1 shadow-sm">
-          <div className="text-xs text-slate-400 font-medium">PnL Cumulé</div>
+        <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">PnL Cumulé</div>
           <div className={`text-2xl font-black font-mono ${totalPnL >= 0 ? "text-[#00E676]" : "text-rose-400"}`}>
             {totalPnL >= 0 ? `+${formatCurrency(totalPnL)}` : formatCurrency(totalPnL)}
           </div>
           <div className="text-[11px] text-slate-500">{totalTrades} positions fermées</div>
         </div>
 
-        <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1 shadow-sm">
-          <div className="text-xs text-slate-400 font-medium">Profit Factor</div>
+        <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Profit Factor</div>
           <div className="text-2xl font-black text-white font-mono">{profitFactor}</div>
           <div className="text-[11px] text-slate-500">Gains vs Pertes</div>
         </div>
 
-        <div className="bg-[#111615]/90 border border-[#1B2320] p-4 rounded-xl space-y-1 shadow-md">
-          <div className="text-xs text-slate-400 font-medium">Ratio R:R Moyen</div>
+        <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Ratio R:R Moyen</div>
           <div className="text-2xl font-black text-purple-400 font-mono">1:{avgRR}</div>
           <div className="text-[11px] text-slate-500">Espérance par trade</div>
         </div>
 
-        <div className="col-span-2 md:col-span-1 bg-[#111615]/90 border border-[#1B2320] p-4 rounded-xl space-y-1 shadow-md">
-          <div className="text-xs text-slate-400 font-medium">Discipline Émotionnelle</div>
+        <div className="col-span-2 md:col-span-1 bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Discipline Émotionnelle</div>
           <div className="text-2xl font-black text-[#00E676] font-mono">
             {disciplineEmoPercent}%
           </div>
@@ -625,7 +614,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       </div>
 
       {/* Trades Table / List */}
-      <div className="bg-[#111615] border border-[#1B2320] rounded-2xl overflow-hidden shadow-xl">
+      <div className="bg-[#111615] border border-[#1B2320] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-[#0D1110]/80 text-slate-400 font-semibold border-b border-[#1B2320]">

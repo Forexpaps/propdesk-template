@@ -210,7 +210,7 @@ export const MacroDashboard: React.FC = () => {
       </div>
 
       {/* Sentiment de risque */}
-      <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-5 space-y-3">
+      <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-3">
         <div className="flex items-center justify-between text-xs font-bold">
           <span className="text-slate-400">Sentiment de risque</span>
           <span className={riskScore >= 60 ? "text-[#00E676]" : riskScore <= 40 ? "text-rose-400" : "text-slate-300"}>
@@ -252,12 +252,12 @@ export const MacroDashboard: React.FC = () => {
             {quotes.map((q) => {
               const positive = q.changePercent >= 0;
               return (
-                <div key={q.symbol} className="bg-[#111615] border border-[#1B2320] rounded-2xl p-4 space-y-2">
+                <div key={q.symbol} className="bg-[#111615] border border-[#1B2320] rounded-xl p-4 space-y-2">
                   <div className="flex items-center justify-between text-xs text-slate-400">
                     <span>{q.label}</span>
                     <span className="font-mono text-[10px] text-slate-600">{q.symbol}</span>
                   </div>
-                  <div className="text-xl font-bold text-white font-mono">{formatPrice(q.price)}</div>
+                  <div className="text-xl font-black text-white font-mono">{formatPrice(q.price)}</div>
                   <Sparkline points={q.sparkline} positive={positive} />
                   <div className={`text-xs font-bold ${positive ? "text-[#00E676]" : "text-rose-400"}`}>
                     {positive ? "+" : ""}
@@ -301,7 +301,7 @@ export const MacroDashboard: React.FC = () => {
           </div>
         )}
         {rawEvents && events.length > 0 && (
-          <div className="border border-[#1B2320] rounded-2xl divide-y divide-[#1B2320] overflow-hidden">
+          <div className="border border-[#1B2320] rounded-xl divide-y divide-[#1B2320] overflow-hidden">
             {events.map((item) => {
               const isImminent = item.countdown !== null && item.minutesUntil <= 15;
               return (
@@ -355,7 +355,7 @@ export const MacroDashboard: React.FC = () => {
       </div>
 
       {/* Repères macro */}
-      <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-5 text-xs text-slate-300 space-y-1">
+      <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 text-xs text-slate-300 space-y-1">
         <p>
           <strong className="text-white">Repères macro.</strong> Un <strong className="text-white">DXY</strong>{" "}
           (dollar) qui monte pèse souvent sur l'or et les actions. Des{" "}

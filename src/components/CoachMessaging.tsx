@@ -1,18 +1,11 @@
 import React, { useState } from "react";
 import {
   Send,
-  Paperclip,
-  User,
   CheckCheck,
   Clock,
   MessageSquare,
-  Award,
   BookOpen,
-  FileText,
-  Star,
-  Zap,
-  ArrowUpRight,
-  ShieldCheck
+  Star
 } from "lucide-react";
 import { Coach, CoachMessage, Trade, StudentProfile } from "../types";
 import { formatCurrency } from "../lib/format";
@@ -105,7 +98,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
   return (
     <div className="space-y-6 pb-12">
       {/* Top Banner */}
-      <div className="bg-gradient-to-r from-[#111615] via-[#151D1A] to-[#111615] p-6 rounded-2xl border border-[#1B2320] shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-[#111615] p-6 rounded-xl border border-[#1B2320] flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00E676]/10 text-[#00E676] text-xs font-semibold border border-[#00E676]/20">
             <MessageSquare className="w-3.5 h-3.5" />
@@ -123,8 +116,8 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
       {/* Main Messaging Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-[600px]">
         {/* Left Sidebar: Coaches List */}
-        <div className="lg:col-span-1 bg-[#111615] border border-[#1B2320] rounded-2xl p-4 space-y-4">
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-2">
+        <div className="lg:col-span-1 bg-[#111615] border border-[#1B2320] rounded-xl p-4 space-y-4">
+          <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-2">
             Vos Coachs Référents
           </h2>
 
@@ -174,7 +167,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
         </div>
 
         {/* Right Chat Area */}
-        <div className="lg:col-span-3 bg-[#111615] border border-[#1B2320] rounded-2xl flex flex-col justify-between overflow-hidden shadow-xl">
+        <div className="lg:col-span-3 bg-[#111615] border border-[#1B2320] rounded-xl flex flex-col justify-between overflow-hidden">
           {/* Active Coach Header */}
           <div className="p-4 bg-[#0D1110]/80 border-b border-[#1B2320] flex items-center justify-between">
             <div className="flex items-center gap-3">
