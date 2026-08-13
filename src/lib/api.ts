@@ -219,6 +219,23 @@ export const api = {
       body: JSON.stringify(state),
     }),
 
+  /**
+   * Restaure une sauvegarde JSON précédemment exportée (« Données &
+   * Sauvegarde » dans le profil) — remplace le profil, les collections et
+   * les résultats de quiz de l'appelant. Distincte de `importState` : celle-ci
+   * fonctionne à tout moment sur une base déjà en service, pas uniquement au
+   * tout premier amorçage.
+   */
+  restoreState: (state: {
+    student?: StudentProfile;
+    collections?: Partial<ServerCollections>;
+    quizResults?: Record<string, ModuleQuizResult>;
+  }) =>
+    request<{ success: true; imported: string[]; skipped: string[] }>("/api/state/restore", {
+      method: "POST",
+      body: JSON.stringify(state),
+    }),
+
   // --- Authentification ---
 
   /** Sonde d'état du démarrage. Répond toujours 200. */

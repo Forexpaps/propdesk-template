@@ -19,9 +19,12 @@ import {
   Star,
   Check,
   ShieldAlert,
+  DatabaseBackup,
+  Download,
 } from "lucide-react";
 import { StudentProfile, TraderBadge } from "../types";
 import { resizeAvatar, AVATAR_SIZE } from "../lib/image";
+import { api } from "../lib/api";
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -103,6 +106,78 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   }, [isOpen, initialTab]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Données & Sauvegarde — export/import JSON de tout le bureau de
+  // l'utilisateur connecté (profil, trades, comptes, modules, messages,
+  // badges, notifications, résultats de quiz). Aucune réinitialisation
+  // destructrice ici, volontairement : voir `server/routes.ts`,
+  // POST /state/restore.
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
+  const [backupStatus, setBackupStatus] = useState<
+    | { kind: "idle" }
+    | { kind: "busy"; message: string }
+    | { kind: "success"; message: string }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" });
+
+  const handleExportBackup = async () => {
+    setBackupStatus({ kind: "busy", message: "Export en cours…" });
+    try {
+      const state = await api.fetchState();
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `propdesk-sauvegarde-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setBackupStatus({ kind: "success", message: "Sauvegarde téléchargée." });
+    } catch {
+      setBackupStatus({ kind: "error", message: "L'export a échoué. Réessaie." });
+    }
+  };
+
+  const handleImportBackupFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Sans réinitialiser la valeur, resélectionner le même fichier après une
+    // erreur n'émettrait aucun évènement.
+    e.target.value = "";
+    if (!file) return;
+
+    // Restaurer une sauvegarde REMPLACE les collections concernées (mêmes
+    // règles qu'un PUT /collections/:name normal, voir server/routes.ts) —
+    // ce n'est pas un ajout. Confirmation explicite avant d'agir.
+    if (
+      !confirm(
+        "Importer ce fichier va remplacer tes données actuelles (trades, comptes, modules, badges...) par celles du fichier. Cette action ne peut pas être annulée. Continuer ?"
+      )
+    ) {
+      return;
+    }
+
+    setBackupStatus({ kind: "busy", message: "Restauration en cours…" });
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const result = await api.restoreState({
+        student: parsed.student ?? undefined,
+        collections: parsed.collections ?? undefined,
+        quizResults: parsed.quizResults ?? undefined,
+      });
+      setBackupStatus({
+        kind: "success",
+        message: `Restauration terminée (${result.imported.length} élément(s)). Rechargement de la page…`,
+      });
+      setTimeout(() => window.location.reload(), 1200);
+    } catch {
+      setBackupStatus({
+        kind: "error",
+        message: "Ce fichier n'a pas pu être importé — vérifie qu'il s'agit bien d'un export PropDesk.",
+      });
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -411,6 +486,66 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </button>
               </div>
             )}
+
+            {/* Données & Sauvegarde — export/import JSON de tout le bureau
+                de l'utilisateur connecté. Disponible aux deux mondes (staff
+                et élève), chacun n'agissant que sur ses propres données —
+                voir POST /state/restore. Pas de bouton de réinitialisation
+                destructrice, décision explicite (voir HANDOFF §7.3). */}
+            <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] space-y-3">
+              <div className="flex items-center gap-3">
+                <DatabaseBackup className="w-6 h-6 text-[#00E676] shrink-0" />
+                <div>
+                  <div className="text-sm font-bold text-white">Données & Sauvegarde</div>
+                  <p className="text-xs text-slate-400">
+                    Exporte toutes tes données dans un fichier JSON, ou restaure une sauvegarde précédente.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportBackup}
+                  disabled={backupStatus.kind === "busy"}
+                  className="px-3 py-2 rounded-xl text-[11px] font-bold text-slate-950 bg-[#00E676] hover:bg-[#00c865] disabled:opacity-50 shrink-0 transition-colors flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Exporter mes données
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => backupFileInputRef.current?.click()}
+                  disabled={backupStatus.kind === "busy"}
+                  className="px-3 py-2 rounded-xl text-[11px] font-bold text-slate-300 bg-[#1B2320] hover:bg-[#232D29] disabled:opacity-50 shrink-0 transition-colors flex items-center gap-1.5"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Importer une sauvegarde
+                </button>
+                <input
+                  ref={backupFileInputRef}
+                  type="file"
+                  accept="application/json"
+                  onChange={(e) => void handleImportBackupFile(e)}
+                  className="hidden"
+                />
+              </div>
+
+              {backupStatus.kind !== "idle" && (
+                <p
+                  className={`text-[11px] ${
+                    backupStatus.kind === "error"
+                      ? "text-rose-400"
+                      : backupStatus.kind === "success"
+                      ? "text-[#00E676]"
+                      : "text-slate-400"
+                  }`}
+                >
+                  {backupStatus.message}
+                </p>
+              )}
+            </div>
 
             {/* Inputs Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

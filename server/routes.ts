@@ -19,7 +19,7 @@ import {
 } from "./schemas";
 import { authRouter, staffRouter } from "./auth/routes";
 import { studentAuthRouter, studentProtectedRouter } from "./auth/studentRoutes";
-import { requireAuth } from "./auth/middleware";
+import { requireAuth, type AuthContext } from "./auth/middleware";
 import { createRateLimit } from "./middleware/rateLimit";
 import { getEconomicCalendar } from "./economicCalendar";
 import { getMarketData } from "./marketData";
@@ -236,31 +236,34 @@ const collectionsRateLimit = createRateLimit({
   message: "Trop d'écritures à la base de données. Réessaie dans quelques minutes.",
 });
 
-api.put("/collections/:name", collectionsRateLimit, (req, res) => {
-  const name = req.params.name as CollectionName;
-  if (!COLLECTION_NAMES.includes(name)) {
-    res.status(404).json({ error: `Collection inconnue : ${req.params.name}` });
-    return;
-  }
-
+/**
+ * Cœur de l'écriture d'une collection, partagé par `PUT /collections/:name`
+ * ET par la restauration de sauvegarde (`POST /state/restore`) — jamais
+ * dupliqué, pour que les deux chemins appliquent exactement les mêmes règles
+ * d'autorisation et la même fusion protectrice des messages coach. Toute
+ * évolution de cette logique (nouvelle collection réservée, nouvelle règle de
+ * fusion) n'a besoin d'être écrite qu'ici.
+ */
+function writeCollectionForAuth(
+  auth: AuthContext,
+  name: CollectionName,
+  rawPayload: unknown
+): { ok: true; count: number } | { ok: false; status: number; error: string } {
   // Une session élève ne touche jamais qu'à son propre Journal — ni les
   // collections du bureau staff, ni celles d'un autre élève.
-  if (req.auth!.kind === "student" && !STUDENT_ALLOWED_COLLECTIONS.has(name)) {
-    res.status(403).json({ error: "Action réservée au staff." });
-    return;
+  if (auth.kind === "student" && !STUDENT_ALLOWED_COLLECTIONS.has(name)) {
+    return { ok: false, status: 403, error: "Action réservée au staff." };
   }
 
   // Les fiches élèves contiennent les notes privées du coach : sans ce contrôle,
   // la protection de la vue côté client ne serait que cosmétique.
-  if (ADMIN_ONLY_COLLECTIONS.has(name) && req.auth?.isAdmin !== true) {
-    res.status(403).json({ error: "Action réservée à l'administrateur." });
-    return;
+  if (ADMIN_ONLY_COLLECTIONS.has(name) && auth.isAdmin !== true) {
+    return { ok: false, status: 403, error: "Action réservée à l'administrateur." };
   }
 
-  const parsed = collectionPayloadSchema.safeParse(req.body);
+  const parsed = collectionPayloadSchema.safeParse(rawPayload);
   if (!parsed.success) {
-    res.status(400).json({ error: "Collection invalide.", details: parsed.error.issues });
-    return;
+    return { ok: false, status: 400, error: "Collection invalide." };
   }
 
   // `collectionPayloadSchema` ne valide qu'un `id` et laisse tout le reste
@@ -280,10 +283,10 @@ api.put("/collections/:name", collectionsRateLimit, (req, res) => {
   // reste toujours autoritaire côté serveur, quoi que le client envoie —
   // un élève ne peut qu'ajouter ou modifier SES PROPRES messages.
   let dataToWrite = parsed.data;
-  if (req.auth!.kind === "student" && name === "messages") {
+  if (auth.kind === "student" && name === "messages") {
     const existingCoachMessages = listCollection<{ id: string; sender?: string; [key: string]: unknown }>(
       name,
-      req.auth!.dataUserId
+      auth.dataUserId
     ).filter((m) => m.sender === "coach");
 
     const submittedNonCoach = (
@@ -301,21 +304,37 @@ api.put("/collections/:name", collectionsRateLimit, (req, res) => {
   }
 
   try {
-    replaceCollection(name, dataToWrite, req.auth!.dataUserId);
+    replaceCollection(name, dataToWrite, auth.dataUserId);
   } catch (err) {
     if (err instanceof CollectionOwnershipConflictError) {
       // Un ou plusieurs `id` soumis appartiennent déjà à un autre bureau
       // (voir le commentaire de `replaceCollection`) — rien n'a été écrit.
       // Un id généré côté client (`Date.now()`) est entré en collision ;
       // recharger régénère un id propre à la prochaine tentative.
-      res.status(409).json({
+      return {
+        ok: false,
+        status: 409,
         error: "Conflit de synchronisation : recharge la page et réessaie.",
-      });
-      return;
+      };
     }
     throw err;
   }
-  res.json({ success: true, count: dataToWrite.length });
+  return { ok: true, count: dataToWrite.length };
+}
+
+api.put("/collections/:name", collectionsRateLimit, (req, res) => {
+  const name = req.params.name as CollectionName;
+  if (!COLLECTION_NAMES.includes(name)) {
+    res.status(404).json({ error: `Collection inconnue : ${req.params.name}` });
+    return;
+  }
+
+  const result = writeCollectionForAuth(req.auth!, name, req.body);
+  if (!result.ok) {
+    res.status(result.status).json({ error: result.error });
+    return;
+  }
+  res.json({ success: true, count: result.count });
 });
 
 const profileRateLimit = createRateLimit({
@@ -461,6 +480,74 @@ api.post("/state/seed", stateSeedRateLimit, (req, res) => {
 
   seedDemoData();
   res.json({ success: true });
+});
+
+const stateRestoreRateLimit = createRateLimit({
+  windowMs: 15 * 60_000,
+  max: 5,
+  message: "Trop de tentatives de restauration. Réessaie dans quelques minutes.",
+});
+
+/**
+ * Restaure une sauvegarde JSON précédemment exportée (section « Données &
+ * Sauvegarde » du profil) — remplace le profil, les collections et les
+ * résultats de quiz du bureau de l'appelant SEULEMENT. Contrairement à
+ * `/state/import` (réservée au tout premier amorçage, voir plus haut),
+ * fonctionne à tout moment sur une base déjà en service : c'est une
+ * restauration volontaire de SES PROPRES données par l'appelant, jamais
+ * celles d'un autre bureau.
+ *
+ * Chaque collection passe par `writeCollectionForAuth`, exactement comme un
+ * `PUT /collections/:name` normal : une session élève ne peut restaurer que
+ * les collections qui lui sont déjà autorisées, avec la même fusion
+ * protectrice des messages coach. Une collection inconnue, refusée ou
+ * invalide est simplement ignorée (renvoyée dans `skipped`) plutôt que de
+ * bloquer toute la restauration — un fichier partiellement corrompu ou
+ * modifié à la main ne doit pas empêcher de récupérer le reste.
+ */
+api.post("/state/restore", stateRestoreRateLimit, (req, res) => {
+  const parsed = importStateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Fichier de sauvegarde invalide.", details: parsed.error.issues });
+    return;
+  }
+
+  const auth = req.auth!;
+  const imported: string[] = [];
+  const skipped: string[] = [];
+
+  if (parsed.data.student) {
+    // Une session élève n'a pas de profil éditable côté serveur (voir
+    // PUT /profile juste en dessous, réservée au staff) : le profil élève
+    // exporté est de toute façon reconstruit depuis la fiche enrolledStudents
+    // à chaque lecture, jamais depuis un profil restauré ici.
+    if (auth.kind === "student") {
+      skipped.push("student");
+    } else {
+      saveProfile(parsed.data.student, auth.dataUserId);
+      imported.push("student");
+    }
+  }
+
+  for (const [name, payload] of Object.entries(parsed.data.collections ?? {})) {
+    if (!COLLECTION_NAMES.includes(name as CollectionName)) {
+      skipped.push(name);
+      continue;
+    }
+    const result = writeCollectionForAuth(auth, name as CollectionName, payload);
+    if (result.ok) {
+      imported.push(name);
+    } else {
+      skipped.push(name);
+    }
+  }
+
+  if (parsed.data.quizResults) {
+    replaceQuizResults(parsed.data.quizResults, auth.dataUserId);
+    imported.push("quizResults");
+  }
+
+  res.json({ success: true, imported, skipped });
 });
 
 /**
