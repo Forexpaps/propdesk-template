@@ -31,19 +31,7 @@ function EquityCurvePlaceholder() {
   );
 }
 import {
-  TrendingUp,
-  BookOpen,
-  BookMarked,
-  Award,
-  Zap,
   ChevronRight,
-  ArrowUpRight,
-  Sliders,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  PlayCircle,
-  ExternalLink,
 } from "lucide-react";
 import { formatCurrency } from "../lib/format";
 import {
@@ -132,13 +120,13 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
       {/* 2. Top 4 KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Score Examen — module Examen pas encore disponible dans l'app */}
-        <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-5 space-y-4 flex flex-col justify-between shadow-sm hover:border-[#00E676]/30 transition-all">
+        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between shadow-sm hover:border-[#00E676]/30 transition-all">
           <div className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
             SCORE EXAMEN
           </div>
           <div className="space-y-2">
             <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-bold text-slate-500">—</span>
+              <span className="text-2xl font-black text-slate-500 font-mono">—</span>
               <span className="text-xs text-slate-500 font-medium">/100</span>
             </div>
             <p className="text-xs text-slate-500">Bientôt disponible</p>
@@ -146,12 +134,12 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         </div>
 
         {/* Card 2: Win Rate Journal */}
-        <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-5 space-y-4 flex flex-col justify-between shadow-sm hover:border-[#00E676]/30 transition-all">
+        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between shadow-sm hover:border-[#00E676]/30 transition-all">
           <div className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
             WIN RATE JOURNAL
           </div>
           <div className="space-y-1">
-            <div className="text-3xl font-bold text-[#00E676]">
+            <div className="text-2xl font-black text-[#00E676] font-mono">
               {winRate}%
             </div>
             <p className="text-xs text-slate-400">
@@ -161,12 +149,12 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         </div>
 
         {/* Card 3: PnL Cumulé */}
-        <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-5 space-y-4 flex flex-col justify-between shadow-sm hover:border-[#00E676]/30 transition-all">
+        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between shadow-sm hover:border-[#00E676]/30 transition-all">
           <div className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
             PNL CUMULÉ
           </div>
           <div className="flex items-end justify-between">
-            <div className={`text-3xl font-bold ${isPnLPositive ? "text-[#00E676]" : "text-rose-400"}`}>
+            <div className={`text-2xl font-black font-mono ${isPnLPositive ? "text-[#00E676]" : "text-rose-400"}`}>
               {isPnLPositive ? "+" : ""}
               {formatCurrency(totalPnL)}
             </div>
@@ -186,13 +174,13 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         </div>
 
         {/* Card 4: Série de Discipline */}
-        <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-5 space-y-4 flex flex-col justify-between shadow-sm hover:border-amber-500/30 transition-all">
+        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between shadow-sm hover:border-amber-500/30 transition-all">
           <div className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
             SÉRIE DE DISCIPLINE
           </div>
           <div className="space-y-1">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-3xl font-bold text-[#FFB800]">{disciplineStreak}</span>
+              <span className="text-2xl font-black text-[#FFB800] font-mono">{disciplineStreak}</span>
               <span className="text-xs text-slate-400 font-medium">
                 {disciplineStreak > 1 ? "jours" : "jour"}
               </span>
@@ -237,6 +225,17 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             textHover: "group-hover:text-[#00E676]",
           },
           {
+            key: "replay",
+            tab: "replay",
+            letter: "R",
+            title: "Replay",
+            description: "Backtest manuel sur données historiques réelles.",
+            glow: "bg-[radial-gradient(circle_at_0%_0%,rgba(139,92,246,0.20),transparent_65%)]",
+            badgeClasses: "text-violet-400 bg-violet-500/15 border-violet-500/30",
+            borderHover: "hover:border-violet-500/40",
+            textHover: "group-hover:text-violet-400",
+          },
+          {
             key: "exam",
             tab: "exam",
             letter: "E",
@@ -274,7 +273,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                 <div
                   key={c.key}
                   onClick={() => setActiveTab(c.tab)}
-                  className={`bg-[#111615] ${c.glow} border border-[#1B2320] ${c.borderHover} p-5 rounded-2xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between`}
+                  className={`bg-[#111615] ${c.glow} border border-[#1B2320] ${c.borderHover} p-5 rounded-xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between`}
                 >
                   <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-bold text-sm ${c.badgeClasses}`}>
                     {c.letter}
@@ -295,7 +294,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
       {/* 4. Bottom Main Section: Courbe de progression (2/3) + Ta semaine (1/3) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2">
         {/* Left Column: Courbe de progression (2 cols) */}
-        <div className="lg:col-span-2 bg-[#111615] border border-[#1B2320] rounded-2xl p-6 space-y-5">
+        <div className="lg:col-span-2 bg-[#111615] border border-[#1B2320] rounded-xl p-6 space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-bold text-white">Courbe de progression</h3>
@@ -312,10 +311,10 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           {/* Total Capital display */}
           <div className="space-y-1">
             <div className="flex items-baseline gap-3">
-              <span className="text-3xl sm:text-4xl font-extrabold text-white">
+              <span className="text-3xl sm:text-4xl font-black text-white font-mono">
                 {formatCurrency(student.currentCapital)}
               </span>
-              <span className="px-2 py-0.5 rounded bg-[#00E676]/10 text-[#00E676] text-xs font-bold border border-[#00E676]/20">
+              <span className="px-2 py-0.5 rounded bg-[#00E676]/10 text-[#00E676] text-xs font-mono font-bold border border-[#00E676]/20">
                 {isCapitalUp ? "+" : ""}{capitalDiffPercent}%
               </span>
             </div>
@@ -333,7 +332,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         </div>
 
         {/* Right Column: Ta semaine (1 col) */}
-        <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-6 space-y-4 flex flex-col justify-between">
+        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-6 space-y-4 flex flex-col justify-between">
           <div>
             <h3 className="text-base font-bold text-white">Ta semaine</h3>
           </div>

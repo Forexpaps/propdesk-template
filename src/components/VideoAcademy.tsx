@@ -111,7 +111,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
   return (
     <div className="space-y-8 pb-12">
       {/* Top Banner & Progression Bar */}
-      <div className="bg-[#111615] rounded-2xl border border-[#1B2320] p-6 shadow-sm relative overflow-hidden">
+      <div className="bg-[#111615] rounded-xl border border-[#1B2320] p-6 relative overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00E676]/10 text-[#00E676] text-xs font-semibold border border-[#00E676]/20">
@@ -129,8 +129,8 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
           {/* Global Progress Box */}
           <div className="bg-[#0D1110] border border-[#1B2320] rounded-xl p-4 min-w-[280px] space-y-3">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-400 font-medium">Progression Globale</span>
-              <span className="text-[#00E676] font-bold font-mono text-sm">{globalProgress}%</span>
+              <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Progression Globale</span>
+              <span className="text-[#00E676] font-black font-mono text-sm">{globalProgress}%</span>
             </div>
 
             <div className="w-full bg-[#1B2320] h-2.5 rounded-full overflow-hidden">
@@ -197,7 +197,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
           return (
             <div
               key={module.id}
-              className="bg-[#111615] rounded-2xl border border-[#1B2320]/90 overflow-hidden shadow-lg transition-all"
+              className="bg-[#111615] rounded-xl border border-[#1B2320]/90 overflow-hidden transition-all"
             >
               {/* Module Header Bar */}
               <div

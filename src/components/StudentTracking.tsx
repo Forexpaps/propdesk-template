@@ -1,28 +1,15 @@
 import React, { useState } from "react";
 import {
-  Users,
   Search,
   Plus,
   Edit,
   Eye,
   ShieldCheck,
-  TrendingUp,
-  AlertTriangle,
-  Award,
   CheckCircle2,
   Trash2,
-  UserCheck,
-  Phone,
-  Mail,
-  BookOpen,
-  DollarSign,
   Wallet,
   Activity,
-  FileText,
   Lock,
-  ChevronRight,
-  Sparkles,
-  Zap,
   Tag,
   Timer,
   MessageSquare,
@@ -206,7 +193,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-[#111615] via-[#00E676]/5 to-[#111615] border border-[#1B2320] rounded-2xl p-6 relative overflow-hidden shadow-xl">
+      <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-6 relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
@@ -283,7 +270,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
           return (
             <div
               key={st.id}
-              className="bg-[#111615]/90 border border-[#1B2320] hover:border-[#232D29] rounded-2xl p-5 space-y-4 transition-all hover:shadow-xl relative group"
+              className="bg-[#111615] border border-[#1B2320] hover:border-[#232D29] rounded-xl p-5 space-y-4 transition-all relative group"
             >
               <div className="border-b border-[#1B2320]/80 pb-4 space-y-3">
                 <div className="flex items-center gap-3">
@@ -360,8 +347,8 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               {/* Performance & Capital Metrics */}
               <div className="grid grid-cols-3 gap-2 bg-[#0D1110] p-3 rounded-xl border border-[#151D1A] text-xs">
                 <div>
-                  <span className="text-[10px] text-slate-500 block">Capital Enregistré</span>
-                  <span className="font-mono font-bold text-white text-sm">
+                  <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold block">Capital Enregistré</span>
+                  <span className="font-mono font-black text-white text-sm">
                     {formatCurrency(st.currentCapital)}
                   </span>
                   <span className={`text-[10px] block ${isProfit ? "text-[#00E676]" : "text-rose-400"}`}>
@@ -369,13 +356,13 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-500 block">Win Rate & Trades</span>
-                  <span className="font-mono font-bold text-[#00E676] text-sm">{st.winRate}%</span>
+                  <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold block">Win Rate & Trades</span>
+                  <span className="font-mono font-black text-[#00E676] text-sm">{st.winRate}%</span>
                   <span className="text-[10px] text-slate-400 block">{st.totalTrades} positions</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-500 block">Progression Cours</span>
-                  <span className="font-mono font-bold text-[#00E676] text-sm">{st.courseCompletionPercentage}%</span>
+                  <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold block">Progression Cours</span>
+                  <span className="font-mono font-black text-[#00E676] text-sm">{st.courseCompletionPercentage}%</span>
                   <div className="w-full bg-[#1B2320] h-1.5 rounded-full mt-1 overflow-hidden">
                     <div
                       className="bg-[#00E676] h-full rounded-full"

@@ -6,15 +6,9 @@ import {
   AlertTriangle,
   Plus,
   DollarSign,
-  PieChart,
   Award,
-  Calendar,
   Layers,
-  CheckCircle2,
   XCircle,
-  BarChart3,
-  ChevronRight,
-  Info,
   Building,
   ArrowUpRight,
   ArrowDownRight,
@@ -145,7 +139,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Banner Header */}
-      <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] p-6 rounded-2xl border border-[#00E676]/20 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm relative overflow-hidden">
+      <div className="bg-[#111615] p-6 rounded-xl border border-[#1B2320] flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
         <div className="space-y-2 z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20 text-xs font-mono font-bold">
             <Wallet className="w-3.5 h-3.5" /> Gestionnaire Multi-Portefeuilles & Prop Firms
@@ -172,15 +166,15 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
 
       {/* Capital Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] p-5 rounded-2xl border border-[#00E676]/20 space-y-2">
-          <div className="text-xs font-medium text-slate-400 flex items-center justify-between">
+        <div className="bg-[#111615] p-4 rounded-xl border border-[#1B2320] space-y-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold flex items-center justify-between">
             <span>Capital Total Cumulé</span>
-            <DollarSign className="w-4 h-4 text-[#00E676]" />
+            <DollarSign className="w-3.5 h-3.5 text-[#00E676]" />
           </div>
-          <div className="text-2xl font-bold font-mono text-[#00E676]">
+          <div className="text-2xl font-black font-mono text-[#00E676]">
             {formatCurrency(totalCombinedEquity)}
           </div>
-          <div className="text-xs text-slate-400 flex items-center gap-1 font-mono">
+          <div className="text-[11px] text-slate-500 flex items-center gap-1 font-mono">
             {parseFloat(totalCombinedPnlPercent) >= 0 ? (
               <span className="text-[#00E676] font-bold flex items-center gap-0.5">
                 <ArrowUpRight className="w-3.5 h-3.5" /> +{totalCombinedPnlPercent}%
@@ -190,43 +184,43 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 <ArrowDownRight className="w-3.5 h-3.5" /> {totalCombinedPnlPercent}%
               </span>
             )}
-            <span>depuis le démarrage</span>
+            <span className="font-sans">depuis le démarrage</span>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] p-5 rounded-2xl border border-blue-500/20 space-y-2">
-          <div className="text-xs font-medium text-slate-400 flex items-center justify-between">
+        <div className="bg-[#111615] p-4 rounded-xl border border-[#1B2320] space-y-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold flex items-center justify-between">
             <span>Comptes Actifs & Evaluation</span>
-            <Building className="w-4 h-4 text-blue-400" />
+            <Building className="w-3.5 h-3.5 text-blue-400" />
           </div>
-          <div className="text-2xl font-bold font-mono text-blue-300">
+          <div className="text-2xl font-black font-mono text-blue-300">
             {accounts.length} Portefeuilles
           </div>
-          <div className="text-xs text-slate-400">
+          <div className="text-[11px] text-slate-500">
             {accounts.filter((a) => a.type.includes("Prop Firm")).length} Comptes Prop Firms sous gestion
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] p-5 rounded-2xl border border-amber-500/20 space-y-2">
-          <div className="text-xs font-medium text-slate-400 flex items-center justify-between">
+        <div className="bg-[#111615] p-4 rounded-xl border border-[#1B2320] space-y-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold flex items-center justify-between">
             <span>Profit Cumulé Net</span>
-            <TrendingUp className="w-4 h-4 text-amber-400" />
+            <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
           </div>
-          <div className="text-2xl font-bold font-mono text-amber-300">
+          <div className="text-2xl font-black font-mono text-amber-300">
             +{formatCurrency(totalCombinedPnl)}
           </div>
-          <div className="text-xs text-slate-400">Bénéfices réels enregistrés sur le desk</div>
+          <div className="text-[11px] text-slate-500">Bénéfices réels enregistrés sur le desk</div>
         </div>
 
-        <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] p-5 rounded-2xl border border-rose-500/20 space-y-2">
-          <div className="text-xs font-medium text-slate-400 flex items-center justify-between">
+        <div className="bg-[#111615] p-4 rounded-xl border border-[#1B2320] space-y-1.5">
+          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold flex items-center justify-between">
             <span>Règle Risque Globale</span>
-            <ShieldCheck className="w-4 h-4 text-rose-400" />
+            <ShieldCheck className="w-3.5 h-3.5 text-rose-400" />
           </div>
-          <div className="text-2xl font-bold font-mono text-rose-300 flex items-center gap-2">
+          <div className="text-2xl font-black font-mono text-rose-300 flex items-center gap-2">
             <span>1.0% Max</span>
           </div>
-          <div className="text-xs text-rose-300 font-medium">Protection contre le Surtraitement</div>
+          <div className="text-[11px] text-rose-300/80">Protection contre le Surtraitement</div>
         </div>
       </div>
 
@@ -266,7 +260,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 onClick={() => setSelectedAccountId(acc.id)}
                 className={`p-4 rounded-xl border transition-all cursor-pointer space-y-3 ${
                   isSelected
-                    ? "bg-gradient-to-br from-[#0D1110] to-[#111615] border-[#00E676]/40 shadow-lg shadow-[#00E676]/10"
+                    ? "bg-[#111615] border-[#00E676]/40"
                     : "bg-[#0D1110] border-[#151D1A] hover:border-[#00E676]/20"
                 }`}
               >
@@ -318,8 +312,8 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
 
         {/* Right Column: Selected Account Deep-Dive Inspector */}
         {selectedAccount && (
-          <div className="lg:col-span-2 bg-gradient-to-br from-[#0D1110] to-[#111615] border border-[#00E676]/20 rounded-2xl p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#00E676]/20 pb-4 gap-4">
+          <div className="lg:col-span-2 bg-[#111615] border border-[#1B2320] rounded-xl p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#1B2320] pb-4 gap-4">
               <div>
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-1 rounded bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20 text-xs font-mono font-bold">
@@ -464,7 +458,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
               {/* `initialBalance > 0` : sert de diviseur juste en dessous — un compte
                   legacy/malformé à 0 ou négatif donnerait un pourcentage NaN/inversé. */}
               {selectedAccount.profitTargetPercent > 0 && selectedAccount.initialBalance > 0 && (
-                <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] p-4 rounded-xl border border-[#00E676]/20 space-y-3">
+                <div className="bg-[#0D1110] p-4 rounded-xl border border-[#151D1A] space-y-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-200 font-bold flex items-center gap-1.5">
                       <Award className="w-4 h-4 text-[#00E676]" /> Objectif de Validation (Profit Target)
@@ -514,30 +508,30 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
             </div>
 
             {/* Quick Stats Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gradient-to-br from-[#0D1110] to-[#111615] p-4 rounded-xl border border-[#00E676]/20 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#0D1110] p-4 rounded-xl border border-[#151D1A] text-xs">
               <div>
-                <div className="text-slate-400 font-mono">Jours de Trading</div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Jours de Trading</div>
                 <div className="text-sm font-bold text-white mt-1">
                   {selectedAccount.tradingDays} / {selectedAccount.minTradingDaysRequired} jours min
                 </div>
               </div>
 
               <div>
-                <div className="text-slate-400 font-mono">Trades Exécutés</div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Trades Exécutés</div>
                 <div className="text-sm font-bold text-white mt-1">
                   {positionsDuCompte(selectedAccount.id)} positions
                 </div>
               </div>
 
               <div>
-                <div className="text-slate-400 font-mono">Capital Initial</div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Capital Initial</div>
                 <div className="text-sm font-bold text-white mt-1 font-mono">
                   {formatCurrency(selectedAccount.initialBalance)}
                 </div>
               </div>
 
               <div>
-                <div className="text-slate-400 font-mono">Solde Actuel</div>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Solde Actuel</div>
                 <div className="text-sm font-bold text-[#00E676] mt-1 font-mono">
                   {formatCurrency(selectedAccount.equity)}
                 </div>
@@ -550,8 +544,8 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
       {/* Modal Add Account */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-gradient-to-br from-[#0D1110] to-[#111615] border border-[#00E676]/20 rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl relative">
-            <div className="flex items-center justify-between border-b border-[#00E676]/20 pb-4">
+          <div className="bg-[#111615] border border-[#1B2320] rounded-xl max-w-lg w-full p-6 space-y-6 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-lg bg-[#00E676]/10">
                   <Wallet className="w-5 h-5 text-[#00E676]" />
@@ -575,7 +569,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   placeholder="ex: FTMO $100K Phase 1"
                   value={newAccName}
                   onChange={(e) => setNewAccName(e.target.value)}
-                  className="w-full bg-[#0D1110] border border-[#00E676]/20 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50"
                 />
               </div>
 
@@ -588,7 +582,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     placeholder="FTMO, MyFundedFX, IC Markets..."
                     value={newAccFirm}
                     onChange={(e) => setNewAccFirm(e.target.value)}
-                    className="w-full bg-[#0D1110] border border-[#00E676]/20 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50"
                   />
                 </div>
 
@@ -597,7 +591,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <select
                     value={newAccType}
                     onChange={(e) => setNewAccType(e.target.value as AccountType)}
-                    className="w-full bg-[#0D1110] border border-[#00E676]/20 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50"
                   >
                     <option value="Prop Firm Evaluation">Prop Firm Evaluation</option>
                     <option value="Prop Firm Funded">Prop Firm Funded</option>
@@ -616,7 +610,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     min="1"
                     value={newAccBalance}
                     onChange={(e) => setNewAccBalance(e.target.value)}
-                    className="w-full bg-[#0D1110] border border-purple-500/30 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-purple-500 font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50 font-mono"
                   />
                 </div>
 
@@ -626,7 +620,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     type="number"
                     value={newAccProfitTarget}
                     onChange={(e) => setNewAccProfitTarget(e.target.value)}
-                    className="w-full bg-[#0D1110] border border-purple-500/30 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-purple-500 font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50 font-mono"
                   />
                 </div>
               </div>
@@ -638,7 +632,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     type="number"
                     value={newAccMaxDailyDrawdown}
                     onChange={(e) => setNewAccMaxDailyDrawdown(e.target.value)}
-                    className="w-full bg-[#0D1110] border border-purple-500/30 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-purple-500 font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50 font-mono"
                   />
                 </div>
 
@@ -648,12 +642,12 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     type="number"
                     value={newAccMaxTotalDrawdown}
                     onChange={(e) => setNewAccMaxTotalDrawdown(e.target.value)}
-                    className="w-full bg-[#0D1110] border border-purple-500/30 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-purple-500 font-mono"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50 font-mono"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#00E676]/20">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1B2320]">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
