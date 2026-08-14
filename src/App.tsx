@@ -23,7 +23,6 @@ import { listPending } from "./lib/pendingChanges";
 
 import {
   initialStudentProfile,
-  initialCoaches,
   initialModules,
   initialTrades,
   initialMessages,
@@ -49,6 +48,8 @@ import {
   AppNotification,
   TraderBadge,
   TradeDraft,
+  Coach,
+  FOUNDER_COACH_ID,
 } from "./types";
 import { isTabType, type TabType as SidebarTabType } from "./components/Sidebar";
 
@@ -283,7 +284,7 @@ function resolveStudentValue<T>(serverValue: T, localKey: string): T {
  * hors périmètre de l'accès élève.
  */
 function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
-  const { status, trades, accounts, modules, messages, badges, quizResults, student } = useStudentBootstrap();
+  const { status, trades, accounts, modules, messages, badges, quizResults, student, coaches } = useStudentBootstrap();
   const syncEnabled = status === "online";
 
   // Bandeau d'avertissement immédiat quand une sauvegarde échoue en
@@ -668,7 +669,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
 
             {activeTab === "messaging" && (
               <CoachMessaging
-                coaches={initialCoaches}
+                coaches={coaches}
                 messages={syncedMessages}
                 student={studentProfile}
                 trades={syncedTrades}
@@ -956,6 +957,28 @@ function AcademyApp({
     startingCapital: accounts.reduce((sum, a) => sum + a.initialBalance, 0),
     currentCapital: accounts.reduce((sum, a) => sum + a.equity, 0),
   };
+
+  /**
+   * Le "coach" que les élèves voient dans leur Messagerie est le fondateur
+   * lui-même — bureau staff partagé, un seul fil de discussion (voir
+   * `buildCoachesForStudent`, `server/routes.ts`, et `FOUNDER_COACH_ID`,
+   * `server/db.ts`). Ici, pas besoin d'aller-retour serveur : le profil est
+   * déjà en mémoire. `[]` tant que le profil n'a pas encore de nom (juste
+   * après la première installation) — cohérent avec ce que
+   * `buildCoachesForStudent` renvoie côté élève dans ce même cas.
+   */
+  const founderCoaches: Coach[] = student.name
+    ? [
+        {
+          id: FOUNDER_COACH_ID,
+          name: student.name,
+          role: student.role || "Coach",
+          specialty: student.level || "",
+          avatar: student.avatar,
+          isOnline: true,
+        },
+      ]
+    : [];
 
   /**
    * Ferme la session : invalide le jeton côté serveur, oublie le cache local, et
@@ -1524,7 +1547,7 @@ function AcademyApp({
             <ForumSection
               topics={forumTopics}
               student={student}
-              coaches={initialCoaches}
+              coaches={founderCoaches}
               onCreateTopic={handleCreateForumTopic}
               onAddReply={handleAddForumReply}
               onToggleLikeTopic={handleToggleLikeTopic}
@@ -1538,7 +1561,7 @@ function AcademyApp({
 
           {activeTab === "messaging" && (
             <CoachMessaging
-              coaches={initialCoaches}
+              coaches={founderCoaches}
               messages={messages}
               student={student}
               trades={trades}

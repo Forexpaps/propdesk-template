@@ -1,6 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { randomBytes } from "node:crypto";
-import { db, DEFAULT_USER_ID } from "../db";
+import { db, DEFAULT_USER_ID, FOUNDER_COACH_ID } from "../db";
 import { getProfile, saveProfile, listCollection, updateCollectionItem, replaceCollection } from "../repositories";
 import { setupSchema, loginSchema, inviteStaffSchema, changePasswordSchema, securityEventsQuerySchema } from "../schemas";
 import { createRateLimit } from "../middleware/rateLimit";
@@ -727,15 +727,16 @@ staffRouter.post(
       return;
     }
 
-    // `coachId` doit correspondre à l'un des coachs fictifs affichés côté
-    // élève (`src/data/mockData.ts`, `initialCoaches`) : `CoachMessaging`
-    // filtre son fil par ce champ, pas par l'identité réelle du compte staff
-    // qui répond. Fixé sur le head coach faute d'un vrai choix d'expéditeur
-    // dans cette vue — un seul fil existe ici, pas un par coach fictif.
+    // `coachId` doit correspondre au coach affiché côté élève, reconstruit
+    // depuis le vrai profil fondateur par `buildCoachesForStudent`
+    // (server/routes.ts) : `CoachMessaging` filtre son fil par ce champ, pas
+    // par l'identité réelle du compte staff qui répond. Fixé sur
+    // `FOUNDER_COACH_ID` faute d'un vrai choix d'expéditeur dans cette vue —
+    // un seul fil existe ici, pas un par membre du staff (bureau partagé).
     const message = {
       id: `msg-${randomBytes(9).toString("base64url")}`,
       sender: "coach" as const,
-      coachId: "coach-thomas",
+      coachId: FOUNDER_COACH_ID,
       text,
       timestamp: new Date().toISOString(),
       status: "sent" as const,

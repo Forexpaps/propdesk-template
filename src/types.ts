@@ -165,8 +165,18 @@ export interface Coach {
   specialty: string;
   avatar: string;
   isOnline: boolean;
-  rating: number;
+  /** Absent pour un coach reconstruit depuis un vrai profil — pas de note fabriquée. */
+  rating?: number;
 }
+
+/**
+ * Identifiant du seul "coach" affiché côté élève — miroir client de
+ * `FOUNDER_COACH_ID` (`server/db.ts`). Dupliqué plutôt que partagé via un
+ * import, le client ne pouvant pas importer du code serveur (Node/
+ * better-sqlite3) sans casser le bundle navigateur. Si l'un change, l'autre
+ * doit changer avec lui.
+ */
+export const FOUNDER_COACH_ID = "coach-thomas";
 
 export interface CoachMessage {
   id: string;

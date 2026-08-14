@@ -52,7 +52,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
   prefilledLessonTitle,
   prefilledTradeId,
 }) => {
-  const [selectedCoachId, setSelectedCoachId] = useState<string>("coach-thomas");
+  const [selectedCoachId, setSelectedCoachId] = useState<string>(coaches[0]?.id || "");
   const [inputText, setInputText] = useState<string>(
     prefilledLessonTitle
       ? `Bonjour Coach, j'ai une question concernant la leçon "${prefilledLessonTitle}" : `
@@ -71,8 +71,12 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
     );
   }
 
+  // Recours à `coaches[0]` par son id RÉSOLU (`selectedCoach.id`), jamais à
+  // l'état brut `selectedCoachId` : ce dernier peut être vide au tout premier
+  // rendu côté élève, où `coaches` arrive après un aller-retour serveur
+  // (l'état de la sélection est initialisé avant que la liste soit connue).
   const selectedCoach = coaches.find((c) => c.id === selectedCoachId) || coaches[0];
-  const activeConversation = messages.filter((m) => m.coachId === selectedCoachId);
+  const activeConversation = messages.filter((m) => m.coachId === selectedCoach.id);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,7 +85,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
     setIsSending(true);
     try {
       await onSendMessage(
-        selectedCoachId,
+        selectedCoach.id,
         inputText,
         selectedTradeAttachment || undefined,
         prefilledLessonTitle
@@ -151,10 +155,12 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
                     <div className="space-y-0.5 overflow-hidden">
                       <div className="flex items-center justify-between">
                         <h3 className="text-xs font-bold text-white truncate">{coach.name}</h3>
-                        <span className="text-[10px] text-[#00E676] font-bold flex items-center gap-0.5">
-                          <Star className="w-2.5 h-2.5 fill-[#00E676]" />
-                          {coach.rating}
-                        </span>
+                        {coach.rating !== undefined && (
+                          <span className="text-[10px] text-[#00E676] font-bold flex items-center gap-0.5">
+                            <Star className="w-2.5 h-2.5 fill-[#00E676]" />
+                            {coach.rating}
+                          </span>
+                        )}
                       </div>
                       <p className="text-[11px] text-[#00E676] font-medium truncate">{coach.role}</p>
                       <p className="text-[10px] text-slate-400 line-clamp-1">{coach.specialty}</p>
