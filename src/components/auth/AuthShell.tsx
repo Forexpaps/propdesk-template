@@ -26,14 +26,17 @@ export const AuthShell: React.FC<AuthShellProps> = ({
   <div className="min-h-screen bg-[#0B0F0E] text-slate-100 font-sans antialiased selection:bg-[#00E676] selection:text-slate-950 flex flex-col items-center justify-center p-4">
     <div className="w-full max-w-md space-y-6">
       {/* Le logo n'est pas décoratif : il identifie le service sur lequel on
-          s'apprête à saisir un mot de passe. */}
+          s'apprête à saisir un mot de passe. PNG à fond transparent (recadré
+          depuis l'ancien logo-auth.jpg, qui portait un badge sombre en dur
+          autour du "P") : s'intègre directement au fond de la page, sans
+          rectangle ni coins arrondis à gérer côté CSS. */}
       <img
-        src="/logo-auth.jpg"
+        src="/logo-auth.png"
         alt="PropDesk"
         width={768}
         height={512}
         fetchPriority="high"
-        className="w-56 h-auto mx-auto rounded-2xl"
+        className="w-56 h-auto mx-auto"
       />
 
       <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-8 space-y-6 shadow-2xl">
