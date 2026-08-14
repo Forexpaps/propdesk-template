@@ -81,18 +81,23 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   );
 
   let tempCapital = student.startingCapital;
-  const equityData = sortedTrades.length === 0
-    ? [{ label: "Départ", capital: student.startingCapital }]
-    : sortedTrades.map((trade, index) => {
-        const pnl = parseFloat(String(trade.pnl)) || 0;
-        if (trade.result === "WIN" || trade.result === "LOSS") {
-          tempCapital += pnl;
-        }
-        return {
-          label: `T${index + 1}`,
-          capital: tempCapital
-        };
-      }).concat([{ label: "Actuel", capital: student.currentCapital }]);
+  const equityData = [
+    { label: "Départ", capital: student.startingCapital },
+    ...sortedTrades.map((trade, index) => {
+      const pnl = parseFloat(String(trade.pnl)) || 0;
+      if (trade.result === "WIN" || trade.result === "LOSS") {
+        tempCapital += pnl;
+      }
+      return {
+        label: `T${index + 1}`,
+        capital: tempCapital
+      };
+    }),
+    // Point final rattaché au vrai capital courant (somme des portefeuilles) :
+    // évite que la courbe diverge silencieusement si un trade sans compte
+    // rattaché, ou en %, n'entre pas dans le même calcul que `tempCapital`.
+    ...(sortedTrades.length > 0 ? [{ label: "Actuel", capital: student.currentCapital }] : []),
+  ];
 
   // Trades en $ uniquement : un trade en % n'est pas une somme d'argent,
   // même principe que dans PerformanceDashboard.tsx.

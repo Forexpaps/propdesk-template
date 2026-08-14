@@ -39,3 +39,38 @@ export function totalDrawdownPercent(account: TradingAccount): number {
   if (account.initialBalance <= 0) return 0;
   return ((account.initialBalance - account.equity) / account.initialBalance) * 100;
 }
+
+/**
+ * Recalcule le solde de chaque compte à partir des trades qui lui sont
+ * rattachés : `equity = capital initial + somme des PnL des trades liés`
+ * (en dollars uniquement — un trade en % n'est pas une somme d'argent).
+ *
+ * Un compte sans trade rattaché garde son solde tel quel — retirer le
+ * dernier trade lié à un compte ne doit pas silencieusement remettre son
+ * solde au capital initial si ce compte avait un ajustement manuel
+ * antérieur ; seul le PnL des trades *présents* est recalculé, jamais
+ * "annulé" par leur absence.
+ *
+ * Renvoie `accounts` à l'identique (même référence) quand rien ne bouge,
+ * pour ne déclencher ni sauvegarde ni re-rendu inutile.
+ */
+export function syncAccountsWithTrades(
+  accounts: TradingAccount[],
+  trades: Trade[]
+): TradingAccount[] {
+  let changed = false;
+  const next = accounts.map((acc) => {
+    const linkedTrades = trades.filter((t) => t.accountId === acc.id);
+    if (linkedTrades.length === 0) return acc;
+
+    const pnl = linkedTrades
+      .filter((t) => (t.pnlUnit ?? "USD") !== "PERCENT")
+      .reduce((sum, t) => sum + t.pnl, 0);
+    const newBalance = acc.initialBalance + pnl;
+
+    if (acc.equity === newBalance && acc.currentBalance === newBalance) return acc;
+    changed = true;
+    return { ...acc, equity: newBalance, currentBalance: newBalance };
+  });
+  return changed ? next : accounts;
+}

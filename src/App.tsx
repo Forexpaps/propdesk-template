@@ -117,6 +117,7 @@ function ViewFallback() {
   );
 }
 import { formatCurrency } from "./lib/format";
+import { syncAccountsWithTrades } from "./lib/walletStats";
 import { usePersistentState } from "./hooks/usePersistentState";
 import { useBootstrap, useSyncedState, useStudentBootstrap } from "./hooks/useServerSync";
 import { useAuth } from "./hooks/useAuth";
@@ -352,6 +353,13 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
+  // Solde de chaque portefeuille recalculé depuis les trades qui lui sont
+  // rattachés à chaque saisie/modification/suppression — voir
+  // `syncAccountsWithTrades`.
+  useEffect(() => {
+    setSyncedAccounts((prev) => syncAccountsWithTrades(prev, syncedTrades));
+  }, [syncedTrades]);
+
   // Progression recalculée en direct depuis les vraies données — jamais
   // persistée telle quelle, voir `src/lib/badges.ts`.
   const liveBadges = computeBadgeProgress(syncedBadges, syncedTrades, syncedModules);
@@ -458,6 +466,10 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     );
   };
 
+  const handleDeleteAccount = (id: string) => {
+    setSyncedAccounts((prev) => prev.filter((acc) => acc.id !== id));
+  };
+
   const handleToggleLessonCompletion = (moduleId: string, lessonId: string) => {
     setSyncedModules((prev) =>
       prev.map((mod) =>
@@ -535,9 +547,13 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   // Messagerie, Outils, Macro) suit le réglage de visibilité du fondateur —
   // pas de liste figée ici, sous peine de rendre ce réglage sans effet côté
   // élève.
+  // Même principe que côté fondateur (AcademyApp) : le capital affiché vient
+  // des portefeuilles réels de l'élève, jamais d'une valeur saisie à la main.
   const studentProfile: StudentProfile = {
     ...student,
     isAdmin: false,
+    startingCapital: syncedAccounts.reduce((sum, a) => sum + a.initialBalance, 0),
+    currentCapital: syncedAccounts.reduce((sum, a) => sum + a.equity, 0),
   };
 
   return (
@@ -615,6 +631,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
                 trades={syncedTrades}
                 onAddAccount={handleAddAccount}
                 onUpdateAccountBalance={handleUpdateAccountBalance}
+                onDeleteAccount={handleDeleteAccount}
               />
             )}
 
@@ -915,27 +932,30 @@ function AcademyApp({
 
   // L'écriture dans localStorage est désormais assurée par usePersistentState.
 
-  // Le capital courant est dérivé du PnL cumulé du journal.
-  //
-  // Renvoyer `prev` **à l'identique** quand la valeur ne bouge pas n'est pas
-  // une micro-optimisation : cet effet s'exécute à chaque montage, et un
-  // nouvel objet à chaque fois — même porteur de la même valeur — suffisait à
-  // faire croire au reste de l'application que le profil venait d'être
-  // modifié. En ligne cela déclenchait un `PUT /api/profile` inutile à chaque
-  // démarrage ; hors ligne cela marquait le profil comme « en attente », et le
-  // bandeau de reconnexion annonçait des modifications qui n'existaient pas.
-  // Un bandeau qui crie au loup à chaque fois n'est plus lu.
+  // Solde de chaque portefeuille recalculé depuis les trades qui lui sont
+  // rattachés à chaque saisie/modification/suppression — voir
+  // `syncAccountsWithTrades`.
   useEffect(() => {
-    // Un trade saisi en % n'est pas une somme d'argent : l'exclure du capital
-    // recalculé, sous peine de mélanger deux unités hétérogènes.
-    const totalPnL = trades
-      .filter((t) => (t.pnlUnit ?? "USD") !== "PERCENT")
-      .reduce((acc, t) => acc + t.pnl, 0);
-    setStudent((prev) => {
-      const capital = prev.startingCapital + totalPnL;
-      return prev.currentCapital === capital ? prev : { ...prev, currentCapital: capital };
-    });
+    setAccounts((prev) => syncAccountsWithTrades(prev, trades));
   }, [trades]);
+
+  /**
+   * Le capital affiché (en-tête, tableau de bord, sidebar, Rentabilité) n'est
+   * plus une valeur saisie à la main sur le profil : c'est la somme des
+   * portefeuilles réels (`accounts`), exactement comme "Capital Total Cumulé"
+   * dans le Portefeuille. Sans portefeuille, il vaut 0 — un site neuf ne doit
+   * jamais afficher un capital inventé.
+   *
+   * Calculé au rendu, jamais persisté : `student.startingCapital` /
+   * `currentCapital` restent en base pour compatibilité mais ne pilotent plus
+   * rien à l'affichage, `displayStudent` est un objet dérivé, pas un nouvel
+   * état à synchroniser.
+   */
+  const displayStudent: StudentProfile = {
+    ...student,
+    startingCapital: accounts.reduce((sum, a) => sum + a.initialBalance, 0),
+    currentCapital: accounts.reduce((sum, a) => sum + a.equity, 0),
+  };
 
   /**
    * Ferme la session : invalide le jeton côté serveur, oublie le cache local, et
@@ -1098,6 +1118,10 @@ function AcademyApp({
         acc.id === id ? { ...acc, equity: newBalance, currentBalance: newBalance } : acc
       )
     );
+  };
+
+  const handleDeleteAccount = (id: string) => {
+    setAccounts((prev) => prev.filter((acc) => acc.id !== id));
   };
 
   const handleImportSignalToJournal = (sig: CoachSignal) => {
@@ -1327,7 +1351,7 @@ function AcademyApp({
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        student={student}
+        student={displayStudent}
         courseCompletionPercentage={courseCompletionPercentage}
         totalUnreadMessages={totalUnreadMessages}
         mobileOpen={mobileOpen}
@@ -1394,7 +1418,7 @@ function AcademyApp({
         {/* Top Header Bar */}
         <TopHeader
           activeTab={activeTab}
-          student={student}
+          student={displayStudent}
           setMobileOpen={setMobileOpen}
           onOpenProfileModal={() => {
             setProfileModalTab("profile");
@@ -1419,7 +1443,7 @@ function AcademyApp({
           <React.Suspense fallback={<ViewFallback />}>
           {activeTab === "dashboard" && (
             <MainDashboard
-              student={student}
+              student={displayStudent}
               trades={trades}
               modules={modules}
               forumTopics={forumTopics}
@@ -1461,6 +1485,7 @@ function AcademyApp({
               trades={trades}
               onAddAccount={handleAddAccount}
               onUpdateAccountBalance={handleUpdateAccountBalance}
+              onDeleteAccount={handleDeleteAccount}
             />
           )}
 
@@ -1525,7 +1550,7 @@ function AcademyApp({
 
           {activeTab === "analytics" && (
             <PerformanceDashboard
-              student={student}
+              student={displayStudent}
               trades={trades}
               courseCompletionPercentage={courseCompletionPercentage}
             />
@@ -1594,7 +1619,7 @@ function AcademyApp({
       <PositionCalculatorModal
         isOpen={isCalculatorOpen}
         onClose={() => setIsCalculatorOpen(false)}
-        defaultCapital={student.currentCapital}
+        defaultCapital={displayStudent.currentCapital}
         onApplyToJournal={(calc) => {
           setJournalDraft({
             pair: calc.pair,
