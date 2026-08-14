@@ -24,7 +24,7 @@ import { createRateLimit } from "./middleware/rateLimit";
 import { getEconomicCalendar } from "./economicCalendar";
 import { getMarketData } from "./marketData";
 import { getStudentById } from "./auth/studentCredentials";
-import { DEFAULT_USER_ID } from "./db";
+import { DEFAULT_USER_ID, FOUNDER_COACH_ID } from "./db";
 
 export const api = Router();
 
@@ -182,6 +182,45 @@ function buildStudentProfile(studentAccountId: string): Record<string, unknown> 
 }
 
 /**
+ * "Coach" affiché côté élève dans la Messagerie — reconstruit depuis le vrai
+ * profil du bureau staff partagé (`DEFAULT_USER_ID`), jamais une identité
+ * fictive. Seuls des champs publics (nom, avatar, rôle/niveau) traversent
+ * cette frontière — jamais l'email, le téléphone ni aucun champ privé du
+ * profil fondateur.
+ *
+ * `id` est fixé sur `FOUNDER_COACH_ID` : `CoachMessaging` filtre son fil par
+ * ce champ, et la route qui écrit la réponse du coach
+ * (`server/auth/routes.ts`) l'utilise pour taguer chaque message — les deux
+ * doivent rester le même identifiant, quel que soit le compte staff qui
+ * répond réellement (bureau partagé, voir §"Qui l'utilise" du HANDOFF).
+ *
+ * Si le profil fondateur n'a pas encore de nom renseigné (juste après la
+ * toute première installation), renvoie `[]` : `CoachMessaging` affiche
+ * alors honnêtement "Aucun coach disponible" plutôt qu'une fiche vide.
+ */
+function buildCoachesForStudent(): Array<Record<string, unknown>> {
+  const staffProfile = getProfile<{
+    name?: string;
+    avatar?: string;
+    role?: string;
+    level?: string;
+  }>(DEFAULT_USER_ID);
+
+  if (!staffProfile?.name) return [];
+
+  return [
+    {
+      id: FOUNDER_COACH_ID,
+      name: staffProfile.name,
+      role: staffProfile.role || "Coach",
+      specialty: staffProfile.level || "",
+      avatar: staffProfile.avatar || "",
+      isOnline: true,
+    },
+  ];
+}
+
+/**
  * Payload de démarrage : toutes les collections en un aller-retour, dans les
  * formes exactes attendues par le client.
  *
@@ -198,6 +237,7 @@ api.get("/state", (req, res) => {
       bootstrapped: isBootstrapped(),
       student: buildStudentProfile(req.auth!.userId),
       quizResults: getQuizResults(dataUserId),
+      coaches: buildCoachesForStudent(),
       collections: Object.fromEntries(
         [...STUDENT_ALLOWED_COLLECTIONS].map((name) => [name, listCollection(name, dataUserId)])
       ),

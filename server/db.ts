@@ -411,3 +411,14 @@ export function setMeta(key: string, value: string): void {
  * l'ajout d'un écran de connexion ne demande aucune migration de schéma.
  */
 export const DEFAULT_USER_ID = "user-local";
+
+/**
+ * Identifiant du seul "coach" affiché côté élève (`CoachMessaging.tsx`) :
+ * tout le staff partage un unique bureau, donc un unique fil de discussion,
+ * quel que soit le compte staff qui répond réellement. Partagé entre
+ * `buildCoachesForStudent` (server/routes.ts, qui construit l'entrée
+ * affichée à l'élève) et la route qui écrit la réponse du coach
+ * (server/auth/routes.ts) pour que les deux ne dérivent jamais l'un de
+ * l'autre.
+ */
+export const FOUNDER_COACH_ID = "coach-thomas";

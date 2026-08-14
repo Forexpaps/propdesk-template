@@ -10,6 +10,7 @@ import {
   TraderBadge,
   Module,
   ModuleQuizResult,
+  Coach,
 } from "../types";
 
 /** Collections synchronisées avec le serveur, dans les formes de src/types.ts. */
@@ -53,6 +54,13 @@ export interface ServerState {
   student: StudentProfile | null;
   quizResults: Record<string, ModuleQuizResult>;
   collections: ServerCollections;
+  /**
+   * Présent uniquement pour une session élève : le coach reconstruit depuis
+   * le vrai profil fondateur (voir `buildCoachesForStudent`,
+   * `server/routes.ts`). Absent pour une session staff, qui construit sa
+   * propre entrée directement depuis son profil déjà en mémoire.
+   */
+  coaches?: Coach[];
 }
 
 /** État d'authentification renvoyé par `/api/auth/me`. */

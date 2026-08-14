@@ -1,4 +1,4 @@
-import { Module, Trade, Coach, CoachMessage, StudentProfile, ForumTopic, TradingAccount, CoachSignal, TraderBadge, EnrolledStudent, AppNotification } from "../types";
+import { Module, Trade, CoachMessage, StudentProfile, ForumTopic, TradingAccount, CoachSignal, TraderBadge, EnrolledStudent, AppNotification } from "../types";
 
 export const initialStudentProfile: StudentProfile = {
   name: "",
@@ -9,8 +9,6 @@ export const initialStudentProfile: StudentProfile = {
   startingCapital: 0,
   currentCapital: 0,
 };
-
-export const initialCoaches: Coach[] = [];
 
 export const initialModules: Module[] = [];
 
