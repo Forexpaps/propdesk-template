@@ -12,7 +12,8 @@ import {
   Building,
   ArrowUpRight,
   ArrowDownRight,
-  RefreshCw
+  RefreshCw,
+  Trash2
 } from "lucide-react";
 import { TradingAccount, AccountType, Trade } from "../types";
 import { formatCurrency } from "../lib/format";
@@ -46,7 +47,8 @@ interface WalletManagementProps {
   trades: Trade[];
   onAddAccount: (account: TradingAccount) => void;
   onUpdateAccountBalance: (id: string, newBalance: number) => void;
-  /** Masque les actions d'ajout et d'ajustement de solde — vue admin d'un élève. */
+  onDeleteAccount: (id: string) => void;
+  /** Masque les actions d'ajout, d'ajustement de solde et de suppression — vue admin d'un élève. */
   readOnly?: boolean;
 }
 
@@ -55,6 +57,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   trades,
   onAddAccount,
   onUpdateAccountBalance,
+  onDeleteAccount,
   readOnly = false,
 }) => {
   const [filterType, setFilterType] = useState<string>("ALL");
@@ -134,6 +137,16 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
     setSelectedAccountId(newAcc.id);
     setIsAddModalOpen(false);
     setNewAccName("");
+  };
+
+  const handleDeleteAccount = (account: TradingAccount) => {
+    if (!window.confirm(`Supprimer le portefeuille "${account.name}" ? Cette action est irréversible.`)) {
+      return;
+    }
+    onDeleteAccount(account.id);
+    if (selectedAccountId === account.id) {
+      setSelectedAccountId(accounts.find((a) => a.id !== account.id)?.id || "");
+    }
   };
 
   return (
@@ -348,6 +361,13 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     className="px-3 py-2 rounded-xl bg-[#00E676]/10 hover:bg-[#00E676]/20 text-[#00E676] hover:text-[#00E676] font-bold text-xs flex items-center gap-1.5 transition-colors"
                   >
                     <RefreshCw className="w-3.5 h-3.5" /> Ajuster le Solde
+                  </button>
+                  <button
+                    onClick={() => handleDeleteAccount(selectedAccount)}
+                    title="Supprimer ce portefeuille"
+                    className="px-3 py-2 rounded-xl bg-[#1B2320] hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 font-bold text-xs flex items-center gap-1.5 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Supprimer
                   </button>
                 </div>
               )}

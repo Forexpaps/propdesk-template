@@ -79,12 +79,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [preferredPairs, setPreferredPairs] = useState(
     student.preferredPairs || "EUR/USD, XAU/USD, NAS100"
   );
-  const [startingCapital, setStartingCapital] = useState(
-    student.startingCapital.toString()
-  );
-  const [currentCapital, setCurrentCapital] = useState(
-    student.currentCapital.toString()
-  );
   /**
    * Statut d'administrateur, en lecture seule.
    *
@@ -223,8 +217,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       phone,
       bio,
       preferredPairs,
-      startingCapital: parseFloat(startingCapital) || 10000,
-      currentCapital: parseFloat(currentCapital) || 10000,
+      // `startingCapital`/`currentCapital` ne sont plus édités ici : ils sont
+      // dérivés des portefeuilles réels à l'affichage (voir `App.tsx`,
+      // `displayStudent`/`studentProfile`). Le `...student` initial les
+      // conserve tels quels dans le payload envoyé au serveur.
       // `isAdmin` n'est volontairement pas renvoyé : le serveur l'ignore dans le
       // corps et réinjecte sa propre valeur. Le `...student` initial le conserve
       // pour que l'état local reste cohérent d'ici au prochain rechargement.
@@ -591,25 +587,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="block font-medium text-slate-300 mb-1">Capital Initial ($)</label>
-                <input
-                  type="number"
-                  value={startingCapital}
-                  onChange={(e) => setStartingCapital(e.target.value)}
-                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white font-mono focus:outline-none focus:border-[#00E676]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-300 mb-1">Capital Actuel Enregistré ($)</label>
-                <input
-                  type="number"
-                  value={currentCapital}
-                  onChange={(e) => setCurrentCapital(e.target.value)}
-                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-[#00E676] font-mono focus:outline-none focus:border-[#00E676] font-bold"
-                />
-              </div>
             </div>
 
             <div>

@@ -220,6 +220,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
                 trades={studentData.trades}
                 onAddAccount={() => {}}
                 onUpdateAccountBalance={() => {}}
+                onDeleteAccount={() => {}}
                 readOnly
               />
             )}
