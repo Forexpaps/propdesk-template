@@ -1,17 +1,21 @@
 import { Module, Trade, CoachMessage, StudentProfile, ForumTopic, TradingAccount, CoachSignal, TraderBadge, EnrolledStudent, AppNotification } from "../types";
 
 /**
- * Définitions des badges — catalogue de ce qu'il est possible de débloquer,
- * pas un état d'activité. Contrairement aux autres tableaux `initial*` de ce
- * fichier (vidés lors de la remise à zéro des données de démo), celui-ci
- * décrit une vraie fonctionnalité du produit (titre, description, critère,
- * récompense) — il n'a jamais été une donnée factice en soi. Seul l'état
- * d'activité l'était (`unlocked: true` avec des dates de démo inventées) :
- * ici, chaque badge démarre honnêtement non débloqué, sans progression
- * inventée. `computeBadgeProgress` (`src/lib/badges.ts`) recalcule la vraie
- * progression en direct à chaque rendu pour les badges calculables ; les
- * `currentValue`/`progressPercentage` ci-dessous ne sont donc que des
- * valeurs de repli inertes, jamais affichées telles quelles.
+ * Définitions des badges — catalogue de ce qu'il est possible de débloquer.
+ * Contrairement aux autres tableaux `initial*` de ce fichier (vidés lors de
+ * la remise à zéro des données de démo), celui-ci décrit une vraie
+ * fonctionnalité du produit (titre, description, critère, récompense) — il
+ * n'a jamais été une donnée factice en soi.
+ *
+ * Les 9 badges sont marqués `unlocked: true` avec des dates de 2024 — décision
+ * explicite du fondateur (pas une donnée de démo réintroduite par erreur).
+ * `unlocked`/`unlockedAt` ne sont jamais recalculés par
+ * `computeBadgeProgress` (`src/lib/badges.ts`) : une fois posés ici (ou
+ * écrits en base), ils restent tels quels tant que personne n'y touche.
+ * `currentValue`/`progressPercentage`, eux, sont recalculés en direct à
+ * chaque rendu pour les badges calculables — les valeurs ci-dessous ne sont
+ * qu'un repli inerte pour les 3 badges non calculables (voir
+ * `computeSingleBadgeProgress`).
  */
 export const initialTraderBadges: TraderBadge[] = [
   {
@@ -20,11 +24,12 @@ export const initialTraderBadges: TraderBadge[] = [
     description: "Exécuter 15 trades consécutifs avec un risque strictement inférieur ou égal à 1%.",
     iconName: "ShieldCheck",
     category: "DISCIPLINE",
-    unlocked: false,
-    progressPercentage: 0,
-    currentValue: 0,
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 15,
     targetValue: 15,
     unit: "trades",
+    unlockedAt: "15 Janvier 2024",
     rewardXP: 300,
   },
   {
@@ -33,11 +38,12 @@ export const initialTraderBadges: TraderBadge[] = [
     description: "Compléter 100% des modules vidéo de la formation.",
     iconName: "Award",
     category: "ACADEMY",
-    unlocked: false,
-    progressPercentage: 0,
+    unlocked: true,
+    progressPercentage: 100,
     currentValue: 0,
     targetValue: 0,
     unit: "leçons",
+    unlockedAt: "22 Février 2024",
     rewardXP: 500,
   },
   {
@@ -46,11 +52,12 @@ export const initialTraderBadges: TraderBadge[] = [
     description: "Atteindre 10% de profit virtuel sur le module Replay sans jamais dépasser 10% de Drawdown Max.",
     iconName: "Zap",
     category: "PROPFIRM",
-    unlocked: false,
-    progressPercentage: 0,
-    currentValue: 0,
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 10,
     targetValue: 10,
     unit: "% profit",
+    unlockedAt: "10 Mars 2024",
     rewardXP: 450,
   },
   {
@@ -59,11 +66,12 @@ export const initialTraderBadges: TraderBadge[] = [
     description: "Enregistrer au moins 15 trades avec une émotion maîtrisée ('Calm' ou 'Disciplined').",
     iconName: "Smile",
     category: "DISCIPLINE",
-    unlocked: false,
-    progressPercentage: 0,
-    currentValue: 0,
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 15,
     targetValue: 15,
     unit: "trades sans tilt",
+    unlockedAt: "5 Avril 2024",
     rewardXP: 350,
   },
   {
@@ -72,11 +80,12 @@ export const initialTraderBadges: TraderBadge[] = [
     description: "Relire et documenter 5 trades clôturés avec une note technique complète dans le journal.",
     iconName: "Sparkles",
     category: "PERFORMANCE",
-    unlocked: false,
-    progressPercentage: 0,
-    currentValue: 0,
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 5,
     targetValue: 5,
     unit: "trades documentés",
+    unlockedAt: "18 Mai 2024",
     rewardXP: 250,
   },
   {
@@ -85,11 +94,12 @@ export const initialTraderBadges: TraderBadge[] = [
     description: "Respecter à 100% ton plan de trading sans écart émotionnel pendant 7 jours consécutifs.",
     iconName: "Flame",
     category: "DISCIPLINE",
-    unlocked: false,
-    progressPercentage: 0,
-    currentValue: 0,
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 7,
     targetValue: 7,
     unit: "jours",
+    unlockedAt: "30 Juin 2024",
     rewardXP: 400,
   },
   {
@@ -98,11 +108,12 @@ export const initialTraderBadges: TraderBadge[] = [
     description: "Valider un trade gagnant enregistré dans le journal avec un Risk/Reward ≥ 3.0.",
     iconName: "Target",
     category: "PERFORMANCE",
-    unlocked: false,
-    progressPercentage: 0,
-    currentValue: 0,
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 3.0,
     targetValue: 3.0,
     unit: "R/R",
+    unlockedAt: "12 Juillet 2024",
     rewardXP: 300,
   },
   {
@@ -111,11 +122,12 @@ export const initialTraderBadges: TraderBadge[] = [
     description: "Générer un total cumulé de au moins +10.0R de bénéfices sur le journal de trading.",
     iconName: "TrendingUp",
     category: "PERFORMANCE",
-    unlocked: false,
-    progressPercentage: 0,
-    currentValue: 0,
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 10.0,
     targetValue: 10.0,
     unit: "R",
+    unlockedAt: "25 Août 2024",
     rewardXP: 600,
   },
   {
@@ -124,11 +136,12 @@ export const initialTraderBadges: TraderBadge[] = [
     description: "Obtenir une note de 80/100 ou plus à l'évaluation finale.",
     iconName: "Crown",
     category: "ACADEMY",
-    unlocked: false,
-    progressPercentage: 0,
-    currentValue: 0,
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 80,
     targetValue: 80,
     unit: "pts",
+    unlockedAt: "8 Septembre 2024",
     rewardXP: 500,
   },
 ];
