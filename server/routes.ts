@@ -182,6 +182,24 @@ function buildStudentProfile(studentAccountId: string): Record<string, unknown> 
 }
 
 /**
+ * Profil du bureau staff partagé, `isAdmin` toujours forcé à `true`.
+ *
+ * Tout compte staff a exactement les mêmes droits (voir
+ * `StaffAccountsModal.tsx`, "Mêmes droits pour tous sur ce bureau") — `false`
+ * ou absent n'est jamais un état légitime ici, seulement un profil jamais
+ * réenregistré depuis sa création (le profil par défaut, `initialStudentProfile`
+ * dans `src/data/mockData.ts`, n'a longtemps porté aucun champ `isAdmin` du
+ * tout). Sans ce correctif, le champ restait figé à `false`/`undefined` et
+ * `Sidebar.tsx` (qui décide d'afficher "Suivi des Élèves" sur ce seul champ)
+ * masquait silencieusement l'onglet à un vrai compte fondateur.
+ */
+function buildStaffProfile(dataUserId: string): Record<string, unknown> | null {
+  const profile = getProfile<Record<string, unknown>>(dataUserId);
+  if (!profile) return null;
+  return { ...profile, isAdmin: true };
+}
+
+/**
  * "Coach" affiché côté élève dans la Messagerie — reconstruit depuis le vrai
  * profil du bureau staff partagé (`DEFAULT_USER_ID`), jamais une identité
  * fictive. Seuls des champs publics (nom, avatar, rôle/niveau) traversent
@@ -261,7 +279,7 @@ api.get("/state", (req, res) => {
 
   res.json({
     bootstrapped: isBootstrapped(),
-    student: getProfile(dataUserId),
+    student: buildStaffProfile(dataUserId),
     quizResults: getQuizResults(dataUserId),
     collections,
   });
