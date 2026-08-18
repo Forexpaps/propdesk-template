@@ -99,9 +99,6 @@ const CoachSignals = React.lazy(() =>
 const StudentTracking = React.lazy(() =>
   import("./components/StudentTracking").then((m) => ({ default: m.StudentTracking }))
 );
-const ReplayModule = React.lazy(() =>
-  import("./components/ReplayModule").then((m) => ({ default: m.ReplayModule }))
-);
 
 /**
  * Attente d'une vue en cours de chargement.
@@ -593,13 +590,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
           }}
         />
 
-        <main
-          className={
-            activeTab === "replay"
-              ? "flex-1 w-full flex flex-col min-h-0"
-              : "p-4 sm:p-8 flex-1 max-w-7xl w-full mx-auto"
-          }
-        >
+        <main className="p-4 sm:p-8 flex-1 max-w-7xl w-full mx-auto">
           <React.Suspense fallback={<ViewFallback />}>
             {activeTab === "dashboard" && (
               <MainDashboard
@@ -645,8 +636,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
             )}
 
             {activeTab === "macro" && <MacroDashboard />}
-
-            {activeTab === "replay" && <ReplayModule />}
 
             {activeTab === "exam" && (
               <div className="space-y-6">
@@ -1456,13 +1445,7 @@ function AcademyApp({
             s'excluent mutuellement, il n'en charge jamais deux à la fois. La
             placer à l'intérieur de <main> conserve la mise en page et le
             gabarit pendant l'attente — au-dessus, la page entière sauterait. */}
-        <main
-          className={
-            activeTab === "replay"
-              ? "flex-1 w-full flex flex-col min-h-0"
-              : "p-4 sm:p-8 flex-1 max-w-7xl w-full mx-auto"
-          }
-        >
+        <main className="p-4 sm:p-8 flex-1 max-w-7xl w-full mx-auto">
           <React.Suspense fallback={<ViewFallback />}>
           {activeTab === "dashboard" && (
             <MainDashboard
@@ -1589,8 +1572,6 @@ function AcademyApp({
           )}
 
           {activeTab === "macro" && <MacroDashboard />}
-
-          {activeTab === "replay" && <ReplayModule />}
           </React.Suspense>
         </main>
       </div>

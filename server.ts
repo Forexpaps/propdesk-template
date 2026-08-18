@@ -79,37 +79,6 @@ startLockoutCleanup();
 // Serve public static assets
 app.use("/public", express.static(path.join(ROOT,"public")));
 
-// Module Replay FX : appli statique autonome (HTML/CSS/JS vanilla, ~27 Mo dont
-// un `market-data.js` de 25 Mo de bougies HistData embarquées). Servi ici,
-// hors de `public/` (donc invisible pour Vite/Rollup), pour ne jamais
-// reproduire le blocage de `npm run build` (plusieurs minutes à 100% CPU)
-// rencontré quand ce même fichier vivait dans `public/replay-fx/` (voir
-// HANDOFF.md §4ter). Monté avant le middleware Vite/le statique de prod :
-// une requête sur `/replay-fx/*` est donc toujours servie ici en premier.
-//
-// Cache-Control explicite : sans lui, express.static ne pose aucun en-tête
-// de cache, et le navigateur retélécharge les ~27 Mo à CHAQUE visite de
-// l'onglet Replay. En production, ce trafic répété a suffi à déclencher la
-// protection anti-abus de l'edge Railway (429 sur tout le site, pas
-// seulement Replay) après une poignée de rechargements. `market-data.js`
-// (bougies HistData figées, ne changera plus) reçoit un cache long et
-// `immutable` ; le reste (app.js/styles.css/index.html, du vrai code
-// pouvant encore être corrigé) reçoit un cache court — assez pour absorber
-// les rechargements rapprochés d'une session, sans risquer de servir une
-// version obsolète pendant des jours après un correctif.
-app.use(
-  "/replay-fx",
-  express.static(path.join(ROOT, "replay-fx"), {
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith("market-data.js")) {
-        res.setHeader("Cache-Control", "public, max-age=2592000, immutable");
-      } else {
-        res.setHeader("Cache-Control", "public, max-age=3600");
-      }
-    },
-  })
-);
-
 async function startServer() {
   // Le serveur HTTP est créé explicitement, au lieu de laisser `app.listen()`
   // le faire : en développement, Vite a besoin d'une référence dessus pour y
