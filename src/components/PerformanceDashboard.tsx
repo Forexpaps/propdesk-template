@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -11,19 +11,7 @@ import {
   Cell,
   CartesianGrid,
 } from "recharts";
-import {
-  Award,
-  ShieldCheck,
-  LineChart,
-  Brain,
-  Target,
-  ArrowUpRight,
-  ArrowDownRight,
-  Clock,
-  AlertTriangle,
-  RotateCcw,
-  BarChart3,
-} from "lucide-react";
+import { LineChart, AlertTriangle, RotateCcw } from "lucide-react";
 import { Trade, StudentProfile } from "../types";
 import { formatCurrency } from "../lib/format";
 import { computePerformanceStats } from "../lib/performanceStats";
@@ -31,7 +19,6 @@ import { computePerformanceStats } from "../lib/performanceStats";
 interface PerformanceDashboardProps {
   student: StudentProfile;
   trades: Trade[];
-  courseCompletionPercentage: number;
 }
 
 const tooltipStyle = {
@@ -40,55 +27,115 @@ const tooltipStyle = {
   itemStyle: { color: "#ffffff" },
 };
 
-/** Micro-label en petites majuscules espacées, au-dessus d'une valeur — motif repris de Replay FX. */
+/** Micro-label en petites majuscules espacées, au-dessus d'une valeur. */
 const MicroLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">{children}</span>
+  <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">{children}</span>
 );
 
-/** Carte flat à bordure fine, sans ombre — motif repris de Replay FX (contraste avec les anciens dégradés colorés). */
+/** Carte flat à bordure fine, sans ombre. */
 const Card: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = "" }) => (
   <div className={`bg-[#111615] border border-[#1B2320] rounded-xl ${className}`}>{children}</div>
 );
 
-type Section = "overview" | "categories" | "errors";
+/**
+ * En-tête de section — petite barre verticale colorée + titre en gras,
+ * motif repris tel quel de la maquette de référence pour cette page.
+ */
+const SectionHeader: React.FC<{ children: React.ReactNode; color?: string }> = ({
+  children,
+  color = "bg-indigo-500",
+}) => (
+  <div className="flex items-center gap-2">
+    <span className={`w-1 h-4 rounded-full ${color}`} />
+    <h3 className="text-sm font-bold text-white">{children}</h3>
+  </div>
+);
 
-export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
-  student,
-  trades,
-  courseCompletionPercentage,
-}) => {
-  const [section, setSection] = useState<Section>("overview");
+/** Une des huit cartes de la rangée de statistiques du haut. */
+const StatCard: React.FC<{
+  label: string;
+  value: string;
+  valueClassName: string;
+  secondary?: string;
+}> = ({ label, value, valueClassName, secondary }) => (
+  <Card className="p-3.5 space-y-1">
+    <MicroLabel>{label}</MicroLabel>
+    <div className={`text-xl font-black font-mono ${valueClassName}`}>{value}</div>
+    {secondary && <div className="text-[10px] text-slate-500">{secondary}</div>}
+  </Card>
+);
 
+/** Empty state générique — court, dans le ton discret de la maquette de référence. */
+const EmptyState: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="h-full min-h-[140px] flex items-center justify-center text-xs text-slate-500 italic text-center px-6">
+    {children}
+  </div>
+);
+
+type BestWhereDimension = "session" | "hour" | "day" | "pair" | "strategy" | "direction" | "market";
+
+export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ student, trades }) => {
+  const stats = computePerformanceStats(student, trades);
   const {
     equityData,
-    strategyChartData,
-    emotionChartData,
     totalTrades,
-    wins,
     winRate,
     totalPnL,
-    disciplineScore,
-    capitalDiffPercent,
-    isCapitalUp,
     pairChartData,
     directionChartData,
     dayChartData,
     sessionChartData,
-    tradesSansHeure,
     mistakeChartData,
     totalErrorsCost,
     netResultWithoutErrors,
-  } = computePerformanceStats(student, trades);
+    profitFactor,
+    avgRR,
+    drawdownMaxPercent,
+    expectancyPerTrade,
+    avgWin,
+    avgLoss,
+    monthlyChartData,
+    hourChartData,
+    marketChartData,
+    emotionChartData,
+  } = stats;
 
-  const sections: { id: Section; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: "overview", label: "Vue d'ensemble", icon: LineChart },
-    { id: "categories", label: "Psychologie & Catégories", icon: Brain },
-    { id: "errors", label: "Erreurs", icon: RotateCcw },
+  const [bestWhere, setBestWhere] = useState<BestWhereDimension>("session");
+
+  const bestWhereTabs: { id: BestWhereDimension; label: string }[] = [
+    { id: "session", label: "Session" },
+    { id: "hour", label: "Heure" },
+    { id: "day", label: "Jour" },
+    { id: "pair", label: "Actif" },
+    { id: "strategy", label: "Setup" },
+    { id: "direction", label: "Sens" },
+    { id: "market", label: "Marché" },
   ];
+
+  const bestWhereData = useMemo(() => {
+    switch (bestWhere) {
+      case "session":
+        return sessionChartData.map((d) => ({ key: d.session, pnl: d.pnl, tradesCount: d.tradesCount }));
+      case "hour":
+        return hourChartData.map((d) => ({ key: d.hour, pnl: d.pnl, tradesCount: d.tradesCount }));
+      case "day":
+        return dayChartData.map((d) => ({ key: d.day, pnl: d.pnl, tradesCount: d.tradesCount }));
+      case "pair":
+        return pairChartData.map((d) => ({ key: d.pair, pnl: d.pnl, tradesCount: d.tradesCount }));
+      case "strategy":
+        return stats.strategyChartData.map((d) => ({ key: d.strategy, pnl: d.pnl, tradesCount: d.tradesCount }));
+      case "direction":
+        return directionChartData.map((d) => ({ key: d.direction, pnl: d.pnl, tradesCount: d.tradesCount }));
+      case "market":
+        return marketChartData.map((d) => ({ key: d.market, pnl: d.pnl, tradesCount: d.tradesCount }));
+      default:
+        return [];
+    }
+  }, [bestWhere, sessionChartData, hourChartData, dayChartData, pairChartData, stats.strategyChartData, directionChartData, marketChartData]);
 
   return (
     <div className="space-y-6 pb-12">
-      {/* Header : micro-label + titre + ticker PnL, motif repris du header instrument de Replay FX */}
+      {/* Header minimal : micro-label + titre + ticker PnL */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-1.5 mb-1">
@@ -110,153 +157,111 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
         </div>
       </div>
 
-      {/* Navigation en pilules soulignées — motif repris de Replay FX (Backtest/Journal/Statistiques) */}
-      <div className="flex items-center gap-6 sm:gap-8 border-b border-[#1B2320] overflow-x-auto">
-        {sections.map((s) => {
-          const Icon = s.icon;
-          const isActive = section === s.id;
-          return (
-            <button
-              key={s.id}
-              onClick={() => setSection(s.id)}
-              className={`relative flex items-center gap-2 pb-3 text-sm font-bold whitespace-nowrap transition-colors ${
-                isActive ? "text-white" : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {s.label}
-              {isActive && (
-                <span className="absolute -bottom-px left-0 right-0 h-0.5 bg-[#00E676] rounded-full" />
-              )}
-            </button>
-          );
-        })}
+      {/* Rangée de statistiques — huit cartes, une valeur par métrique clé. */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+        <StatCard
+          label="Capital"
+          value={formatCurrency(student.currentCapital)}
+          valueClassName="text-[#00E676]"
+        />
+        <StatCard
+          label="P&L Net"
+          value={`${totalPnL >= 0 ? "+" : ""}${formatCurrency(totalPnL)}`}
+          valueClassName={totalPnL >= 0 ? "text-[#00E676]" : "text-rose-400"}
+        />
+        <StatCard
+          label="Win Rate"
+          value={`${winRate}%`}
+          valueClassName={winRate >= 50 ? "text-[#00E676]" : "text-rose-400"}
+          secondary={`${totalTrades} trade${totalTrades > 1 ? "s" : ""}`}
+        />
+        <StatCard
+          label="Profit Factor"
+          value={profitFactor}
+          valueClassName={profitFactor !== "N/A" && Number(profitFactor) >= 1 ? "text-[#00E676]" : "text-rose-400"}
+        />
+        <StatCard label="RR Moyen" value={avgRR} valueClassName="text-blue-400" />
+        <StatCard
+          label="Drawdown Max"
+          value={`-${drawdownMaxPercent.toFixed(1)}%`}
+          valueClassName="text-rose-400"
+        />
+        <StatCard
+          label="Espérance / Trade"
+          value={`${expectancyPerTrade >= 0 ? "+" : ""}${formatCurrency(expectancyPerTrade)}`}
+          valueClassName={expectancyPerTrade >= 0 ? "text-purple-400" : "text-rose-400"}
+        />
+        <StatCard
+          label="Gain / Perte Moy."
+          value={`${formatCurrency(avgWin)} / ${formatCurrency(avgLoss)}`}
+          valueClassName="text-white"
+        />
       </div>
 
-      {section === "overview" && (
-        <div className="space-y-6">
-          {/* Primary KPI Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="p-4 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <MicroLabel>Capital Financé</MicroLabel>
-                <ShieldCheck className="w-3.5 h-3.5 text-[#00E676]" />
-              </div>
-              <div className="text-2xl font-black text-[#00E676] font-mono">
-                {formatCurrency(student.currentCapital)}
-              </div>
-              <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                <span className={`font-bold flex items-center ${isCapitalUp ? "text-[#00E676]" : "text-rose-400"}`}>
-                  {isCapitalUp ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-                  {isCapitalUp ? "+" : ""}
-                  {capitalDiffPercent.toFixed(1)}%
-                </span>
-                <span>depuis le démarrage</span>
-              </div>
-            </Card>
-
-            <Card className="p-4 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <MicroLabel>Taux de Réussite</MicroLabel>
-                <Target className="w-3.5 h-3.5 text-amber-400" />
-              </div>
-              <div className="text-2xl font-black text-amber-400 font-mono">{winRate}%</div>
-              <div className="text-[11px] text-slate-500">{wins} gagnants sur {totalTrades} positions</div>
-              <div className="w-full h-1.5 rounded-full overflow-hidden flex mt-1">
-                <div className="h-full bg-[#00E676]" style={{ width: `${winRate}%` }} />
-                <div className="h-full bg-rose-500/60" style={{ width: `${100 - winRate}%` }} />
-              </div>
-            </Card>
-
-            <Card className="p-4 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <MicroLabel>Indice de Discipline</MicroLabel>
-                <Brain className="w-3.5 h-3.5 text-purple-400" />
-              </div>
-              <div className="text-2xl font-black text-purple-400 font-mono">{disciplineScore}%</div>
-              <div className="text-[11px] text-slate-500">Respect strict du Risk Management</div>
-            </Card>
-
-            <Card className="p-4 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <MicroLabel>Avancement Académie</MicroLabel>
-                <Award className="w-3.5 h-3.5 text-rose-400" />
-              </div>
-              <div className="text-2xl font-black text-white font-mono">{courseCompletionPercentage}%</div>
-              <div className="text-[11px] text-slate-500">Modules de cours théoriques validés</div>
-            </Card>
+      {/* Courbe de capital — pleine largeur */}
+      <Card className="p-5 space-y-4">
+        <SectionHeader color="bg-[#00E676]">Courbe de capital</SectionHeader>
+        {trades.length === 0 ? (
+          <EmptyState>Ajoute des trades pour voir ta courbe de capital.</EmptyState>
+        ) : (
+          <div className="h-72 w-full pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={equityData}>
+                <defs>
+                  <linearGradient id="colorCapital" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#00E676" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="#00E676" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
+                <XAxis dataKey="date" stroke="#475569" fontSize={11} />
+                <YAxis stroke="#475569" fontSize={11} domain={["auto", "auto"]} />
+                <Tooltip {...tooltipStyle} formatter={(value: any) => [formatCurrency(Number(value)), "Capital"]} />
+                <Area type="monotone" dataKey="capital" stroke="#00E676" strokeWidth={2} fillOpacity={1} fill="url(#colorCapital)" />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
+        )}
+      </Card>
 
-          {/* Equity Curve & Strategy Breakdown */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2 p-5 space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-white">Courbe d'Équité du Capital</h3>
-                <p className="text-[11px] text-slate-500">Évolution nette du compte de trading</p>
-              </div>
-              <div className="h-72 w-full pt-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={equityData}>
-                    <defs>
-                      <linearGradient id="colorCapital" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#00E676" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#00E676" stopOpacity={0.0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
-                    <XAxis dataKey="date" stroke="#475569" fontSize={11} />
-                    <YAxis stroke="#475569" fontSize={11} domain={["auto", "auto"]} />
-                    <Tooltip {...tooltipStyle} formatter={(value: any) => [formatCurrency(Number(value)), "Capital"]} />
-                    <Area type="monotone" dataKey="capital" stroke="#00E676" strokeWidth={2} fillOpacity={1} fill="url(#colorCapital)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-
-            <Card className="p-5 space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-white">Taux de Réussite par Stratégie</h3>
-                <p className="text-[11px] text-slate-500">Pourcentage de gain selon la configuration</p>
-              </div>
-              <div className="h-72 w-full pt-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={strategyChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
-                    <XAxis dataKey="strategy" stroke="#475569" fontSize={10} interval={0} angle={-15} textAnchor="end" />
-                    <YAxis stroke="#475569" fontSize={11} unit="%" />
-                    <Tooltip {...tooltipStyle} formatter={(value: any) => [`${value}%`, "Win Rate"]} />
-                    <Bar dataKey="winRate" radius={[6, 6, 0, 0]}>
-                      {strategyChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.winRate >= 60 ? "#10b981" : entry.winRate >= 40 ? "#f59e0b" : "#f43f5e"} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {section === "categories" && (
-        <div className="space-y-6">
-          {/* Psychology & Emotion vs Profitability */}
-          <Card className="p-5 space-y-4">
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Brain className="w-4 h-4 text-purple-400" />
-                Impact Psychologique & Émotionnel sur la Rentabilité
-              </h3>
-              <p className="text-[11px] text-slate-500">
-                Comparaison directe du PnL net selon l'état émotionnel lors de la prise de position
-              </p>
+      {/* Performance mensuelle & Psychologie — deux colonnes */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="p-5 space-y-4">
+          <SectionHeader color="bg-blue-500">Performance mensuelle</SectionHeader>
+          {monthlyChartData.length === 0 ? (
+            <EmptyState>Pas assez de trades pour une vue mensuelle.</EmptyState>
+          ) : (
+            <div className="h-56 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
+                  <XAxis dataKey="month" stroke="#475569" fontSize={11} />
+                  <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
+                  <Tooltip {...tooltipStyle} formatter={(value: any) => [formatCurrency(Number(value)), "PnL"]} />
+                  <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
+                    {monthlyChartData.map((entry, index) => (
+                      <Cell key={`cell-month-${index}`} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
+          )}
+        </Card>
 
-            <div className="h-64 w-full">
+        <Card className="p-5 space-y-4">
+          <SectionHeader color="bg-purple-500">Psychologie</SectionHeader>
+          {trades.length === 0 ? (
+            <EmptyState>
+              Win rate quand l'émotion est forte vs faible. Tague ton état émotionnel sur chaque trade
+              dans le Journal.
+            </EmptyState>
+          ) : (
+            <div className="h-56 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={emotionChartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
-                  <XAxis dataKey="emotion" stroke="#475569" fontSize={12} />
+                  <XAxis dataKey="emotion" stroke="#475569" fontSize={10} interval={0} angle={-15} textAnchor="end" />
                   <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
                   <Tooltip
                     {...tooltipStyle}
@@ -264,7 +269,7 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
                       `${formatCurrency(Number(value))} (${props?.payload?.tradesCount ?? 0} trade${
                         (props?.payload?.tradesCount ?? 0) > 1 ? "s" : ""
                       })`,
-                      "PnL Total",
+                      "PnL",
                     ]}
                   />
                   <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
@@ -275,204 +280,121 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({
                 </BarChart>
               </ResponsiveContainer>
             </div>
+          )}
+        </Card>
+      </div>
 
-            <div className="p-3.5 rounded-lg bg-[#0D1110] border border-[#1B2320] text-xs text-slate-300 flex items-start gap-3">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <div>
-                <strong className="text-amber-400">Constat Psychologique Clé : </strong>
-                Vos positions prises avec un état <span className="text-[#00E676] font-bold">Discipliné / Calme</span> génèrent 100% de vos bénéfices nets. Les trades pris sous impulsion <span className="text-rose-400 font-bold">FOMO</span> sont responsables de la totalité de votre Drawdown.
-              </div>
+      {/* Où es-tu le meilleur ? — filtres en pilules sur une seule donnée à la fois */}
+      <Card className="p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <SectionHeader color="bg-amber-500">Où es-tu le meilleur ?</SectionHeader>
+          <div className="flex items-center gap-1 flex-wrap">
+            {bestWhereTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setBestWhere(tab.id)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${
+                  bestWhere === tab.id
+                    ? "bg-[#1B2320] border-[#00E676]/40 text-white"
+                    : "border-transparent text-slate-500 hover:text-slate-300"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {bestWhereData.length === 0 ? (
+          <EmptyState>Pas assez de données.</EmptyState>
+        ) : (
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={bestWhereData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
+                <XAxis dataKey="key" stroke="#475569" fontSize={11} interval={0} angle={bestWhereData.length > 6 ? -15 : 0} textAnchor={bestWhereData.length > 6 ? "end" : "middle"} />
+                <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
+                <Tooltip
+                  {...tooltipStyle}
+                  formatter={(value: any, _name: any, props: any) => [
+                    `${formatCurrency(Number(value))} (${props?.payload?.tradesCount ?? 0} trade${
+                      (props?.payload?.tradesCount ?? 0) > 1 ? "s" : ""
+                    })`,
+                    "PnL",
+                  ]}
+                />
+                <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
+                  {bestWhereData.map((entry, index) => (
+                    <Cell key={`cell-best-${index}`} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </Card>
+
+      {/* Erreurs les plus fréquentes — conservé de l'ancienne version, pas dans
+          la maquette de référence mais donnée réelle utile, jamais affichée
+          ailleurs dans l'app. */}
+      {mistakeChartData.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="p-5 space-y-4">
+            <SectionHeader color="bg-rose-500">Erreurs les plus fréquentes</SectionHeader>
+            <div className="space-y-2">
+              {mistakeChartData.map((m) => (
+                <div key={m.mistake} className="p-3 rounded-lg bg-[#0D1110] border border-[#1B2320] flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-bold text-white">{m.mistake}</div>
+                    <div className="text-[11px] text-slate-500">{m.count} occurrence{m.count > 1 ? "s" : ""}</div>
+                  </div>
+                  <div className={`font-mono font-bold ${m.cost >= 0 ? "text-[#00E676]" : "text-rose-400"}`}>
+                    {m.cost >= 0 ? "+" : ""}
+                    {formatCurrency(m.cost)}
+                  </div>
+                </div>
+              ))}
             </div>
           </Card>
 
-          {/* Actif & Direction */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="p-5 space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <BarChart3 className="w-4 h-4 text-[#00E676]" />
-                  PnL Net par Actif
-                </h3>
-                <p className="text-[11px] text-slate-500">Rentabilité selon la paire tradée (top 8 par volume)</p>
+          <Card className="p-5 space-y-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-400" />
+              <h3 className="text-sm font-bold text-white">Coût Total des Erreurs</h3>
+            </div>
+            <div className="space-y-1">
+              <div className="text-2xl font-black text-rose-400 font-mono">
+                {formatCurrency(totalErrorsCost)}
               </div>
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={pairChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
-                    <XAxis dataKey="pair" stroke="#475569" fontSize={11} />
-                    <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
-                    <Tooltip {...tooltipStyle} formatter={(value: any) => [formatCurrency(Number(value)), "PnL Total"]} />
-                    <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
-                      {pairChartData.map((entry, index) => (
-                        <Cell key={`cell-pair-${index}`} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-
-            <Card className="p-5 space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <ArrowUpRight className="w-4 h-4 text-[#00E676]" />
-                  PnL Net par Direction
-                </h3>
-                <p className="text-[11px] text-slate-500">Rentabilité Long vs Short</p>
-              </div>
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={directionChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
-                    <XAxis dataKey="direction" stroke="#475569" fontSize={12} />
-                    <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
-                    <Tooltip {...tooltipStyle} formatter={(value: any) => [formatCurrency(Number(value)), "PnL Total"]} />
-                    <Bar dataKey="pnl" radius={[6, 6, 0, 0]} barSize={80}>
-                      {directionChartData.map((entry, index) => (
-                        <Cell key={`cell-dir-${index}`} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          </div>
-
-          {/* Jour de la Semaine & Session de Marché */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="p-5 space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-amber-400" />
-                  PnL Net par Jour de la Semaine
-                </h3>
-                <p className="text-[11px] text-slate-500">Identifie tes meilleurs et pires jours de trading</p>
-              </div>
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dayChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
-                    <XAxis dataKey="day" stroke="#475569" fontSize={12} />
-                    <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
-                    <Tooltip {...tooltipStyle} formatter={(value: any) => [formatCurrency(Number(value)), "PnL Total"]} />
-                    <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
-                      {dayChartData.map((entry, index) => (
-                        <Cell key={`cell-day-${index}`} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-
-            <Card className="p-5 space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-amber-400" />
-                  PnL Net par Session de Marché
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  Basé sur l'heure d'entrée saisie
-                  {tradesSansHeure > 0 ? ` — ${tradesSansHeure} trade(s) sans heure exclus` : ""}
-                </p>
-              </div>
-              {sessionChartData.length === 0 ? (
-                <div className="h-64 w-full flex items-center justify-center text-xs text-slate-500 italic text-center px-6">
-                  Aucun trade avec une heure d'entrée renseignée pour l'instant.
-                </div>
-              ) : (
-                <div className="h-64 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={sessionChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
-                      <XAxis dataKey="session" stroke="#475569" fontSize={10} interval={0} angle={-15} textAnchor="end" />
-                      <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
-                      <Tooltip {...tooltipStyle} formatter={(value: any) => [formatCurrency(Number(value)), "PnL Total"]} />
-                      <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
-                        {sessionChartData.map((entry, index) => (
-                          <Cell key={`cell-session-${index}`} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </Card>
-          </div>
+              <p className="text-xs text-slate-400">
+                Sans ces erreurs, ton résultat cumulé serait de{" "}
+                <span className="text-[#00E676] font-bold">{formatCurrency(netResultWithoutErrors)}</span>{" "}
+                au lieu de {formatCurrency(totalPnL)}.
+              </p>
+            </div>
+            <div className="h-56 w-full pt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={mistakeChartData} layout="vertical" margin={{ left: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
+                  <XAxis type="number" stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
+                  <YAxis type="category" dataKey="mistake" stroke="#475569" fontSize={10} width={110} />
+                  <Tooltip {...tooltipStyle} formatter={(value: any) => [formatCurrency(Number(value)), "Coût"]} />
+                  <Bar dataKey="cost" radius={[0, 6, 6, 0]} fill="#f43f5e" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
         </div>
       )}
 
-      {section === "errors" && (
-        <div className="space-y-6">
-          {mistakeChartData.length === 0 ? (
-            <Card className="p-5">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-2">
-                <RotateCcw className="w-4 h-4 text-rose-400" />
-                Erreurs les plus fréquentes
-              </h3>
-              <p className="text-xs text-slate-500 italic">
-                Aucune erreur taguée pour l'instant. Tague les erreurs commises directement sur un trade
-                dans le Journal (champ « Erreurs Commises ») pour voir apparaître ces statistiques.
-              </p>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="p-5 space-y-4">
-                <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <RotateCcw className="w-4 h-4 text-rose-400" />
-                    Erreurs les plus fréquentes
-                  </h3>
-                  <p className="text-[11px] text-slate-500">Classées par nombre d'occurrences</p>
-                </div>
-                <div className="space-y-2">
-                  {mistakeChartData.map((m) => (
-                    <div key={m.mistake} className="p-3 rounded-lg bg-[#0D1110] border border-[#1B2320] flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-bold text-white">{m.mistake}</div>
-                        <div className="text-[11px] text-slate-500">{m.count} occurrence{m.count > 1 ? "s" : ""}</div>
-                      </div>
-                      <div className={`font-mono font-bold ${m.cost >= 0 ? "text-[#00E676]" : "text-rose-400"}`}>
-                        {m.cost >= 0 ? "+" : ""}
-                        {formatCurrency(m.cost)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              <Card className="p-5 space-y-4">
-                <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-rose-400" />
-                    Coût Total des Erreurs
-                  </h3>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-2xl font-black text-rose-400 font-mono">
-                    {formatCurrency(totalErrorsCost)}
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Sans ces erreurs, ton résultat cumulé serait de{" "}
-                    <span className="text-[#00E676] font-bold">{formatCurrency(netResultWithoutErrors)}</span>{" "}
-                    au lieu de {formatCurrency(totalPnL)}.
-                  </p>
-                </div>
-                <div className="h-56 w-full pt-2">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={mistakeChartData} layout="vertical" margin={{ left: 10 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
-                      <XAxis type="number" stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
-                      <YAxis type="category" dataKey="mistake" stroke="#475569" fontSize={10} width={110} />
-                      <Tooltip {...tooltipStyle} formatter={(value: any) => [formatCurrency(Number(value)), "Coût"]} />
-                      <Bar dataKey="cost" radius={[0, 6, 6, 0]} fill="#f43f5e" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </Card>
-            </div>
-          )}
-        </div>
+      {mistakeChartData.length === 0 && (
+        <Card className="p-5 flex items-center gap-3">
+          <RotateCcw className="w-4 h-4 text-slate-600 shrink-0" />
+          <p className="text-xs text-slate-500 italic">
+            Aucune erreur taguée pour l'instant. Tague les erreurs commises directement sur un trade
+            dans le Journal (champ « Erreurs Commises ») pour voir apparaître ces statistiques.
+          </p>
+        </Card>
       )}
     </div>
   );
