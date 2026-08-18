@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -72,8 +72,6 @@ const EmptyState: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </div>
 );
 
-type BestWhereDimension = "session" | "hour" | "day" | "pair" | "strategy" | "direction" | "market";
-
 export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ student, trades }) => {
   const stats = computePerformanceStats(student, trades);
   const {
@@ -100,38 +98,17 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
     emotionChartData,
   } = stats;
 
-  const [bestWhere, setBestWhere] = useState<BestWhereDimension>("session");
-
-  const bestWhereTabs: { id: BestWhereDimension; label: string }[] = [
-    { id: "session", label: "Session" },
-    { id: "hour", label: "Heure" },
-    { id: "day", label: "Jour" },
-    { id: "pair", label: "Actif" },
-    { id: "strategy", label: "Setup" },
-    { id: "direction", label: "Sens" },
-    { id: "market", label: "Marché" },
+  // Une carte par dimension, toutes affichées en même temps — plus de pilules
+  // à cliquer pour comparer deux répartitions entre elles.
+  const bestWhereDimensions: { label: string; data: { key: string; pnl: number; tradesCount: number }[] }[] = [
+    { label: "Session", data: sessionChartData.map((d) => ({ key: d.session, pnl: d.pnl, tradesCount: d.tradesCount })) },
+    { label: "Heure", data: hourChartData.map((d) => ({ key: d.hour, pnl: d.pnl, tradesCount: d.tradesCount })) },
+    { label: "Jour", data: dayChartData.map((d) => ({ key: d.day, pnl: d.pnl, tradesCount: d.tradesCount })) },
+    { label: "Actif", data: pairChartData.map((d) => ({ key: d.pair, pnl: d.pnl, tradesCount: d.tradesCount })) },
+    { label: "Setup", data: stats.strategyChartData.map((d) => ({ key: d.strategy, pnl: d.pnl, tradesCount: d.tradesCount })) },
+    { label: "Sens", data: directionChartData.map((d) => ({ key: d.direction, pnl: d.pnl, tradesCount: d.tradesCount })) },
+    { label: "Marché", data: marketChartData.map((d) => ({ key: d.market, pnl: d.pnl, tradesCount: d.tradesCount })) },
   ];
-
-  const bestWhereData = useMemo(() => {
-    switch (bestWhere) {
-      case "session":
-        return sessionChartData.map((d) => ({ key: d.session, pnl: d.pnl, tradesCount: d.tradesCount }));
-      case "hour":
-        return hourChartData.map((d) => ({ key: d.hour, pnl: d.pnl, tradesCount: d.tradesCount }));
-      case "day":
-        return dayChartData.map((d) => ({ key: d.day, pnl: d.pnl, tradesCount: d.tradesCount }));
-      case "pair":
-        return pairChartData.map((d) => ({ key: d.pair, pnl: d.pnl, tradesCount: d.tradesCount }));
-      case "strategy":
-        return stats.strategyChartData.map((d) => ({ key: d.strategy, pnl: d.pnl, tradesCount: d.tradesCount }));
-      case "direction":
-        return directionChartData.map((d) => ({ key: d.direction, pnl: d.pnl, tradesCount: d.tradesCount }));
-      case "market":
-        return marketChartData.map((d) => ({ key: d.market, pnl: d.pnl, tradesCount: d.tradesCount }));
-      default:
-        return [];
-    }
-  }, [bestWhere, sessionChartData, hourChartData, dayChartData, pairChartData, stats.strategyChartData, directionChartData, marketChartData]);
 
   return (
     <div className="space-y-6 pb-12">
@@ -284,55 +261,53 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
         </Card>
       </div>
 
-      {/* Où es-tu le meilleur ? — filtres en pilules sur une seule donnée à la fois */}
-      <Card className="p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <SectionHeader color="bg-amber-500">Où es-tu le meilleur ?</SectionHeader>
-          <div className="flex items-center gap-1 flex-wrap">
-            {bestWhereTabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setBestWhere(tab.id)}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${
-                  bestWhere === tab.id
-                    ? "bg-[#1B2320] border-[#00E676]/40 text-white"
-                    : "border-transparent text-slate-500 hover:text-slate-300"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+      {/* Où es-tu le meilleur ? — une carte par dimension, toutes visibles en
+          même temps : plus besoin de naviguer entre des pilules pour
+          comparer deux répartitions, chacune a sa propre section. */}
+      <div className="space-y-4">
+        <SectionHeader color="bg-amber-500">Où es-tu le meilleur ?</SectionHeader>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {bestWhereDimensions.map((dim) => (
+            <Card key={dim.label} className="p-5 space-y-4">
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wide">{dim.label}</h4>
+              {dim.data.length === 0 ? (
+                <EmptyState>Pas assez de données.</EmptyState>
+              ) : (
+                <div className="h-56 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dim.data}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
+                      <XAxis
+                        dataKey="key"
+                        stroke="#475569"
+                        fontSize={11}
+                        interval={0}
+                        angle={dim.data.length > 6 ? -15 : 0}
+                        textAnchor={dim.data.length > 6 ? "end" : "middle"}
+                      />
+                      <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
+                      <Tooltip
+                        {...tooltipStyle}
+                        formatter={(value: any, _name: any, props: any) => [
+                          `${formatCurrency(Number(value))} (${props?.payload?.tradesCount ?? 0} trade${
+                            (props?.payload?.tradesCount ?? 0) > 1 ? "s" : ""
+                          })`,
+                          "PnL",
+                        ]}
+                      />
+                      <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
+                        {dim.data.map((entry, index) => (
+                          <Cell key={`cell-${dim.label}-${index}`} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Card>
+          ))}
         </div>
-
-        {bestWhereData.length === 0 ? (
-          <EmptyState>Pas assez de données.</EmptyState>
-        ) : (
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={bestWhereData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
-                <XAxis dataKey="key" stroke="#475569" fontSize={11} interval={0} angle={bestWhereData.length > 6 ? -15 : 0} textAnchor={bestWhereData.length > 6 ? "end" : "middle"} />
-                <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
-                <Tooltip
-                  {...tooltipStyle}
-                  formatter={(value: any, _name: any, props: any) => [
-                    `${formatCurrency(Number(value))} (${props?.payload?.tradesCount ?? 0} trade${
-                      (props?.payload?.tradesCount ?? 0) > 1 ? "s" : ""
-                    })`,
-                    "PnL",
-                  ]}
-                />
-                <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
-                  {bestWhereData.map((entry, index) => (
-                    <Cell key={`cell-best-${index}`} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </Card>
+      </div>
 
       {/* Erreurs les plus fréquentes — conservé de l'ancienne version, pas dans
           la maquette de référence mais donnée réelle utile, jamais affichée
