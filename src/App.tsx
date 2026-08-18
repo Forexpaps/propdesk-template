@@ -16,6 +16,7 @@ import { StaffAccountsModal } from "./components/StaffAccountsModal";
 import { SecurityLogModal } from "./components/SecurityLogModal";
 import { NotificationModal } from "./components/NotificationModal";
 import { MindsetJournalModal } from "./components/MindsetJournalModal";
+import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
 import { SetupAnalyzerModal } from "./components/SetupAnalyzerModal";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
 import { computeBadgeProgress } from "./lib/badges";
@@ -434,6 +435,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [isSetupAnalyzerOpen, setIsSetupAnalyzerOpen] = useState(false);
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
+  const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileModalTab, setProfileModalTab] = useState<"profile" | "badges">("profile");
@@ -572,6 +574,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         }}
         onLogout={handleLogout}
         onOpenChecklist={() => setIsChecklistOpen(true)}
+        onOpenTradingPlan={() => setIsTradingPlanOpen(true)}
         onOpenSetupAnalyzer={() => setIsSetupAnalyzerOpen(true)}
         onOpenMindset={() => setIsMindsetModalOpen(true)}
         canManageSidebar={false}
@@ -672,6 +675,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       <SetupAnalyzerModal isOpen={isSetupAnalyzerOpen} onClose={() => setIsSetupAnalyzerOpen(false)} />
       <MindsetJournalModal isOpen={isMindsetModalOpen} onClose={() => setIsMindsetModalOpen(false)} />
       <TradingPlanModal isOpen={isChecklistOpen} onClose={() => setIsChecklistOpen(false)} />
+      <TradingPlanEditorModal isOpen={isTradingPlanOpen} onClose={() => setIsTradingPlanOpen(false)} />
       <NotificationModal
         isOpen={isNotificationsModalOpen}
         onClose={() => setIsNotificationsModalOpen(false)}
@@ -790,6 +794,7 @@ function AcademyApp({
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
+  const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
   const [isStaffAccountsOpen, setIsStaffAccountsOpen] = useState(false);
   const [isSecurityLogOpen, setIsSecurityLogOpen] = useState(false);
 
@@ -1375,6 +1380,7 @@ function AcademyApp({
         }}
         onLogout={handleLogout}
         onOpenChecklist={() => setIsChecklistOpen(true)}
+        onOpenTradingPlan={() => setIsTradingPlanOpen(true)}
         onOpenSetupAnalyzer={() => setIsSetupAnalyzerOpen(true)}
         onOpenMindset={() => setIsMindsetModalOpen(true)}
         canManageSidebar={isOwner}
@@ -1642,6 +1648,12 @@ function AcademyApp({
       <TradingPlanModal
         isOpen={isChecklistOpen}
         onClose={() => setIsChecklistOpen(false)}
+      />
+
+      {/* Module Pratique : plan de trading (règles personnelles, distinct de la checklist ci-dessus) */}
+      <TradingPlanEditorModal
+        isOpen={isTradingPlanOpen}
+        onClose={() => setIsTradingPlanOpen(false)}
       />
 
       {/* Mindset & Tilt Radar Modal */}

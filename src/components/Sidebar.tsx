@@ -28,6 +28,7 @@ import {
   Calendar,
   Target,
   LogOut,
+  ClipboardList,
 } from "lucide-react";
 import { StudentProfile } from "../types";
 
@@ -91,6 +92,7 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
   "audit",
   "mindset",
   "calendar",
+  "tradingPlan",
 ] as const;
 
 export type SidebarItemKey = (typeof SIDEBAR_TOGGLEABLE_KEYS)[number];
@@ -115,6 +117,7 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   audit: null,
   mindset: null,
   calendar: "macro",
+  tradingPlan: null,
 };
 
 /**
@@ -153,6 +156,7 @@ interface SidebarProps {
    */
   onLogout?: () => void;
   onOpenChecklist?: () => void;
+  onOpenTradingPlan?: () => void;
   // Section OUTILS : chaque entrée ouvre une modale.
   onOpenSetupAnalyzer?: () => void;
   onOpenMindset?: () => void;
@@ -182,6 +186,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenProfileModal,
   onLogout,
   onOpenChecklist,
+  onOpenTradingPlan,
   onOpenSetupAnalyzer,
   onOpenMindset,
   onToggleSidebarItem,
@@ -223,6 +228,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const pratiqueItems: SidebarEntry[] = [
     { key: "exam", id: "exam", label: "Examen", icon: Award },
     { key: "checklist", id: null, label: "Exercice du jour", icon: Sliders, onOpen: onOpenChecklist },
+    { key: "tradingPlan", id: null, label: "Plan de trading", icon: ClipboardList, onOpen: onOpenTradingPlan },
   ];
 
   const formationItems: SidebarEntry[] = [
