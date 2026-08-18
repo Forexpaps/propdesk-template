@@ -79,6 +79,13 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   const [selectedAccountId, setSelectedAccountId] = useState<string>(
     accounts[0]?.id || ""
   );
+  // Modales maison pour la suppression et l'ajustement de solde — remplacent
+  // window.confirm()/prompt(), qui restent muets (aucune boîte de dialogue,
+  // retour silencieux) sur iOS en mode application (icône ajoutée à l'écran
+  // d'accueil), signalé par l'utilisateur en usage réel sur iPhone.
+  const [deleteConfirmAccount, setDeleteConfirmAccount] = useState<TradingAccount | null>(null);
+  const [balanceEditAccount, setBalanceEditAccount] = useState<TradingAccount | null>(null);
+  const [balanceEditValue, setBalanceEditValue] = useState("");
 
   // Form state
   const [newAccName, setNewAccName] = useState("");
@@ -154,13 +161,30 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   };
 
   const handleDeleteAccount = (account: TradingAccount) => {
-    if (!window.confirm(`Supprimer le portefeuille "${account.name}" ? Cette action est irréversible.`)) {
-      return;
+    setDeleteConfirmAccount(account);
+  };
+
+  const confirmDeleteAccount = () => {
+    if (!deleteConfirmAccount) return;
+    onDeleteAccount(deleteConfirmAccount.id);
+    if (selectedAccountId === deleteConfirmAccount.id) {
+      setSelectedAccountId(accounts.find((a) => a.id !== deleteConfirmAccount.id)?.id || "");
     }
-    onDeleteAccount(account.id);
-    if (selectedAccountId === account.id) {
-      setSelectedAccountId(accounts.find((a) => a.id !== account.id)?.id || "");
+    setDeleteConfirmAccount(null);
+  };
+
+  const handleOpenBalanceEdit = (account: TradingAccount) => {
+    setBalanceEditValue(account.equity.toString());
+    setBalanceEditAccount(account);
+  };
+
+  const confirmBalanceEdit = () => {
+    if (!balanceEditAccount) return;
+    const newBal = parseFloat(balanceEditValue);
+    if (!isNaN(newBal)) {
+      onUpdateAccountBalance(balanceEditAccount.id, newBal);
     }
+    setBalanceEditAccount(null);
   };
 
   return (
@@ -362,18 +386,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
               {!readOnly && (
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => {
-                      const newBalStr = prompt(
-                        "Mettre à jour le solde du portefeuille ($) :",
-                        selectedAccount.equity.toString()
-                      );
-                      if (newBalStr) {
-                        const newBal = parseFloat(newBalStr);
-                        if (!isNaN(newBal)) {
-                          onUpdateAccountBalance(selectedAccount.id, newBal);
-                        }
-                      }
-                    }}
+                    onClick={() => handleOpenBalanceEdit(selectedAccount)}
                     className="px-3 py-2 rounded-xl bg-[#00E676]/10 hover:bg-[#00E676]/20 text-[#00E676] hover:text-[#00E676] font-bold text-xs flex items-center gap-1.5 transition-colors"
                   >
                     <RefreshCw className="w-3.5 h-3.5" /> Ajuster le Solde
@@ -701,6 +714,84 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation de suppression — modale maison, voir la note près de
+          l'état `deleteConfirmAccount` pour la raison (window.confirm() muet
+          sur iOS en mode application). */}
+      {deleteConfirmAccount && (
+        <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#111615] border border-[#1B2320] rounded-xl max-w-sm w-full p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-rose-500/10 shrink-0">
+                <Trash2 className="w-5 h-5 text-rose-400" />
+              </div>
+              <h3 className="text-base font-bold text-white">Supprimer ce portefeuille ?</h3>
+            </div>
+            <p className="text-xs text-slate-400">
+              Supprimer « <span className="text-white font-bold">{deleteConfirmAccount.name}</span> » ?
+              Cette action est irréversible.
+            </p>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setDeleteConfirmAccount(null)}
+                className="px-4 py-2.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 font-bold text-xs"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmDeleteAccount}
+                className="px-4 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-bold text-xs"
+              >
+                Supprimer définitivement
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ajustement de solde — modale maison, remplace prompt() pour la même
+          raison (silencieux sur iOS en mode application). */}
+      {balanceEditAccount && (
+        <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#111615] border border-[#1B2320] rounded-xl max-w-sm w-full p-6 space-y-5 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-[#00E676]/10 shrink-0">
+                <RefreshCw className="w-5 h-5 text-[#00E676]" />
+              </div>
+              <h3 className="text-base font-bold text-white">Ajuster le Solde</h3>
+            </div>
+            <div>
+              <label className="block font-medium text-slate-300 mb-1 text-xs">
+                Nouveau solde de « {balanceEditAccount.name} » ($)
+              </label>
+              <input
+                type="number"
+                autoFocus
+                value={balanceEditValue}
+                onChange={(e) => setBalanceEditValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") confirmBalanceEdit();
+                }}
+                className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white font-mono focus:outline-none focus:border-[#00E676]/50"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setBalanceEditAccount(null)}
+                className="px-4 py-2.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 font-bold text-xs"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmBalanceEdit}
+                className="px-4 py-2.5 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-bold text-xs"
+              >
+                Enregistrer
+              </button>
+            </div>
           </div>
         </div>
       )}
