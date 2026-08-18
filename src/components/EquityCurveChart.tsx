@@ -8,6 +8,7 @@ import {
   YAxis,
   Tooltip,
   ReferenceLine,
+  CartesianGrid,
 } from "recharts";
 
 /**
@@ -51,6 +52,7 @@ export const EquityCurveChart: React.FC<EquityCurveChartProps> = ({ data }) => (
           <stop offset="95%" stopColor="#00E676" stopOpacity={0.0} />
         </linearGradient>
       </defs>
+      <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
       <XAxis dataKey="label" stroke="#475569" fontSize={11} tickLine={false} axisLine={false} />
       <YAxis
         stroke="#475569"

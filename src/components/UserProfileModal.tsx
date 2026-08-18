@@ -26,6 +26,16 @@ import { StudentProfile, TraderBadge } from "../types";
 import { resizeAvatar, AVATAR_SIZE } from "../lib/image";
 import { api } from "../lib/api";
 
+const SectionHeader: React.FC<{ children?: React.ReactNode; color?: string }> = ({
+  children,
+  color = "bg-[#00E676]",
+}) => (
+  <span className="inline-flex items-center gap-2">
+    <span className={`w-1 h-4 rounded-full ${color} shrink-0`} />
+    {children}
+  </span>
+);
+
 interface UserProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -632,10 +642,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         {activeSubTab === "badges" && (
           <div className="space-y-6">
             {/* Top XP Level Header Card */}
-            <div className="bg-[#0D1110] border border-[#1B2320] rounded-2xl p-5 space-y-4">
+            <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
+                    <SectionHeader />
                     <Crown className="w-5 h-5 text-amber-400" />
                     <h4 className="text-base font-bold text-white">Rang : Trader SMC Confirmé</h4>
                     <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 text-[10px] font-mono font-bold border border-amber-500/30">
@@ -647,16 +658,16 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   </p>
                 </div>
 
-                <div className="bg-[#111615] border border-[#1B2320] p-3 rounded-xl flex items-center gap-4 text-xs font-mono shrink-0">
+                <div className="bg-[#0D1110] border border-[#1B2320] p-3 rounded-xl flex items-center gap-4 text-xs font-mono shrink-0">
                   <div>
-                    <span className="text-slate-500 block text-[10px]">BADGES DÉBLOQUÉS</span>
+                    <span className="text-slate-500 block text-[9px] uppercase tracking-wider font-bold">BADGES DÉBLOQUÉS</span>
                     <span className="text-[#00E676] font-bold text-base">
                       {unlockedBadgesCount} / {badges.length}
                     </span>
                   </div>
                   <div className="w-px h-8 bg-[#1B2320]" />
                   <div>
-                    <span className="text-slate-500 block text-[10px]">TOTAL XP GAGNÉS</span>
+                    <span className="text-slate-500 block text-[9px] uppercase tracking-wider font-bold">TOTAL XP GAGNÉS</span>
                     <span className="text-amber-400 font-bold text-base">{totalXP} XP</span>
                   </div>
                 </div>
@@ -711,12 +722,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 return (
                   <div
                     key={badge.id}
-                    className={`p-4 rounded-2xl border transition-all space-y-3 flex flex-col justify-between ${
+                    className={`p-4 rounded-xl border transition-all space-y-3 flex flex-col justify-between ${
                       badge.unlocked
-                        ? "bg-[#0D1110] border-[#00E676]/30 shadow-sm"
+                        ? "bg-[#111615] border-[#00E676]/30"
                         : canClaim
-                        ? "bg-[#0D1110] border-amber-500/50 shadow-md animate-pulse"
-                        : "bg-[#0D1110]/50 border-[#1B2320] opacity-80"
+                        ? "bg-[#111615] border-amber-500/50 animate-pulse"
+                        : "bg-[#111615]/50 border-[#1B2320] opacity-80"
                     }`}
                   >
                     <div className="space-y-2">
@@ -738,7 +749,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                             <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
                               {badge.title}
                             </h4>
-                            <span className="text-[10px] font-mono text-slate-500 uppercase">
+                            <span className="text-[9px] font-mono text-slate-500 uppercase tracking-wider">
                               {badge.category}
                             </span>
                           </div>
