@@ -88,7 +88,6 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
   // Panneau 1 — Taille de position & risque
   const [capital, setCapital] = useState<number>(defaultCapital || 10000);
   const [riskPercent, setRiskPercent] = useState<number>(1);
-  const [contract1, setContract1] = useState<number>(DEFAULT_CONTRACT.Forex);
   const [entry1, setEntry1] = useState<number>(1.085);
   const [stop1, setStop1] = useState<number>(1.082);
   const [target1, setTarget1] = useState<number>(1.092);
@@ -98,12 +97,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
   const [stop2, setStop2] = useState<number>(1.082);
   const [target2, setTarget2] = useState<number>(1.092);
 
-  // Panneau 3 — Valeur du pip
-  const [lots3, setLots3] = useState<number>(1);
-  const [pipSize3, setPipSize3] = useState<number>(0.0001);
-  const [contract3, setContract3] = useState<number>(DEFAULT_CONTRACT.Forex);
-
-  // Panneau 4 — Profit / Perte
+  // Panneau 3 — Profit / Perte
   const [entry4, setEntry4] = useState<number>(1.085);
   const [exit4, setExit4] = useState<number>(1.09);
   const [units4, setUnits4] = useState<number>(100000);
@@ -113,11 +107,12 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
 
   const handleAssetClass = (ac: AssetClass) => {
     setAssetClass(ac);
-    setContract1(DEFAULT_CONTRACT[ac]);
-    setContract3(DEFAULT_CONTRACT[ac]);
   };
 
   // --- Panneau 1 : Taille de position & risque ---
+  // Taille de contrat dérivée de la classe d'actif (plus de champ éditable —
+  // simplifié sur demande explicite de l'utilisateur).
+  const contract1 = DEFAULT_CONTRACT[assetClass];
   const riskAmount1 = (capital * riskPercent) / 100;
   const isLong1 = target1 >= entry1;
   const riskDiff1 = Math.abs(entry1 - stop1);
@@ -136,12 +131,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
   const rr2 = riskDiff2 > 0 ? rewardDiff2 / riskDiff2 : 0;
   const breakevenWinRate2 = rr2 > 0 ? (1 / (1 + rr2)) * 100 : 0;
 
-  // --- Panneau 3 : Valeur du pip ---
-  const totalUnits3 = lots3 * contract3;
-  const valuePerPipPerLot3 = contract3 * pipSize3;
-  const pipValue3 = lots3 * valuePerPipPerLot3;
-
-  // --- Panneau 4 : Profit / Perte ---
+  // --- Panneau 3 : Profit / Perte ---
   const movement4 = exit4 - entry4;
   const movementPct4 = entry4 > 0 ? (Math.abs(movement4) / entry4) * 100 : 0;
   const pnl4 = (direction4 === "LONG" ? movement4 : -movement4) * units4;
@@ -172,7 +162,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
             </div>
             <div>
               <h3 className="text-base font-bold text-white">Calculateurs de Trading</h3>
-              <p className="text-xs text-slate-400">Position, risque, valeur du pip et profit — en un coup d'œil</p>
+              <p className="text-xs text-slate-400">Position, risque et profit — en un coup d'œil</p>
             </div>
           </div>
           <button
@@ -215,10 +205,9 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {/* Panneau 1 : Taille de position & risque */}
             <CalcCard title="Taille de position & risque" subtitle="Taille pour ne risquer qu'un % du capital + profit potentiel et perte max.">
-              <div className="grid grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-2 gap-2.5">
                 <FieldInput label="Capital (€/$)" value={capital} onChange={setCapital} step="100" />
                 <FieldInput label="Risque (%)" value={riskPercent} onChange={setRiskPercent} step="0.1" />
-                <FieldInput label="Contrat" value={contract1} onChange={setContract1} step="1" />
               </div>
               <div className="grid grid-cols-3 gap-2.5">
                 <FieldInput label="Entrée" value={entry1} onChange={setEntry1} />
@@ -256,21 +245,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
               </div>
             </CalcCard>
 
-            {/* Panneau 3 : Valeur du pip */}
-            <CalcCard title="Valeur du pip" subtitle="Combien vaut 1 pip selon la taille de position (devise de cotation).">
-              <div className="grid grid-cols-3 gap-2.5">
-                <FieldInput label="Lots" value={lots3} onChange={setLots3} step="0.01" />
-                <FieldInput label="Taille pip" value={pipSize3} onChange={setPipSize3} step="0.0001" />
-                <FieldInput label="Contrat" value={contract3} onChange={setContract3} step="1" />
-              </div>
-              <div className="space-y-0">
-                <ResultRow label="Unités" value={totalUnits3.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} />
-                <ResultRow label="Valeur / pip / lot" value={formatCurrency(valuePerPipPerLot3)} />
-                <ResultRow label="Valeur du pip" value={formatCurrency(pipValue3)} valueClassName="text-blue-400" />
-              </div>
-            </CalcCard>
-
-            {/* Panneau 4 : Profit / Perte */}
+            {/* Panneau 3 : Profit / Perte */}
             <CalcCard title="Profit / Perte" subtitle="Le résultat d'un trade entre l'entrée et la sortie.">
               <div className="grid grid-cols-2 gap-2.5">
                 <FieldInput label="Entrée" value={entry4} onChange={setEntry4} />
