@@ -105,10 +105,7 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
   // à cliquer pour comparer deux répartitions entre elles.
   const bestWhereDimensions: { label: string; data: { key: string; pnl: number; tradesCount: number }[] }[] = [
     { label: "Session", data: sessionChartData.map((d) => ({ key: d.session, pnl: d.pnl, tradesCount: d.tradesCount })) },
-    { label: "Heure", data: hourChartData.map((d) => ({ key: d.hour, pnl: d.pnl, tradesCount: d.tradesCount })) },
     { label: "Jour", data: dayChartData.map((d) => ({ key: d.day, pnl: d.pnl, tradesCount: d.tradesCount })) },
-    { label: "Actif", data: pairChartData.map((d) => ({ key: d.pair, pnl: d.pnl, tradesCount: d.tradesCount })) },
-    { label: "Setup", data: stats.strategyChartData.map((d) => ({ key: d.strategy, pnl: d.pnl, tradesCount: d.tradesCount })) },
     { label: "Sens", data: directionChartData.map((d) => ({ key: d.direction, pnl: d.pnl, tradesCount: d.tradesCount })) },
     { label: "Marché", data: marketChartData.map((d) => ({ key: d.market, pnl: d.pnl, tradesCount: d.tradesCount })) },
   ];
