@@ -61,6 +61,11 @@ export interface PerformanceStats {
   monthlyChartData: { month: string; pnl: number; tradesCount: number }[];
   hourChartData: { hour: string; pnl: number; tradesCount: number }[];
   marketChartData: { market: string; pnl: number; tradesCount: number }[];
+  /** Détail par actif (tableau) — trié par PnL total décroissant. */
+  assetDetailData: { asset: string; tradesCount: number; winRate: number; pnl: number }[];
+  /** Plus longue série de trades gagnants/perdants consécutifs (WIN/LOSS uniquement, BREAKEVEN/OPEN ignorés — ne rompent ni ne prolongent la série). */
+  bestWinStreak: number;
+  worstLossStreak: number;
 }
 
 export function computePerformanceStats(student: StudentProfile, trades: Trade[]): PerformanceStats {
@@ -342,6 +347,40 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
     tradesCount: marketStats[market].total,
   }));
 
+  // 15. Détail par actif (tableau) — reprend `pairStats` déjà calculé (point
+  // 4), mais avec la totalité des actifs (pas les 8 premiers par nombre de
+  // trades comme `pairChartData`) et triés par PnL total décroissant.
+  const assetDetailData = Object.keys(pairStats)
+    .map((asset) => ({
+      asset,
+      tradesCount: pairStats[asset].total,
+      winRate:
+        pairStats[asset].total > 0
+          ? Math.round((pairStats[asset].wins / pairStats[asset].total) * 100)
+          : 0,
+      pnl: pairStats[asset].pnl,
+    }))
+    .sort((a, b) => b.pnl - a.pnl);
+
+  // 16. Meilleure/pire série — la plus longue suite de WIN/LOSS consécutifs
+  // dans l'ordre chronologique (`sortedTrades`). BREAKEVEN/OPEN sont ignorés,
+  // ni ne rompent ni ne prolongent une série en cours.
+  let bestWinStreak = 0;
+  let worstLossStreak = 0;
+  let currentWinStreak = 0;
+  let currentLossStreak = 0;
+  sortedTrades.forEach((t) => {
+    if (t.result === "WIN") {
+      currentWinStreak += 1;
+      currentLossStreak = 0;
+      bestWinStreak = Math.max(bestWinStreak, currentWinStreak);
+    } else if (t.result === "LOSS") {
+      currentLossStreak += 1;
+      currentWinStreak = 0;
+      worstLossStreak = Math.max(worstLossStreak, currentLossStreak);
+    }
+  });
+
   return {
     equityData,
     strategyChartData,
@@ -371,6 +410,9 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
     monthlyChartData,
     hourChartData,
     marketChartData,
+    assetDetailData,
+    bestWinStreak,
+    worstLossStreak,
   };
 }
 
