@@ -25,6 +25,16 @@ import {
 } from "lucide-react";
 import { Module, Lesson, QuizQuestion, ModuleQuizResult } from "../types";
 
+const SectionHeader: React.FC<{ children?: React.ReactNode; color?: string }> = ({
+  children,
+  color = "bg-[#00E676]",
+}) => (
+  <span className="inline-flex items-center gap-2">
+    <span className={`w-1 h-4 rounded-full ${color} shrink-0`} />
+    {children}
+  </span>
+);
+
 interface VideoAcademyProps {
   modules: Module[];
   quizResults: Record<string, ModuleQuizResult>;
@@ -129,7 +139,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
           {/* Global Progress Box */}
           <div className="bg-[#0D1110] border border-[#1B2320] rounded-xl p-4 min-w-[280px] space-y-3">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Progression Globale</span>
+              <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Progression Globale</span>
               <span className="text-[#00E676] font-black font-mono text-sm">{globalProgress}%</span>
             </div>
 
@@ -210,16 +220,19 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                      <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider">
                         {module.category}
                       </span>
                       <span className="text-slate-600">•</span>
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <span className="text-[11px] text-slate-400 flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5 text-slate-500" />
                         {module.durationTotal}
                       </span>
                     </div>
-                    <h2 className="text-lg font-bold text-white tracking-tight">{module.title}</h2>
+                    <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                      <SectionHeader />
+                      {module.title}
+                    </h2>
                     <p className="text-xs text-slate-400 line-clamp-2 max-w-3xl">
                       {module.description}
                     </p>

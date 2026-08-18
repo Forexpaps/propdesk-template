@@ -28,6 +28,20 @@ function formatMessageTimestamp(raw: string): string {
   });
 }
 
+/**
+ * En-tête de section — barre verticale colorée + titre, motif repris tel
+ * quel de PerformanceDashboard.tsx pour un rendu cohérent sur tout l'écosystème.
+ */
+const SectionHeader: React.FC<{ children: React.ReactNode; color?: string }> = ({
+  children,
+  color = "bg-[#00E676]",
+}) => (
+  <div className="flex items-center gap-2">
+    <span className={`w-1 h-4 rounded-full ${color}`} />
+    <h3 className="text-sm font-bold text-white">{children}</h3>
+  </div>
+);
+
 interface CoachMessagingProps {
   coaches: Coach[];
   messages: CoachMessage[];
@@ -121,9 +135,9 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-[600px]">
         {/* Left Sidebar: Coaches List */}
         <div className="lg:col-span-1 bg-[#111615] border border-[#1B2320] rounded-xl p-4 space-y-4">
-          <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-2">
-            Vos Coachs Référents
-          </h2>
+          <div className="px-2">
+            <SectionHeader>Vos Coachs Référents</SectionHeader>
+          </div>
 
           <div className="space-y-2">
             {coaches.map((coach) => {
@@ -135,7 +149,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
                   className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
                     isSelected
                       ? "bg-[#1B2320]/90 border-[#00E676]/50 shadow-md"
-                      : "bg-[#0D1110]/40 border-[#151D1A] hover:bg-[#151D1A]/50"
+                      : "bg-[#0D1110]/40 border-[#1B2320] hover:bg-[#1B2320]/50"
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -146,7 +160,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
                         className="w-11 h-11 rounded-full object-cover border-2 border-[#232D29]"
                       />
                       <span
-                        className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#151D1A] ${
+                        className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#1B2320] ${
                           coach.isOnline ? "bg-[#00E676]" : "bg-slate-500"
                         }`}
                       />
@@ -232,7 +246,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
                         <div
                           className={`p-3 rounded-xl text-xs space-y-1 font-mono border ${
                             isStudent
-                              ? "bg-[#0D1110]/20 text-slate-950 border-[#151D1A]/20"
+                              ? "bg-[#0D1110]/20 text-slate-950 border-[#1B2320]/20"
                               : "bg-[#0D1110]/60 text-slate-200 border-[#232D29]"
                           }`}
                         >

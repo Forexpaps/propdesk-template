@@ -54,6 +54,20 @@ const MISTAKE_OPTIONS: TradeMistake[] = [
   "Sur-trading",
 ];
 
+/**
+ * En-tête de section — barre verticale colorée + titre, motif repris tel
+ * quel de PerformanceDashboard.tsx pour un rendu cohérent sur tout l'écosystème.
+ */
+const SectionHeader: React.FC<{ children: React.ReactNode; color?: string }> = ({
+  children,
+  color = "bg-[#00E676]",
+}) => (
+  <div className="flex items-center gap-2">
+    <span className={`w-1 h-4 rounded-full ${color}`} />
+    <h3 className="text-sm font-bold text-white">{children}</h3>
+  </div>
+);
+
 interface TradingJournalProps {
   trades: Trade[];
   /**
@@ -507,36 +521,37 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       </div>
 
       {/* Metric Cards Bar */}
+      <SectionHeader>Performance</SectionHeader>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Taux de Réussite</div>
-          <div className="text-2xl font-black text-[#00E676] font-mono">{winRate}%</div>
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Taux de Réussite</div>
+          <div className="text-xl font-black text-[#00E676] font-mono">{winRate}%</div>
           <div className="text-[11px] text-slate-500">{winTrades} W / {lossTrades} L</div>
         </div>
 
         <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">PnL Cumulé</div>
-          <div className={`text-2xl font-black font-mono ${totalPnL >= 0 ? "text-[#00E676]" : "text-rose-400"}`}>
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">PnL Cumulé</div>
+          <div className={`text-xl font-black font-mono ${totalPnL >= 0 ? "text-[#00E676]" : "text-rose-400"}`}>
             {totalPnL >= 0 ? `+${formatCurrency(totalPnL)}` : formatCurrency(totalPnL)}
           </div>
           <div className="text-[11px] text-slate-500">{totalTrades} positions fermées</div>
         </div>
 
         <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Profit Factor</div>
-          <div className="text-2xl font-black text-white font-mono">{profitFactor}</div>
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Profit Factor</div>
+          <div className="text-xl font-black text-white font-mono">{profitFactor}</div>
           <div className="text-[11px] text-slate-500">Gains vs Pertes</div>
         </div>
 
         <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Ratio R:R Moyen</div>
-          <div className="text-2xl font-black text-purple-400 font-mono">1:{avgRR}</div>
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Ratio R:R Moyen</div>
+          <div className="text-xl font-black text-purple-400 font-mono">1:{avgRR}</div>
           <div className="text-[11px] text-slate-500">Espérance par trade</div>
         </div>
 
         <div className="col-span-2 md:col-span-1 bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Discipline Émotionnelle</div>
-          <div className="text-2xl font-black text-[#00E676] font-mono">
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Discipline Émotionnelle</div>
+          <div className="text-xl font-black text-[#00E676] font-mono">
             {disciplineEmoPercent}%
           </div>
           <div className="text-[11px] text-slate-500">Respect du plan de trading</div>
@@ -614,6 +629,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       </div>
 
       {/* Trades Table / List */}
+      <SectionHeader color="bg-blue-500">Registre des Positions</SectionHeader>
       <div className="bg-[#111615] border border-[#1B2320] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300">
@@ -1229,28 +1245,28 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             {/* Résumé complet de la saisie */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
-                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Compte</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Compte</div>
                 <div className="text-white font-semibold">
                   {nomDuCompte(selectedChartTrade.accountId) ?? "Non rattaché"}
                 </div>
               </div>
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
-                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Marché</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Marché</div>
                 <div className="text-white font-semibold">{selectedChartTrade.marketCategory}</div>
               </div>
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
-                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Résultat</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Résultat</div>
                 <div className="text-white font-semibold">{selectedChartTrade.result}</div>
               </div>
 
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
-                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Entrée</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Entrée</div>
                 <div className="text-white font-mono">
                   {selectedChartTrade.date} {selectedChartTrade.time}
                 </div>
               </div>
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
-                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Sortie</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Sortie</div>
                 <div className="text-white font-mono">
                   {selectedChartTrade.exitDate
                     ? `${selectedChartTrade.exitDate} ${selectedChartTrade.exitTime ?? ""}`
@@ -1258,31 +1274,31 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 </div>
               </div>
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
-                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Taille de lot</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Taille de lot</div>
                 <div className="text-white font-mono">{selectedChartTrade.lotSize}</div>
               </div>
 
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
-                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Prix d'entrée</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Prix d'entrée</div>
                 <div className="text-white font-mono">{selectedChartTrade.entryPrice}</div>
               </div>
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
-                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Stop Loss</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Stop Loss</div>
                 <div className="text-white font-mono">{selectedChartTrade.stopLoss}</div>
               </div>
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
-                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Take Profit</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Take Profit</div>
                 <div className="text-white font-mono">{selectedChartTrade.takeProfit}</div>
               </div>
 
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
-                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">Prix de sortie</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Prix de sortie</div>
                 <div className="text-white font-mono">
                   {selectedChartTrade.exitPrice || "—"}
                 </div>
               </div>
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
-                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">PnL net</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">PnL net</div>
                 <div
                   className={`font-mono font-bold ${
                     selectedChartTrade.pnl > 0
@@ -1298,7 +1314,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 </div>
               </div>
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
-                <div className="text-slate-500 text-[10px] uppercase font-bold mb-0.5">État émotionnel</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">État émotionnel</div>
                 <div>{getEmotionBadge(selectedChartTrade.emotion)}</div>
               </div>
             </div>

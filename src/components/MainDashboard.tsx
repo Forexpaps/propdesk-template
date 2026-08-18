@@ -44,6 +44,20 @@ import {
 import { TabType, SidebarItemKey } from "./Sidebar";
 import { computeDisciplineStreak } from "../lib/badges";
 
+/**
+ * En-tête de section — barre verticale colorée + titre, motif repris tel
+ * quel de PerformanceDashboard.tsx pour un rendu cohérent sur tout l'écosystème.
+ */
+const SectionHeader: React.FC<{ children: React.ReactNode; color?: string }> = ({
+  children,
+  color = "bg-[#00E676]",
+}) => (
+  <div className="flex items-center gap-2">
+    <span className={`w-1 h-4 rounded-full ${color}`} />
+    <h3 className="text-sm font-bold text-white">{children}</h3>
+  </div>
+);
+
 interface MainDashboardProps {
   student: StudentProfile;
   trades: Trade[];
@@ -125,13 +139,13 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
       {/* 2. Top 4 KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Score Examen — module Examen pas encore disponible dans l'app */}
-        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between shadow-sm hover:border-[#00E676]/30 transition-all">
-          <div className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between">
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
             SCORE EXAMEN
           </div>
           <div className="space-y-2">
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-black text-slate-500 font-mono">—</span>
+              <span className="text-xl font-black text-slate-500 font-mono">—</span>
               <span className="text-xs text-slate-500 font-medium">/100</span>
             </div>
             <p className="text-xs text-slate-500">Bientôt disponible</p>
@@ -139,12 +153,12 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         </div>
 
         {/* Card 2: Win Rate Journal */}
-        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between shadow-sm hover:border-[#00E676]/30 transition-all">
-          <div className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between">
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
             WIN RATE JOURNAL
           </div>
           <div className="space-y-1">
-            <div className="text-2xl font-black text-[#00E676] font-mono">
+            <div className="text-xl font-black text-[#00E676] font-mono">
               {winRate}%
             </div>
             <p className="text-xs text-slate-400">
@@ -154,12 +168,12 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         </div>
 
         {/* Card 3: PnL Cumulé */}
-        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between shadow-sm hover:border-[#00E676]/30 transition-all">
-          <div className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between">
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
             PNL CUMULÉ
           </div>
           <div className="flex items-end justify-between">
-            <div className={`text-2xl font-black font-mono ${isPnLPositive ? "text-[#00E676]" : "text-rose-400"}`}>
+            <div className={`text-xl font-black font-mono ${isPnLPositive ? "text-[#00E676]" : "text-rose-400"}`}>
               {isPnLPositive ? "+" : ""}
               {formatCurrency(totalPnL)}
             </div>
@@ -179,13 +193,13 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         </div>
 
         {/* Card 4: Série de Discipline */}
-        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between shadow-sm hover:border-amber-500/30 transition-all">
-          <div className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between">
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
             SÉRIE DE DISCIPLINE
           </div>
           <div className="space-y-1">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-black text-[#FFB800] font-mono">{disciplineStreak}</span>
+              <span className="text-xl font-black text-[#FFB800] font-mono">{disciplineStreak}</span>
               <span className="text-xs text-slate-400 font-medium">
                 {disciplineStreak > 1 ? "jours" : "jour"}
               </span>
@@ -213,7 +227,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           letter: string;
           title: string;
           description: string;
-          glow: string;
           badgeClasses: string;
           borderHover: string;
           textHover: string;
@@ -224,7 +237,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             letter: "J",
             title: "Journal de trading",
             description: "Chaque trade audité : exécution, émotion, respect du plan.",
-            glow: "bg-[radial-gradient(circle_at_0%_0%,rgba(0,230,118,0.20),transparent_65%)]",
             badgeClasses: "text-[#00E676] bg-[#00E676]/15 border-[#00E676]/30",
             borderHover: "hover:border-[#00E676]/40",
             textHover: "group-hover:text-[#00E676]",
@@ -235,7 +247,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             letter: "E",
             title: "Examen",
             description: "20 graphiques inédits, notés et corrigés un par un.",
-            glow: "bg-[radial-gradient(circle_at_0%_0%,rgba(59,130,246,0.20),transparent_65%)]",
             badgeClasses: "text-blue-400 bg-blue-500/15 border-blue-500/30",
             borderHover: "hover:border-blue-500/40",
             textHover: "group-hover:text-blue-400",
@@ -246,7 +257,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             letter: "V",
             title: "Module vidéo",
             description: "Parcours débutant → masterclass, 14 leçons.",
-            glow: "bg-[radial-gradient(circle_at_0%_0%,rgba(245,158,11,0.20),transparent_65%)]",
             badgeClasses: "text-amber-400 bg-amber-500/15 border-amber-500/30",
             borderHover: "hover:border-amber-500/40",
             textHover: "group-hover:text-amber-400",
@@ -258,16 +268,14 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
 
         return (
           <div className="space-y-3 pt-2">
-            <h2 className="text-[11px] font-bold tracking-widest text-slate-500 uppercase">
-              MODULES
-            </h2>
+            <SectionHeader color="bg-amber-500">Modules</SectionHeader>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {visibleCards.map((c) => (
                 <div
                   key={c.key}
                   onClick={() => setActiveTab(c.tab)}
-                  className={`bg-[#111615] ${c.glow} border border-[#1B2320] ${c.borderHover} p-5 rounded-xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between`}
+                  className={`bg-[#111615] border border-[#1B2320] ${c.borderHover} p-5 rounded-xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between`}
                 >
                   <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-bold text-sm ${c.badgeClasses}`}>
                     {c.letter}
@@ -291,8 +299,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         <div className="lg:col-span-2 bg-[#111615] border border-[#1B2320] rounded-xl p-6 space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <h3 className="text-base font-bold text-white">Courbe de progression</h3>
-              <p className="text-xs text-slate-400">Capital réel issu de tes trades journalisés</p>
+              <SectionHeader color="bg-[#00E676]">Courbe de progression</SectionHeader>
+              <p className="text-xs text-slate-400 mt-1">Capital réel issu de tes trades journalisés</p>
             </div>
             <button
               onClick={() => setActiveTab("journal")}
@@ -328,7 +336,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         {/* Right Column: Ta semaine (1 col) */}
         <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-6 space-y-4 flex flex-col justify-between">
           <div>
-            <h3 className="text-base font-bold text-white">Ta semaine</h3>
+            <SectionHeader color="bg-blue-500">Ta semaine</SectionHeader>
           </div>
 
           <div className="space-y-3 flex-1">

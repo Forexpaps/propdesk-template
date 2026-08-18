@@ -1,21 +1,138 @@
 # HANDOFF — PropDesk (Académie de Trading)
 
 Document de reprise. Il suppose que tu n'as accès ni à la conversation qui
-l'a produit, ni à autre chose que ce dépôt. Rédigé après une session
-complète (création du dépôt GitHub, remise à zéro complète des données de
-démo, capital dérivé des portefeuilles réels partout dans l'app,
-synchronisation automatique portefeuille ↔ trades, correction de la courbe
-de progression) — pas une compilation superficielle de notes.
+l'a produit, ni à autre chose que ce dépôt. Rédigé **au milieu d'un
+chantier en cours**, sur demande explicite de l'utilisateur qui vient de
+t'interrompre — la section §0 ci-dessous décrit exactement où reprendre,
+lis-la en premier.
 
 > **État à la dernière mise à jour de ce document**
-> Branche `main`, dernier commit : **`aac295f`** (« Vide les données de
-> démo et lie le capital affiché aux portefeuilles réels »), poussé sur
-> **GitHub** (`https://github.com/Forexpaps/propdesk`, dépôt privé — voir
-> §4 pour l'historique de sa création).
-> Répertoire de travail **propre** (`git status` sans rien à committer).
-> `npm run lint` (`tsc --noEmit`) et `npm run build` passent tous les deux,
-> build ~2.9s.
-> Aucun chantier en attente de commit à ce jour.
+> Branche `main`, dernier commit poussé : **`c7b95fd`** (« Sépare chaque
+> dimension d'"Où es-tu le meilleur ?" en sa propre carte »), déployé avec
+> succès sur Railway.
+> **Répertoire de travail SALE** — 6 fichiers modifiés, non committés, un
+> chantier d'harmonisation visuelle en cours (voir §0). `npm run lint` et
+> `npm run build` passent tous les deux malgré l'état intermédiaire.
+> Application déployée sur **Railway** (plus Vercel, abandonné — voir §8),
+> domaine `https://propdesk-academie.up.railway.app`.
+
+---
+
+## 0. Chantier d'harmonisation visuelle : TERMINÉ
+
+Les 6 modules principaux + l'onglet Badges du Profil sont désormais
+harmonisés sur le style Macro/Rentabilité (cartes `#111615`/`#1B2320`,
+micro-labels `[9px]`, `SectionHeader` à barre colorée). `StudentTracking.tsx`
+(2 `<h4>` restants de la Vue Complète), `VideoAcademy.tsx` et
+`UserProfileModal.tsx` (onglet Badges) ont été complétés à la reprise de
+cette session. `npm run lint`/`npm run build` passent, vérification
+visuelle faite dans le Browser pane (Tableau de bord, Messagerie Coach,
+Suivi des Élèves, onglet Badges & Succès). Section conservée ci-dessous à
+titre d'historique du chantier.
+
+## 0 bis. Où reprendre EXACTEMENT — chantier interrompu en cours (historique, résolu)
+
+**Tâche en cours** : harmoniser visuellement tous les modules de
+l'écosystème sur le langage graphique de Macro (`MacroDashboard.tsx`) et
+Rentabilité (`PerformanceDashboard.tsx`), à la demande explicite de
+l'utilisateur (« je veux que tu reprennes le visuel du module macro et du
+module rentabilité et que tu t'en serves pour tous les modules »). Un
+plan a été validé en mode plan avant de commencer — voir
+`/Users/forexpaps/.claude/plans/quelles-autres-h-bergeur-me-composed-ember.md`
+pour le plan complet approuvé (nom de fichier trompeur, hérité d'une
+question sans rapport posée plus tôt dans la session : c'est bien le plan
+d'harmonisation visuelle).
+
+**Périmètre confirmé avec l'utilisateur** (`AskUserQuestion`, réponses
+"Recommandé" les deux fois) :
+- Les **6 modules principaux** accessibles depuis la sidebar + l'onglet
+  Badges du Profil.
+- **Explicitement exclus** : le Forum (inaccessible actuellement) et les
+  petites modales (calculateur de position, plan de trading, journal
+  mental, notifications).
+
+**Référence de design** (voir §8 pour le détail) : carte
+`bg-[#111615] border border-[#1B2320] rounded-xl` ; micro-label
+`text-[9px] uppercase tracking-wider text-slate-500 font-bold` ; en-tête
+de section = barre verticale colorée + titre
+(`<span className="w-1 h-4 rounded-full {accent}" /><h3 className="text-sm font-bold text-white">{titre}</h3>`,
+extrait tel quel dans un composant `SectionHeader` local à chaque
+fichier) ; valeur de stat `text-xl font-black font-mono {accent}`.
+
+### Statut par fichier (liste de tâches déjà créée dans le tracker de tâches)
+
+1. ✅ **`src/components/TradingJournal.tsx`** — terminé. Micro-labels
+   unifiées (`[10px]`→`[9px]`, y compris dans la grille du modal détail
+   qui utilisait un ordre de classes différent), valeurs de stat
+   (`text-2xl`→`text-xl`), `SectionHeader` ajouté au-dessus de la rangée
+   KPI (« Performance ») et du tableau (« Registre des Positions »).
+2. ✅ **`src/components/WalletManagement.tsx`** — terminé. Bordures
+   `#151D1A`→`#1B2320` unifiées, micro-labels/valeurs harmonisées,
+   `SectionHeader` sur « Sélectionner un Compte » et « Règles de Risk &
+   Drawdown Prop Firm ».
+3. ✅ **`src/components/MainDashboard.tsx`** — terminé. Décorations
+   `shadow-sm`/glow radial retirées des cartes (absentes de
+   Macro/Rentabilité), `SectionHeader` sur « Modules », « Courbe de
+   progression », « Ta semaine ». **`src/components/EquityCurveChart.tsx`**
+   modifié en même temps : `CartesianGrid stroke="#1B2320"` ajouté (absent
+   avant).
+4. ✅ **`src/components/CoachMessaging.tsx`** — terminé. `SectionHeader`
+   sur « Vos Coachs Référents », bordures `#151D1A`→`#1B2320`.
+5. 🔶 **`src/components/StudentTracking.tsx`** — **EN COURS, C'EST ICI QU'IL
+   FAUT REPRENDRE.** Déjà fait : composant `SectionHeader` local ajouté
+   (ligne ~28, signature légèrement différente des autres fichiers — ici
+   `<span>` pas `<div>`, pensé pour être inséré inline dans un `<h4>`
+   existant sans casser sa mise en page), bordures `#151D1A`→`#1B2320`
+   unifiées (3 occurrences). **Reste à faire** : appliquer `SectionHeader`
+   aux deux `<h4 className="text-sm font-bold text-white flex items-center gap-2">`
+   de la Vue Complète en lecture seule (dans la modale "READ ONLY PREVIEW",
+   grep `text-sm font-bold text-white flex items-center gap-2` pour les
+   retrouver — actuellement lignes ~778 et ~818) : « Portefeuilles &
+   Comptes Attribués (...) » et « Historique Récent des Trades ». Ces deux
+   `<h4>` ont une icône Lucide en tête ET un badge conditionnel en fin de
+   ligne (`{selectedStudent.studentAccountId && (...)}`) — le remplacement
+   doit préserver icône et badge, seul le libellé doit être enveloppé par
+   `SectionHeader` (ou la barre colorée insérée juste avant l'icône).
+   **Décision déjà prise et à ne pas remettre en cause** : les titres de
+   *modales* (« Fiche Édition : {nom} », « Inscrire un Nouvel Élève »,
+   « Accès élève créé ») ne reçoivent PAS le traitement `SectionHeader` —
+   ce sont des titres de fenêtre, pas des en-têtes de section à
+   l'intérieur d'une page, exactement comme le titre de
+   `UserProfileModal.tsx` ou de la modale d'ajout de portefeuille dans
+   `WalletManagement.tsx` n'ont pas été touchés non plus. Ne pas les
+   convertir par souci de "cohérence excessive".
+6. ⬜ **`src/components/VideoAcademy.tsx`** — **pas commencé.** Prévu :
+   `SectionHeader` sur les titres de modules/sections ; micro-label de
+   catégorie (`text-xs font-bold text-amber-400 uppercase tracking-wider`)
+   et barre de progression (`text-[10px]`) à ramener sur le format
+   `[9px]` canonique.
+7. ⬜ **`src/components/UserProfileModal.tsx`, onglet Badges & Succès
+   uniquement** — **pas commencé, le plus gros écart restant.** Reclasser
+   `bg-[#0D1110]/rounded-2xl`→`bg-[#111615]/rounded-xl` sur la carte
+   d'en-tête XP (~ligne 650) et sur les cartes de badges (une classe
+   partagée à corriger une fois, appliquée à N badges) ; ajouter
+   `SectionHeader`. **Ne toucher que l'onglet Badges** — l'onglet « Profil
+   & Options » (formulaire d'édition) est hors périmètre.
+8. ⬜ **Vérification finale + commit(s) + push** — une fois les 3 fichiers
+   restants faits : `npm run lint`, `npm run build`, vérification visuelle
+   de CHAQUE module dans le Browser pane (comparer au rendu déjà en place
+   de Macro/Rentabilité), puis committer (un seul commit ou quelques
+   commits thématiques — l'utilisateur n'a pas d'exigence particulière
+   là-dessus cette fois) et pousser. Le déploiement Railway suit
+   automatiquement le push (déclencheur déjà configuré, voir §8) — vérifier
+   via `railway deployment list --service propdesk --json`, **sans
+   marteler l'URL publique avec des `curl` répétés** (voir le piège documenté
+   en §6, le blocage anti-abus de l'edge Railway a déjà été déclenché deux
+   fois cette session par des vérifications trop fréquentes).
+
+**Pour reprendre immédiatement** : lis le plan complet à
+`/Users/forexpaps/.claude/plans/quelles-autres-h-bergeur-me-composed-ember.md`
+(contexte + référence de design + détail fichier par fichier), termine
+StudentTracking.tsx (point 5 ci-dessus), puis enchaîne sur VideoAcademy.tsx
+et UserProfileModal.tsx dans l'ordre, puis la vérification finale (point 8).
+Le tracker de tâches interne a déjà les 8 tâches créées avec le bon statut
+(#1-4 completed, #5 in_progress, #6-8 pending) — pas besoin de le
+reconstruire, juste continuer à le mettre à jour.
 
 ---
 
@@ -25,182 +142,70 @@ de progression) — pas une compilation superficielle de notes.
 Concepts*) destinée à un coach (le fondateur, compte admin) et à ses
 élèves. Interface **entièrement en français**, ton direct, tutoiement.
 Devise unique : **`$`**, jamais `€`. **Aucune IA n'est utilisée nulle
-part** (retirée intégralement lors d'une session antérieure — décision
-produit explicite et répétée, **ne pas la réintroduire sans nouvelle
-demande explicite**).
+part** — décision produit explicite et répétée plusieurs fois cette
+session (notamment en refusant implicitement de reproduire les
+fonctionnalités "+ IA"/"Rapport hebdo IA" d'une maquette de référence
+partagée par l'utilisateur), **ne jamais la réintroduire sans nouvelle
+demande explicite**.
 
 C'est un **vrai projet full-stack** : React 19 + TypeScript + Vite côté
 client, Express + `better-sqlite3` (SQLite, mode WAL) côté serveur, un
 seul process Node sert les deux.
 
-**Identité visuelle** : design system inspiré du module Replay FX (session
-antérieure) — cartes plates à bordure fine (`#1B2320`), micro-labels en
-majuscules espacées au-dessus des valeurs, chiffres clés en police mono,
-navigation en pilules soulignées pour les vues à onglets internes. Palette
-PropDesk (vert `#00E676`, fonds `#0D1110`/`#111615`).
+**Identité visuelle** : design system unifié progressivement cette
+session autour du langage visuel de Macro/Rentabilité — cartes plates à
+bordure fine (`#111615`/`#1B2320`), micro-labels `[9px]` en majuscules
+espacées, en-têtes de section à barre verticale colorée. Palette PropDesk
+(vert `#00E676`, fonds `#0D1110`/`#111615`) inchangée. **Chantier
+d'harmonisation en cours sur TOUT l'écosystème — voir §0, ne pas repartir
+de zéro.**
 
 ### Qui l'utilise
 
-Outil de travail d'un coach (« ForexPaps », `th.gauthey99@gmail.com`,
-compte fondateur) et de son staff. Plusieurs comptes staff peuvent se
-connecter séparément mais **partagent tous le même bureau** (mêmes trades,
-fiches élèves, portefeuilles) — pas de multi-tenant côté staff. **Les
-élèves ont un second monde d'identité complètement séparé**, chacun avec
-son propre bureau de données personnel cloisonné. Seul « Suivi des
-Élèves » reste structurellement réservé à un compte staff (`isAdmin`, vrai
-pour tout le staff).
+Outil de travail d'un coach (« ForexPaps »/« Forex Paps » selon
+l'environnement, `th.gauthey99@gmail.com`, compte fondateur) et de son
+staff. Plusieurs comptes staff partagent le même bureau (mêmes trades,
+fiches élèves, portefeuilles). Les élèves ont un second monde d'identité
+séparé, chacun avec son propre bureau cloisonné. Seul « Suivi des
+Élèves » reste réservé à un compte staff (`isAdmin`, désormais **toujours
+vrai pour tout compte staff** — voir §6, un bug qui l'empêchait d'être
+vrai a été corrigé cette session).
 
-### Le repo est maintenant sur GitHub
+### Le projet est maintenant hébergé sur Railway (pas seulement GitHub)
 
-Nouveau cette session : `https://github.com/Forexpaps/propdesk`, **privé**.
-Créé via `gh repo create` + `gh auth login` (device flow navigateur).
-L'ancien remote `origin` contenait un **Personal Access Token en clair dans
-l'URL** (`https://Forexpaps:github_pat_...@github.com/...`) — remplacé par
-une URL propre (`https://github.com/Forexpaps/propdesk.git`), l'auth passe
-désormais par le credential helper de `gh`. L'utilisateur a vérifié que
-l'ancien token n'apparaissait déjà plus dans ses tokens actifs GitHub (déjà
-invalide avant cette session) — rien à révoquer en plus.
+**Changement majeur cette session** : l'utilisateur a publié le site sur
+**Vercel** en premier — **ça ne fonctionne pas et ne fonctionnera jamais
+sans réécriture lourde** (serverless, système de fichiers éphémère,
+incompatible avec un serveur Express + SQLite persistant). Symptôme
+observé : connexion automatique sur un faux compte de démo figé
+("Alexandre Vance"), déconnexion impossible. Diagnostiqué et expliqué à
+l'utilisateur, **abandonné au profit de Railway**.
 
-**Piège opérationnel découvert et confirmé cette session** : `.gitignore`
-contient la règle `data/` (destinée à ignorer le dossier SQLite
-`./data/horizon.db` à la racine) — **sans slash de tête, ce motif matche
-`data/` à N'IMPORTE QUELLE profondeur**, y compris `src/data/`. Résultat :
-`git add src/data/mockData.ts` (chemin explicite) **refuse** en le
-signalant comme ignoré, il faut `git add -f src/data/mockData.ts`.
-`git add -A`/`git add .`, eux, stagent correctement les fichiers déjà
-suivis même s'ils matchent une règle d'ignore (seuls les fichiers *non
-suivis* sont réellement ignorés par ces commandes) — donc pas de risque de
-perdre silencieusement une modification via un commit habituel, mais
-`git add <chemin exact>` sur `src/data/*` demandera systématiquement `-f`.
-**Non corrigé** : la règle `.gitignore` pourrait être resserrée en
-`/data/` (ancrée à la racine) pour lever l'ambiguïté — pas fait cette
-session, faute de demande explicite ; à faire si ça recommence à gêner.
-
-### Fonctionnalités, honnêtement caractérisées
-
-**Réellement dynamiques et fonctionnelles** :
-- **Journal de trading** (`TradingJournal.tsx`, 1331 lignes) — CRUD trades
-  complet, PnL saisi librement (`$` ou `%`, jamais recalculé), capture
-  d'écran jointe, tag de 9 erreurs d'exécution prédéfinies, export CSV
-  protégé contre l'injection de formule. Persisté serveur. Chaque trade
-  peut être rattaché à un portefeuille (`Trade.accountId`) — **et ce
-  rattachement pilote désormais réellement le solde du portefeuille**
-  (nouveau cette session, voir §4).
-- **Portefeuille** (`WalletManagement.tsx`, 691 lignes) — multi-comptes
-  Prop Firm/Broker, drawdown quotidien/total calculés en direct.
-  **Nouveau cette session** : bouton **Supprimer** un portefeuille
-  (confirmation native), et le solde (`equity`/`currentBalance`) se
-  recalcule **automatiquement** dès qu'un trade lui est rattaché — la
-  saisie manuelle (« Ajuster le Solde ») ne sert plus que tant qu'aucun
-  trade n'est encore rattaché au compte (voir §4/§8 pour les détails et
-  compromis).
-- **Tableau de bord** (`MainDashboard.tsx`, 396 lignes) — le capital
-  affiché (badge en-tête, carte « Courbe de progression ») et la courbe
-  elle-même sont désormais **dérivés des portefeuilles et trades réels**,
-  jamais d'une valeur figée (voir §4). **Bug corrigé cette session** : le
-  point de départ de la courbe disparaissait dès qu'un trade existait,
-  la rendant plate — corrigé, la courbe part toujours du capital initial
-  réel.
-- **Rentabilité** (`PerformanceDashboard.tsx`, 479 lignes) — 3
-  sous-onglets à navigation en pilules (Vue d'ensemble / Psychologie &
-  Catégories / Erreurs). Dérivé de `src/lib/performanceStats.ts`, source
-  unique de vérité pour ce module — reçoit désormais lui aussi le
-  `student` dérivé des portefeuilles (voir §3/§4), donc cohérent avec le
-  Tableau de bord.
-- **Macro** (`MacroDashboard.tsx`) — cotations et calendrier économique
-  réellement en direct, sans clé API.
-- **Modules vidéo** (`VideoAcademy.tsx`, 756 lignes) — lecture vidéo, quiz
-  notés (seuil 70%), progression persistée serveur. **Catalogue vide par
-  défaut désormais** (voir §4 : `mockData.ts` vidé) — à remplir avec le
-  vrai contenu de cours de l'utilisateur, aucun module de démo ne reste.
-- **Système de badges** — calculés en direct (`src/lib/badges.ts`,
-  `computeBadgeProgress`) depuis les vraies données. Le badge « Prop Firm
-  Challenge Ready » lit le `localStorage` du module Replay FX (voir §8).
-- **Module Replay** (`ReplayModule.tsx` + `replay-fx/`) — backtest manuel
-  sur données historiques réelles HistData.com 2024 (7 paires forex, 1m à
-  Daily).
-- **Données & Sauvegarde** (`UserProfileModal.tsx`) — export/import JSON
-  complet du bureau de l'utilisateur connecté, sans bouton de
-  réinitialisation destructrice.
-- **Messagerie coach** bidirectionnelle, **centre d'alertes**, **espace
-  admin de suivi des élèves** avec « Vue Complète » et gestion réelle des
-  accès de connexion — système **indépendant** du capital dérivé des
-  portefeuilles ci-dessus (voir « Deux systèmes de capital » ci-dessous).
-- **Journal de sécurité + verrouillage de compte**, réservé `isOwner`.
-- **Mode modérateur du Forum**, strictement réservé à `student.isAdmin`.
-  Le Forum reste sans entrée de navigation dans la sidebar (décision
-  produit inchangée).
-- **Outils déterministes** (aucune IA) : audit de setup, calculateur de
-  position (préremplit désormais avec le capital réel dérivé, voir §4),
-  checklist pré-trade (non persistée).
-- **Mode hors ligne avec file d'attente** (`src/lib/pendingChanges.ts`).
-
-**Partiellement statiques ou factices** — inchangé depuis la session
-précédente, sauf mention contraire :
-- **`MainDashboard.tsx`** — sous-titre et bloc « Ta semaine » toujours
-  codés en dur.
-- **`MacroDashboard.tsx`** — « Actualités marché » toujours statique.
-- **`EquityCurveChart.tsx`** — `ReferenceLine` « PALIER $11,500 » toujours
-  codée en dur (celle du module Rentabilité, distincte de la courbe du
-  Tableau de bord corrigée cette session).
-- **`UserProfileModal.tsx`** — « NIVEAU 4 » toujours statique. Les champs
-  « Capital Initial » / « Capital Actuel Enregistré » ont été **retirés**
-  cette session (voir §4) : plus aucun champ de capital éditable
-  manuellement dans ce formulaire.
-- **`NotificationModal.tsx`** — statut « Push Server: Connecté (Live) »
-  toujours factice.
-- **`ForumSection.tsx`** (765 lignes) — CRUD réel, toujours sans entrée de
-  navigation dans la sidebar.
-- **`StudentTracking.tsx`** (888 lignes) — inchangé, métriques par défaut
-  toujours saisies manuellement sauf via « Vue Complète »/« Lecture »
-  (système `EnrolledStudent.startingCapital`/`currentCapital`,
-  **indépendant** de la refonte capital de cette session — voir
-  « Deux systèmes de capital » ci-dessous).
-- **`MindsetJournalModal.tsx`** — toujours `localStorage` uniquement.
-- **`CoachSignals.tsx`** — toujours aucune UI de création de signal côté
-  coach.
-
-### Deux systèmes de capital — à ne jamais confondre
-
-Cette session a changé **uniquement** le capital du **bureau de la
-personne connectée** (fondateur ou élève avec son propre login), affiché
-sur son propre Tableau de bord/en-tête/Rentabilité. Il existe un système
-**totalement différent et non touché** :
-`EnrolledStudent.startingCapital`/`currentCapital` (`StudentTracking.tsx`,
-`types.ts` ligne ~226) — un champ **saisi à la main par le coach** pour
-noter l'état d'un élève qu'il suit, quand cet élève n'a pas (ou pas encore)
-de compte de connexion réel. Le type documente déjà explicitement (ligne
-~237) : si `studentAccountId` est présent, ce champ manuel « devient
-obsolète », les vraies données de cet élève doivent être lues via l'API.
-**Ne jamais appliquer la logique de dérivation par portefeuilles de cette
-session à `EnrolledStudent`** sans demande explicite distincte — c'est un
-concept produit délibérément différent.
-
-**Ordres de grandeur** (lignes de code, vérifié à cette analyse) :
-`src/App.tsx` 1682 (+25 cette session), `TradingJournal.tsx` 1331,
-`UserProfileModal.tsx` 801 (-23 cette session), `StudentTracking.tsx` 888,
-`server/auth/routes.ts` 771, `ForumSection.tsx` 765, `VideoAcademy.tsx`
-756, `WalletManagement.tsx` 691 (+20 cette session), `server/routes.ts`
-572, `Sidebar.tsx` 582, `PerformanceDashboard.tsx` 479, `server/db.ts` 413,
-`src/lib/api.ts` 353, `MainDashboard.tsx` 396 (+5 cette session),
-`src/types.ts` 356, `src/lib/performanceStats.ts` 310,
-`server/repositories.ts` 291, `src/lib/badges.ts` 262, `server/schemas.ts`
-220, `ReplayModule.tsx` 31, `src/lib/walletStats.ts` 76 (+35 cette
-session), **`src/data/mockData.ts` 31 lignes (contre 1408 avant cette
-session — vidé de tout son contenu de démo, voir §4)**.
-
-**État de la base réelle** (`data/horizon.db` — inspectée à cette mise à
-jour, voir §2 pour les commandes) : **quasiment vierge**. 1 compte staff
-réel (`th.gauthey99@gmail.com`), 1 profil réel (« ForexPaps »), **1
-portefeuille de test** (`acc-...`, nommé « test », capital initial
-$100 000, solde actuel $102 963) et **1 trade de test** (EUR/USD, +$2 963,
-rattaché à ce portefeuille) créés par l'utilisateur pendant cette session
-pour vérifier la synchronisation portefeuille↔trade. Aucun élève inscrit,
-aucun module de cours, aucun message, aucun sujet de forum, aucun badge,
-aucune notification. **Ce portefeuille/trade « test » est probablement à
-nettoyer ou à conserver comme premier vrai portefeuille selon l'intention
-de l'utilisateur — à clarifier avec lui avant de le supprimer, ne pas
-supposer.**
+**Railway** (`https://propdesk-academie.up.railway.app`, projet
+"propdesk", dépôt GitHub `Forexpaps/propdesk` connecté) :
+- Service configuré avec un **volume persistant** `/data` (500 Mo) monté
+  sur `DATA_DIR=/data`, `NODE_ENV=production`.
+- **Déploiement automatique sur push** — a nécessité un correctif
+  manuel : `railway add --repo` seul ne crée PAS de déclencheur de
+  déploiement automatique (bug/lacune du CLI), il a fallu créer le
+  `DeploymentTrigger` manquant via l'API GraphQL de Railway (voir §8 pour
+  la commande exacte). **Fonctionne maintenant correctement.**
+- **Domaine changé en cours de session** : `propdesk-production-ab8b.up.railway.app`
+  (généré au tout premier `railway domain`) a été abandonné pour
+  `propdesk-academie.up.railway.app` (visible dans les captures d'écran
+  de l'utilisateur — probablement renommé depuis le dashboard Railway).
+  **Utiliser systématiquement `propdesk-academie.up.railway.app`
+  désormais.**
+- **Piège récurrent cette session** : l'edge Railway ("railway-hikari")
+  bloque périodiquement TOUT le trafic vers l'app avec des réponses
+  `429 rate limited`, un mécanisme anti-abus indépendant de l'application
+  (les logs serveur restent sains, les métriques Railway ne montrent
+  aucune erreur applicative). Déclenché au moins deux fois cette session,
+  très probablement par des vérifications `curl` trop fréquentes/répétées
+  de ma part. **Void §6 et §9 — ne JAMAIS vérifier le déploiement par des
+  `curl` répétés, un seul contrôle après un délai raisonnable, en
+  s'appuyant d'abord sur `railway deployment list --json` (API, pas
+  affecté par ce blocage) avant de solliciter l'URL publique.**
 
 ---
 
@@ -210,94 +215,84 @@ supposer.**
 npm install
 ```
 
-**Aucune variable d'environnement requise** — `.env.example` liste `PORT`
-(défaut 3000), `DATA_DIR` (défaut `./data`), `NODE_ENV`. Un `.env` existe
-déjà à la racine.
+**Aucune variable d'environnement requise en local** — `.env.example`
+liste `PORT` (défaut 3000), `DATA_DIR` (défaut `./data`), `NODE_ENV`. Un
+`.env` existe déjà à la racine.
 
 | Commande | Effet |
 |---|---|
 | `npm run dev` | serveur de développement sur http://localhost:3000 (`tsx server.ts`) |
 | `npm run lint` | `tsc --noEmit` — **doit toujours sortir sans erreur** |
-| `npm run build` | `vite build` (client) + `esbuild server.ts` → `dist/server.cjs`, ~2.9s |
+| `npm run build` | `vite build` (client) + `esbuild server.ts` → `dist/server.cjs`, ~1.5-3s |
 | `npm start` | sert le build de production (`NODE_ENV=production` requis) |
 | `npm run clean` | supprime `dist/` et `server.js` |
 
 Un seul port, pas de proxy à configurer. `.claude/launch.json` démarre le
 serveur sous le nom **`horizon-dev`**.
 
-**⚠️ Après tout changement dans `server/` ou `server.ts`**, il faut
-redémarrer le serveur de dev (`preview_stop` puis `preview_start`, ou
+**⚠️ Après tout changement dans `server/` ou `server.ts`**, redémarrer le
+serveur de dev (`preview_stop` puis `preview_start`, ou
 `lsof -ti:3000 | xargs -r kill -9 && npm run dev`) — TSX ne recharge pas à
 chaud les fichiers serveur. Un redémarrage fait perdre la session
 navigateur (cookie lié au process/port) — redemander à l'utilisateur de se
-reconnecter est normal et attendu après un redémarrage serveur.
+reconnecter est normal.
 
 **⚠️ Piège d'outil de prévisualisation confirmé** : un raccourci clavier
-simulé (`cmd+R`) pour recharger la page **n'a pas toujours déclenché un
-vrai rechargement** dans le Browser pane. La commande `navigate()` vers la
-même URL fonctionne de façon fiable. **Préférer `navigate()`**.
+simulé (`cmd+R`) ne recharge pas toujours vraiment la page. Préférer
+`navigate()` vers la même URL.
 
 **⚠️ `window.confirm()`/`window.prompt()` natifs ne fonctionnent pas dans
 le Browser pane automatisé** — `confirm()` retourne silencieusement
-`false` (le clic semble n'avoir aucun effet), `prompt()` lève carrément une
-exception non interceptée (« prompt() is not supported. »). Ça touche
-notamment : import de sauvegarde, ajustement de solde de portefeuille, et
-**le nouveau bouton Supprimer un portefeuille** (voir §4). Pour vérifier
-qu'un flux protégé par `confirm()` fonctionne réellement, deux options :
-appeler l'endpoint directement en JS (`fetch(...)`), ou stubber
-temporairement `window.confirm` depuis `javascript_tool`
-(`window.confirm = () => true`) juste avant de cliquer — **uniquement pour
-vérifier**, jamais une façon de contourner la confirmation en usage réel.
+`false`, `prompt()` lève une exception. Pour vérifier un flux qui en
+dépend (ex: suppression d'un portefeuille), stubber temporairement via
+`javascript_tool` (`window.confirm = () => true`) juste avant de cliquer.
 
-### Inspecter la base
+**⚠️ Faux messages d'erreur persistants dans la console du navigateur** —
+confirmé plusieurs fois cette session : `read_console_messages` peut
+afficher des erreurs `[vite] Failed to reload ...` ou des
+`ReferenceError` qui datent d'un état de code ANTÉRIEUR (avant un
+correctif), alors que la page rendue est parfaitement fonctionnelle. Avant
+de conclure à un vrai bug, vérifier visuellement (screenshot) que la page
+fonctionne réellement — si oui, ce sont des entrées de journal obsolètes,
+pas une erreur en cours.
+
+### Inspecter la base locale
 
 ```bash
-sqlite3 data/horizon.db "select id, name, email, must_change_password from staff_accounts"
-sqlite3 data/horizon.db "select id, json_extract(payload,'\$.name'), json_extract(payload,'\$.startingCapital'), json_extract(payload,'\$.currentCapital') from users where id='user-local'"
+sqlite3 data/horizon.db "select id, name, email from staff_accounts"
+sqlite3 data/horizon.db "select json_extract(payload,'\$.isAdmin') from users where id='user-local'"
 sqlite3 data/horizon.db "select id, json_extract(payload,'\$.name'), json_extract(payload,'\$.initialBalance'), json_extract(payload,'\$.equity') from trading_accounts"
-sqlite3 data/horizon.db "select id, json_extract(payload,'\$.pair'), json_extract(payload,'\$.pnl'), json_extract(payload,'\$.accountId') from trades"
+sqlite3 data/horizon.db "select id, json_extract(payload,'\$.unlocked'), json_extract(payload,'\$.description') from badges"
 ```
 
-**⚠️ Piège à connaître** : `users.payload.startingCapital`/`currentCapital`
-en base sont désormais des **valeurs figées héritées**, plus jamais mises
-à jour ni lues pour l'affichage (voir §4/§8 — le capital affiché est
-recalculé au rendu depuis `trading_accounts`). Ne pas s'étonner si la base
-affiche `100000/100000` alors que l'UI montre `$102,963` : c'est attendu,
-**fais confiance à `trading_accounts`, pas à `users.payload`**, pour
-connaître le vrai capital de quelqu'un.
+**⚠️ Piège confirmé et corrigé cette session, mais à connaître** :
+`users.payload.isAdmin` peut être `0`/absent en base pour le compte
+fondateur SANS que ce soit un problème réel à l'usage — le serveur force
+désormais `isAdmin: true` dans la réponse `/api/state` pour toute session
+staff (voir §6/§8), sans jamais réécrire la valeur en base. Ne pas
+s'alarmer si une requête SQL directe montre `0` : c'est attendu, la valeur
+qui compte est celle renvoyée par l'API, pas celle stockée.
 
-Sonder l'API sans session :
+**Piège confirmé, non corrigé, faible priorité** : `.gitignore` contient
+`data/` sans slash de tête, qui matche `src/data/` en plus du dossier
+SQLite racine — `git add src/data/mockData.ts` (chemin exact) refuse et
+demande `-f`. `git add -A`/`git add .` fonctionnent normalement pour ce
+fichier déjà suivi.
 
-```bash
-curl -s localhost:3000/api/health && curl -s localhost:3000/api/auth/me
-curl -s -o /dev/null -w "%{http_code}\n" localhost:3000/replay-fx/index.html
-```
+### Inspecter la base Railway (production)
 
-Compte admin actuel (staff, fondateur) : `th.gauthey99@gmail.com`. Le mot
-de passe n'est **jamais** consigné ici — demande-le à l'utilisateur si
-besoin. **Ne le tape jamais toi-même** dans un formulaire (voir §9,
-absolue et non négociable).
+Pas d'accès direct — pas de SSH utilisé cette session sur la base
+Railway (une demande d'accès SSH a été explicitement refusée par
+l'utilisateur pour une tâche annexe, voir §6). Pour toute vérification,
+passer par l'API HTTP du site déployé (`curl`, avec parcimonie — voir
+§1/§6) ou par le dashboard Railway (`railway open`, ou
+https://railway.com/project/1ff27138-1722-451a-95c5-4719ffbae46a).
 
-**⚠️ Règle stricte, absolue — mots de passe et navigateur automatisé.**
-Ne jamais taper un mot de passe dans un champ de formulaire du Browser
-pane, même un mot de passe de test, même avec autorisation explicite.
-Pour se connecter, demander à l'utilisateur de le faire lui-même.
-L'authentification programmatique via `curl`/`fetch` (mot de passe jamais
-vu par un humain) reste légitime.
+### Compte admin
 
-**⚠️ Attention aux appels qui écrivent des données réelles pendant un
-test.** Un `fetch()` de vérification exécuté depuis la console du
-navigateur, dans un onglet où l'utilisateur est réellement connecté,
-touche sa **vraie base de données** — pas un bac à sable. **Toujours
-vérifier l'état AVANT d'exécuter un appel qui écrit, pas seulement
-après** — et préférer, quand c'est possible, un aller-retour neutre
-(relire l'état existant puis le renvoyer tel quel) plutôt qu'une donnée
-fabriquée.
-
-**Ne teste JAMAIS l'authentification (staff ou élève) sur `data/`** sans
-nécessité — préfère une base jetable (`DATA_DIR=/tmp/xxx PORT=3102 npx tsx
-server.ts`) quand c'est possible ; sinon nettoie systématiquement après
-coup.
+`th.gauthey99@gmail.com` — mot de passe jamais consigné ici. **Ne jamais
+le taper toi-même** dans un formulaire (voir §9, absolue et non
+négociable), y compris pour se connecter à l'environnement Railway.
 
 ---
 
@@ -308,326 +303,255 @@ coup.
 ```
 server.ts                     point d'entrée : Express + Vite/statique
                                + helmet + trust proxy (prod) + 4 tâches
-                               de nettoyage périodiques + route statique
-                               dédiée /replay-fx
+                               de nettoyage périodiques.
+                               La route statique dédiée /replay-fx a été
+                               RETIRÉE cette session (module supprimé,
+                               voir §4) — ne plus la chercher.
 server/
-  db.ts (413)                  SQLite (better-sqlite3, WAL, foreign_keys
-                               ON), 17 tables. Inchangé cette session.
-  repositories.ts (291)        SEUL module qui parle à SQLite pour les
-                               collections génériques. replaceCollection()
-                               vérifie la PROPRIÉTÉ de chaque id soumis.
-                               safeParsePayload() défensif sur toute
-                               lecture JSON. Inchangé cette session.
-  routes.ts (572)               routes /api/* génériques.
-                               writeCollectionForAuth() centralise
-                               l'autorisation par collection. Inchangé
-                               cette session.
-  schemas.ts (220)              validation zod. Inchangé cette session.
-  economicCalendar.ts / marketData.ts   proxies en cache, inchangés.
-  middleware/rateLimit.ts       inchangé.
-  auth/                         inchangé cette session (password.ts,
-                               sessions.ts, credentials.ts, routes.ts,
-                               middleware.ts, studentCredentials.ts,
-                               studentSessions.ts, studentRoutes.ts,
-                               loginLockout.ts, securityEvents.ts).
+  db.ts (+11 lignes)           SQLite (better-sqlite3, WAL, foreign_keys
+                               ON), 17 tables. Nouveau cette session :
+                               `FOUNDER_COACH_ID` (constante partagée,
+                               voir §4 "Messagerie coach"), inchangé côté
+                               schéma.
+  repositories.ts               inchangé cette session.
+  routes.ts (+62 lignes net)    routes /api/* génériques. Nouveau cette
+                               session : `buildCoachesForStudent()`
+                               (reconstruit le coach affiché à l'élève
+                               depuis le vrai profil fondateur) et
+                               `buildStaffProfile()` (force
+                               `isAdmin: true` dans la réponse `/api/state`
+                               pour toute session staff — voir §6/§8).
+  schemas.ts                    inchangé cette session.
+  auth/routes.ts (+15 lignes)   la route qui écrit la réponse du coach à
+                               un élève utilise désormais
+                               `FOUNDER_COACH_ID` (constante partagée)
+                               au lieu d'une chaîne "coach-thomas" codée
+                               en dur.
 src/
-  main.tsx                      point de montage React, inchangé.
-  App.tsx (1682)                 porte d'auth à deux mondes,
-                               `StudentAuthenticatedApp` (élève connecté)
-                               et `AcademyApp` (staff/fondateur).
-                               **Modifié cette session** :
-                               - `handleDeleteAccount` (les deux
-                                 composants) : filtre le portefeuille par
-                                 id, câblé sur `onDeleteAccount` de
-                                 `WalletManagement`.
-                               - Ancien `useEffect` qui recalculait
-                                 `student.currentCapital` depuis le PnL
-                                 total des trades (persistant, via
-                                 `setStudent`) **retiré**, remplacé par un
-                                 second `useEffect` qui appelle
-                                 `syncAccountsWithTrades(prev, trades)`
-                                 sur `setAccounts`/`setSyncedAccounts` à
-                                 chaque changement de `trades` — le calcul
-                                 vit maintenant sur les PORTEFEUILLES, pas
-                                 sur le profil.
-                               - `displayStudent` (AcademyApp) /
-                                 `studentProfile` (StudentAuthenticatedApp,
-                                 objet déjà existant, étendu) : objets
-                                 DÉRIVÉS, jamais persistés, où
-                                 `startingCapital`/`currentCapital` sont
-                                 recalculés à chaque rendu depuis
-                                 `accounts.reduce(...)`. Passés à
-                                 `Sidebar`, `TopHeader`, `MainDashboard`,
-                                 `PerformanceDashboard` et
-                                 `PositionCalculatorModal`
-                                 (`defaultCapital`). `ForumSection`,
-                                 `CoachMessaging` et `UserProfileModal`
-                                 continuent de recevoir le `student`
-                                 BRUT (non dérivé) — ils n'affichent pas
-                                 de capital, et `UserProfileModal` doit
-                                 éditer le vrai objet stocké.
-  types.ts (356)                 inchangé.
-  data/mockData.ts (31, contre 1408 avant)   **VIDÉ cette session** — tous
-                               les `initial*` (profil, coaches, modules,
-                               trades, comptes, signaux, messages, sujets
-                               de forum, élèves inscrits, notifications,
-                               badges) sont désormais des tableaux/objet
-                               vides. Sert toujours de fallback initial
-                               React (avant que l'état serveur arrive) ET
-                               de contenu d'amorçage
-                               (`server/seed.ts`, `seedDemoData()`) quand
-                               une base neuve démarre sans donnée
-                               `localStorage` héritée à importer — les
-                               deux chemins produisent désormais un
-                               bureau réellement vide, pas un jeu de
-                               démo. **Piège gitignore** : voir §1, `git
-                               add` sur ce chemin exact demande `-f`.
-  hooks/                         inchangé.
+  App.tsx (+58 lignes net)      porte d'auth à deux mondes. Cette
+                               session : `founderCoaches` dérivé du
+                               profil du fondateur (voir §4), plus de
+                               prop `courseCompletionPercentage` passée à
+                               `PerformanceDashboard` (retirée, plus
+                               utilisée par ce composant après sa
+                               refonte).
+  types.ts (+12 lignes)         `Coach.rating` devenu optionnel (plus de
+                               note fictive), constante
+                               `FOUNDER_COACH_ID` côté client (miroir de
+                               celle du serveur, dupliquée
+                               intentionnellement — le client ne peut pas
+                               importer du code serveur).
+  data/mockData.ts (+158/-...)  `initialCoaches` supprimé (plus jamais
+                               utilisé, les coachs sont désormais
+                               toujours dérivés d'un vrai profil).
+                               `initialTraderBadges` restauré avec les 9
+                               définitions d'origine, MAIS
+                               `unlocked: true` sur les 9 avec des dates
+                               2024 (décision explicite du fondateur,
+                               voir §4 — pas une régression vers les
+                               données de démo). `initialStudentProfile`
+                               porte désormais `isAdmin: true` par
+                               défaut (voir §6).
+  hooks/useServerSync.ts        `useStudentBootstrap()` expose désormais
+                               `coaches` (voir §4).
   lib/
-    api.ts (353)                    inchangé cette session.
-    badges.ts (262)                 inchangé cette session (le calcul du
-                               badge Prop Firm Challenge Ready continue
-                               de lire le `localStorage` de Replay FX,
-                               voir §8 — sans lien avec le capital dérivé
-                               des portefeuilles).
-    walletStats.ts (76, +35 lignes)   **Nouveau cette session** :
-                               `syncAccountsWithTrades(accounts, trades)`
-                               — pure, recalcule
-                               `equity`/`currentBalance = initialBalance +
-                               somme(pnl des trades liés, hors %)` pour
-                               chaque compte qui a AU MOINS un trade
-                               rattaché (`trade.accountId === acc.id`).
-                               Un compte sans trade rattaché n'est jamais
-                               touché (préserve un ajustement manuel
-                               antérieur). Renvoie `accounts` à
-                               l'identique (même référence) si rien ne
-                               bouge, pour éviter un
-                               `PUT /api/collections/accounts` ou un
-                               re-rendu inutiles. Appelée par un
-                               `useEffect([trades])` dans `App.tsx`, dans
-                               les DEUX composants (élève et
-                               staff/fondateur).
-    autres fichiers                inchangés.
+    api.ts (+8 lignes)          `ServerState.coaches?: Coach[]` ajouté.
+    badges.ts (+110/-...)       calcul du badge "Prop Firm Challenge
+                               Ready" (basé sur le module Replay,
+                               supprimé) retiré — ce badge est
+                               redevenu non calculable en direct
+                               (`trackable: false`), son état
+                               `unlocked` persisté n'est pas affecté.
+    performanceStats.ts (+104)  refonte de `computePerformanceStats` :
+                               nouveaux champs `profitFactor`, `avgRR`
+                               (réutilisés de `computeJournalSummary`),
+                               `drawdownMaxPercent`, `expectancyPerTrade`,
+                               `avgWin`/`avgLoss`, `monthlyChartData`,
+                               `hourChartData`, `marketChartData` — tous
+                               dérivés des vrais trades, voir §4.
   components/
-    WalletManagement.tsx (691, +20)   **Modifié cette session** :
-                               nouvelle prop obligatoire
-                               `onDeleteAccount: (id: string) => void`.
-                               Bouton « Supprimer » (icône `Trash2`) dans
-                               l'inspecteur du compte sélectionné, à côté
-                               de « Ajuster le Solde ». Confirmation
-                               native (`window.confirm`, voir piège §2).
-                               Après suppression, si le compte supprimé
-                               était sélectionné, sélectionne un autre
-                               compte restant (ou aucun). `readOnly`
-                               masque toujours ce bouton (vue admin d'un
-                               élève, `AdminStudentView.tsx`).
-    MainDashboard.tsx (396, +5)   **Bug corrigé cette session** : le
-                               calcul de `equityData` omettait le point
-                               « Départ » (`student.startingCapital`) dès
-                               que `trades.length > 0` — la courbe
-                               semblait alors plate car elle démarrait
-                               directement au dernier point. Le point de
-                               départ est désormais TOUJOURS le premier
-                               élément du tableau, suivi de chaque trade
-                               dans l'ordre chronologique, puis d'un
-                               point final « Actuel » basé sur
-                               `student.currentCapital` (capital
-                               réellement dérivé des comptes, pas le
-                               `tempCapital` accumulé localement — garde-
-                               fou contre une divergence silencieuse si
-                               un trade sans compte rattaché, ou en %,
-                               n'entre pas dans le même calcul).
-    UserProfileModal.tsx (801, -23)   **Modifié cette session** : les
-                               champs « Capital Initial ($) » et
-                               « Capital Actuel Enregistré ($) », leurs
-                               états locaux (`startingCapital`,
-                               `currentCapital`) et leur envoi dans
-                               `handleSubmit` ont été **retirés** — plus
-                               aucune édition manuelle du capital. Le
-                               `...student` initial dans le payload
-                               envoyé au serveur conserve les valeurs
-                               historiques telles quelles (voir piège
-                               §2 : elles ne pilotent plus rien à
-                               l'affichage).
-    AdminStudentView.tsx           **+1 ligne cette session** :
-                               `onDeleteAccount={() => {}}` (no-op) ajouté
-                               à l'appel `<WalletManagement readOnly />`
-                               pour satisfaire la nouvelle prop
-                               obligatoire — cohérent avec les autres
-                               callbacks no-op déjà présents à cet appel
-                               (`onAddAccount`, `onUpdateAccountBalance`).
-    Sidebar.tsx, TopHeader.tsx, PerformanceDashboard.tsx,
-    performanceStats.ts            **non modifiés directement** — ils
-                               lisent toujours `student.currentCapital`/
-                               `startingCapital` tels quels, mais reçoivent
-                               désormais l'objet DÉRIVÉ (`displayStudent`/
-                               `studentProfile`) depuis `App.tsx` au lieu
-                               du profil brut — leur propre code n'a pas eu
-                               besoin de changer.
-    autres composants               inchangés cette session.
-replay-fx/                      inchangé cette session. Appli HTML/CSS/JS
-                               vanilla autonome, servie via une route
-                               Express dédiée, PAS dans `public/`.
+    ReplayModule.tsx             SUPPRIMÉ cette session (voir §4).
+    PerformanceDashboard.tsx      **entièrement réécrit deux fois cette
+                               session** : (1) refonte complète sur la
+                               maquette "MacroPulse" partagée par
+                               l'utilisateur — rangée de 8 stats, courbe
+                               de capital, Performance mensuelle +
+                               Psychologie, "Où es-tu le meilleur ?" ;
+                               (2) le filtrage par pilules de "Où es-tu
+                               le meilleur ?" a ensuite été remplacé par
+                               7 cartes séparées affichées simultanément
+                               (Session/Heure/Jour/Actif/Setup/Sens/
+                               Marché), sur demande explicite de
+                               l'utilisateur qui ne voulait plus avoir à
+                               cliquer pour comparer. C'est CE fichier
+                               (avec MacroDashboard.tsx) qui sert
+                               maintenant de référence de style pour tout
+                               le reste de l'écosystème — voir §0.
+    TradingJournal.tsx,
+    WalletManagement.tsx,
+    MainDashboard.tsx,
+    CoachMessaging.tsx            harmonisés visuellement sur le style
+                               Macro/Rentabilité cette session — voir §0
+                               pour le détail exact de ce qui a changé
+                               dans chacun. **Non committés.**
+    StudentTracking.tsx            harmonisation EN COURS, voir §0 —
+                               **non committé, incomplet.**
+    VideoAcademy.tsx,
+    UserProfileModal.tsx           harmonisation PAS ENCORE COMMENCÉE —
+                               voir §0.
+    EquityCurveChart.tsx (+2)     `CartesianGrid` ajouté (absent avant),
+                               pour cohérence avec les autres graphiques.
+    auth/AuthShell.tsx (+9/-...)  logo `/logo-auth.jpg` → `/logo-auth.png`
+                               (fond transparent, voir §4), classe
+                               `rounded-2xl` retirée de l'`<img>` (plus
+                               nécessaire, le fond est transparent).
+    UserProfileModal.tsx,
+    StaffAccountsModal.tsx,
+    SecurityLogModal.tsx,
+    StudentTracking.tsx           **correctif de layout distinct** (pas
+                               le chantier d'harmonisation visuelle) :
+                               les modales longues faisaient disparaître
+                               leur en-tête au-delà d'une certaine
+                               hauteur d'écran (bug de centrage Safari,
+                               voir §4/§8). Corrigé en plafonnant la
+                               carte (`max-h-[calc(100vh-4rem)]`) avec un
+                               en-tête `sticky` et un corps qui défile
+                               seul — **déjà committé** (`d5c6936`),
+                               distinct du chantier en cours.
 public/
-  icon.png / logo-auth.jpg / logo.png  inchangé.
+  logo-auth.jpg                 SUPPRIMÉ, remplacé par logo-auth.png
+                               (fond transparent, voir §4).
+  logo-auth.png                 NOUVEAU — extrait par seuil de luminance
+                               depuis l'ancien JPG (script Python/Pillow
+                               ponctuel, pas conservé dans le dépôt).
+replay-fx/                      SUPPRIMÉ ENTIÈREMENT cette session (9
+                               fichiers, ~27 Mo) — voir §4. Ne plus y
+                               faire référence nulle part.
 ```
 
 ### Le modèle d'authentification à deux mondes
 
-Inchangé cette session — voir le tableau `AuthContext` / `dataUserId` /
-`isOwner` vs `isAdmin` déjà en place.
+Inchangé structurellement, mais **`isAdmin` côté staff est désormais
+fiable** (voir §6) — `buildStaffProfile()` (server/routes.ts) force
+`isAdmin: true` dans la réponse `/api/state` pour toute session staff,
+override qui n'est jamais écrit en base (même principe que
+`hiddenSidebarItems`/`badges` déjà documentés dans les versions
+précédentes de ce fichier).
 
 ### Schéma SQLite (17 tables)
 
-Inchangé cette session (aucune migration ajoutée). Rappel des tables les
-plus pertinentes pour le travail de cette session :
-- `users` — un bureau par `id` (`user-local` pour le fondateur/staff
-  partagé, `student-xxx` pour chaque élève connecté). `payload.
-  startingCapital`/`currentCapital` **ne sont plus lus pour l'affichage**
-  (voir ci-dessus), mais restent en base — champ hérité, pas supprimé du
-  schéma.
-- `trading_accounts` — un portefeuille par ligne, `payload.equity`/
-  `currentBalance` désormais tenus à jour automatiquement par
-  `syncAccountsWithTrades` dès qu'un trade leur est rattaché.
-- `trades` — `payload.accountId` est le lien optionnel vers
-  `trading_accounts.id` qui pilote toute cette session.
+Inchangé cette session, aucune migration ajoutée.
 
 ---
 
-## 4. Fonctionnalités terminées
+## 4. Fonctionnalités terminées cette session (chronologique)
 
-*(Historique détaillé chantier-par-chantier dans `git log`.)*
+*(Sessions antérieures : voir `git log`. Cette section couvre uniquement
+depuis le dernier HANDOFF, commit `c34a014`.)*
 
-### Session courante — GitHub, remise à zéro complète, capital dérivé des portefeuilles
+1. **Publication sur Vercel, diagnostic d'échec, migration vers Railway**
+   — voir §1. Domaine Railway généré, volume persistant configuré,
+   déclencheur de déploiement automatique créé manuellement (bug du CLI
+   Railway, voir §8).
 
-Chantier en plusieurs temps, sur demande explicite à chaque étape :
+2. **Messagerie coach reconnectée à une vraie identité** — les élèves
+   voyaient "Aucun coach disponible" (la liste de coachs de démo avait
+   été vidée lors d'un nettoyage antérieur). `buildCoachesForStudent()`
+   (server/routes.ts) reconstruit désormais le coach affiché depuis le
+   vrai profil du fondateur (nom, avatar, rôle — jamais l'email). Le
+   fondateur voit sa propre entrée dérivée directement de son profil en
+   mémoire côté `AcademyApp`. `FOUNDER_COACH_ID` partagé (dupliqué
+   volontairement client/serveur) entre la reconstruction du coach et la
+   route qui écrit la réponse du staff à un élève.
 
-1. **Lancement du projet** (`npm run dev`, vérifié dans le Browser pane) —
-   point de départ de la session, rien à signaler.
+3. **Catalogue des 9 badges restauré, puis tous débloqués sur demande
+   explicite** — les badges avaient été vidés lors du même nettoyage.
+   D'abord restaurés avec un état honnête (aucun débloqué, progression
+   recalculée en direct). Puis, sur demande explicite ultérieure de
+   l'utilisateur (« je veux que tu valides tous les badges et succès à
+   partir de 2024 »), les 9 sont passés à `unlocked: true` avec des dates
+   réparties sur 2024 — **décision produit assumée, pas une régression**.
+   `unlocked`/`unlockedAt` ne sont jamais recalculés par
+   `computeBadgeProgress`, seule la progression affichée des badges
+   calculables l'est.
 
-2. **Création du dépôt GitHub** — `gh auth login` (device flow
-   navigateur, code affiché à l'utilisateur qui l'a saisi lui-même sur
-   github.com/login/device), `gh repo create Forexpaps/propdesk --private
-   --source=. --remote=temp-origin`, remplacement de l'ancien remote
-   `origin` (qui contenait un PAT en clair dans son URL — signalé
-   explicitement à l'utilisateur comme risque de sécurité) par le remote
-   propre créé par `gh`. Push initial réussi. L'utilisateur a vérifié
-   lui-même que l'ancien token n'était déjà plus dans sa liste de tokens
-   actifs GitHub — rien à révoquer.
+4. **Logo de connexion à fond transparent** — `logo-auth.jpg` portait un
+   badge sombre en dur (carré aux coins arrondis) visible sur le fond de
+   la page. Remplacé par un PNG à fond transparent, extrait par seuil de
+   luminance (script Python/Pillow ponctuel : les pixels sombres
+   [canevas ET badge, tous deux < seuil] deviennent transparents, le
+   glyphe blanc/vert reste opaque).
 
-3. **Remise à zéro complète des données de démo** (« site neuf ») — sur
-   demande explicite, avec clarification préalable (`AskUserQuestion`) sur
-   le périmètre exact :
-   - **Choix de l'utilisateur : tout supprimer, y compris les modules de
-     cours de démo** (l'autre option proposée — garder les modules comme
-     base à éditer — n'a pas été retenue).
-   - Base SQLite réelle nettoyée directement (script `tsx` ponctuel,
-     supprimé après usage) : toutes les collections du bureau `user-local`
-     vidées via `replaceCollection(name, [], "user-local")`, les 6
-     bureaux de test (`student-xxx`, créés pendant les tests précédents)
-     supprimés (cascade SQL automatique sur leurs trades/comptes/modules
-     via `ON DELETE CASCADE`), les 4 élèves inscrits fictifs supprimés de
-     `enrolled_students` (cascade sur le seul compte de connexion élève de
-     test, « Julien Moreau »). Le profil réel (« ForexPaps »,
-     `th.gauthey99@gmail.com`, bio personnalisée, avatar importé) a été
-     **conservé tel quel** — identifié comme personnalisation réelle, pas
-     comme donnée de démo. `currentCapital` réaligné sur `startingCapital`
-     (plus de PnL fictif résiduel).
-   - `src/data/mockData.ts` vidé de tout son contenu (voir §3) pour que
-     plus AUCUN futur amorçage ne réintroduise de démo.
-   - Vérifié dans le navigateur après redémarrage : Tableau de bord,
-     Journal, Messagerie Coach tous à zéro sans plantage.
+5. **Module Replay retiré entièrement** — sur demande explicite, après un
+   diagnostic de blocage persistant : le fichier `market-data.js` (25 Mo,
+   sans cache HTTP au départ) déclenchait la protection anti-abus de
+   l'edge Railway à chaque rechargement de l'onglet Replay, bloquant TOUT
+   le site (pas seulement Replay). Un correctif de cache HTTP a d'abord
+   été tenté (`Cache-Control` long sur `market-data.js`), puis
+   l'utilisateur a finalement demandé le retrait complet du module.
+   Supprimé : `replay-fx/` (dossier entier), `ReplayModule.tsx`, la route
+   statique dédiée dans `server.ts`, toutes les références dans
+   `App.tsx`/`Sidebar.tsx`/`MainDashboard.tsx`, le calcul du badge "Prop
+   Firm Challenge Ready" (redevenu non calculable).
 
-4. **Suppression de portefeuille** (`WalletManagement.tsx`) — fonctionnalité
-   manquante repérée par l'utilisateur en testant l'app fraîchement remise
-   à zéro (« je viens de créer un portefeuille test, je veux pouvoir le
-   supprimer »). Voir §3 pour le détail technique. Vérifié dans le
-   navigateur (avec `window.confirm` stubbé pour contourner le piège §2),
-   `PUT /api/collections/accounts → 200`, persistance confirmée après
-   rechargement.
+6. **Correctif d'affichage tronqué sur 4 modales** (`UserProfileModal.tsx`,
+   `StaffAccountsModal.tsx`, `SecurityLogModal.tsx`,
+   `StudentTracking.tsx` × 3 modales) — signalé par l'utilisateur sur son
+   propre profil. Cause : `items-center` + `overflow-y-auto` sur le
+   conteneur externe d'une modale, combiné à un enfant plus haut que
+   l'écran, provoque un bug de centrage (confirmé sur Safari) où le haut
+   du contenu devient inatteignable au lieu de défiler. Corrigé
+   systématiquement : carte plafonnée à `max-h-[calc(100vh-4rem)]`, en-tête
+   `sticky top-0`, corps dans un conteneur `flex-1 overflow-y-auto`
+   séparé. **Bonus découvert en vérifiant "élèves" comme demandé** :
+   `student.isAdmin` (champ du profil) n'était jamais explicitement à
+   `true` pour un compte fondateur frais (regression du nettoyage de
+   données antérieur), ce qui masquait "Suivi des Élèves" de la sidebar.
+   Corrigé à la racine — voir §3/§6/§8.
 
-5. **Capital dérivé des portefeuilles réels, partout dans l'app** — repéré
-   par l'utilisateur : un « site neuf » sans portefeuille affichait quand
-   même $100 000 de capital sur le Tableau de bord. Clarification
-   préalable (`AskUserQuestion`) sur le périmètre :
-   - **Choix de l'utilisateur : partout dans l'app** (en-tête, Tableau de
-     bord, sidebar, Rentabilité), pas seulement la courbe — avec retrait
-     du champ manuel du profil puisqu'il n'aurait plus eu d'effet.
-   - Voir §3 pour le détail technique (`displayStudent`/`studentProfile`
-     dérivés, `UserProfileModal` allégé).
-   - Vérifié dans le navigateur : $0 partout sans portefeuille, $100 000
-     cohérent avec un portefeuille de test créé puis supprimé pour
-     revérifier le retour à $0.
+7. **Refonte complète de Rentabilité sur une maquette externe
+   ("MacroPulse")** — l'utilisateur a partagé une capture d'écran d'une
+   autre application et demandé une reproduction esthétique fidèle.
+   Nouvelle structure : rangée de 8 statistiques (Capital, P&L Net, Win
+   Rate, Profit Factor, RR Moyen, Drawdown Max, Espérance/Trade,
+   Gain/Perte Moy.), courbe de capital pleine largeur, Performance
+   mensuelle + Psychologie en 2 colonnes, "Où es-tu le meilleur ?".
+   Nouveaux calculs ajoutés à `performanceStats.ts` (voir §3), tous
+   dérivés des vrais trades. Deux dimensions de la maquette de référence
+   ("Type") ont été sciemment omises faute de champ `Trade` correspondant
+   — pas de donnée inventée. Puis, sur demande explicite de suivi, le
+   filtrage par pilules de "Où es-tu le meilleur ?" a été remplacé par 7
+   cartes toujours visibles (plus besoin de cliquer pour comparer).
 
-6. **Synchronisation automatique portefeuille ↔ trades** — bug réel
-   signalé par l'utilisateur en conditions réelles : après avoir saisi un
-   vrai trade rattaché à son portefeuille « test », ni le solde du
-   portefeuille ni la courbe de progression ne bougeaient. Cause : le
-   solde d'un compte n'était mis à jour QUE manuellement (« Ajuster le
-   Solde »), jamais depuis les trades journalisés, y compris quand un
-   `accountId` de rattachement existait. Voir §3/§8 pour le détail
-   technique et les compromis assumés (`syncAccountsWithTrades`). Vérifié
-   directement sur les vraies données de l'utilisateur (portefeuille
-   « test » $100 000 → $102 963 après son trade EUR/USD réel de +$2 963).
-
-7. **Courbe de progression plate malgré une variation réelle** — bug
-   distinct repéré par l'utilisateur juste après le point 6 : le solde
-   affichait bien $102 963, mais la courbe restait une ligne plate. Cause
-   isolée : `MainDashboard.tsx` omettait systématiquement le point de
-   départ dès qu'au moins un trade existait (voir §3 pour le détail).
-   Vérifié visuellement : la courbe part maintenant de $100 000 (« Départ »)
-   et monte jusqu'à $102 963 (« Actuel »).
-
-8. **Commit + push** — un seul commit groupant les 6 fichiers modifiés
-   (`aac295f`), poussé sur `origin/main` sur demande explicite.
-
-Toutes les décisions de périmètre ambiguës (site vierge : tout supprimer
-vs. garder les modules ; capital dérivé : partout vs. juste la courbe) ont
-été reposées via `AskUserQuestion` avant implémentation — méthode qui
-fonctionne bien avec cet utilisateur, voir §9. Dans les deux cas,
-l'utilisateur a choisi l'option la plus large/« Recommandé ».
-
-### Sécurité et robustesse — historique antérieur inchangé
-
-*(Sessions antérieures — IDOR critique, verrouillage sidebar, CSV
-injection, journal de sécurité + verrouillage de compte, mode modérateur
-Forum gardé, `forum_replies` avec propriétaire, lecture JSON défensive,
-`quizResultsSchema` borné, SheetJS à jour — inchangé, voir `git log` pour
-le détail.)*
-
-### Module Replay (Replay FX externe) — historique antérieur inchangé
-
-*(Intégré lors d'une session antérieure, voir `git log` pour le détail
-complet : cause du blocage de build historique — Tailwind v4 qui scannait
-le fichier de données de 25 Mo —, route Express dédiée `/replay-fx`,
-intégration comme onglet standard de la sidebar. Aucune modification cette
-session.)*
+8. **Chantier en cours : harmonisation visuelle de tout l'écosystème sur
+   ce même style** — voir §0 pour l'état exact et la suite à faire.
 
 ---
 
-## 5. Historique des chantiers récents (résumé)
-
-*(Ordre chronologique inverse, les plus récents en premier.)*
+## 5. Historique des chantiers (résumé, ordre chronologique inverse)
 
 | Commit | Résumé |
 |---|---|
+| `c7b95fd` | Sépare chaque dimension d'"Où es-tu le meilleur ?" en sa propre carte |
+| `11550cc` | Refond Rentabilité sur la maquette MacroPulse partagée par l'utilisateur |
+| `d5c6936` | Corrige l'affichage tronqué des modales profil/élèves/coachs (+ correctif isAdmin) |
+| `a66f384` | Retire entièrement le module Replay (Replay FX) |
+| `74c76bd` | Ajoute le cache HTTP sur les assets de Replay FX |
+| `9e52120` | Logo de connexion à fond transparent |
+| `53f28f4` | Débloque les 9 badges avec des dates de 2024 |
+| `20e98e1` | Réactive le catalogue des 9 badges, avec un état honnête |
+| `50f35da` | Vérifie le déclencheur de déploiement Railway nouvellement créé (commit vide, test) |
+| `52694ff` | Affiche le fondateur comme coach dans la Messagerie élève |
+| `c34a014` | Met à jour le HANDOFF.md après analyse complète du projet *(précédente version de ce document)* |
+| `0c1523e` | Retire bun.lock, obsolète depuis le commit initial |
 | `aac295f` | Vide les données de démo et lie le capital affiché aux portefeuilles réels |
-| `0213656` | Met à jour le HANDOFF.md : session Replay FX + audit de bugs + Données & Sauvegarde |
-| `656c757` | Ajoute l'export et la restauration de sauvegarde (Données & Sauvegarde) |
-| `963124d` | Réactive le badge "Prop Firm Challenge Ready" via le journal Replay FX |
-| `7ce08fe` | Borne le schéma de résultats de quiz |
-| `97c0177` | Renforce la lecture JSON et l'intégrité de forum_replies côté serveur |
-| `aa827cf` | Corrige le mode modérateur du Forum, non gardé côté serveur |
-| `e522776` | Reprend le langage visuel de Replay FX sur les modules existants |
-| `c770ee8` | Intègre le module Replay FX (backtest manuel sur données historiques réelles) |
-| `9d62075` | Marque le badge-3 "Prop Firm Challenge Ready" comme pas encore disponible |
-| `ff306de` | Réécrit intégralement le HANDOFF.md après analyse fraîche complète du projet |
-| `4a50d74` | Retire entièrement le module Replay (simulateur + Monte Carlo) — *depuis remplacé* |
-| `0939553` | Journal de sécurité + verrouillage de compte (fondateur-only) |
-| `6333780` | Retrait complet de l'export PDF personnel |
 
-*(Commits antérieurs à `6333780` : voir `git log` directement, non
-reproduits ici pour rester lisible.)*
+*(Commits antérieurs à `aac295f` : voir `git log`, couverts par les
+versions précédentes de ce document.)*
+
+**Non committé actuellement** : le chantier d'harmonisation visuelle en
+cours (§0) — 6 fichiers modifiés, `git status --short` pour la liste
+exacte à tout moment.
 
 ---
 
@@ -635,100 +559,84 @@ reproduits ici pour rester lisible.)*
 
 ### 🟡 Connus, non corrigés (décisions produit ou priorité basse)
 
-1. **Forum inaccessible depuis l'UI.** Décision produit toujours en
-   vigueur.
-2. **Rate limiter en mémoire, par processus.** Compromis accepté pour un
-   outil mono-instance.
-3. **Absence de flux de récupération de mot de passe.** Discussion
-   produit, pas un bug de code.
+1. **Forum inaccessible depuis l'UI.** Décision produit inchangée.
+2. **Rate limiter en mémoire, par processus.** Compromis accepté.
+3. **Absence de flux de récupération de mot de passe.** Discussion produit.
 4. **`CoachSignals.tsx` : aucune UI pour qu'un coach crée un signal.**
 5. **`NotificationModal.tsx` : statut "Push Server Live" factice.**
-6. **`MindsetJournalModal.tsx` : persistance `localStorage` uniquement**,
-   historique jamais affiché à l'écran.
+6. **`MindsetJournalModal.tsx` : persistance `localStorage` uniquement.**
 7. **`MainDashboard.tsx` : sous-titre + bloc "Ta semaine" codés en dur.**
 8. **`MacroDashboard.tsx` : fil d'actualités statique.**
-9. **`EquityCurveChart.tsx` : `ReferenceLine` "$11,500 · ATTEINT" codée
-   en dur** (module Rentabilité — distincte de la courbe du Tableau de
-   bord, corrigée cette session).
+9. **`EquityCurveChart.tsx` : `ReferenceLine` "$11,500 · ATTEINT" codée en
+   dur** — toujours présente, non demandée à corriger, laissée telle
+   quelle même en touchant ce fichier cette session (ajout du
+   `CartesianGrid` seulement).
 10. **`UserProfileModal.tsx` : "NIVEAU 4" statique.**
-11. **`package.json.name` reste `"react-example"`.** `vite` dupliqué
-    entre `dependencies` et `devDependencies`.
-12. **`.gitignore` : règle `data/` sans slash de tête matche aussi
-    `src/data/`** (voir §1) — `git add <chemin exact>` sur ce dossier
-    demande systématiquement `-f`. Pas corrigé faute de demande
-    explicite ; correction triviale si ça gêne (`data/` → `/data/`).
+11. **`package.json.name` reste `"react-example"`.**
+12. **`.gitignore` : règle `data/` matche aussi `src/data/`** — voir §2.
+13. **`syncAccountsWithTrades` (src/lib/walletStats.ts) écrase tout
+    ajustement manuel dès qu'au moins un trade est rattaché au compte.**
+    Compromis assumé, documenté en détail dans une version antérieure de
+    ce fichier (voir historique git de HANDOFF.md si besoin du détail).
+14. **Le badge de rating des coachs (`Coach.rating`) est optionnel et
+    absent pour tout coach dérivé d'un vrai profil** — comportement
+    voulu (pas de note fictive), juste noté pour éviter qu'un futur
+    Claude ne le "corrige" en ajoutant une note inventée.
 
-### 🟡 Compromis assumés, nouveaux cette session
+### 🟠 Nouveau cette session, actif et à surveiller
 
-13. **`syncAccountsWithTrades` écrase tout ajustement manuel dès qu'AU
-    MOINS un trade est rattaché au compte.** Une fois qu'un trade a
-    `accountId = X`, le solde de `X` devient entièrement piloté par la
-    somme des PnL des trades qui lui sont liés — un « Ajuster le Solde »
-    fait ensuite sur ce compte serait silencieusement écrasé au prochain
-    changement de `trades` (ajout/édition/suppression, sur N'IMPORTE quel
-    trade, puisque l'effet tourne sur tout le tableau `trades`). C'est
-    voulu et correspond à la demande explicite de l'utilisateur
-    (« synchronisé à chaque fois que je rentre un trade »), mais un
-    utilisateur qui voudrait injecter un dépôt/retrait/frais hors journal
-    sur un compte qui a déjà des trades rattachés n'a **aucun moyen
-    actuel** de le faire persister. Pas un bug — juste une limite connue
-    à garder en tête si le sujet revient. Un compte SANS aucun trade
-    rattaché reste, lui, entièrement piloté par « Ajuster le Solde »
-    comme avant.
-14. **Portefeuille « test » et son trade restent dans la vraie base** (voir
-    §1) — décision volontairement laissée à l'utilisateur, à ne pas
-    supprimer de ta propre initiative.
+15. **Blocage anti-abus périodique de l'edge Railway (429
+    `railway-hikari`)** — voir §1. Se déclenche visiblement en réponse à
+    des requêtes HTTP répétées/rapprochées vers le domaine public
+    (`curl` de vérification en boucle en étant la cause la plus probable
+    identifiée cette session). Se résout de lui-même après un délai
+    (observé : de quelques minutes à plus de 40 minutes selon les
+    épisodes). **Prévention** : ne jamais vérifier un déploiement par
+    plusieurs `curl` rapprochés — utiliser `railway deployment list
+    --service propdesk --json` (API Railway, non affectée) pour confirmer
+    le build, puis UN SEUL `curl` espacé dans le temps pour confirmer que
+    le site répond.
 
 ### ✅ Résolus cette session (retirés de la liste)
 
-Absence de bouton de suppression de portefeuille, capital du Tableau de
-bord/en-tête figé indépendamment des portefeuilles réels, solde de
-portefeuille non synchronisé avec les trades rattachés, courbe de
-progression plate malgré un trade réel (point de départ manquant). Voir §4
-pour le détail de chaque correctif.
+Messagerie coach vide, badges vidés, logo avec badge sombre en dur,
+module Replay causant des blocages edge, modales tronquées en hauteur
+(Safari), `student.isAdmin` jamais vrai pour un compte fondateur frais,
+déploiement Railway sans déclencheur automatique, vérification de
+déploiement basée sur le mauvais mot-clé (`railway status` affiche
+"Online", jamais "Deployed" — une boucle de vérification cherchait ce
+second mot et restait bloquée indéfiniment, corrigé en basculant sur
+`railway deployment list --json`).
 
 ### Piège opérationnel : `AdminStudentView.tsx` est un overlay
 
-Inchangé — voir historique. Scoper toute recherche DOM à
+Inchangé — scoper toute recherche DOM à
 `document.querySelector('.fixed.inset-0.z-50...')`.
 
-### Piège opérationnel : `window.confirm()`/`window.prompt()` dans l'outil de prévisualisation
+### Piège rencontré et confirmé cette session : `git add <chemin exact>` sur `src/data/`
 
-Voir §2 — touche désormais aussi le bouton Supprimer un portefeuille.
-
-### Piège opérationnel : `cmd+R` simulé ne recharge pas toujours
-
-Voir §2 — préférer `navigate()`.
-
-### Piège opérationnel, nouveau cette session : `.gitignore` `data/` matche `src/data/`
-
-Voir §1/§2 — `git add -f` nécessaire sur `src/data/*`, `git add -A`
-fonctionne normalement.
+Voir §2 — `git add -f` nécessaire, `git add -A` fonctionne normalement.
 
 ---
 
 ## 6 bis. Ce qui ressemble à du code mort, mais ne l'est pas
 
-*(Inchangé, voir historique — `EnrolledStudent.accounts`, `ForumSection.tsx`,
-`Trade.mistakes`, `Trade.aiAudit`/`pnlPercentage`, `TraderBadge.trackable`,
-`requireOwner`/`requireAdmin`, `updateCollectionItem()`, `replay-fx/` servi
-par une route Express dédiée.)*
+*(Inchangé pour les entrées antérieures — voir historique git si besoin
+du détail complet : `EnrolledStudent.accounts`, `ForumSection.tsx`,
+`Trade.mistakes`, `TraderBadge.trackable`, `requireOwner`/`requireAdmin`,
+`updateCollectionItem()`.)*
 
-**Ajout cette session** : `src/data/mockData.ts` (31 lignes, tous des
-tableaux/objet vides) **n'est PAS un fichier orphelin ni un reliquat à
-supprimer** — il reste importé par `App.tsx` (état React initial, avant
-que le serveur réponde) et `server/seed.ts` (`seedDemoData()`, amorçage
-d'une base neuve sans import `localStorage` hérité). Le vider était
-délibéré (voir §4), le fichier lui-même doit rester en place avec sa forme
-actuelle (tableaux vides, mais toujours exportés et typés).
+**Ajout cette session** : `FOUNDER_COACH_ID` existe en DEUX endroits
+(`server/db.ts` et `src/types.ts`), volontairement dupliqué et jamais
+partagé via un import — le client ne peut pas importer du code serveur
+(Node/better-sqlite3) sans casser le bundle navigateur. Si l'un change,
+l'autre DOIT changer avec lui, sans quoi le fil de messagerie élève↔coach
+se désynchronise silencieusement.
 
-**Ajout cette session** : `users.payload.startingCapital`/`currentCapital`
-en base **ne sont plus lus pour l'affichage** mais restent écrits/lus par
-`saveProfile()`/`getProfile()` (`server/repositories.ts`, inchangé) — ne
-pas les retirer du schéma zod (`server/schemas.ts`) ni du type
-`StudentProfile` (`types.ts`) sans vérifier au préalable qu'aucun autre
-consommateur (notamment `EnrolledStudent`, système distinct, voir §1) n'en
-dépend.
+**Ajout cette session** : `users.payload.isAdmin` peut légitimement valoir
+`0`/absent en base pour le compte fondateur sans que ce soit un bug — voir
+§2/§3/§8, la valeur qui fait foi est celle forcée par
+`buildStaffProfile()` à la réponse API, jamais celle stockée telle quelle.
 
 ---
 
@@ -736,155 +644,133 @@ dépend.
 
 | Sujet | Décision |
 |---|---|
-| Périmètre de l'accès élève | Étendu à tout l'écosystème sauf Suivi des Élèves |
-| Badges non calculables | Marqués « pas encore disponible », jamais de fausse progression |
-| Emplacement du Journal de sécurité | Modale dédiée, pas un onglet de sidebar |
-| Couleur du Portefeuille | Vert PropDesk exact (`#00E676`) |
-| Module Replay | Replay FX (externe), intégré comme onglet standard sidebar |
-| Style visuel global | Langage Replay FX (cartes plates, micro-labels, pilules) |
-| Données & Sauvegarde | Dans Profil & Options, tout le bureau, sans réinitialisation destructrice |
-| Mode modérateur Forum | Réservé à `student.isAdmin` |
-| **Dépôt GitHub** | **Privé, créé cette session (`Forexpaps/propdesk`), auth via `gh` CLI, remote sans token en clair** |
-| **Remise à zéro « site neuf »** | **Périmètre total : y compris les modules de cours de démo, pas seulement les données d'activité** |
-| **Capital affiché** | **Dérivé de la somme des portefeuilles réels PARTOUT dans l'app (pas seulement la courbe), champ manuel du profil retiré** |
-| **Synchronisation solde ↔ trades** | **Automatique dès qu'un trade est rattaché à un compte ; un compte sans trade rattaché reste piloté manuellement** |
-| **Portefeuille/trade « test » actuels en base** | **Laissés tels quels, décision explicitement renvoyée à l'utilisateur** |
+| Hébergement | **Railway**, pas Vercel (incompatible avec l'architecture) |
+| Domaine Railway | `propdesk-academie.up.railway.app` (pas `-production-ab8b`) |
+| Module Replay | **Retiré entièrement**, source du blocage edge Railway |
+| Badges | **Les 9 débloqués avec des dates 2024**, décision explicite du fondateur — ne pas repartir sur un état "vierge" sans redemande |
+| Style visuel cible | Langage Macro/Rentabilité (cartes plates, micro-labels 9px, en-têtes à barre colorée) appliqué à **tout** l'écosystème, hors Forum et petites modales |
+| "Où es-tu le meilleur ?" (Rentabilité) | 7 cartes toujours visibles, **pas** de filtre à pilules |
+| Métriques "Type"/"Marché" de la maquette externe | "Marché" calculable (`Trade.marketCategory` existe) et implémenté ; "Type" omis, aucun champ correspondant |
+| Accès SSH à la base Railway | **Refusé explicitement** par l'utilisateur pour l'instant (question posée pour les badges, pas encore nécessaire pour l'harmonisation visuelle qui ne touche que du code, pas des données) |
+| Titres de modales vs en-têtes de section | Seuls les en-têtes de section À L'INTÉRIEUR d'une page/modale reçoivent `SectionHeader` ; le titre de la fenêtre elle-même n'est jamais converti (voir §0, point 5) |
 
 ---
 
 ## 7. Prochaines tâches, dans l'ordre
 
-**Aucun chantier explicite en attente à ce jour.** Tout ce qui a été
-signalé par l'utilisateur cette session (suppression de portefeuille,
-capital figé, synchronisation trades↔portefeuille, courbe plate) a été
-traité, vérifié en conditions réelles, committé et poussé sur GitHub.
+**1. Terminer le chantier interrompu (§0) — priorité immédiate absolue :**
+   1. Finir `StudentTracking.tsx` (2 `<h4>` restants).
+   2. `VideoAcademy.tsx`.
+   3. `UserProfileModal.tsx`, onglet Badges uniquement.
+   4. Vérification (`lint`, `build`, visuelle module par module), commit,
+      push, confirmation du déploiement Railway (sans marteler l'URL).
 
-S'il faut proposer un point de départ à l'utilisateur plutôt que d'attendre
-une demande :
-
-1. **Demander s'il veut garder ou supprimer le portefeuille « test » et
-   son trade** (voir §1/§6) — c'est la seule donnée résiduelle non-vide
-   dans une base par ailleurs entièrement remise à zéro, et sa nature
-   (test à nettoyer vs. premier vrai portefeuille) n'a jamais été
-   tranchée explicitement.
-2. **Remplir le catalogue de cours** (`modules`, vidé cette session) —
-   l'utilisateur va devoir recréer ses vrais modules/leçons/quiz depuis
-   zéro ; pas d'UI de création de module identifiée dans ce dépôt à ce
-   stade (`VideoAcademy.tsx` semble être un lecteur/quiz, pas un éditeur —
-   **à vérifier avant d'affirmer quoi que ce soit à l'utilisateur**, ne
-   pas supposer que l'admin peut créer un module depuis l'UI sans avoir
-   lu le composant).
-3. Si l'utilisateur veut continuer à démêler le compromis du point 13
-   (§6) — un ajustement manuel de solde persistant même avec des trades
-   rattachés — ce serait un chantier à cadrer avec lui d'abord (ex:
-   introduire un champ `manualAdjustment` séparé sur `TradingAccount`),
-   pas à décider de ta propre initiative.
+**2. Une fois le chantier ci-dessus terminé**, aucune tâche explicite en
+attente n'est connue — redemander directement à l'utilisateur.
 
 ### Ce qui n'est PAS une tâche
 
 - **Réintroduire de l'IA sous quelque forme que ce soit.**
-- **Le cloisonnement des données par compte staff** — bureau partagé
-  toujours voulu.
-- **Donner aux élèves accès à « Suivi des Élèves ».**
-- **Migrer le rate limiter vers Redis** sans demande explicite.
-- **Reconstruire une fonctionnalité d'export PDF** sans demande explicite.
-- **Ajouter un bouton de réinitialisation destructrice** à Données &
-  Sauvegarde sans demande explicite.
-- **"Réparer" le fil d'actus Macro statique, le centre de signaux sans
-  création UI, le statut "Live" factice des notifications, le "NIVEAU 4"
-  statique, la ligne de référence codée en dur de la courbe d'équité
-  (module Rentabilité), le bloc "Ta semaine" du tableau de bord** —
-  limitations connues et acceptées.
-- **Réactiver le Forum dans la sidebar** sans demande explicite.
-- **Supprimer le portefeuille/trade « test »** de ta propre initiative
-  (voir point 1 ci-dessus — demande d'abord).
-- **Resserrer la règle `.gitignore` `data/` → `/data/`** sans demande
-  explicite (voir §6, point 12 — connu, pas gênant en pratique avec
-  `git add -A`).
-- **Appliquer la logique de capital dérivé des portefeuilles à
-  `EnrolledStudent`** (Suivi des Élèves) — systèmes délibérément
-  distincts, voir §1 « Deux systèmes de capital ».
+- **Retoucher le badge de rating des coachs** (absence volontaire).
+- **"Réparer" les 9 limitations connues listées en §6** sans demande
+  explicite (Forum, MindsetJournal, statut Push factice, etc.).
+- **Convertir les titres de modales en `SectionHeader`** (voir §6ter).
+- **Vérifier le déploiement Railway par des `curl` répétés** — voir §1/§6,
+  ça a déjà causé deux blocages evités cette session.
+- **Recréer le module Replay** sans demande explicite — retiré
+  volontairement, cause identifiée d'un vrai incident de production.
+- **Réinitialiser les badges à un état "non débloqué"** sans demande
+  explicite — décision produit assumée (voir §6ter).
 
 ---
 
 ## 8. Décisions techniques importantes
 
-### Le capital affiché est calculé au rendu, jamais persisté
+### Railway : le déclencheur de déploiement automatique n'est pas créé par `railway add --repo`
 
-`displayStudent`/`studentProfile` (`App.tsx`) recalculent
-`startingCapital`/`currentCapital` à **chaque rendu** depuis `accounts`,
-sans jamais appeler `setStudent`/`api.saveProfile`. C'est un choix
-délibéré : l'ancien mécanisme (un `useEffect` qui persistait
-`currentCapital` recalculé depuis le PnL des trades) déclenchait un
-`PUT /api/profile` à chaque changement de trades, et le commentaire
-d'origine documentait déjà le risque (bandeau « modifications en
-attente » qui « crie au loup » à chaque montage si l'objet recalculé
-n'est pas strictement égal à l'ancien). Recalculer à la volée à partir
-d'`accounts` (déjà synchronisé séparément) évite complètement cette classe
-de problème — pas de nouvel état à synchroniser, pas de risque de dérive
-entre « ce qui est affiché » et « ce qui est en base ».
+Découverte cette session après plusieurs push restés sans effet sur le
+site déployé (déploiement resté sur un ancien commit malgré `git push`
+répétés). `railway add --repo`/`railway service source connect` relient
+le SERVICE au dépôt (source), mais ne créent pas automatiquement l'objet
+`DeploymentTrigger` qui écoute les push GitHub — un objet distinct de
+l'API Railway. Créé manuellement via l'API GraphQL :
 
-### `syncAccountsWithTrades` : équilibre entre auto-sync et perte de contrôle manuel
+```bash
+railway api 'mutation($input: DeploymentTriggerCreateInput!) { deploymentTriggerCreate(input: $input) { id branch repository provider } }' \
+  --var 'input={"branch":"main","environmentId":"<ID>","projectId":"<ID>","provider":"github","repository":"Forexpaps/propdesk","serviceId":"<ID>"}'
+```
+Vérifié fonctionnel par un commit vide de test (`50f35da`) qui a bien
+déclenché un build automatique. **Si un futur dépôt/service Railway est
+créé pour ce projet (nouvel environnement, fork), refaire cette étape —
+ne pas supposer que la connexion GitHub suffit.**
 
-Deux approches étaient possibles pour lier trades et solde de compte : (a)
-toujours recalculer depuis les trades, en supprimant purement et
-simplement l'ajustement manuel ; (b) séparer `equity` en deux
-composantes (solde dérivé des trades + un delta manuel séparé, plus
-correct mais plus complexe, nécessiterait un nouveau champ sur
-`TradingAccount` et une migration). Le choix retenu est un compromis
-pragmatique explicitement documenté (voir §6, point 13) : un compte
-**sans aucun trade rattaché** reste 100% piloté par l'ajustement manuel
-(cas d'usage : suivi d'un compte externe, dépôts/retraits) ; dès qu'**au
-moins un trade** lui est rattaché, le solde bascule entièrement sur le
-calcul automatique et tout ajustement manuel antérieur/futur sur ce compte
-sera silencieusement écrasé au prochain changement de `trades`. Si ce
-compromis devient gênant à l'usage (utilisateur qui veut journaliser ses
-trades ET faire des ajustements manuels sur le même compte), la vraie
-solution est l'option (b) — ne pas la construire préventivement sans
-qu'il en fasse la demande.
+### `railway status` n'affiche jamais le mot "Deployed"
 
-### Pourquoi le point « Départ » de la courbe manquait
+Piège opérationnel réel rencontré cette session : une boucle de
+vérification attendait le mot-clé `"Deployed"` dans la sortie de
+`railway status` pour savoir qu'un déploiement était terminé — ce mot
+n'apparaît JAMAIS, le statut réel est `"Online"` (ou `"Building"`,
+`"Failed"`, `"Crashed"`). La boucle restait donc bloquée indéfiniment
+jusqu'à expiration, même quand le déploiement avait déjà réussi. Corrigé
+en basculant sur `railway deployment list --service propdesk --json`, qui
+renvoie un champ `status` fiable et interrogeable (`SUCCESS`, `FAILED`,
+`BUILDING`).
 
-`MainDashboard.tsx` construisait `equityData` avec un `? :` : soit un seul
-point « Départ » (aucun trade), soit **directement** la liste des trades
-suivie d'un point « Actuel » (au moins un trade) — sans jamais inclure
-« Départ » dans cette seconde branche. Le bug n'était visible qu'avec très
-peu de trades (avec beaucoup de trades, la partie manquante était
-proportionnellement négligeable sur le graphique). Leçon générale : une
-structure `condition ? [un seul cas] : [liste différente]` pour construire
-une série temporelle mérite une relecture attentive de ce qui existe dans
-une branche mais pas dans l'autre — ici, le point de départ existait dans
-une branche et avait simplement été oublié dans l'autre.
+### Le bug de centrage Safari sur une modale "overflow + items-center"
 
-### GitHub — remote sans token en clair, auth via `gh` CLI
+Documenté en détail dans le commit `d5c6936` et son message — pattern à
+connaître pour toute NOUVELLE modale ajoutée à l'app : ne jamais utiliser
+`fixed inset-0 ... flex items-center justify-center ... overflow-y-auto`
+sur le conteneur externe SANS plafonner la hauteur de la carte interne
+(`max-h-[calc(100vh-4rem)]`) et sans y ajouter son propre `overflow-y-auto`
+interne avec un en-tête `sticky`. Sinon, un enfant plus haut que l'écran
+fait disparaître son propre haut (titre, bouton fermer) hors de portée,
+de façon irrécupérable au scroll sur certains navigateurs (confirmé sur
+Safari).
 
-Le remote `origin` initial contenait un Personal Access Token directement
-dans l'URL HTTPS (`https://user:TOKEN@github.com/...`) — visible en clair
-dans `.git/config`, dans l'historique de n'importe quel outil qui
-affiche la config git, et désormais dans les transcripts de cette
-conversation. Remplacé par une URL sans identifiants
-(`https://github.com/Forexpaps/propdesk.git`), l'authentification passant
-par le credential helper que `gh auth login` configure. **Si un futur push
-échoue avec une erreur d'authentification**, la réponse est `gh auth
-login` (device flow, code affiché à l'utilisateur), jamais de réintroduire
-un token dans l'URL du remote.
+### `student.isAdmin` doit être forcé côté serveur, jamais supposé stocké correctement
 
-### Tester un flux protégé par `window.confirm()` sans compromettre la vérification
+`buildStaffProfile()` (server/routes.ts) force `isAdmin: true` dans la
+réponse `/api/state` pour toute session staff, quelle que soit la valeur
+réellement stockée en base — miroir exact de `buildStudentProfile()` qui
+force `isAdmin: false` côté élève. Raison : le profil par défaut
+(`initialStudentProfile`, mockData.ts) n'a longtemps porté aucun champ
+`isAdmin` du tout (undefined → falsy), et `Sidebar.tsx` décide d'afficher
+"Suivi des Élèves" sur ce seul champ — un compte fondateur fraîchement
+créé (site neuf, ou nouvel environnement comme Railway) se retrouvait donc
+sans accès à ses propres élèves, silencieusement. **Toute future logique
+qui a besoin de savoir "est-ce un compte staff" doit lire cette valeur
+forcée par l'API, jamais relire le profil stocké directement.**
 
-Pattern utilisé pour vérifier la suppression de portefeuille : stubber
-`window.confirm = () => true` via `javascript_tool` juste avant de
-cliquer, puisque le clic seul ne déclenche jamais le vrai dialogue natif
-dans le Browser pane (voir §2/§6). Confirmer ensuite le résultat par deux
-canaux indépendants : la requête réseau observée (`PUT
-/api/collections/accounts → 200`) ET un rechargement complet de la page
-(`navigate()`) pour vérifier la persistance réelle, pas seulement l'état
-React en mémoire.
+### Extraction d'un logo à fond transparent par seuil de luminance
 
-*(Pour les décisions antérieures — Tailwind v4 vs gros asset statique,
-`writeCollectionForAuth()`, couplage badge/localStorage Replay FX,
-`safeParsePayload()`, aller-retour neutre pour tester une écriture — voir
-la version précédente de ce document dans `git log -p -- HANDOFF.md`, ou
-directement l'historique git du code concerné.)*
+Technique utilisée pour `logo-auth.png` (pas de Photoshop/ImageMagick
+disponible, Pillow installé via `pip3 install Pillow numpy` à la volée) :
+calculer la luminance de chaque pixel (`0.299R + 0.587G + 0.114B`),
+construire un histogramme pour repérer la coupure naturelle entre "fond
+sombre" et "glyphe clair", puis appliquer une rampe alpha
+`clip((lum - low) / (high - low), 0, 1)` avec `low`/`high` calés juste
+au-dessus du pixel le plus clair du fond à éliminer (mesuré précisément,
+pas deviné). Fonctionne bien pour un visuel à deux tons nets (fond sombre
+uniforme + glyphe clair), à réutiliser si un futur logo/asset a le même
+besoin.
+
+### La maquette externe ("MacroPulse") sert de référence de style, pas de source de vérité produit
+
+Quand l'utilisateur partage une capture d'écran d'une autre application
+en demandant une reproduction "esthétique", la bonne lecture est :
+reproduire le langage visuel (cartes, couleurs, typographie, densité,
+structure de mise en page) en le nourrissant des VRAIES données/fonctions
+de PropDesk — jamais copier des fonctionnalités hors-sujet (l'app de
+référence avait des boutons "+ IA", explicitement incompatibles avec la
+règle "aucune IA" de ce projet) ni inventer des métriques dont PropDesk
+n'a pas la donnée sous-jacente (voir "Type", omis faute de champ
+`Trade` correspondant, plutôt que fabriqué).
+
+*(Pour les décisions antérieures à cette session — Tailwind v4 vs gros
+asset statique, `writeCollectionForAuth()`, `safeParsePayload()`,
+capital dérivé des portefeuilles jamais persisté — voir l'historique git
+de ce document, `git log -p -- HANDOFF.md`.)*
 
 ---
 
@@ -893,103 +779,98 @@ directement l'historique git du code concerné.)*
 - Il **communique en français**, ton direct, tutoiement.
 - Il travaille par **demandes courtes et itératives**, souvent en
   signalant un problème constaté en usage réel plutôt qu'en décrivant une
-  solution à l'avance — cette session en est un exemple particulièrement
-  net : « je viens de rentrer un trade... mon portefeuille ne se met pas à
-  jour » a mené directement à isoler et corriger un vrai bug de
-  synchronisation, jamais mentionné avant que l'utilisateur ne le
-  rencontre lui-même en testant l'app.
-- **Il attend d'être consulté sur les choix de conception ambigus avant
-  l'implémentation.** Cette session : deux `AskUserQuestion` posées avant
-  d'agir (périmètre exact de la remise à zéro « site neuf » ; périmètre
-  du capital dérivé des portefeuilles). Dans les deux cas il a choisi
-  l'option la plus large, marquée « Recommandé ».
-- **Il teste réellement l'app en conditions d'usage et remonte les bugs
-  au fil de l'eau**, pas seulement en lisant du code ou en faisant
-  confiance à une implémentation qui « devrait marcher ». Trois bugs
-  distincts de cette session (solde non synchronisé, courbe plate,
-  capital figé à $100 000 sur un site neuf) ont tous été découverts par
-  lui en utilisant l'app normalement, pas par un audit de code demandé.
-- **Il committe et pousse sur GitHub sur demande explicite**, groupée
-  plutôt qu'au fil de l'eau cette session (un seul commit pour 6 fichiers,
-  demandé après plusieurs correctifs successifs plutôt qu'après chacun).
-- **Toujours vérifier en conditions réelles, pas seulement à la
-  compilation.** Cette session : chaque correctif (suppression de
-  portefeuille, capital dérivé, synchronisation trades, courbe corrigée) a
-  été vérifié dans le Browser pane avant d'être annoncé comme terminé —
-  y compris en stubbant `window.confirm` pour contourner une limitation
-  connue de l'outil plutôt que de sauter la vérification.
-- **Ses données de travail sont réelles** (`data/horizon.db`). Cette
-  session a nécessité une remise à zéro volontaire et étendue de cette
-  base réelle — vérifiée deux fois avant d'agir (comptage des lignes par
-  table, inspection du contenu réel des `enrolled_students`/`trades`) pour
-  ne jamais confondre donnée réelle personnalisée (le profil « ForexPaps »)
-  et donnée de démo à supprimer.
-- Il **ne donne pas ses mots de passe pour que tu les utilises** — même
-  fourni en clair sur demande explicite, la règle de sécurité prime.
+  solution — confirmé encore cette session (messagerie coach vide,
+  badges manquants, modale tronquée, module Replay cassé : tous
+  découverts par lui en utilisant l'app, pas par un audit demandé).
+- **Il peut interrompre un chantier en cours de production pour demander
+  autre chose** (cette mise à jour du HANDOFF en est la preuve directe) —
+  dans ce cas, documenter précisément l'état d'interruption (§0) est
+  exactement ce qu'il attend, pas une reprise silencieuse ni un
+  redémarrage à zéro.
+- **Il partage parfois une référence visuelle externe** (capture d'écran
+  d'une autre app) en demandant une reproduction fidèle — voir §8, la
+  bonne pratique est de reproduire le LANGAGE VISUEL avec les vraies
+  données du projet, jamais de copier des fonctionnalités hors-sujet ou
+  d'inventer une donnée absente.
+- **Il change parfois d'avis en cours de route** (badges : d'abord
+  restaurés "honnêtes" puis tous débloqués sur demande explicite ;
+  Rentabilité : filtres à pilules d'abord, puis cartes toujours visibles
+  sur demande de suivi) — ne pas s'accrocher à un choix antérieur si une
+  nouvelle demande le remet en cause, et ne pas re-proposer l'ancien
+  comportement sans qu'il le redemande.
+- **Il refuse parfois une demande de permission élargie** (accès SSH à la
+  base Railway pour les badges) sans que ça bloque le reste du travail —
+  respecter le refus, proposer une alternative de moindre portée si
+  possible, ne pas insister.
+- **Toujours vérifier en conditions réelles.** Chaque correctif de cette
+  session a été vérifié visuellement dans le Browser pane avant d'être
+  annoncé terminé, y compris en stubbant `window.confirm` quand
+  nécessaire plutôt que de sauter la vérification.
+- **Attention à la fréquence des vérifications sur l'environnement de
+  production** — le blocage edge Railway (§1/§6) a été déclenché au moins
+  deux fois cette session par des `curl` de vérification trop rapprochés.
+  Espacer les contrôles, privilégier l'API Railway (non affectée par ce
+  blocage) à des requêtes HTTP directes vers le site public.
+- Il **ne donne jamais ses mots de passe pour que tu les utilises** —
+  règle absolue, y compris pour l'environnement Railway.
 - Quand il demande une mise à jour du HANDOFF « suffisamment détaillée »,
-  il attend qu'elle reflète fidèlement tout ce qui a changé, avec une
-  liste explicite : résumé du projet, architecture, fichiers
-  modifiés, fonctionnalités terminées, bugs connus, prochaines tâches,
-  décisions techniques, commandes à lancer, contexte de travail — toutes
-  ces sections ont été revues à cette mise à jour, pas seulement les
-  grandes lignes.
+  il attend fidélité complète à ce qui a changé — **et, comme cette
+  fois, une description exacte du point d'interruption si le travail est
+  coupé en plein milieu**, pas seulement un résumé de ce qui est fini.
 
 ### Méthode de vérification qui a fait ses preuves
 
-1. `npm run lint` après chaque changement de code.
-2. Redémarrer le serveur de dev après tout changement **serveur**, en
-   prévenant que la session sera perdue.
-3. Pour un bug touchant à l'écriture de données réelles : vérifier l'état
-   AVANT d'écrire, préférer un aller-retour neutre à une donnée fabriquée
-   quand c'est possible.
-4. Pour un bug d'UI/UX : reproduire le scénario exact dans le navigateur,
-   en utilisant `navigate()` plutôt qu'un raccourci clavier simulé, et en
-   stubbant `window.confirm`/`window.prompt` via `javascript_tool`
-   uniquement quand un flux protégé par une boîte de dialogue native doit
-   être vérifié.
-5. Nettoyage systématique des données de test après vérification — sauf
-   quand la donnée résiduelle appartient à l'utilisateur lui-même (le
-   portefeuille « test » de cette session a été laissé en place,
-   volontairement, la décision de le garder ou non lui revient).
-6. Pour une fonctionnalité substantielle ou ambiguë : reposer les
-   questions de clarification avant d'écrire du code via
-   `AskUserQuestion`, même si un HANDOFF antérieur documentait déjà une
-   piste de réponse.
-7. Confirmer un correctif par au moins deux canaux indépendants quand
-   c'est possible (ex: requête réseau observée ET rechargement complet de
-   la page) plutôt que de se fier à un seul signal.
+1. `npm run lint` après chaque changement de code, même en cours de
+   chantier multi-fichiers.
+2. Redémarrer le serveur de dev après tout changement **serveur**.
+3. Vérification visuelle dans le Browser pane avant d'annoncer un
+   correctif terminé — `navigate()` plutôt qu'un raccourci clavier
+   simulé pour tout rechargement dont le résultat compte.
+4. Pour un déploiement Railway : `railway deployment list --json`
+   d'abord (fiable, jamais bloqué par l'edge), UN SEUL `curl` espacé dans
+   le temps ensuite pour confirmer que le site public répond.
+5. Pour une fonctionnalité ambiguë ou un chantier de grande ampleur :
+   passer par le mode plan (`AskUserQuestion` pour lever les
+   ambiguïtés de périmètre) avant d'écrire du code — a bien fonctionné
+   pour le chantier d'harmonisation visuelle en cours (§0).
+6. Nettoyage systématique des scripts ponctuels après usage (ex: script
+   Python d'extraction du logo, scripts `_seed-*.ts` de peuplement de
+   badges en base locale — jamais laissés dans le dépôt).
 
 ---
 
 ## 10. État à la reprise
 
-- Branche `main`, dernier commit `aac295f`, poussé sur
-  `https://github.com/Forexpaps/propdesk` (`origin/main` à jour).
-  Répertoire de travail **propre**, rien en attente de commit.
-- `npm run lint` et `npm run build` passent tous les deux (build ~2.9s).
-- **Aucun chantier de code en cours.** Le commit de cette session couvre :
-  remise à zéro complète des données de démo, suppression de portefeuille,
-  capital dérivé des portefeuilles réels partout dans l'app,
-  synchronisation automatique solde↔trades, correction de la courbe de
-  progression.
-- Base réelle (`data/horizon.db`) quasiment vierge : 1 profil réel, 1
-  portefeuille de test (« test », $100 000 → $102 963), 1 trade de test
-  rattaché. Aucun élève inscrit, aucun module de cours, aucune autre
-  collection non vide.
-- **Aucun thread utilisateur en attente identifié** à ce jour — tous les
-  sujets soulevés cette session ont été traités, vérifiés et poussés.
+- Branche `main`, dernier commit **poussé** `c7b95fd`. **Répertoire de
+  travail SALE** — 6 fichiers modifiés, non committés (chantier
+  d'harmonisation visuelle interrompu, voir §0 pour le détail exact).
+- `npm run lint` et `npm run build` passent tous les deux malgré l'état
+  intermédiaire — sûr de reprendre le travail sans rien réparer d'abord.
+- Application déployée et fonctionnelle sur Railway
+  (`propdesk-academie.up.railway.app`), déploiement automatique
+  opérationnel. **Au moment de cette mise à jour, l'edge Railway est
+  potentiellement encore en cooldown après les vérifications de cette
+  session — ne pas re-tester immédiatement par curl, voir §1/§6.**
+- Base locale (`data/horizon.db`) : 1 profil réel, 1 portefeuille "test"
+  ($100 000 → $102 963), 1 trade réel, 9 badges tous débloqués (dates
+  2024), 0 élève inscrit.
+- **Un seul thread ouvert** : terminer le chantier d'harmonisation
+  visuelle exactement comme décrit en §0, puis redemander à l'utilisateur
+  s'il a une nouvelle tâche.
 
 ### Par où commencer
 
-1. Vérifier avec l'utilisateur s'il y a une tâche immédiate en tête (le
-   document ci-dessus est une base de reprise, pas une feuille de route
-   imposée).
-2. Si rien de précis n'est demandé, le point le plus naturel à proposer
-   est de **clarifier le sort du portefeuille/trade « test »** actuellement
-   dans sa vraie base (§1/§7, point 1) — c'est la seule ambiguïté encore
-   ouverte identifiée à cette mise à jour.
+1. Lire intégralement §0 ci-dessus.
+2. Lire le plan complet à
+   `/Users/forexpaps/.claude/plans/quelles-autres-h-bergeur-me-composed-ember.md`.
+3. `git status --short` et `git diff` pour confirmer l'état exact des 6
+   fichiers en cours (peut avoir légèrement évolué si l'utilisateur a
+   fait autre chose entre-temps — toujours vérifier avant de supposer).
+4. Terminer `StudentTracking.tsx`, puis `VideoAcademy.tsx`, puis
+   `UserProfileModal.tsx` (onglet Badges), puis la vérification finale +
+   commit + push (tâche #8 du tracker).
 
 > Ce document est la **seule** source de reprise fiable. S'il existe un
-> écart entre ce document et le code, **fais confiance au code** — vérifie
-> par la lecture directe des fichiers sources, et corrige ce document en
-> conséquence.
+> écart entre ce document et le code, **fais confiance au code** —
+> vérifie par la lecture directe des fichiers sources et par
+> `git status`/`git diff`, et corrige ce document en conséquence.

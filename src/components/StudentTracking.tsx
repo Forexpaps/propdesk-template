@@ -21,6 +21,20 @@ import { formatCurrency } from "../lib/format";
 import { api } from "../lib/api";
 import { AdminStudentView } from "./AdminStudentView";
 
+/**
+ * En-tête de section — barre verticale colorée + titre, motif repris tel
+ * quel de PerformanceDashboard.tsx pour un rendu cohérent sur tout l'écosystème.
+ */
+const SectionHeader: React.FC<{ children?: React.ReactNode; color?: string }> = ({
+  children,
+  color = "bg-[#00E676]",
+}) => (
+  <span className="inline-flex items-center gap-2">
+    <span className={`w-1 h-4 rounded-full ${color} shrink-0`} />
+    {children}
+  </span>
+);
+
 interface StudentTrackingProps {
   students: EnrolledStudent[];
   onUpdateStudent: (updatedStudent: EnrolledStudent) => void;
@@ -345,7 +359,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               </div>
 
               {/* Performance & Capital Metrics */}
-              <div className="grid grid-cols-3 gap-2 bg-[#0D1110] p-3 rounded-xl border border-[#151D1A] text-xs">
+              <div className="grid grid-cols-3 gap-2 bg-[#0D1110] p-3 rounded-xl border border-[#1B2320] text-xs">
                 <div>
                   <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold block">Capital Enregistré</span>
                   <span className="font-mono font-black text-white text-sm">
@@ -384,7 +398,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               </div>
 
               {/* Private Notes Preview */}
-              <div className="bg-[#0D1110]/60 p-2.5 rounded-xl border border-[#151D1A]/80 text-[11px] text-slate-400 italic flex items-start gap-2">
+              <div className="bg-[#0D1110]/60 p-2.5 rounded-xl border border-[#1B2320]/80 text-[11px] text-slate-400 italic flex items-start gap-2">
                 <MessageSquare className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
                 <span className="line-clamp-2">
                   <strong className="not-italic text-slate-300">Note Coach : </strong>
@@ -762,6 +776,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
             {/* Accounts Section in Read-Only */}
             <div className="space-y-3">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <SectionHeader />
                 <Wallet className="w-4 h-4 text-[#00E676]" /> Portefeuilles & Comptes Attribués (
                 {(selectedStudent.studentAccountId ? realAccounts ?? [] : selectedStudent.accounts).length})
                 {selectedStudent.studentAccountId && (
@@ -789,7 +804,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                         </span>
                       </div>
                       <div className="text-slate-400 text-[11px]">Courtier/Prop Firm : {acc.firmOrBroker} ({acc.type})</div>
-                      <div className="flex items-center justify-between pt-2 border-t border-[#151D1A] font-mono">
+                      <div className="flex items-center justify-between pt-2 border-t border-[#1B2320] font-mono">
                         <span className="text-slate-500">Solde Réel:</span>
                         <span className="font-bold text-[#00E676] text-sm">{formatCurrency(acc.currentBalance)}</span>
                       </div>
@@ -802,6 +817,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
             {/* Recent Trades Journal in Read-Only */}
             <div className="space-y-3">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <SectionHeader />
                 <Activity className="w-4 h-4 text-[#00E676]" /> Historique Récent des Trades
                 {selectedStudent.studentAccountId && (
                   <span className="text-[10px] font-normal text-[#00E676] normal-case">

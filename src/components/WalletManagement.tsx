@@ -36,6 +36,20 @@ import {
  * branchement : remonter l'`accountId` à `App.tsx`, basculer l'onglet, et
  * pré-positionner le filtre du journal.
  */
+/**
+ * En-tête de section — barre verticale colorée + titre, motif repris tel
+ * quel de PerformanceDashboard.tsx pour un rendu cohérent sur tout l'écosystème.
+ */
+const SectionHeader: React.FC<{ children: React.ReactNode; color?: string }> = ({
+  children,
+  color = "bg-[#00E676]",
+}) => (
+  <div className="flex items-center gap-2">
+    <span className={`w-1 h-4 rounded-full ${color}`} />
+    <h3 className="text-sm font-bold text-white">{children}</h3>
+  </div>
+);
+
 interface WalletManagementProps {
   accounts: TradingAccount[];
   /**
@@ -180,11 +194,11 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
       {/* Capital Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-[#111615] p-4 rounded-xl border border-[#1B2320] space-y-1.5">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold flex items-center justify-between">
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold flex items-center justify-between">
             <span>Capital Total Cumulé</span>
             <DollarSign className="w-3.5 h-3.5 text-[#00E676]" />
           </div>
-          <div className="text-2xl font-black font-mono text-[#00E676]">
+          <div className="text-xl font-black font-mono text-[#00E676]">
             {formatCurrency(totalCombinedEquity)}
           </div>
           <div className="text-[11px] text-slate-500 flex items-center gap-1 font-mono">
@@ -202,11 +216,11 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
         </div>
 
         <div className="bg-[#111615] p-4 rounded-xl border border-[#1B2320] space-y-1.5">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold flex items-center justify-between">
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold flex items-center justify-between">
             <span>Comptes Actifs & Evaluation</span>
             <Building className="w-3.5 h-3.5 text-blue-400" />
           </div>
-          <div className="text-2xl font-black font-mono text-blue-300">
+          <div className="text-xl font-black font-mono text-blue-300">
             {accounts.length} Portefeuilles
           </div>
           <div className="text-[11px] text-slate-500">
@@ -215,22 +229,22 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
         </div>
 
         <div className="bg-[#111615] p-4 rounded-xl border border-[#1B2320] space-y-1.5">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold flex items-center justify-between">
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold flex items-center justify-between">
             <span>Profit Cumulé Net</span>
             <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
           </div>
-          <div className="text-2xl font-black font-mono text-amber-300">
+          <div className="text-xl font-black font-mono text-amber-300">
             +{formatCurrency(totalCombinedPnl)}
           </div>
           <div className="text-[11px] text-slate-500">Bénéfices réels enregistrés sur le desk</div>
         </div>
 
         <div className="bg-[#111615] p-4 rounded-xl border border-[#1B2320] space-y-1.5">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold flex items-center justify-between">
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold flex items-center justify-between">
             <span>Règle Risque Globale</span>
             <ShieldCheck className="w-3.5 h-3.5 text-rose-400" />
           </div>
-          <div className="text-2xl font-black font-mono text-rose-300 flex items-center gap-2">
+          <div className="text-xl font-black font-mono text-rose-300 flex items-center gap-2">
             <span>1.0% Max</span>
           </div>
           <div className="text-[11px] text-rose-300/80">Protection contre le Surtraitement</div>
@@ -258,9 +272,11 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: List of Accounts */}
         <div className="space-y-3 lg:col-span-1">
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
-            <Layers className="w-4 h-4 text-[#00E676]" /> Sélectionner un Compte ({filteredAccounts.length})
-          </h2>
+          <SectionHeader>
+            <span className="inline-flex items-center gap-2">
+              <Layers className="w-4 h-4 text-[#00E676]" /> Sélectionner un Compte ({filteredAccounts.length})
+            </span>
+          </SectionHeader>
 
           {filteredAccounts.map((acc) => {
             const isSelected = selectedAccount?.id === acc.id;
@@ -274,7 +290,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 className={`p-4 rounded-xl border transition-all cursor-pointer space-y-3 ${
                   isSelected
                     ? "bg-[#111615] border-[#00E676]/40"
-                    : "bg-[#0D1110] border-[#151D1A] hover:border-[#00E676]/20"
+                    : "bg-[#0D1110] border-[#1B2320] hover:border-[#00E676]/20"
                 }`}
               >
                 <div className="flex items-start justify-between">
@@ -299,7 +315,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   </span>
                 </div>
 
-                <div className="flex items-baseline justify-between pt-2 border-t border-[#151D1A]">
+                <div className="flex items-baseline justify-between pt-2 border-t border-[#1B2320]">
                   <div>
                     <div className="text-[10px] text-slate-500">Solde Actuel</div>
                     <div className="text-base font-bold font-mono text-white">
@@ -375,9 +391,11 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
 
             {/* Drawdown & Objectives Tracker Bars */}
             <div className="space-y-4">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider font-mono flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[#00E676]" /> Règles de Risk & Drawdown Prop Firm
-              </h3>
+              <SectionHeader color="bg-rose-500">
+                <span className="inline-flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-[#00E676]" /> Règles de Risk & Drawdown Prop Firm
+                </span>
+              </SectionHeader>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Daily Loss Limit Card */}
@@ -396,7 +414,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     : "text-[#00E676]";
 
                   return (
-                    <div className="bg-[#0D1110] p-4 rounded-xl border border-[#151D1A] space-y-3">
+                    <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] space-y-3">
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-slate-400 font-medium flex items-center gap-1">
                           <AlertTriangle className="w-3.5 h-3.5 text-amber-400" /> Drawdown Quotidien Max
@@ -443,7 +461,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   const distanceToInvalidation = totalMax - totalLossAbs;
 
                   return (
-                    <div className="bg-[#0D1110] p-4 rounded-xl border border-[#151D1A] space-y-3">
+                    <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] space-y-3">
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-slate-400 font-medium flex items-center gap-1">
                           <XCircle className="w-3.5 h-3.5 text-rose-400" /> Drawdown Total Max (Invalidation)
@@ -478,7 +496,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
               {/* `initialBalance > 0` : sert de diviseur juste en dessous — un compte
                   legacy/malformé à 0 ou négatif donnerait un pourcentage NaN/inversé. */}
               {selectedAccount.profitTargetPercent > 0 && selectedAccount.initialBalance > 0 && (
-                <div className="bg-[#0D1110] p-4 rounded-xl border border-[#151D1A] space-y-3">
+                <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] space-y-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-200 font-bold flex items-center gap-1.5">
                       <Award className="w-4 h-4 text-[#00E676]" /> Objectif de Validation (Profit Target)
@@ -528,30 +546,30 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
             </div>
 
             {/* Quick Stats Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#0D1110] p-4 rounded-xl border border-[#151D1A] text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] text-xs">
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Jours de Trading</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Jours de Trading</div>
                 <div className="text-sm font-bold text-white mt-1">
                   {selectedAccount.tradingDays} / {selectedAccount.minTradingDaysRequired} jours min
                 </div>
               </div>
 
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Trades Exécutés</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Trades Exécutés</div>
                 <div className="text-sm font-bold text-white mt-1">
                   {positionsDuCompte(selectedAccount.id)} positions
                 </div>
               </div>
 
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Capital Initial</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Capital Initial</div>
                 <div className="text-sm font-bold text-white mt-1 font-mono">
                   {formatCurrency(selectedAccount.initialBalance)}
                 </div>
               </div>
 
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Solde Actuel</div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Solde Actuel</div>
                 <div className="text-sm font-bold text-[#00E676] mt-1 font-mono">
                   {formatCurrency(selectedAccount.equity)}
                 </div>
