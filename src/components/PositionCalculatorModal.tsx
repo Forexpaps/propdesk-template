@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Calculator, Shield, DollarSign, ArrowRight, Check, X, AlertCircle } from "lucide-react";
+import { Calculator, X, Check } from "lucide-react";
 import { formatCurrency } from "../lib/format";
 
 interface PositionCalculatorModalProps {
@@ -17,86 +17,162 @@ interface PositionCalculatorModalProps {
   }) => void;
 }
 
+type AssetClass = "Forex" | "Indices" | "Crypto" | "Métaux";
+
+const DEFAULT_CONTRACT: Record<AssetClass, number> = {
+  Forex: 100000,
+  Indices: 1,
+  Crypto: 1,
+  Métaux: 100,
+};
+
+/** Micro-label en petites majuscules espacées — même motif que Rentabilité/Macro. */
+const MicroLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">{children}</span>
+);
+
+/** Carte flat à bordure fine, sans ombre — un des 4 calculateurs. */
+const CalcCard: React.FC<{ title: string; subtitle: string; children: React.ReactNode }> = ({
+  title,
+  subtitle,
+  children,
+}) => (
+  <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4">
+    <div>
+      <h4 className="text-sm font-bold text-white">{title}</h4>
+      <p className="text-[11px] text-slate-500 mt-0.5">{subtitle}</p>
+    </div>
+    {children}
+  </div>
+);
+
+const FieldInput: React.FC<{
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  step?: string;
+}> = ({ label, value, onChange, step = "0.0001" }) => (
+  <div>
+    <label className="block text-[10px] text-slate-500 mb-1 font-sans">{label}</label>
+    <input
+      type="number"
+      step={step}
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white text-sm font-mono font-bold focus:outline-none focus:border-[#00E676]"
+    />
+  </div>
+);
+
+const ResultRow: React.FC<{ label: string; value: React.ReactNode; valueClassName?: string }> = ({
+  label,
+  value,
+  valueClassName = "text-white",
+}) => (
+  <div className="flex items-center justify-between text-xs border-t border-[#1B2320] pt-2.5">
+    <span className="text-slate-400 font-sans">{label}</span>
+    <span className={`font-mono font-bold ${valueClassName}`}>{value}</span>
+  </div>
+);
+
 export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = ({
   isOpen,
   onClose,
   defaultCapital,
   onApplyToJournal,
 }) => {
+  const [assetClass, setAssetClass] = useState<AssetClass>("Forex");
   const [pair, setPair] = useState("EUR/USD");
-  const [capital, setCapital] = useState<number>(defaultCapital || 25000);
-  const [riskPercent, setRiskPercent] = useState<number>(1); // 1%
-  const [entryPrice, setEntryPrice] = useState<number>(1.0850);
-  const [stopLoss, setStopLoss] = useState<number>(1.0820);
-  const [takeProfit, setTakeProfit] = useState<number>(1.0940);
-  const [direction, setDirection] = useState<"LONG" | "SHORT">("LONG");
   const [copied, setCopied] = useState(false);
+
+  // Panneau 1 — Taille de position & risque
+  const [capital, setCapital] = useState<number>(defaultCapital || 10000);
+  const [riskPercent, setRiskPercent] = useState<number>(1);
+  const [contract1, setContract1] = useState<number>(DEFAULT_CONTRACT.Forex);
+  const [entry1, setEntry1] = useState<number>(1.085);
+  const [stop1, setStop1] = useState<number>(1.082);
+  const [target1, setTarget1] = useState<number>(1.092);
+
+  // Panneau 2 — Risque / Rendement
+  const [entry2, setEntry2] = useState<number>(1.085);
+  const [stop2, setStop2] = useState<number>(1.082);
+  const [target2, setTarget2] = useState<number>(1.092);
+
+  // Panneau 3 — Valeur du pip
+  const [lots3, setLots3] = useState<number>(1);
+  const [pipSize3, setPipSize3] = useState<number>(0.0001);
+  const [contract3, setContract3] = useState<number>(DEFAULT_CONTRACT.Forex);
+
+  // Panneau 4 — Profit / Perte
+  const [entry4, setEntry4] = useState<number>(1.085);
+  const [exit4, setExit4] = useState<number>(1.09);
+  const [units4, setUnits4] = useState<number>(100000);
+  const [direction4, setDirection4] = useState<"LONG" | "SHORT">("LONG");
 
   if (!isOpen) return null;
 
-  // Calculation Logic
-  const riskAmount = (capital * riskPercent) / 100;
-  
-  // Calculate Pips / Points difference
-  const isIndices = pair.includes("NAS") || pair.includes("US30") || pair.includes("GER40");
-  const isCrypto = pair.includes("BTC") || pair.includes("ETH");
-  const isJpy = pair.includes("JPY");
+  const handleAssetClass = (ac: AssetClass) => {
+    setAssetClass(ac);
+    setContract1(DEFAULT_CONTRACT[ac]);
+    setContract3(DEFAULT_CONTRACT[ac]);
+  };
 
-  let pipMultiplier = 10000; // Standard Forex 4 decimals
-  if (isJpy) pipMultiplier = 100;
-  if (isIndices || isCrypto) pipMultiplier = 1;
+  // --- Panneau 1 : Taille de position & risque ---
+  const riskAmount1 = (capital * riskPercent) / 100;
+  const isLong1 = target1 >= entry1;
+  const riskDiff1 = Math.abs(entry1 - stop1);
+  const rewardDiff1 = Math.abs(target1 - entry1);
+  const units1 = riskDiff1 > 0 ? riskAmount1 / riskDiff1 : 0;
+  const lots1 = contract1 > 0 ? units1 / contract1 : 0;
+  const potentialProfit1 = units1 * rewardDiff1;
+  const rr1 = riskDiff1 > 0 ? rewardDiff1 / riskDiff1 : 0;
 
-  const priceDiff = direction === "LONG" ? entryPrice - stopLoss : stopLoss - entryPrice;
-  const pipsSL = Math.abs(priceDiff * pipMultiplier);
+  // --- Panneau 2 : Risque / Rendement ---
+  const isLong2 = target2 >= entry2;
+  const riskDiff2 = Math.abs(entry2 - stop2);
+  const rewardDiff2 = Math.abs(target2 - entry2);
+  const riskPct2 = entry2 > 0 ? (riskDiff2 / entry2) * 100 : 0;
+  const gainPct2 = entry2 > 0 ? (rewardDiff2 / entry2) * 100 : 0;
+  const rr2 = riskDiff2 > 0 ? rewardDiff2 / riskDiff2 : 0;
+  const breakevenWinRate2 = rr2 > 0 ? (1 / (1 + rr2)) * 100 : 0;
 
-  const profitDiff = direction === "LONG" ? takeProfit - entryPrice : entryPrice - takeProfit;
-  const pipsTP = Math.abs(profitDiff * pipMultiplier);
+  // --- Panneau 3 : Valeur du pip ---
+  const totalUnits3 = lots3 * contract3;
+  const valuePerPipPerLot3 = contract3 * pipSize3;
+  const pipValue3 = lots3 * valuePerPipPerLot3;
 
-  const riskRewardRatio = pipsSL > 0 ? parseFloat((pipsTP / pipsSL).toFixed(2)) : 0;
-  const potentialReward = riskAmount * riskRewardRatio;
-
-  // Calculate Lot Size
-  // 1 standard forex lot = 100,000 units = $10 per pip on EUR/USD
-  let lotSize = 0;
-  if (pipsSL > 0) {
-    if (isIndices) {
-      lotSize = parseFloat((riskAmount / (pipsSL || 1)).toFixed(2));
-    } else if (isCrypto) {
-      lotSize = parseFloat((riskAmount / (pipsSL || 1)).toFixed(3));
-    } else {
-      // Forex standard lot: 1 Pip = $10 for 1 lot
-      const pipValuePerLot = isJpy ? 7.5 : 10;
-      lotSize = parseFloat((riskAmount / (pipsSL * pipValuePerLot)).toFixed(2));
-    }
-  }
+  // --- Panneau 4 : Profit / Perte ---
+  const movement4 = exit4 - entry4;
+  const movementPct4 = entry4 > 0 ? (Math.abs(movement4) / entry4) * 100 : 0;
+  const pnl4 = (direction4 === "LONG" ? movement4 : -movement4) * units4;
 
   const handleApply = () => {
     if (onApplyToJournal) {
       onApplyToJournal({
         pair,
-        entryPrice,
-        stopLoss,
-        takeProfit,
-        lotSize,
-        riskAmount,
-        riskRewardRatio,
+        entryPrice: entry1,
+        stopLoss: stop1,
+        takeProfit: target1,
+        lotSize: parseFloat(lots1.toFixed(3)),
+        riskAmount: riskAmount1,
+        riskRewardRatio: parseFloat(rr1.toFixed(2)),
       });
     }
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
-      <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-xl w-full p-6 space-y-6 shadow-2xl relative text-slate-100">
+    <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4 font-sans overflow-y-auto">
+      <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-5xl w-full my-8 shadow-2xl relative text-slate-100 max-h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
+        <div className="p-5 sm:p-6 border-b border-[#1B2320] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20">
               <Calculator className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Calculateur de Risk & Position Size</h3>
-              <p className="text-xs text-slate-400">Calculez précisément vos lots MetaTrader & Prop Firm</p>
+              <h3 className="text-base font-bold text-white">Calculateurs de Trading</h3>
+              <p className="text-xs text-slate-400">Position, risque, valeur du pip et profit — en un coup d'œil</p>
             </div>
           </div>
           <button
@@ -107,160 +183,133 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
           </button>
         </div>
 
-        {/* Direction Switch */}
-        <div className="grid grid-cols-2 gap-2 bg-[#0D1110] p-1 rounded-xl border border-[#1B2320] text-xs font-bold">
-          <button
-            onClick={() => {
-              setDirection("LONG");
-              if (stopLoss > entryPrice) {
-                const temp = stopLoss;
-                setStopLoss(entryPrice);
-                setEntryPrice(temp);
-              }
-            }}
-            className={`py-2 rounded-lg transition-all ${
-              direction === "LONG"
-                ? "bg-[#00E676] text-slate-950 shadow-md font-extrabold"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            ACHAT (LONG) 📈
-          </button>
-          <button
-            onClick={() => {
-              setDirection("SHORT");
-              if (stopLoss < entryPrice) {
-                const temp = stopLoss;
-                setStopLoss(entryPrice);
-                setEntryPrice(temp);
-              }
-            }}
-            className={`py-2 rounded-lg transition-all ${
-              direction === "SHORT"
-                ? "bg-rose-500 text-white shadow-md font-extrabold"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            VENTE (SHORT) 📉
-          </button>
-        </div>
-
-        {/* Form Inputs Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
-          <div>
-            <label className="block text-slate-400 mb-1 font-sans">Paire / Instrument</label>
-            <select
-              value={pair}
-              onChange={(e) => setPair(e.target.value)}
-              className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2.5 text-white font-bold focus:outline-none focus:border-[#00E676]"
-            >
-              <option value="EUR/USD">EUR/USD (Forex)</option>
-              <option value="GBP/USD">GBP/USD (Forex)</option>
-              <option value="USD/JPY">USD/JPY (Forex)</option>
-              <option value="XAU/USD">XAU/USD (Or)</option>
-              <option value="NAS100">NAS100 (Indice US)</option>
-              <option value="US30">US30 (Dow Jones)</option>
-              <option value="BTC/USDT">BTC/USDT (Crypto)</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-slate-400 mb-1 font-sans">Capital du Compte ($)</label>
-            <input
-              type="number"
-              value={capital}
-              onChange={(e) => setCapital(Number(e.target.value))}
-              className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2.5 text-white font-bold focus:outline-none focus:border-[#00E676]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-slate-400 mb-1 font-sans">Risque % par Trade</label>
-            <div className="flex gap-1.5">
-              {[0.5, 1, 2].map((r) => (
+        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
+          {/* Classe d'actif + paire (pour "Appliquer au Journal") */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="grid grid-cols-4 gap-1.5 bg-[#0D1110] p-1 rounded-xl border border-[#1B2320] text-xs font-bold w-full sm:w-auto">
+              {(["Forex", "Indices", "Crypto", "Métaux"] as AssetClass[]).map((ac) => (
                 <button
-                  key={r}
-                  onClick={() => setRiskPercent(r)}
-                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition-all ${
-                    riskPercent === r
-                      ? "bg-[#00E676]/15 border-[#00E676] text-[#00E676]"
-                      : "bg-[#0D1110] border-[#1B2320] text-slate-400"
+                  key={ac}
+                  onClick={() => handleAssetClass(ac)}
+                  className={`px-3 py-1.5 rounded-lg transition-all ${
+                    assetClass === ac
+                      ? "bg-[#00E676] text-slate-950 font-extrabold"
+                      : "text-slate-400 hover:text-white"
                   }`}
                 >
-                  {r}%
+                  {ac}
                 </button>
               ))}
+            </div>
+            <div className="flex items-center gap-2 text-xs sm:ml-auto">
+              <MicroLabel>Paire (pour le journal)</MicroLabel>
               <input
-                type="number"
-                step="0.1"
-                value={riskPercent}
-                onChange={(e) => setRiskPercent(Number(e.target.value))}
-                className="w-16 bg-[#0D1110] border border-[#1B2320] rounded-lg px-2 text-center text-white font-bold"
+                type="text"
+                value={pair}
+                onChange={(e) => setPair(e.target.value)}
+                className="bg-[#0D1110] border border-[#1B2320] rounded-lg px-2.5 py-1.5 text-white font-mono font-bold w-32 focus:outline-none focus:border-[#00E676]"
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-slate-400 mb-1 font-sans">Prix d'Entrée</label>
-            <input
-              type="number"
-              step="0.0001"
-              value={entryPrice}
-              onChange={(e) => setEntryPrice(Number(e.target.value))}
-              className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2.5 text-white font-bold focus:outline-none focus:border-[#00E676]"
-            />
-          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* Panneau 1 : Taille de position & risque */}
+            <CalcCard title="Taille de position & risque" subtitle="Taille pour ne risquer qu'un % du capital + profit potentiel et perte max.">
+              <div className="grid grid-cols-3 gap-2.5">
+                <FieldInput label="Capital (€/$)" value={capital} onChange={setCapital} step="100" />
+                <FieldInput label="Risque (%)" value={riskPercent} onChange={setRiskPercent} step="0.1" />
+                <FieldInput label="Contrat" value={contract1} onChange={setContract1} step="1" />
+              </div>
+              <div className="grid grid-cols-3 gap-2.5">
+                <FieldInput label="Entrée" value={entry1} onChange={setEntry1} />
+                <FieldInput label="Stop-loss" value={stop1} onChange={setStop1} />
+                <FieldInput label="Objectif" value={target1} onChange={setTarget1} />
+              </div>
+              <div className="space-y-0">
+                <ResultRow label="Taille (unités)" value={units1.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} />
+                <ResultRow label="≈ Lots" value={lots1.toFixed(2)} valueClassName="text-blue-400" />
+                <ResultRow label="Perte maximale" value={`-${formatCurrency(riskAmount1)}`} valueClassName="text-rose-400" />
+                <ResultRow label="Profit potentiel" value={`+${formatCurrency(potentialProfit1)}`} valueClassName="text-[#00E676]" />
+                <ResultRow label="Ratio R:R" value={`1 : ${rr1.toFixed(2)}`} valueClassName="text-[#00E676]" />
+              </div>
+            </CalcCard>
 
-          <div>
-            <label className="block text-slate-400 mb-1 font-sans">Stop Loss (SL)</label>
-            <input
-              type="number"
-              step="0.0001"
-              value={stopLoss}
-              onChange={(e) => setStopLoss(Number(e.target.value))}
-              className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2.5 text-white font-bold focus:outline-none focus:border-rose-500"
-            />
-          </div>
+            {/* Panneau 2 : Risque / Rendement */}
+            <CalcCard title="Risque / Rendement" subtitle="Le ratio R:R et le taux de réussite pour être à l'équilibre.">
+              <div className="grid grid-cols-3 gap-2.5">
+                <FieldInput label="Entrée" value={entry2} onChange={setEntry2} />
+                <FieldInput label="Stop" value={stop2} onChange={setStop2} />
+                <FieldInput label="Objectif" value={target2} onChange={setTarget2} />
+              </div>
+              <div className="space-y-0">
+                <ResultRow label="Sens" value={isLong2 ? "Achat (long)" : "Vente (short)"} />
+                <ResultRow
+                  label="Risque / Gain"
+                  value={`${riskPct2.toFixed(2)}% / ${gainPct2.toFixed(2)}%`}
+                />
+                <ResultRow label="Ratio R:R" value={`1 : ${rr2.toFixed(2)}`} valueClassName="text-[#00E676]" />
+                <ResultRow
+                  label="% gagnants pour l'équilibre"
+                  value={`${breakevenWinRate2.toFixed(1)} %`}
+                  valueClassName="text-amber-400"
+                />
+              </div>
+            </CalcCard>
 
-          <div>
-            <label className="block text-slate-400 mb-1 font-sans">Take Profit (TP)</label>
-            <input
-              type="number"
-              step="0.0001"
-              value={takeProfit}
-              onChange={(e) => setTakeProfit(Number(e.target.value))}
-              className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2.5 text-white font-bold focus:outline-none focus:border-[#00E676]"
-            />
-          </div>
-        </div>
+            {/* Panneau 3 : Valeur du pip */}
+            <CalcCard title="Valeur du pip" subtitle="Combien vaut 1 pip selon la taille de position (devise de cotation).">
+              <div className="grid grid-cols-3 gap-2.5">
+                <FieldInput label="Lots" value={lots3} onChange={setLots3} step="0.01" />
+                <FieldInput label="Taille pip" value={pipSize3} onChange={setPipSize3} step="0.0001" />
+                <FieldInput label="Contrat" value={contract3} onChange={setContract3} step="1" />
+              </div>
+              <div className="space-y-0">
+                <ResultRow label="Unités" value={totalUnits3.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} />
+                <ResultRow label="Valeur / pip / lot" value={formatCurrency(valuePerPipPerLot3)} />
+                <ResultRow label="Valeur du pip" value={formatCurrency(pipValue3)} valueClassName="text-blue-400" />
+              </div>
+            </CalcCard>
 
-        {/* Calculated Results Card */}
-        <div className="bg-[#0D1110] border border-[#00E676]/30 rounded-xl p-4 space-y-3 font-mono">
-          <div className="flex items-center justify-between text-xs border-b border-[#1B2320] pb-2">
-            <span className="text-slate-400 font-sans">Montant Risqué :</span>
-            <span className="text-rose-400 font-bold">-{formatCurrency(riskAmount)}</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 text-center">
-            <div className="bg-[#111615] p-3 rounded-lg border border-[#1B2320]">
-              <span className="text-[10px] text-slate-400 block uppercase font-sans">Taille du Lot à Passer</span>
-              <span className="text-xl font-black text-[#00E676]">{lotSize} Lot(s)</span>
-              <span className="text-[10px] text-slate-500 block">({pipsSL.toFixed(1)} Pips / Points SL)</span>
-            </div>
-
-            <div className="bg-[#111615] p-3 rounded-lg border border-[#1B2320]">
-              <span className="text-[10px] text-slate-400 block uppercase font-sans">Ratio R:R & Gain Potentiel</span>
-              <span className="text-xl font-black text-[#00E676]">1 : {riskRewardRatio}</span>
-              <span className="text-[10px] text-[#00E676] block font-bold">+{formatCurrency(potentialReward)}</span>
-            </div>
+            {/* Panneau 4 : Profit / Perte */}
+            <CalcCard title="Profit / Perte" subtitle="Le résultat d'un trade entre l'entrée et la sortie.">
+              <div className="grid grid-cols-2 gap-2.5">
+                <FieldInput label="Entrée" value={entry4} onChange={setEntry4} />
+                <FieldInput label="Sortie" value={exit4} onChange={setExit4} />
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <FieldInput label="Taille (unités)" value={units4} onChange={setUnits4} step="1" />
+                <div>
+                  <label className="block text-[10px] text-slate-500 mb-1 font-sans">Sens</label>
+                  <select
+                    value={direction4}
+                    onChange={(e) => setDirection4(e.target.value as "LONG" | "SHORT")}
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white text-sm font-mono font-bold focus:outline-none focus:border-[#00E676]"
+                  >
+                    <option value="LONG">Achat (long)</option>
+                    <option value="SHORT">Vente (short)</option>
+                  </select>
+                </div>
+              </div>
+              <div className="space-y-0">
+                <ResultRow
+                  label="Mouvement"
+                  value={`${movement4 >= 0 ? "+" : ""}${movement4.toFixed(5)} (${movementPct4.toFixed(2)}%)`}
+                />
+                <ResultRow
+                  label="Profit / Perte"
+                  value={`${pnl4 >= 0 ? "+" : ""}${formatCurrency(pnl4)}`}
+                  valueClassName={pnl4 >= 0 ? "text-[#00E676]" : "text-rose-400"}
+                />
+              </div>
+            </CalcCard>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-t border-[#1B2320] shrink-0">
           <button
             onClick={() => {
-              const text = `Position ${pair} (${direction}) - Lots: ${lotSize} - SL: ${stopLoss} (${pipsSL.toFixed(1)} pips) - Risque: ${formatCurrency(riskAmount)}`;
+              const text = `Position ${pair} — Lots: ${lots1.toFixed(2)} — SL: ${stop1} — Risque: ${formatCurrency(riskAmount1)} — R:R 1:${rr1.toFixed(2)}`;
               navigator.clipboard.writeText(text);
               setCopied(true);
               setTimeout(() => setCopied(false), 2000);
