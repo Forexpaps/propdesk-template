@@ -49,6 +49,18 @@ export interface PerformanceStats {
   mistakeChartData: { mistake: string; count: number; cost: number }[];
   totalErrorsCost: number;
   netResultWithoutErrors: number;
+  profitFactor: string;
+  avgRR: string;
+  /** Plus forte baisse depuis un sommet de la courbe d'équité, en % (0 si jamais en baisse). */
+  drawdownMaxPercent: number;
+  /** PnL net moyen par trade (tous résultats confondus) — 0 sans trade. */
+  expectancyPerTrade: number;
+  /** Moyenne des trades gagnants / perdants (en $, 0 s'il n'y en a aucun). */
+  avgWin: number;
+  avgLoss: number;
+  monthlyChartData: { month: string; pnl: number; tradesCount: number }[];
+  hourChartData: { hour: string; pnl: number; tradesCount: number }[];
+  marketChartData: { market: string; pnl: number; tradesCount: number }[];
 }
 
 export function computePerformanceStats(student: StudentProfile, trades: Trade[]): PerformanceStats {
@@ -247,6 +259,89 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   const totalErrorsCost = mistakeChartData.reduce((acc, m) => acc + m.cost, 0);
   const netResultWithoutErrors = totalPnL - totalErrorsCost;
 
+  // 9. Profit factor & R/R moyen — même calcul que le résumé du Journal
+  // (computeJournalSummary ci-dessous), jamais dupliqué.
+  const { profitFactor, avgRR } = computeJournalSummary(trades);
+
+  // 10. Drawdown max — plus forte baisse depuis un sommet, rejouée sur la
+  // même courbe que `equityData` (capital de départ, puis chaque trade en $
+  // dans l'ordre chronologique).
+  let peakCapital = student.startingCapital;
+  let drawdownMaxPercent = 0;
+  equityData.forEach((point) => {
+    peakCapital = Math.max(peakCapital, point.capital);
+    if (peakCapital > 0) {
+      const drawdown = ((peakCapital - point.capital) / peakCapital) * 100;
+      drawdownMaxPercent = Math.max(drawdownMaxPercent, drawdown);
+    }
+  });
+
+  // 11. Espérance par trade & gains/pertes moyens — trades en $ uniquement,
+  // un trade en % n'étant pas une somme d'argent comparable.
+  const expectancyPerTrade = totalTrades > 0 ? totalPnL / totalTrades : 0;
+  const winningTrades = tradesEnDollars.filter((t) => t.pnl > 0);
+  const losingTrades = tradesEnDollars.filter((t) => t.pnl < 0);
+  const avgWin = winningTrades.length > 0 ? winningTrades.reduce((a, t) => a + t.pnl, 0) / winningTrades.length : 0;
+  const avgLoss = losingTrades.length > 0 ? losingTrades.reduce((a, t) => a + t.pnl, 0) / losingTrades.length : 0;
+
+  // 12. Performance mensuelle — cumul du PnL par mois calendaire, dans
+  // l'ordre chronologique d'apparition (pas un calendrier plein préformaté :
+  // un mois sans aucun trade n'a rien à montrer).
+  const MONTH_LABELS = [
+    "Jan", "Fév", "Mar", "Avr", "Mai", "Juin",
+    "Juil", "Août", "Sep", "Oct", "Nov", "Déc",
+  ];
+  const monthlyStats = new Map<string, { pnl: number; count: number; order: number }>();
+  tradesEnDollars.forEach((t) => {
+    const [y, m] = t.date.split("-").map(Number);
+    const key = `${y}-${String(m).padStart(2, "0")}`;
+    if (!monthlyStats.has(key)) {
+      monthlyStats.set(key, { pnl: 0, count: 0, order: y * 12 + (m ?? 1) });
+    }
+    const entry = monthlyStats.get(key)!;
+    entry.pnl += t.pnl;
+    entry.count += 1;
+  });
+  const monthlyChartData = [...monthlyStats.entries()]
+    .sort((a, b) => a[1].order - b[1].order)
+    .map(([key, s]) => {
+      const monthIndex = Number(key.split("-")[1]) - 1;
+      return { month: MONTH_LABELS[monthIndex] ?? key, pnl: s.pnl, tradesCount: s.count };
+    });
+
+  // 13. Répartition par heure d'entrée — même donnée libre "HH:MM" que la
+  // répartition par session, regroupée cette fois heure par heure plutôt que
+  // par plage de session.
+  const hourStats: Record<string, CategoryStats> = {};
+  tradesEnDollars.forEach((t) => {
+    if (!t.time) return;
+    const hour = parseInt(t.time.split(":")[0], 10);
+    if (Number.isNaN(hour)) return;
+    const key = `${String(hour).padStart(2, "0")}h`;
+    if (!hourStats[key]) hourStats[key] = { wins: 0, total: 0, pnl: 0 };
+    hourStats[key].total += 1;
+    if (t.result === "WIN") hourStats[key].wins += 1;
+    hourStats[key].pnl += t.pnl;
+  });
+  const hourChartData = Object.keys(hourStats)
+    .sort()
+    .map((h) => ({ hour: h, pnl: hourStats[h].pnl, tradesCount: hourStats[h].total }));
+
+  // 14. Répartition par marché — `Trade.marketCategory`, jamais absent (champ
+  // obligatoire à la saisie), donc pas de catégorie "non renseigné" à gérer.
+  const marketStats: Record<string, CategoryStats> = {};
+  trades.forEach((t) => {
+    if (!marketStats[t.marketCategory]) marketStats[t.marketCategory] = { wins: 0, total: 0, pnl: 0 };
+    marketStats[t.marketCategory].total += 1;
+    if (t.result === "WIN") marketStats[t.marketCategory].wins += 1;
+    if ((t.pnlUnit ?? "USD") !== "PERCENT") marketStats[t.marketCategory].pnl += t.pnl;
+  });
+  const marketChartData = Object.keys(marketStats).map((market) => ({
+    market,
+    pnl: marketStats[market].pnl,
+    tradesCount: marketStats[market].total,
+  }));
+
   return {
     equityData,
     strategyChartData,
@@ -267,6 +362,15 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
     mistakeChartData,
     totalErrorsCost,
     netResultWithoutErrors,
+    profitFactor,
+    avgRR,
+    drawdownMaxPercent,
+    expectancyPerTrade,
+    avgWin,
+    avgLoss,
+    monthlyChartData,
+    hourChartData,
+    marketChartData,
   };
 }
 

@@ -631,7 +631,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
               <PerformanceDashboard
                 student={studentProfile}
                 trades={syncedTrades}
-                courseCompletionPercentage={courseCompletionPercentage}
               />
             )}
 
@@ -1558,7 +1557,6 @@ function AcademyApp({
             <PerformanceDashboard
               student={displayStudent}
               trades={trades}
-              courseCompletionPercentage={courseCompletionPercentage}
             />
           )}
 

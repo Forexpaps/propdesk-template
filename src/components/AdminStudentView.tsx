@@ -229,7 +229,6 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
               <PerformanceDashboard
                 student={readOnlyStudent}
                 trades={studentData.trades}
-                courseCompletionPercentage={courseCompletionPercentage}
               />
             )}
 
