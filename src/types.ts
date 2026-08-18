@@ -189,6 +189,28 @@ export interface CoachMessage {
   status: "sent" | "delivered" | "read" | "replied";
 }
 
+/**
+ * Contenu du module « Plan de trading » (section Pratique).
+ *
+ * Persisté en `localStorage` (`horizon_trading_plan`) et non sur le profil
+ * serveur — même choix que `MindsetJournalModal`, voir ce composant : la
+ * route `PUT /api/profile` est réservée au staff (le profil élève n'existe
+ * pas en tant que tel), un vrai module multi-appareils demanderait une
+ * collection serveur dédiée, hors périmètre de cette demande.
+ */
+export interface TradingPlanData {
+  authorizedSessions: string[];
+  tradingHours: string;
+  trackedAssets: string;
+  authorizedSetups: string;
+  riskPerTradePercent: string;
+  maxTradesPerDay: string;
+  maxDailyLossPercent: string;
+  entryConditions: string;
+  stopConditions: string;
+  goldenRules: string;
+}
+
 export interface StudentProfile {
   name: string;
   email: string;
