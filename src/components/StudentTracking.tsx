@@ -399,8 +399,11 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
       {/* EDIT MODAL / FICHE ÉLÈVE MODULABLE */}
       {isEditingFile && selectedStudent && (
         <div className="fixed inset-0 z-50 bg-[#0D1110]/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-3xl w-full p-6 space-y-6 shadow-2xl relative my-8">
-            <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
+          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-3xl w-full shadow-2xl relative my-8 max-h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
+            {/* En-tête collée en haut : voir UserProfileModal.tsx pour le
+                détail du correctif — une fiche élève avec beaucoup de champs
+                poussait sinon le titre et le bouton fermer hors de portée. */}
+            <div className="shrink-0 sticky top-0 z-10 bg-[#111615] px-6 pt-6 pb-4 flex items-center justify-between border-b border-[#1B2320]">
               <div className="flex items-center gap-3">
                 <img
                   src={selectedStudent.avatar}
@@ -423,6 +426,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               </button>
             </div>
 
+            <div className="flex-1 overflow-y-auto px-6 py-5">
             <form onSubmit={handleSaveStudentFile} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -595,6 +599,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 </div>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}
@@ -602,14 +607,15 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
       {/* CREATE STUDENT MODAL */}
       {isCreatingStudent && (
         <div className="fixed inset-0 z-50 bg-[#0D1110]/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-xl w-full p-6 space-y-5 shadow-2xl relative my-8">
-            <div className="flex items-center justify-between border-b border-[#1B2320] pb-3">
+          <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-xl w-full shadow-2xl relative my-8 max-h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
+            <div className="shrink-0 sticky top-0 z-10 bg-[#111615] px-6 pt-6 pb-3 flex items-center justify-between border-b border-[#1B2320]">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 <Plus className="w-5 h-5 text-[#00E676]" /> Inscrire un Nouvel Élève
               </h3>
               <button onClick={() => setIsCreatingStudent(false)} className="text-slate-400 hover:text-white">✕</button>
             </div>
 
+            <div className="flex-1 overflow-y-auto px-6 py-5">
             <form onSubmit={handleCreateNewStudent} className="space-y-4 text-xs">
               <div>
                 <label className="block text-slate-300 font-medium mb-1">Nom Complet</label>
@@ -685,6 +691,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 </button>
               </div>
             </form>
+            </div>
           </div>
         </div>
       )}
@@ -692,7 +699,12 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
       {/* READ ONLY PREVIEW MODAL / MODE LECTURE ÉLÈVE */}
       {isReadOnlyPreview && selectedStudent && (
         <div className="fixed inset-0 z-50 bg-[#0D1110]/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-[#111615] border border-[#00E676]/40 rounded-2xl max-w-4xl w-full p-6 space-y-6 shadow-2xl relative my-8">
+          <div className="bg-[#111615] border border-[#00E676]/40 rounded-2xl max-w-4xl w-full shadow-2xl relative my-8 max-h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
+            {/* En-tête collée en haut (bannière + profil élève) : voir
+                UserProfileModal.tsx pour le détail du correctif — cette vue,
+                la plus longue des quatre modales de ce fichier, est celle qui
+                dépassait le plus souvent la hauteur de l'écran. */}
+            <div className="shrink-0 sticky top-0 z-10 bg-[#111615] px-6 pt-6 pb-3 space-y-3 border-b border-[#1B2320]">
             {/* Top Banner indicating Read-Only Inspection Mode */}
             <div className="bg-[#00E676]/10 border border-[#00E676]/30 p-3 rounded-xl flex items-center justify-between text-xs">
               <div className="flex items-center gap-2 text-[#00E676] font-medium">
@@ -744,7 +756,9 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 </div>
               </div>
             </div>
+            </div>
 
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
             {/* Accounts Section in Read-Only */}
             <div className="space-y-3">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -838,6 +852,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 <MessageSquare className="w-3.5 h-3.5" /> Notes Confidentielles du Coach :
               </span>
               <p className="text-slate-300 italic">{selectedStudent.privateCoachNotes}</p>
+            </div>
             </div>
           </div>
         </div>

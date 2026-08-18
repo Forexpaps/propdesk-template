@@ -118,8 +118,11 @@ export const StaffAccountsModal: React.FC<StaffAccountsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto font-sans">
-      <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-lg w-full p-6 space-y-6 shadow-2xl relative my-8 text-slate-100">
-        <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
+      <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-lg w-full shadow-2xl relative my-8 text-slate-100 max-h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
+        {/* En-tête collée en haut : voir UserProfileModal.tsx pour le détail du
+            correctif (une longue liste de coachs poussait sinon le haut de la
+            modale — titre et bouton fermer compris — hors de portée). */}
+        <div className="shrink-0 sticky top-0 z-10 bg-[#111615] px-6 pt-6 pb-4 flex items-center justify-between border-b border-[#1B2320]">
           <div>
             <h3 className="text-base font-bold text-white">Membres du staff</h3>
             <p className="text-xs text-slate-400">
@@ -136,6 +139,7 @@ export const StaffAccountsModal: React.FC<StaffAccountsModalProps> = ({
           </button>
         </div>
 
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
         {/* Invitation */}
         <form onSubmit={handleInvite} className="space-y-3 bg-[#0D1110] p-4 rounded-xl border border-[#1B2320]">
           <label className="block text-xs font-medium text-slate-300">Inviter un coach</label>
@@ -253,6 +257,7 @@ export const StaffAccountsModal: React.FC<StaffAccountsModalProps> = ({
               </div>
             ))
           )}
+        </div>
         </div>
       </div>
     </div>

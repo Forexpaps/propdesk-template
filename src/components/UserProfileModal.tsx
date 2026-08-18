@@ -269,9 +269,16 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto font-sans">
-      <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-3xl w-full p-6 space-y-6 shadow-2xl relative my-8 text-slate-100">
-        {/* Modal Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1B2320] pb-4">
+      <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-3xl w-full shadow-2xl relative my-8 text-slate-100 max-h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
+        {/* Modal Header — collée en haut (sticky) : sur un profil avec beaucoup
+            de contenu (bio longue, badges nombreux), le corps défile sous cet
+            en-tête sans jamais le faire disparaître, et sans jamais pousser le
+            haut de la modale hors de l'écran (bug de centrage Safari observé
+            avec `items-center` + `overflow-y-auto` sur le conteneur externe
+            quand l'enfant dépasse la hauteur de l'écran : le début du contenu
+            devient inatteignable au lieu de défiler). Voir aussi
+            StaffAccountsModal.tsx et StudentTracking.tsx, même correctif. */}
+        <div className="shrink-0 sticky top-0 z-10 bg-[#111615] px-6 pt-6 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1B2320]">
           <div className="flex items-center gap-3">
             <img
               src={avatar}
@@ -322,6 +329,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           </div>
         </div>
 
+        {/* Corps défilant : seule cette zone scrolle, l'en-tête ci-dessus reste
+            fixe. `px-6 py-5` reprend le padding que portait autrefois la carte
+            entière (`p-6`), désormais retiré de la carte elle-même. */}
+        <div className="flex-1 overflow-y-auto px-6 py-5">
         {/* TAB 1: PROFILE & OPTIONS */}
         {activeSubTab === "profile" && (
           <form onSubmit={handleSubmit} className="space-y-5 text-xs">
@@ -795,6 +806,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

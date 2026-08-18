@@ -122,8 +122,10 @@ export const SecurityLogModal: React.FC<SecurityLogModalProps> = ({ isOpen, onCl
 
   return (
     <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto font-sans">
-      <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-3xl w-full p-6 space-y-5 shadow-2xl relative my-8 text-slate-100">
-        <div className="flex items-center justify-between border-b border-[#1B2320] pb-4">
+      <div className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-3xl w-full shadow-2xl relative my-8 text-slate-100 max-h-[calc(100vh-4rem)] flex flex-col overflow-hidden">
+        {/* En-tête collée en haut : voir UserProfileModal.tsx pour le détail du
+            correctif. */}
+        <div className="shrink-0 sticky top-0 z-10 bg-[#111615] px-6 pt-6 pb-4 flex items-center justify-between border-b border-[#1B2320]">
           <div className="flex items-center gap-2.5">
             <ShieldAlert className="w-5 h-5 text-[#00E676]" />
             <div>
@@ -142,6 +144,7 @@ export const SecurityLogModal: React.FC<SecurityLogModalProps> = ({ isOpen, onCl
           </button>
         </div>
 
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
         {/* Cartes de stats — dernières 24h */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {statCards.map((card) => (
@@ -271,6 +274,7 @@ export const SecurityLogModal: React.FC<SecurityLogModalProps> = ({ isOpen, onCl
           Les mots de passe et jetons de session ne sont jamais enregistrés. Les adresses IP étant des
           données personnelles, les entrées sont supprimées automatiquement au bout de 90 jours.
         </p>
+        </div>
       </div>
     </div>
   );
