@@ -49,7 +49,7 @@ export const initialTraderBadges: TraderBadge[] = [
   {
     id: "badge-3",
     title: "Prop Firm Challenge Ready",
-    description: "Atteindre 10% de profit virtuel sur le module Replay sans jamais dépasser 10% de Drawdown Max.",
+    description: "Atteindre 10% de profit virtuel en backtest sans jamais dépasser 10% de Drawdown Max.",
     iconName: "Zap",
     category: "PROPFIRM",
     unlocked: true,

@@ -230,17 +230,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             textHover: "group-hover:text-[#00E676]",
           },
           {
-            key: "replay",
-            tab: "replay",
-            letter: "R",
-            title: "Replay",
-            description: "Backtest manuel sur données historiques réelles.",
-            glow: "bg-[radial-gradient(circle_at_0%_0%,rgba(139,92,246,0.20),transparent_65%)]",
-            badgeClasses: "text-violet-400 bg-violet-500/15 border-violet-500/30",
-            borderHover: "hover:border-violet-500/40",
-            textHover: "group-hover:text-violet-400",
-          },
-          {
             key: "exam",
             tab: "exam",
             letter: "E",
