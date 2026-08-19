@@ -207,6 +207,23 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_student_sessions_user    ON student_sessions(user_id);
   CREATE INDEX IF NOT EXISTS idx_student_sessions_expires ON student_sessions(expires_at);
 
+  -- Jetons de réinitialisation de mot de passe élève, générés par le staff
+  -- depuis une fiche (« Générer un lien de réinitialisation »). id est
+  -- l'empreinte SHA-256 du jeton (jamais le jeton en clair, même principe que
+  -- student_sessions.id) : le lien lui-même n'est donc récupérable qu'au
+  -- moment de sa création, jamais depuis la base. used_at reste NULL tant que
+  -- le lien n'a pas été consommé ; un jeton utilisé ou expiré n'est plus
+  -- valide mais reste en base pour l'historique jusqu'à la purge périodique.
+  CREATE TABLE IF NOT EXISTS student_password_reset_tokens (
+    id                 TEXT PRIMARY KEY,
+    student_account_id TEXT NOT NULL REFERENCES student_accounts(id) ON DELETE CASCADE,
+    created_at         TEXT NOT NULL,
+    expires_at         TEXT NOT NULL,
+    used_at            TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_student_reset_tokens_account ON student_password_reset_tokens(student_account_id);
+  CREATE INDEX IF NOT EXISTS idx_student_reset_tokens_expires ON student_password_reset_tokens(expires_at);
+
   -- Journal de sécurité, lecture réservée au fondateur (requireOwner). Couvre
   -- les deux mondes (staff ET élève) — account_kind distingue lequel. Purge à
   -- 90 jours (les IP sont des données personnelles), jamais de mot de passe

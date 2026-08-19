@@ -123,6 +123,7 @@ import { useAuth } from "./hooks/useAuth";
 import { LoginScreen } from "./components/auth/LoginScreen";
 import { SetupScreen } from "./components/auth/SetupScreen";
 import { ChangePasswordScreen } from "./components/auth/ChangePasswordScreen";
+import { ResetPasswordScreen } from "./components/auth/ResetPasswordScreen";
 import { api, type ServerState } from "./lib/api";
 
 /** Écran d'attente partagé par les deux étapes de démarrage. */
@@ -170,6 +171,31 @@ export default function App() {
   // l'écran est du staff ou un élève — un seul écran de connexion couvre les
   // deux mondes, avec un lien pour basculer entre les deux formulaires.
   const [loginMode, setLoginMode] = useState<"staff" | "student">("staff");
+
+  /**
+   * Lien de réinitialisation de mot de passe élève (`/reset-password?token=…`,
+   * généré par le staff depuis une fiche — `StudentTracking.tsx`). Vérifié
+   * AVANT tout état d'authentification : ce lien doit fonctionner pour un
+   * élève qui n'a justement plus accès à son compte, staff ou pas. Pas de
+   * routeur dans cette app (voir HANDOFF) — un simple test sur
+   * `window.location`, lu une seule fois au montage : l'URL ne change pas
+   * pendant la vie de cet écran.
+   */
+  const [resetToken] = useState<string | null>(() => {
+    if (window.location.pathname !== "/reset-password") return null;
+    return new URLSearchParams(window.location.search).get("token");
+  });
+
+  if (resetToken) {
+    return (
+      <ResetPasswordScreen
+        token={resetToken}
+        onDone={() => {
+          window.location.href = "/";
+        }}
+      />
+    );
+  }
 
   if (status === "loading") {
     return <LoadingScreen message="Vérification de ta session…" />;

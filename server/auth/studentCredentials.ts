@@ -1,4 +1,5 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { setInterval } from "node:timers";
 import { db } from "../db";
 
 /**
@@ -128,6 +129,18 @@ export function updateStudentPasswordHash(id: string, passwordHash: string): voi
   ).run(passwordHash, new Date().toISOString(), id);
 }
 
+/**
+ * Change l'identifiant de connexion (email) d'un compte élève déjà créé.
+ *
+ * L'appelant (route staff) doit avoir déjà vérifié l'absence de doublon —
+ * cette fonction ne fait que l'écriture, comme `createStudentAccount`.
+ */
+export function updateStudentEmail(id: string, email: string): void {
+  db.prepare(
+    "UPDATE student_accounts SET email = ?, email_lower = ?, updated_at = ? WHERE id = ?"
+  ).run(email.trim(), normalizeEmail(email), new Date().toISOString(), id);
+}
+
 /** Remplace le mot de passe ET lève l'obligation de changement, en une écriture. */
 export function setStudentPassword(id: string, passwordHash: string): void {
   db.prepare(
@@ -145,4 +158,78 @@ export function deleteStudentAccount(enrolledStudentId: string): boolean {
     .prepare("DELETE FROM student_accounts WHERE enrolled_student_id = ?")
     .run(enrolledStudentId);
   return result.changes > 0;
+}
+
+// --- Jetons de réinitialisation de mot de passe ---------------------------
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1h — court, généré à la demande
+
+function fingerprint(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+/**
+ * Génère un jeton de réinitialisation pour un compte élève et le renvoie EN
+ * CLAIR — seule occasion où il existe hors de sa forme hachée : l'appelant
+ * (route staff) doit le donner au staff sous forme de lien complet
+ * immédiatement, jamais le restocker.
+ */
+export function createPasswordResetToken(studentAccountId: string): {
+  token: string;
+  expiresAt: string;
+} {
+  const token = randomBytes(32).toString("base64url");
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + RESET_TOKEN_TTL_MS).toISOString();
+
+  db.prepare(
+    `INSERT INTO student_password_reset_tokens (id, student_account_id, created_at, expires_at)
+     VALUES (?, ?, ?, ?)`
+  ).run(fingerprint(token), studentAccountId, now.toISOString(), expiresAt);
+
+  return { token, expiresAt };
+}
+
+/**
+ * Consomme un jeton de réinitialisation : le marque utilisé et renvoie le
+ * compte élève concerné, ou `null` si le jeton est invalide, déjà utilisé, ou
+ * expiré. Marquer et lire en une seule opération atomique (transaction)
+ * évite qu'un jeton soit consommé deux fois par deux requêtes concurrentes.
+ */
+export function consumePasswordResetToken(token: string): { studentAccountId: string } | null {
+  const id = fingerprint(token);
+
+  return db.transaction(() => {
+    const row = db
+      .prepare(
+        `SELECT student_account_id, expires_at, used_at
+         FROM student_password_reset_tokens WHERE id = ?`
+      )
+      .get(id) as { student_account_id: string; expires_at: string; used_at: string | null } | undefined;
+
+    if (!row || row.used_at || new Date(row.expires_at).getTime() < Date.now()) {
+      return null;
+    }
+
+    db.prepare("UPDATE student_password_reset_tokens SET used_at = ? WHERE id = ?").run(
+      new Date().toISOString(),
+      id
+    );
+
+    return { studentAccountId: row.student_account_id };
+  })();
+}
+
+/** Purge périodique des jetons expirés depuis plus de 24h — même principe que `purgeExpiredStudentSessions`. */
+export function purgeExpiredPasswordResetTokens(): number {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const result = db
+    .prepare("DELETE FROM student_password_reset_tokens WHERE expires_at < ?")
+    .run(cutoff);
+  return result.changes;
+}
+
+export function startPasswordResetTokenCleanup(): void {
+  purgeExpiredPasswordResetTokens();
+  setInterval(purgeExpiredPasswordResetTokens, 60 * 60 * 1000).unref();
 }

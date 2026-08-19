@@ -2,7 +2,15 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { randomBytes } from "node:crypto";
 import { db, DEFAULT_USER_ID, FOUNDER_COACH_ID } from "../db";
 import { getProfile, saveProfile, listCollection, updateCollectionItem, replaceCollection } from "../repositories";
-import { setupSchema, loginSchema, inviteStaffSchema, changePasswordSchema, securityEventsQuerySchema } from "../schemas";
+import {
+  setupSchema,
+  loginSchema,
+  inviteStaffSchema,
+  changePasswordSchema,
+  securityEventsQuerySchema,
+  setStudentPasswordSchema,
+  updateStudentEmailSchema,
+} from "../schemas";
 import { createRateLimit } from "../middleware/rateLimit";
 import { hashPassword, verifyPassword, needsRehash, verifyAgainstDecoy } from "./password";
 import {
@@ -31,11 +39,15 @@ import {
   validateSession,
 } from "./sessions";
 import {
+  createPasswordResetToken,
   createStudentAccount,
   deleteStudentAccount,
   getStudentByEmail as getStudentAccountByEmail,
   getStudentByEnrolledId,
+  setStudentPassword,
+  updateStudentEmail,
 } from "./studentCredentials";
+import { destroyAllStudentSessions } from "./studentSessions";
 import { requireOwner, requireStaffKind } from "./middleware";
 
 /** Routes accessibles sans session : `/me`, `/setup`, `/login`, `/logout`. */
@@ -628,6 +640,129 @@ staffRouter.delete("/students/:enrolledStudentId/access", requireStaffKind, (req
 
   res.status(204).end();
 });
+
+const studentAccessRateLimit = createRateLimit({
+  windowMs: 15 * 60_000,
+  max: 20,
+  message: "Trop d'actions sur cet accès. Réessaie dans quelques minutes.",
+});
+
+/**
+ * Fixe directement le mot de passe d'un compte élève — le staff choisit la
+ * valeur (contrairement à l'invitation, où elle est générée côté serveur).
+ * Déconnecte l'élève de ses sessions en cours : un mot de passe changé sous
+ * lui ne doit pas laisser une session ouverte ailleurs continuer à vivre.
+ */
+staffRouter.put(
+  "/students/:enrolledStudentId/password",
+  requireStaffKind,
+  studentAccessRateLimit,
+  wrap(async (req, res) => {
+    const parsed = setStudentPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Mot de passe invalide.", details: parsed.error.issues });
+      return;
+    }
+
+    const account = getStudentByEnrolledId(req.params.enrolledStudentId);
+    if (!account) {
+      res.status(404).json({ error: "Cette fiche n'a pas d'accès actif." });
+      return;
+    }
+
+    const passwordHash = await hashPassword(parsed.data.newPassword);
+    setStudentPassword(account.id, passwordHash);
+    destroyAllStudentSessions(account.id);
+
+    recordSecurityEvent({
+      eventType: "student_password_set_by_staff", severity: "warning", accountKind: "student",
+      accountEmail: account.email, ip: req.ip, detail: `fiche : ${req.params.enrolledStudentId}`,
+    });
+
+    res.status(204).end();
+  })
+);
+
+/**
+ * Change l'identifiant (email) de connexion d'un compte élève déjà créé.
+ *
+ * Met à jour à la fois `student_accounts.email` (connexion) et le champ
+ * `email` de la fiche `EnrolledStudent` (affichage) — les deux doivent
+ * rester cohérents, un élève ne se connaît que par une seule adresse.
+ */
+staffRouter.put(
+  "/students/:enrolledStudentId/email",
+  requireStaffKind,
+  studentAccessRateLimit,
+  (req, res) => {
+    const parsed = updateStudentEmailSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Adresse e-mail invalide.", details: parsed.error.issues });
+      return;
+    }
+
+    const account = getStudentByEnrolledId(req.params.enrolledStudentId);
+    if (!account) {
+      res.status(404).json({ error: "Cette fiche n'a pas d'accès actif." });
+      return;
+    }
+
+    const existing = getStudentAccountByEmail(parsed.data.email);
+    if (existing && existing.id !== account.id) {
+      res.status(409).json({ error: "Un compte existe déjà avec cette adresse." });
+      return;
+    }
+
+    const students = listCollection<EnrolledStudentLike>("enrolledStudents");
+    const student = students.find((s) => s.id === req.params.enrolledStudentId);
+
+    db.transaction(() => {
+      updateStudentEmail(account.id, parsed.data.email);
+      if (student) {
+        updateCollectionItem("enrolledStudents", student.id, { ...student, email: parsed.data.email });
+      }
+    })();
+
+    recordSecurityEvent({
+      eventType: "student_email_changed", severity: "warning", accountKind: "student",
+      accountEmail: parsed.data.email, ip: req.ip, detail: `fiche : ${req.params.enrolledStudentId}`,
+    });
+
+    res.status(204).end();
+  }
+);
+
+/**
+ * Génère un lien de réinitialisation de mot de passe pour un élève, à
+ * transmettre à la main (pas d'envoi d'e-mail automatique dans ce chantier —
+ * même limitation que le mot de passe temporaire de l'invitation, déjà
+ * affiché une seule fois pour être copié/collé). Le jeton n'est renvoyé
+ * qu'ici, en clair, jamais récupérable ensuite.
+ */
+staffRouter.post(
+  "/students/:enrolledStudentId/reset-link",
+  requireStaffKind,
+  studentAccessRateLimit,
+  (req, res) => {
+    const account = getStudentByEnrolledId(req.params.enrolledStudentId);
+    if (!account) {
+      res.status(404).json({ error: "Cette fiche n'a pas d'accès actif." });
+      return;
+    }
+
+    const { token, expiresAt } = createPasswordResetToken(account.id);
+
+    recordSecurityEvent({
+      eventType: "student_password_reset_link_created", severity: "info", accountKind: "student",
+      accountEmail: account.email, ip: req.ip, detail: `fiche : ${req.params.enrolledStudentId}`,
+    });
+
+    res.status(201).json({
+      link: `${req.protocol}://${req.get("host")}/reset-password?token=${token}`,
+      expiresAt,
+    });
+  }
+);
 
 /**
  * Trades réels d'un élève, en lecture seule — sert à `StudentTracking.tsx`

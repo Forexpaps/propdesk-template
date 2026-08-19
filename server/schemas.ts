@@ -191,6 +191,27 @@ export const changePasswordSchema = z
   })
   .strict();
 
+/** Le staff fixe directement le mot de passe d'un élève — pas de mot de passe actuel à fournir. */
+export const setStudentPasswordSchema = z
+  .object({
+    newPassword: z.string().min(PASSWORD_MIN).max(200),
+  })
+  .strict();
+
+/** Changement de l'identifiant (email) de connexion d'un compte élève. */
+export const updateStudentEmailSchema = z
+  .object({
+    email: emailField,
+  })
+  .strict();
+
+/** Réinitialisation via lien à jeton — même règle de longueur que partout ailleurs. */
+export const consumeResetTokenSchema = z
+  .object({
+    newPassword: z.string().min(PASSWORD_MIN).max(200),
+  })
+  .strict();
+
 /**
  * Filtres de lecture du journal de sécurité (`GET /api/auth/security-events`).
  * Pas de `.strict()` : une query string peut porter des paramètres
@@ -213,6 +234,10 @@ export const securityEventsQuerySchema = z.object({
       "staff_revoked",
       "student_access_created",
       "student_access_revoked",
+      "student_password_set_by_staff",
+      "student_email_changed",
+      "student_password_reset_link_created",
+      "student_password_reset_completed",
     ])
     .optional(),
   limit: z.coerce.number().int().min(1).max(200).default(50),

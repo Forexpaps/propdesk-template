@@ -16,7 +16,16 @@ import {
   KeyRound,
   ShieldOff
 } from "lucide-react";
-import { EnrolledStudent, StudentStatusTag, TradingStyle, TradingAccount, Trade } from "../types";
+import {
+  EnrolledStudent,
+  StudentStatusTag,
+  TradingStyle,
+  TradingAccount,
+  Trade,
+  AccountType,
+  RecurringMistake,
+  RECURRING_MISTAKES,
+} from "../types";
 import { formatCurrency } from "../lib/format";
 import { api, type StaffAccountSummary } from "../lib/api";
 import { AdminStudentView } from "./AdminStudentView";
@@ -43,11 +52,15 @@ interface StudentTrackingProps {
 }
 
 const STATUS_TAG_STYLES: Record<StudentStatusTag, string> = {
-  "En Évaluation FTMO": "bg-purple-500/10 text-purple-400 border-purple-500/30",
-  "Prop Firm Financé": "bg-[#00E676]/20 text-[#00E676] border-[#00E676]/40 font-bold",
-  "Besoin Coaching": "bg-blue-500/10 text-blue-400 border-blue-500/30",
-  "Alerte Tilt": "bg-rose-500/20 text-rose-300 border-rose-500/40 animate-pulse font-bold",
+  "Évaluation Étape 1": "bg-purple-500/10 text-purple-400 border-purple-500/30",
+  "Évaluation Étape 2": "bg-blue-500/10 text-blue-400 border-blue-500/30",
+  "Compte Financé": "bg-[#00E676]/20 text-[#00E676] border-[#00E676]/40 font-bold",
+  "Fonds Propres": "bg-amber-500/10 text-amber-400 border-amber-500/30",
 };
+
+const STATUS_TAGS: StudentStatusTag[] = ["Évaluation Étape 1", "Évaluation Étape 2", "Compte Financé", "Fonds Propres"];
+
+const ACCOUNT_TYPES: AccountType[] = ["Compte DÉMO", "Broker Réel", "Prop Firm Evaluation", "Prop Firm Funded"];
 
 export const StudentTracking: React.FC<StudentTrackingProps> = ({
   students,
@@ -87,6 +100,61 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
   const [realTrades, setRealTrades] = useState<Trade[] | null>(null);
   const [realAccounts, setRealAccounts] = useState<TradingAccount[] | null>(null);
   const [loadingRealTrades, setLoadingRealTrades] = useState(false);
+
+  // Section "Accès & connexion" de la fiche édition : brouillons locaux
+  // (email, nouveau mot de passe) et résultat du dernier lien de
+  // réinitialisation généré — affiché une seule fois, jamais restocké.
+  const [accessEmailDraft, setAccessEmailDraft] = useState("");
+  const [savingAccessEmail, setSavingAccessEmail] = useState(false);
+  const [newPasswordDraft, setNewPasswordDraft] = useState("");
+  const [settingPassword, setSettingPassword] = useState(false);
+  const [generatingResetLink, setGeneratingResetLink] = useState(false);
+  const [resetLinkResult, setResetLinkResult] = useState<string | null>(null);
+  const [accessActionError, setAccessActionError] = useState<string | null>(null);
+
+  const handleSaveAccessEmail = async (student: EnrolledStudent) => {
+    if (!accessEmailDraft.trim()) return;
+    setSavingAccessEmail(true);
+    setAccessActionError(null);
+    try {
+      await api.updateStudentEmail(student.id, accessEmailDraft.trim());
+      const updated = { ...student, email: accessEmailDraft.trim() };
+      onUpdateStudent(updated);
+      setSelectedStudent(updated);
+    } catch (err) {
+      setAccessActionError((err as Error).message || "La mise à jour de l'e-mail a échoué.");
+    } finally {
+      setSavingAccessEmail(false);
+    }
+  };
+
+  const handleSetStudentPassword = async (student: EnrolledStudent) => {
+    if (!newPasswordDraft) return;
+    setSettingPassword(true);
+    setAccessActionError(null);
+    try {
+      await api.setStudentPassword(student.id, newPasswordDraft);
+      setNewPasswordDraft("");
+    } catch (err) {
+      setAccessActionError((err as Error).message || "La définition du mot de passe a échoué.");
+    } finally {
+      setSettingPassword(false);
+    }
+  };
+
+  const handleGenerateResetLink = async (student: EnrolledStudent) => {
+    setGeneratingResetLink(true);
+    setAccessActionError(null);
+    setResetLinkResult(null);
+    try {
+      const result = await api.generateStudentResetLink(student.id);
+      setResetLinkResult(result.link);
+    } catch (err) {
+      setAccessActionError((err as Error).message || "La génération du lien a échoué.");
+    } finally {
+      setGeneratingResetLink(false);
+    }
+  };
 
   const handleInviteStudent = async (student: EnrolledStudent) => {
     setInvitingId(student.id);
@@ -128,6 +196,10 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
     // laisserait la valeur vide.
     setEditForm({ ...student, tradingStyle: student.tradingStyle ?? "Intraday" });
     setIsEditingFile(true);
+    setAccessEmailDraft(student.email);
+    setNewPasswordDraft("");
+    setResetLinkResult(null);
+    setAccessActionError(null);
   };
 
   const handleOpenReadOnly = (student: EnrolledStudent) => {
@@ -182,7 +254,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
       joinedDate: new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }),
       assignedCoach: editForm.assignedCoach,
       level: editForm.level || "Élève Débutant",
-      statusTag: (editForm.statusTag as StudentStatusTag) || "En Évaluation FTMO",
+      statusTag: (editForm.statusTag as StudentStatusTag) || "Évaluation Étape 1",
       tradingStyle: (editForm.tradingStyle as TradingStyle) || "Intraday",
       courseCompletionPercentage: Number(editForm.courseCompletionPercentage) || 0,
       startingCapital: Number(editForm.startingCapital) || 10000,
@@ -191,6 +263,8 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
       winRate: Number(editForm.winRate) || 50,
       riskStatus: editForm.riskStatus || "🟢 Risque Maîtrisé",
       privateCoachNotes: editForm.privateCoachNotes || "Première prise de contact.",
+      initialDiagnostic: editForm.initialDiagnostic,
+      recurringMistakes: editForm.recurringMistakes,
       accounts: [
         {
           id: `acc-new-${Date.now()}`,
@@ -242,7 +316,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
           <button
             onClick={() => {
               setEditForm({
-                statusTag: "En Évaluation FTMO",
+                statusTag: "Évaluation Étape 1",
                 assignedCoach: staffCoaches[0]?.name,
                 level: "Élève Débutant",
                 riskStatus: "🟢 Risque Maîtrisé",
@@ -273,7 +347,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
 
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
           <span className="text-xs text-slate-400 shrink-0">Statut:</span>
-          {["ALL", "En Évaluation FTMO", "Prop Firm Financé", "Besoin Coaching", "Alerte Tilt"].map((tag) => (
+          {["ALL", ...STATUS_TAGS].map((tag) => (
             <button
               key={tag}
               onClick={() => setSelectedTagFilter(tag)}
@@ -510,14 +584,13 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 <div>
                   <label className="block font-medium text-slate-300 mb-1">Statut Élève (Badge)</label>
                   <select
-                    value={editForm.statusTag || "En Évaluation FTMO"}
+                    value={editForm.statusTag || "Évaluation Étape 1"}
                     onChange={(e) => setEditForm({ ...editForm, statusTag: e.target.value as StudentStatusTag })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white font-bold"
                   >
-                    <option value="En Évaluation FTMO">En Évaluation FTMO</option>
-                    <option value="Prop Firm Financé">Prop Firm Financé 🏆</option>
-                    <option value="Besoin Coaching">Besoin Coaching ⚠️</option>
-                    <option value="Alerte Tilt">Alerte Tilt 🔴</option>
+                    {STATUS_TAGS.map((tag) => (
+                      <option key={tag} value={tag}>{tag}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -590,6 +663,132 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 </div>
               </div>
 
+              {/* Diagnostic initial & historique */}
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-xl p-4 space-y-3">
+                <div>
+                  <h4 className="text-sm font-bold text-white">Diagnostic initial & historique</h4>
+                  <p className="text-[11px] text-slate-500">Statistiques de départ de l'élève</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Win Rate %</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={editForm.initialDiagnostic?.winRatePercent ?? ""}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        initialDiagnostic: { ...editForm.initialDiagnostic, winRatePercent: e.target.value === "" ? undefined : Number(e.target.value) },
+                      })}
+                      className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">R/R Moyen</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editForm.initialDiagnostic?.avgRR ?? ""}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        initialDiagnostic: { ...editForm.initialDiagnostic, avgRR: e.target.value === "" ? undefined : Number(e.target.value) },
+                      })}
+                      className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Drawdown Max %</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={editForm.initialDiagnostic?.maxDrawdownPercent ?? ""}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        initialDiagnostic: { ...editForm.initialDiagnostic, maxDrawdownPercent: e.target.value === "" ? undefined : Number(e.target.value) },
+                      })}
+                      className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Trades / Semaine</label>
+                    <input
+                      type="number"
+                      value={editForm.initialDiagnostic?.tradesPerWeek ?? ""}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        initialDiagnostic: { ...editForm.initialDiagnostic, tradesPerWeek: e.target.value === "" ? undefined : Number(e.target.value) },
+                      })}
+                      className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Capital Tradé</label>
+                    <input
+                      type="number"
+                      value={editForm.initialDiagnostic?.tradedCapital ?? ""}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        initialDiagnostic: { ...editForm.initialDiagnostic, tradedCapital: e.target.value === "" ? undefined : Number(e.target.value) },
+                      })}
+                      className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Type de Compte</label>
+                    <select
+                      value={editForm.initialDiagnostic?.accountType ?? ""}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        initialDiagnostic: { ...editForm.initialDiagnostic, accountType: (e.target.value || undefined) as AccountType | undefined },
+                      })}
+                      className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white"
+                    >
+                      <option value="">—</option>
+                      {ACCOUNT_TYPES.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Erreurs récurrentes identifiées */}
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-xl p-4 space-y-3">
+                <div>
+                  <h4 className="text-sm font-bold text-white">Erreurs récurrentes identifiées</h4>
+                  <p className="text-[11px] text-slate-500">Points faibles identifiés</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                  {RECURRING_MISTAKES.map((mistake) => {
+                    const checked = (editForm.recurringMistakes ?? []).includes(mistake);
+                    return (
+                      <label
+                        key={mistake}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors ${
+                          checked
+                            ? "bg-rose-500/10 border-rose-500/40 text-white"
+                            : "bg-[#111615] border-[#1B2320] text-slate-300"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const current = editForm.recurringMistakes ?? [];
+                            const next: RecurringMistake[] = e.target.checked
+                              ? [...current, mistake]
+                              : current.filter((m) => m !== mistake);
+                            setEditForm({ ...editForm, recurringMistakes: next });
+                          }}
+                          className="accent-rose-500 w-4 h-4"
+                        />
+                        <span className="font-medium">{mistake}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div>
                 <label className="block font-medium text-slate-300 mb-1">Notes du Coach (Privées & Confidentiales)</label>
                 <textarea
@@ -599,6 +798,112 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   placeholder="Inscrivez les observations sur les biais psychologiques, règles de sur-lotage et plans d'actions..."
                   className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl p-3 text-white"
                 />
+              </div>
+
+              {/* Accès & connexion */}
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-xl p-4 space-y-3">
+                <div>
+                  <h4 className="text-sm font-bold text-white">Accès & connexion</h4>
+                  <p className="text-[11px] text-slate-500">Identifiants de connexion de l'élève à son espace PropDesk</p>
+                </div>
+
+                {!selectedStudent.studentAccountId ? (
+                  <div className="flex items-center justify-between gap-3 bg-[#111615] border border-[#1B2320] rounded-xl p-3">
+                    <p className="text-[11px] text-slate-400">Cette fiche n'a pas encore d'accès élève actif.</p>
+                    <button
+                      type="button"
+                      disabled={invitingId === selectedStudent.id}
+                      onClick={() => void handleInviteStudent(selectedStudent)}
+                      className="px-3 py-1.5 rounded-lg bg-[#00E676]/15 hover:bg-[#00E676]/25 text-[#00E676] border border-[#00E676]/30 font-bold text-[11px] flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                      {invitingId === selectedStudent.id ? "Création…" : "Donner un accès"}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Identifiant (email de connexion)</label>
+                        <input
+                          type="email"
+                          value={accessEmailDraft}
+                          onChange={(e) => setAccessEmailDraft(e.target.value)}
+                          className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={savingAccessEmail || accessEmailDraft.trim() === selectedStudent.email}
+                        onClick={() => void handleSaveAccessEmail(selectedStudent)}
+                        className="px-4 py-2 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-200 font-bold text-[11px] disabled:opacity-40 whitespace-nowrap"
+                      >
+                        {savingAccessEmail ? "Enregistrement…" : "Enregistrer"}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+                      <div>
+                        <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Nouveau mot de passe</label>
+                        <input
+                          type="text"
+                          value={newPasswordDraft}
+                          onChange={(e) => setNewPasswordDraft(e.target.value)}
+                          placeholder="10 caractères minimum"
+                          className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white font-mono"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        disabled={settingPassword || newPasswordDraft.length < 10}
+                        onClick={() => void handleSetStudentPassword(selectedStudent)}
+                        className="px-4 py-2 rounded-lg bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-bold text-[11px] disabled:opacity-40 flex items-center gap-1.5 whitespace-nowrap"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {settingPassword ? "…" : "Définir"}
+                      </button>
+                    </div>
+
+                    <p className="text-[10px] text-slate-500">
+                      Le mot de passe est chiffré sur le serveur et n'est jamais affiché. Ces deux actions s'appliquent
+                      immédiatement — inutile de cliquer « Sauvegarder la Fiche ». Définir un nouveau mot de passe
+                      déconnecte l'élève de ses sessions en cours.
+                    </p>
+
+                    <div className="pt-2 border-t border-[#1B2320] space-y-2">
+                      <button
+                        type="button"
+                        disabled={generatingResetLink}
+                        onClick={() => void handleGenerateResetLink(selectedStudent)}
+                        className="px-4 py-2 rounded-lg bg-[#111615] hover:bg-[#1B2320] border border-[#1B2320] text-slate-200 font-bold text-[11px] flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                        {generatingResetLink ? "Génération…" : "Générer un lien de réinitialisation"}
+                      </button>
+                      <p className="text-[10px] text-slate-500">
+                        L'élève choisit lui-même son mot de passe via ce lien — rien de secret ne transite. Valable 1h,
+                        usage unique.
+                      </p>
+
+                      {resetLinkResult && (
+                        <div className="flex items-center gap-2 bg-[#111615] border border-[#00E676]/30 rounded-lg p-2.5">
+                          <code className="text-[11px] text-[#00E676] break-all flex-1">{resetLinkResult}</code>
+                          <button
+                            type="button"
+                            onClick={() => navigator.clipboard.writeText(resetLinkResult)}
+                            className="px-2.5 py-1.5 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-300 text-[11px] font-bold shrink-0"
+                          >
+                            Copier
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {accessActionError && (
+                  <p className="text-[11px] text-rose-400">{accessActionError}</p>
+                )}
               </div>
 
               <div className="flex items-center justify-between pt-4 border-t border-[#1B2320]">
@@ -674,7 +979,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-slate-300 font-medium mb-1">Capital Départ ($)</label>
                   <input
@@ -698,6 +1003,144 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                       </option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Statut Élève</label>
+                  <select
+                    value={editForm.statusTag || "Évaluation Étape 1"}
+                    onChange={(e) => setEditForm({ ...editForm, statusTag: e.target.value as StudentStatusTag })}
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white font-bold"
+                  >
+                    {STATUS_TAGS.map((tag) => (
+                      <option key={tag} value={tag}>{tag}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Diagnostic initial & historique */}
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-xl p-4 space-y-3">
+                <div>
+                  <h4 className="text-sm font-bold text-white">Diagnostic initial & historique</h4>
+                  <p className="text-[11px] text-slate-500">Statistiques de départ de l'élève</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Win Rate %</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={editForm.initialDiagnostic?.winRatePercent ?? ""}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        initialDiagnostic: { ...editForm.initialDiagnostic, winRatePercent: e.target.value === "" ? undefined : Number(e.target.value) },
+                      })}
+                      className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">R/R Moyen</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editForm.initialDiagnostic?.avgRR ?? ""}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        initialDiagnostic: { ...editForm.initialDiagnostic, avgRR: e.target.value === "" ? undefined : Number(e.target.value) },
+                      })}
+                      className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Drawdown Max %</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={editForm.initialDiagnostic?.maxDrawdownPercent ?? ""}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        initialDiagnostic: { ...editForm.initialDiagnostic, maxDrawdownPercent: e.target.value === "" ? undefined : Number(e.target.value) },
+                      })}
+                      className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Trades / Semaine</label>
+                    <input
+                      type="number"
+                      value={editForm.initialDiagnostic?.tradesPerWeek ?? ""}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        initialDiagnostic: { ...editForm.initialDiagnostic, tradesPerWeek: e.target.value === "" ? undefined : Number(e.target.value) },
+                      })}
+                      className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Capital Tradé</label>
+                    <input
+                      type="number"
+                      value={editForm.initialDiagnostic?.tradedCapital ?? ""}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        initialDiagnostic: { ...editForm.initialDiagnostic, tradedCapital: e.target.value === "" ? undefined : Number(e.target.value) },
+                      })}
+                      className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Type de Compte</label>
+                    <select
+                      value={editForm.initialDiagnostic?.accountType ?? ""}
+                      onChange={(e) => setEditForm({
+                        ...editForm,
+                        initialDiagnostic: { ...editForm.initialDiagnostic, accountType: (e.target.value || undefined) as AccountType | undefined },
+                      })}
+                      className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white"
+                    >
+                      <option value="">—</option>
+                      {ACCOUNT_TYPES.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Erreurs récurrentes identifiées */}
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-xl p-4 space-y-3">
+                <div>
+                  <h4 className="text-sm font-bold text-white">Erreurs récurrentes identifiées</h4>
+                  <p className="text-[11px] text-slate-500">Points faibles identifiés</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {RECURRING_MISTAKES.map((mistake) => {
+                    const checked = (editForm.recurringMistakes ?? []).includes(mistake);
+                    return (
+                      <label
+                        key={mistake}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition-colors ${
+                          checked
+                            ? "bg-rose-500/10 border-rose-500/40 text-white"
+                            : "bg-[#111615] border-[#1B2320] text-slate-300"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const current = editForm.recurringMistakes ?? [];
+                            const next: RecurringMistake[] = e.target.checked
+                              ? [...current, mistake]
+                              : current.filter((m) => m !== mistake);
+                            setEditForm({ ...editForm, recurringMistakes: next });
+                          }}
+                          className="accent-rose-500 w-4 h-4"
+                        />
+                        <span className="font-medium">{mistake}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 

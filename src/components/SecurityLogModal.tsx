@@ -22,6 +22,10 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   staff_revoked: "Coach révoqué",
   student_access_created: "Accès élève créé",
   student_access_revoked: "Accès élève révoqué",
+  student_password_set_by_staff: "Mot de passe élève fixé par le staff",
+  student_email_changed: "E-mail de connexion élève modifié",
+  student_password_reset_link_created: "Lien de réinitialisation généré",
+  student_password_reset_completed: "Mot de passe élève réinitialisé",
 };
 
 const SEVERITY_LABELS: Record<SecuritySeverity, string> = {
@@ -49,6 +53,10 @@ const EVENT_TYPE_ICONS: Record<string, React.ComponentType<{ className?: string 
   staff_revoked: UserMinus,
   student_access_created: UserPlus,
   student_access_revoked: UserMinus,
+  student_password_set_by_staff: KeyRound,
+  student_email_changed: KeyRound,
+  student_password_reset_link_created: KeyRound,
+  student_password_reset_completed: KeyRound,
 };
 
 function formatDate(iso: string): string {
