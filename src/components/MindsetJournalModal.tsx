@@ -17,6 +17,16 @@ import {
 interface MindsetJournalModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /**
+   * Identifiant de compte (email) inclus dans la clé `localStorage` de
+   * l'historique — absent : clé partagée `horizon_mindset_logs` (bureau
+   * staff, partagé par construction entre tous les coachs, comme les autres
+   * caches locaux de ce bureau). Fourni côté élève (`App.tsx`) : sans lui,
+   * deux élèves différents sur un même poste partagé se voyaient le même
+   * historique de check-in émotionnel (anxiété, tilt/revanche…) — une donnée
+   * sensible qui n'a rien à faire entre deux comptes distincts.
+   */
+  storageKey?: string;
 }
 
 type EmotionState = "CALM" | "DISCIPLINED" | "ANXIOUS" | "IMPULSIVE" | "REVENGE";
@@ -53,16 +63,19 @@ const playZenSound = (freq = 432, duration = 1.2) => {
 export const MindsetJournalModal: React.FC<MindsetJournalModalProps> = ({
   isOpen,
   onClose,
+  storageKey,
 }) => {
   const [selectedEmotion, setSelectedEmotion] = useState<EmotionState>("CALM");
   const [sleepQuality, setSleepQuality] = useState<number>(8); // 1-10
   const [sleepHours, setSleepHours] = useState<number>(7.5);
   const [isSoundEnabled, setIsSoundEnabled] = useState<boolean>(true);
 
+  const localStorageKey = storageKey ? `horizon_mindset_logs_${storageKey}` : "horizon_mindset_logs";
+
   // Mindset logs history
   const [logs, setLogs] = useState<MindsetLog[]>(() => {
     try {
-      const saved = localStorage.getItem("horizon_mindset_logs");
+      const saved = localStorage.getItem(localStorageKey);
       return saved ? JSON.parse(saved) : [
         { id: "1", date: "2026-07-29 14:00", emotion: "CALM", sleepQuality: 8, tiltRisk: 15, status: "OPTIMAL" },
         { id: "2", date: "2026-07-28 09:30", emotion: "DISCIPLINED", sleepQuality: 9, tiltRisk: 10, status: "OPTIMAL" },
@@ -137,7 +150,7 @@ export const MindsetJournalModal: React.FC<MindsetJournalModalProps> = ({
     const updated = [newLog, ...logs];
     setLogs(updated);
     try {
-      localStorage.setItem("horizon_mindset_logs", JSON.stringify(updated));
+      localStorage.setItem(localStorageKey, JSON.stringify(updated));
     } catch {
       // ignore
     }

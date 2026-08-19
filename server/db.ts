@@ -60,13 +60,6 @@ db.exec(`
     payload  TEXT NOT NULL
   );
 
-  CREATE TABLE IF NOT EXISTS coach_signals (
-    id       TEXT PRIMARY KEY,
-    user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    position INTEGER NOT NULL,
-    payload  TEXT NOT NULL
-  );
-
   CREATE TABLE IF NOT EXISTS coach_messages (
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -380,6 +373,32 @@ function migrateForumRepliesUserId(): void {
   const hasUserId = columns.some((c) => c.name === "user_id");
   if (hasUserId) return;
 
+  // `user_id` étant NOT NULL sur la nouvelle table, la jointure ci-dessous
+  // exclut de fait toute ligne dont le `topic_id` ne correspond à aucun
+  // `forum_topics` existant (normalement impossible via l'usage normal de
+  // l'app, protégé par `ON DELETE CASCADE` + `foreign_keys = ON` depuis le
+  // tout premier commit introduisant ces tables — voir le commentaire de
+  // `migrateForumRepliesUserId` ci-dessus). Un tel cas ne pourrait venir que
+  // d'une intervention externe sur la base (import manuel, restauration
+  // partielle) contournant les FK. Plutôt que de perdre ces lignes en
+  // silence, on le signale : la migration reste idempotente et sans perte
+  // dans tous les cas normaux, mais l'opérateur est prévenu si ce n'en est
+  // pas un.
+  const orphanCount = (
+    db
+      .prepare(
+        `SELECT COUNT(*) AS n FROM forum_replies r
+         WHERE NOT EXISTS (SELECT 1 FROM forum_topics t WHERE t.id = r.topic_id)`
+      )
+      .get() as { n: number }
+  ).n;
+  if (orphanCount > 0) {
+    console.warn(
+      `[horizon] Migration forum_replies : ${orphanCount} réponse(s) orpheline(s) ` +
+        `(topic_id sans forum_topics correspondant) seront perdues — base modifiée hors de l'app ?`
+    );
+  }
+
   db.transaction(() => {
     db.exec(`
       CREATE TABLE forum_replies_new (
@@ -471,6 +490,20 @@ function migrateStudentStatusTags(): void {
 }
 
 migrateStudentStatusTags();
+
+/**
+ * Migration ponctuelle : supprime `coach_signals`, table du module "Signaux
+ * & Analyses" retiré entièrement de l'application sur demande explicite de
+ * l'utilisateur (composant, routes de rendu, types, sidebar — voir git log).
+ * Confirmée vide (0 ligne) avant suppression : aucune UI n'a jamais permis
+ * d'y écrire (voir HANDOFF.md, historique). `DROP TABLE IF EXISTS` est
+ * idempotent par construction — pas besoin de clé `meta` dédiée.
+ */
+function migrateDropCoachSignals(): void {
+  db.exec("DROP TABLE IF EXISTS coach_signals;");
+}
+
+migrateDropCoachSignals();
 
 export function getMeta(key: string): string | null {
   const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as

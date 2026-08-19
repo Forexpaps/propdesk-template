@@ -93,7 +93,15 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   const equityData = [
     { label: "Départ", capital: student.startingCapital },
     ...sortedTrades.map((trade, index) => {
-      const pnl = parseFloat(String(trade.pnl)) || 0;
+      // Un trade en % n'est pas une somme d'argent : l'ajouter tel quel au
+      // capital cumulé (ex. "2.5" pour +2.5%) faussait la forme de la courbe
+      // comme s'il s'agissait de +2.5$. Même règle que `totalPnL` plus bas et
+      // que la seule autre courbe d'équité de l'app (`computePerformanceStats`,
+      // `src/lib/performanceStats.ts`) — ce fichier reste néanmoins une
+      // implémentation séparée : ses libellés courts ("T1", "T2"…) servent la
+      // tuile compacte du tableau de bord, la version partagée utilise des
+      // libellés longs adaptés à la page Rentabilité pleine largeur.
+      const pnl = (trade.pnlUnit ?? "USD") !== "PERCENT" ? parseFloat(String(trade.pnl)) || 0 : 0;
       if (trade.result === "WIN" || trade.result === "LOSS") {
         tempCapital += pnl;
       }

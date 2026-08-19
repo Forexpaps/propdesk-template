@@ -305,6 +305,15 @@ export interface CoachingSessionNote {
 export interface EnrolledStudent {
   id: string;
   name: string;
+  /**
+   * Email de contact sur la fiche staff — sert d'email de connexion à la
+   * création du compte élève (voir la route d'invitation), mais **diverge**
+   * dès qu'on modifie l'un des deux séparément de l'autre une fois l'accès
+   * actif : le vrai email de connexion vit dans `student_accounts.email`,
+   * modifiable via "Accès & connexion" (`StudentTracking.tsx`). Pour lire la
+   * valeur qui fait foi une fois un accès créé, voir `api.fetchStudentTrades`
+   * (champ `email` de la réponse), pas ce champ.
+   */
   email: string;
   avatar: string;
   phone?: string;
@@ -371,25 +380,6 @@ export interface TradingAccount {
   accountNumber?: string;
 }
 
-export interface CoachSignal {
-  id: string;
-  coachName: string;
-  coachAvatar: string;
-  pair: string;
-  direction: TradeDirection;
-  timeframe: string;
-  entryZone: string;
-  entryPrice: number;
-  stopLoss: number;
-  takeProfit1: number;
-  takeProfit2: number;
-  riskLevel: "Faible" | "Modéré" | "High Volatility";
-  status: "EN_ATTENTE" | "ACTIF" | "TP_ATTEINT" | "SL_ATTEINT" | "ANNULÉ";
-  date: string;
-  smcNotes: string;
-  pnlResultPips?: number;
-}
-
 export interface TraderBadge {
   id: string;
   title: string;
@@ -451,6 +441,15 @@ export interface ForumTopic {
   title: string;
   category: ForumCategory;
   authorName: string;
+  /**
+   * Identifiant stable de l'auteur, pour le filtre "Mes Sujets"
+   * (`ForumSection.tsx`) — `authorName` seul confondait deux homonymes, et un
+   * auteur qui renomme son profil perdait l'accès à ses propres anciens
+   * sujets dans ce filtre (ils restaient visibles dans la liste générale).
+   * Optionnel : absent sur les sujets créés avant l'ajout du champ, le filtre
+   * retombe alors sur `authorName`.
+   */
+  authorEmail?: string;
   authorAvatar: string;
   authorRole: ForumRole;
   createdAt: string;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Search,
   Plus,
@@ -130,11 +130,34 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
   const [realTrades, setRealTrades] = useState<Trade[] | null>(null);
   const [realAccounts, setRealAccounts] = useState<TradingAccount[] | null>(null);
   const [loadingRealTrades, setLoadingRealTrades] = useState(false);
+  /**
+   * Id de la fiche pour laquelle la dernière requête `fetchStudentTrades` a
+   * été lancée — comparé à la résolution de la promesse dans
+   * `handleOpenReadOnly` pour ignorer une réponse tardive. Sans ce garde-fou,
+   * fermer la lecture d'un élève A puis en ouvrir une autre B avant que la
+   * requête de A ne réponde pouvait faire écraser les vrais trades/soldes de
+   * B par ceux de A si la réponse de A arrivait après celle de B — l'écran
+   * affichait alors le nom de B avec les données financières de A.
+   */
+  const realTradesRequestId = useRef<string | null>(null);
 
   // Section "Accès & connexion" de la fiche édition : brouillons locaux
   // (email, nouveau mot de passe) et résultat du dernier lien de
   // réinitialisation généré — affiché une seule fois, jamais restocké.
   const [accessEmailDraft, setAccessEmailDraft] = useState("");
+  /**
+   * Dernier email de connexion réel connu (`student_accounts.email`, via
+   * `handleOpenEdit`) — distinct de `selectedStudent.email` (la fiche, un
+   * champ de contact séparé une fois l'accès créé, voir `types.ts`). Sert de
+   * référence pour savoir si `accessEmailDraft` a réellement été modifié
+   * (désactive "Enregistrer" tant que non touché) : comparer à
+   * `selectedStudent.email` comme avant cette correction désactivait le
+   * bouton à tort dès que les deux différaient déjà, et le laissait actif à
+   * tort si par coïncidence les deux valeurs concordaient.
+   */
+  const [currentAccessEmail, setCurrentAccessEmail] = useState("");
+  const [loadingAccessEmail, setLoadingAccessEmail] = useState(false);
+  const accessEmailRequestId = useRef<string | null>(null);
   const [savingAccessEmail, setSavingAccessEmail] = useState(false);
   const [newPasswordDraft, setNewPasswordDraft] = useState("");
   const [settingPassword, setSettingPassword] = useState(false);
@@ -151,6 +174,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
       const updated = { ...student, email: accessEmailDraft.trim() };
       onUpdateStudent(updated);
       setSelectedStudent(updated);
+      setCurrentAccessEmail(accessEmailDraft.trim());
     } catch (err) {
       setAccessActionError((err as Error).message || "La mise à jour de l'e-mail a échoué.");
     } finally {
@@ -226,10 +250,44 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
     // laisserait la valeur vide.
     setEditForm({ ...student, tradingStyle: student.tradingStyle ?? "Intraday" });
     setIsEditingFile(true);
-    setAccessEmailDraft(student.email);
     setNewPasswordDraft("");
     setResetLinkResult(null);
     setAccessActionError(null);
+    accessEmailRequestId.current = student.id;
+
+    if (!student.studentAccountId) {
+      // Aucun accès actif : l'email de la fiche EST l'email de connexion à
+      // venir (voir `handleInviteStudent`/la route d'invitation, qui crée le
+      // compte avec `student.email`) — pas de divergence possible ici.
+      setAccessEmailDraft(student.email);
+      setCurrentAccessEmail(student.email);
+      return;
+    }
+
+    // Accès actif : `student.email` (la fiche) peut avoir divergé du vrai
+    // email de connexion (`student_accounts.email`) — voir le commentaire de
+    // la route `/students/:id/trades`. On précharge la fiche email comme
+    // repli immédiat le temps du chargement, puis on la remplace par la
+    // vraie valeur dès qu'elle arrive.
+    setAccessEmailDraft(student.email);
+    setCurrentAccessEmail(student.email);
+    setLoadingAccessEmail(true);
+    api
+      .fetchStudentTrades(student.id)
+      .then((res) => {
+        if (accessEmailRequestId.current !== student.id) return;
+        setAccessEmailDraft(res.email);
+        setCurrentAccessEmail(res.email);
+      })
+      .catch(() => {
+        // Échec silencieux : le repli sur l'email de la fiche reste affiché,
+        // au pire périmé — mieux qu'un champ vide ou une erreur bloquante
+        // pour une info secondaire au reste du formulaire.
+      })
+      .finally(() => {
+        if (accessEmailRequestId.current !== student.id) return;
+        setLoadingAccessEmail(false);
+      });
   };
 
   const handleOpenReadOnly = (student: EnrolledStudent) => {
@@ -237,6 +295,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
     setIsReadOnlyPreview(true);
     setRealTrades(null);
     setRealAccounts(null);
+    realTradesRequestId.current = student.id;
 
     // Un compte actif rend la saisie manuelle recentTrades/accounts
     // obsolète : on charge les vrais trades et portefeuilles de l'élève à
@@ -246,14 +305,21 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
       api
         .fetchStudentTrades(student.id)
         .then((res) => {
+          // Une réponse tardive pour une fiche déjà quittée ne doit jamais
+          // écraser ce qui est affiché pour la fiche ouverte entre-temps.
+          if (realTradesRequestId.current !== student.id) return;
           setRealTrades(res.trades);
           setRealAccounts(res.accounts);
         })
         .catch(() => {
+          if (realTradesRequestId.current !== student.id) return;
           setRealTrades([]);
           setRealAccounts([]);
         })
-        .finally(() => setLoadingRealTrades(false));
+        .finally(() => {
+          if (realTradesRequestId.current !== student.id) return;
+          setLoadingRealTrades(false);
+        });
     }
   };
 
@@ -579,10 +645,24 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   <input
                     type="email"
                     required
+                    disabled={!!selectedStudent.studentAccountId}
                     value={editForm.email || ""}
                     onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                   />
+                  {/* Deux champs distincts existaient sans jamais se synchroniser :
+                      celui-ci (fiche staff, sert d'email de connexion à
+                      l'invitation) et "Identifiant" plus bas (accès actif, vrai
+                      login dans student_accounts). Une fois un accès créé, la
+                      fiche n'est plus la source du login — l'éditer ici pouvait
+                      faire croire à tort que le login avait changé alors que
+                      seule cette fiche l'était. Verrouillé dès qu'un accès
+                      existe, avec un renvoi explicite vers le bon champ. */}
+                  {selectedStudent.studentAccountId && (
+                    <p className="text-[10px] text-slate-500 mt-1">
+                      Email de connexion réel géré plus bas, dans « Accès & connexion ».
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -860,17 +940,23 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   <>
                     <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
                       <div>
-                        <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Identifiant (email de connexion)</label>
+                        <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">
+                          Identifiant (email de connexion)
+                          {loadingAccessEmail && (
+                            <span className="normal-case text-slate-600"> · chargement…</span>
+                          )}
+                        </label>
                         <input
                           type="email"
                           value={accessEmailDraft}
+                          disabled={loadingAccessEmail}
                           onChange={(e) => setAccessEmailDraft(e.target.value)}
-                          className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white"
+                          className="w-full bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white disabled:opacity-50"
                         />
                       </div>
                       <button
                         type="button"
-                        disabled={savingAccessEmail || accessEmailDraft.trim() === selectedStudent.email}
+                        disabled={savingAccessEmail || loadingAccessEmail || accessEmailDraft.trim() === currentAccessEmail}
                         onClick={() => void handleSaveAccessEmail(selectedStudent)}
                         className="px-4 py-2 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-200 font-bold text-[11px] disabled:opacity-40 whitespace-nowrap"
                       >
@@ -1258,7 +1344,10 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-slate-400">{selectedStudent.email} • Inscrit le {selectedStudent.joinedDate}</p>
+                  <p className="text-xs text-slate-400">
+                    {selectedStudent.email} • Inscrit le {selectedStudent.joinedDate}
+                    {selectedStudent.phone && <> • {selectedStudent.phone}</>}
+                  </p>
                   {selectedStudent.assignedCoach && (
                     <p className="text-xs text-[#00E676]">Coach Référent : {selectedStudent.assignedCoach}</p>
                   )}

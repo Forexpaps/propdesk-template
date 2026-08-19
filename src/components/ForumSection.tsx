@@ -100,7 +100,13 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
 
     if (activeTabFilter === "unsolved") return !t.isSolved;
     if (activeTabFilter === "pinned") return t.isPinned;
-    if (activeTabFilter === "my_topics") return t.authorName === student.name;
+    if (activeTabFilter === "my_topics") {
+      // `authorEmail` (stable) prime dès qu'il est présent — `authorName`
+      // seul confondait deux homonymes et perdait le fil après un
+      // renommage de profil. Repli sur `authorName` pour les sujets créés
+      // avant l'ajout du champ, qui n'en portent pas.
+      return t.authorEmail ? t.authorEmail === student.email : t.authorName === student.name;
+    }
 
     return true;
   });
@@ -116,6 +122,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
       title: newTitle,
       category: newCategory,
       authorName: student.name,
+      authorEmail: student.email,
       authorAvatar: student.avatar,
       authorRole: "Élève Premium",
       content: newContent,

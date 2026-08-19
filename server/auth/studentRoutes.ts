@@ -1,6 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
-import { loginSchema, changePasswordSchema, consumeResetTokenSchema } from "../schemas";
+import { loginSchema, changePasswordSchema, consumeResetTokenSchema, updateAvatarSchema } from "../schemas";
 import { createRateLimit } from "../middleware/rateLimit";
+import { getProfile, saveProfile } from "../repositories";
 import { normalizeEmail } from "./credentials";
 import { getLockoutStatus, registerFailedLogin, clearLoginFailures } from "./loginLockout";
 import { hashPassword, verifyPassword, needsRehash, verifyAgainstDecoy } from "./password";
@@ -251,5 +252,41 @@ studentProtectedRouter.post(
       detail: `${Math.max(0, destroyed - 1)} autre(s) session(s) fermée(s)`,
     });
     res.json(authenticatedStudentPayload(student.id));
+  })
+);
+
+/**
+ * Un élève choisit sa propre photo de profil — seul champ de profil qu'il
+ * peut modifier lui-même, le reste (nom, niveau, bio…) restant géré par le
+ * coach sur la fiche `enrolledStudents`. Écrit dans le bureau personnel de
+ * l'élève (`student.userId`), jamais dans la fiche staff partagée — voir
+ * `buildStudentProfile` (`studentCredentials.ts`), qui relit cette valeur et
+ * la fait primer sur `enrolled.avatar` si elle est présente.
+ */
+studentProtectedRouter.put(
+  "/profile/avatar",
+  requireStudentKind,
+  createRateLimit({
+    windowMs: 15 * 60_000,
+    max: 20,
+    message: "Trop de tentatives. Réessaie dans quelques minutes.",
+  }),
+  wrap(async (req, res) => {
+    const parsed = updateAvatarSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Photo de profil invalide." });
+      return;
+    }
+
+    const student = getStudentById(req.auth!.userId);
+    if (!student) {
+      res.status(404).json({ error: "Compte introuvable." });
+      return;
+    }
+
+    const current = getProfile<Record<string, unknown>>(student.userId) ?? {};
+    saveProfile({ ...current, avatar: parsed.data.avatar }, student.userId);
+
+    res.status(204).end();
   })
 );

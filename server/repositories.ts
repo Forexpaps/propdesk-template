@@ -7,7 +7,6 @@ import { db, DEFAULT_USER_ID } from "./db";
 export type CollectionName =
   | "trades"
   | "accounts"
-  | "signals"
   | "messages"
   | "forumTopics"
   | "notifications"
@@ -18,7 +17,6 @@ export type CollectionName =
 const TABLES: Record<CollectionName, string> = {
   trades: "trades",
   accounts: "trading_accounts",
-  signals: "coach_signals",
   messages: "coach_messages",
   forumTopics: "forum_topics",
   notifications: "notifications",
@@ -228,7 +226,13 @@ export function updateCollectionItem<T extends WithId>(
 }
 
 function replaceForumReplies(topicId: string, replies: WithId[], userId: string): void {
-  db.prepare("DELETE FROM forum_replies WHERE topic_id = ?").run(topicId);
+  // `AND user_id = ?` en plus de `topic_id = ?` : même défense en profondeur
+  // que `listForumReplies` (voir son commentaire). Sans exploitabilité
+  // actuelle — `forumTopics` n'est jamais accessible en écriture aux élèves
+  // (absent de STUDENT_ALLOWED_COLLECTIONS), `userId` vaut donc toujours
+  // DEFAULT_USER_ID sur ce chemin — mais une suppression scopée au seul
+  // `topic_id` reste une incohérence latente avec le reste de ce fichier.
+  db.prepare("DELETE FROM forum_replies WHERE topic_id = ? AND user_id = ?").run(topicId, userId);
   const insert = db.prepare(
     "INSERT INTO forum_replies (id, topic_id, user_id, position, payload) VALUES (?, ?, ?, ?, ?)"
   );

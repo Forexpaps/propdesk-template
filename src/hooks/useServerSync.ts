@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type ServerState } from "../lib/api";
-import { clearPending, listPending, markPending } from "../lib/pendingChanges";
+import { clearPending, listPending, markPending, replayPending } from "../lib/pendingChanges";
 import type { Trade, TradingAccount, Module, CoachMessage, ModuleQuizResult, StudentProfile, TraderBadge, Coach } from "../types";
 
 export type SyncStatus = "loading" | "online" | "offline";
@@ -12,7 +12,6 @@ const LEGACY_KEYS = {
   collections: {
     trades: "horizon_trades",
     accounts: "horizon_accounts",
-    signals: "horizon_signals",
     messages: "horizon_messages",
     forumTopics: "horizon_forum_topics",
     notifications: "horizon_notifications",
@@ -170,9 +169,16 @@ export function useBootstrap() {
  *
  * Volontairement plus simple que `useBootstrap` : pas d'import depuis un
  * ancien `localStorage` (aucun élève n'a de données antérieures à son
- * compte), pas de bandeau de modifications hors ligne (pas de mode hors ligne
- * élève). `GET /api/state` est déjà filtré côté serveur pour une session
- * élève — il ne renvoie que les collections listées dans
+ * compte), pas de bandeau interactif de modifications hors ligne — un élève
+ * est seul propriétaire de ses données, donc pas de conflit possible avec un
+ * collègue à arbitrer, contrairement au bureau staff partagé. Une
+ * modification restée en attente (`markPending`, suite à un échec de
+ * `useSyncedState` signalé par `SyncErrorBanner`) est donc rejouée
+ * silencieusement ici, avant même d'appliquer l'état serveur : sans ça, rien
+ * ne la renvoyait jamais, et `resolveStudentValue` (App.tsx) la réappliquait
+ * indéfiniment par-dessus l'état serveur à chaque rechargement sans jamais
+ * réellement l'envoyer. `GET /api/state` est déjà filtré côté serveur pour
+ * une session élève — il ne renvoie que les collections listées dans
  * `STUDENT_ALLOWED_COLLECTIONS` (voir `server/routes.ts`) : trades, accounts
  * (ses propres portefeuilles), modules (sa copie personnelle du programme),
  * messages (son fil avec le coach) et badges (son état de réclamation
@@ -195,6 +201,10 @@ export function useStudentBootstrap() {
 
     (async () => {
       try {
+        if (listPending().length > 0) {
+          await replayPending().catch(() => undefined);
+        }
+
         const serverState = await api.fetchState();
         if (!cancelled) {
           setTrades(serverState.collections.trades ?? []);
@@ -218,7 +228,7 @@ export function useStudentBootstrap() {
     };
   }, []);
 
-  return { status, trades, accounts, modules, messages, badges, quizResults, student, coaches };
+  return { status, trades, accounts, modules, messages, badges, quizResults, student, setStudent, coaches };
 }
 
 /**

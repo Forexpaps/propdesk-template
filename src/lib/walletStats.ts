@@ -20,12 +20,30 @@ export function positionsDuCompte(trades: Trade[], accountId: string): number {
 }
 
 /**
+ * Date du jour au format `YYYY-MM-DD`, en heure **locale** — jamais
+ * `toISOString().split("T")[0]`, qui donne la date UTC. `Trade.date` est
+ * saisi et comparé en heure locale (même principe que `getDayLabel` dans
+ * `performanceStats.ts`) : entre minuit et ~1h-2h du matin en France
+ * (UTC+1/+2), la date UTC est encore celle de la veille, ce qui aurait fait
+ * disparaître du calcul les trades saisis avec la date locale du jour,
+ * sous-évaluant `dailyLossPercent` (un indicateur de conformité prop firm)
+ * pendant cette fenêtre chaque nuit.
+ */
+function todayLocalISODate(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Perte du jour sur un compte, en % du capital initial — **calculée**
  * depuis les trades du jour rattachés à ce compte, jamais affichée en dur.
  */
 export function dailyLossPercent(trades: Trade[], account: TradingAccount): number {
   if (account.initialBalance <= 0) return 0;
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayLocalISODate();
   const pnlToday = trades
     .filter(
       (t) => t.accountId === account.id && t.date === today && (t.pnlUnit ?? "USD") !== "PERCENT"

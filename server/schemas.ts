@@ -19,11 +19,18 @@ import { z } from "zod";
  * réintroduise pas silencieusement un risque.
  */
 const SAFE_MEDIA_URL_FIELDS = ["chartUrl", "avatar"] as const;
+/**
+ * `value == null` (absent ou explicitement `null`) est le seul cas où le
+ * champ n'est pas concerné — tout ce qui n'est PAS une chaîne (nombre, objet,
+ * tableau, booléen) doit échouer, pas passer. La version précédente traitait
+ * `typeof value !== "string"` comme "non concerné", ce qui laissait passer
+ * n'importe quel type non-string sans jamais valider son contenu — un appel
+ * direct à l'API avec un mauvais type contournait donc complètement ce verrou.
+ */
 const isSafeMediaUrl = (value: unknown): boolean =>
-  typeof value !== "string" ||
-  value === "" ||
-  /^https:\/\//.test(value) ||
-  /^data:image\//.test(value);
+  value == null ||
+  (typeof value === "string" &&
+    (value === "" || /^https:\/\//.test(value) || /^data:image\//.test(value)));
 
 /**
  * `initialBalance` (comptes `TradingAccount`) sert de diviseur dans plusieurs
@@ -31,10 +38,12 @@ const isSafeMediaUrl = (value: unknown): boolean =>
  * drawdown) — un compte créé avec un capital nul ou négatif produirait un
  * pourcentage NaN ou de signe inversé. Le formulaire l'empêche déjà
  * (`WalletManagement.tsx`), mais un appel direct à l'API le contournerait
- * sans ce verrou.
+ * sans ce verrou. Même correctif de confusion de type que `isSafeMediaUrl`
+ * ci-dessus : `typeof value !== "number"` laissait passer une chaîne comme
+ * `"0"`, reproduisant silencieusement le bug NaN que ce verrou doit empêcher.
  */
 const isValidInitialBalance = (value: unknown): boolean =>
-  typeof value !== "number" || value > 0;
+  value == null || (typeof value === "number" && value > 0);
 
 /** Tout élément de collection doit porter un id non vide et unique. */
 const collectionItem = z
@@ -90,6 +99,25 @@ export const profileSchema = z
     for (const field of SERVER_OWNED_PROFILE_FIELDS) delete cleaned[field];
     return cleaned;
   });
+
+/**
+ * Mise à jour de sa propre photo de profil par un élève (`PUT
+ * /auth/profile/avatar`) — seul champ du profil qu'un élève peut modifier
+ * lui-même, le reste restant géré par le coach (voir `UserProfileModal.tsx`,
+ * prop `avatarOnly`). Même garde `isSafeMediaUrl` que `profileSchema.avatar`.
+ * La borne de taille couvre largement un avatar réduit à 256×256 en WebP/JPEG
+ * qualité 0.85 (`AVATAR_SIZE`/`AVATAR_QUALITY`, `src/lib/image.ts`), qui ne
+ * dépasse jamais quelques dizaines de Ko une fois encodé en base64.
+ */
+export const updateAvatarSchema = z.object({
+  avatar: z
+    .string()
+    .min(1)
+    .max(400_000)
+    .refine(isSafeMediaUrl, {
+      message: "URL d'avatar invalide : seules https:// et data:image/... sont acceptées.",
+    }),
+});
 
 /**
  * Un seul résultat de quiz de module — voir `ModuleQuizResult` dans
