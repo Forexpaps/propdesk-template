@@ -39,6 +39,7 @@ import {
   validateSession,
 } from "./sessions";
 import {
+  buildStudentProfile,
   createPasswordResetToken,
   createStudentAccount,
   deleteStudentAccount,
@@ -820,8 +821,15 @@ staffRouter.get(
     // l'élève (`account.userId`), pas du bureau staff partagé : chaque élève a
     // ses propres portefeuilles, sa propre copie du programme (progression
     // individuelle) et son propre fil de messagerie.
+    //
+    // `student` passe par `buildStudentProfile` (et non `getProfile(account.userId)`
+    // brut) pour la même raison que la vraie session élève : le profil élève
+    // n'a quasiment jamais `hiddenSidebarItems` renseigné lui-même, un accès
+    // direct à `getProfile` ignorerait donc silencieusement le réglage de
+    // visibilité du fondateur et la Vue Complète afficherait des modules que
+    // le fondateur a pourtant masqués. Bug réel corrigé ici.
     res.json({
-      student: getProfile(account.userId),
+      student: buildStudentProfile(account.id),
       collections: {
         enrolledStudents: listCollection("enrolledStudents", DEFAULT_USER_ID),
         accounts: listCollection("accounts", account.userId),

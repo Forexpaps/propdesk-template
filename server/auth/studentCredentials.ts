@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { setInterval } from "node:timers";
-import { db } from "../db";
+import { db, DEFAULT_USER_ID } from "../db";
+import { getProfile, listCollection } from "../repositories";
 
 /**
  * Accès à la table `student_accounts` — deuxième monde d'identité, séparé de
@@ -232,4 +233,72 @@ export function purgeExpiredPasswordResetTokens(): number {
 export function startPasswordResetTokenCleanup(): void {
   purgeExpiredPasswordResetTokens();
   setInterval(purgeExpiredPasswordResetTokens, 60 * 60 * 1000).unref();
+}
+
+interface EnrolledStudentLite {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string;
+  level: string;
+  joinedDate: string;
+  currentCapital: number;
+  startingCapital: number;
+  [key: string]: unknown;
+}
+
+/**
+ * Entrées de sidebar qu'un élève n'a structurellement aucun moyen d'utiliser
+ * — aucun écran ne les prend en charge côté élève (Suivi des Élèves est
+ * réservé à l'admin).
+ *
+ * Masquées quoi qu'il arrive, indépendamment du réglage de visibilité du
+ * fondateur — ce dernier gouverne le reste (Portefeuille, Rentabilité,
+ * Examen, Exercice du jour, Module vidéo, Messagerie,
+ * Audit Setup, Mindset, Macro) : voir la fusion ci-dessous.
+ */
+const ALWAYS_HIDDEN_FOR_STUDENTS = ["students"];
+
+/**
+ * Profil affichable pour une session élève, reconstruit depuis sa fiche
+ * `EnrolledStudent` côté coach — le compte élève lui-même n'a pas de ligne
+ * `users` renseignée (voir `AdminStudentView.tsx` côté client, même
+ * problème résolu à la même source).
+ *
+ * `hiddenSidebarItems` fusionne les entrées non prises en charge (toujours
+ * masquées) avec le réglage de visibilité du bureau staff partagé : le
+ * fondateur masque ou réaffiche un module pour tout le monde, élèves compris,
+ * depuis la même icône réglage qu'il utilise déjà pour son propre bureau.
+ *
+ * **Seule implémentation** — utilisée à la fois pour la session élève réelle
+ * (`GET /api/state`, `server/routes.ts`) et pour la Vue Complète admin
+ * (`GET /admin/students/:id/view`, `server/auth/routes.ts`). Un appel direct
+ * à `getProfile(account.userId)` à la place de cette fonction renverrait le
+ * profil brut (quasi toujours `{}`, l'élève n'écrit jamais ce champ) et
+ * ignorerait silencieusement le réglage de visibilité du fondateur — bug
+ * réel rencontré et corrigé dans la Vue Complète.
+ */
+export function buildStudentProfile(studentAccountId: string): Record<string, unknown> | null {
+  const account = getStudentById(studentAccountId);
+  if (!account) return null;
+
+  const enrolled = listCollection<EnrolledStudentLite>("enrolledStudents", DEFAULT_USER_ID).find(
+    (s) => s.id === account.enrolledStudentId
+  );
+  if (!enrolled) return null;
+
+  const staffProfile = getProfile<{ hiddenSidebarItems?: string[] }>(DEFAULT_USER_ID);
+  const sharedHidden = staffProfile?.hiddenSidebarItems ?? [];
+
+  return {
+    name: enrolled.name,
+    email: enrolled.email,
+    avatar: enrolled.avatar,
+    level: enrolled.level,
+    joinedDate: enrolled.joinedDate,
+    currentCapital: enrolled.currentCapital,
+    startingCapital: enrolled.startingCapital,
+    isAdmin: false,
+    hiddenSidebarItems: [...new Set([...ALWAYS_HIDDEN_FOR_STUDENTS, ...sharedHidden])],
+  };
 }
