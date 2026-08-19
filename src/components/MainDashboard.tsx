@@ -211,6 +211,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           badgeClasses: string;
           borderHover: string;
           textHover: string;
+          /** Couleur de la lueur au survol — celle du module (badge/bordure). */
+          glowColor: string;
         }> = [
           {
             key: "journal",
@@ -221,6 +223,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             badgeClasses: "text-[#00E676] bg-[#00E676]/15 border-[#00E676]/30",
             borderHover: "hover:border-[#00E676]/40",
             textHover: "group-hover:text-[#00E676]",
+            glowColor: "#00E676",
           },
           {
             key: "academy",
@@ -231,6 +234,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             badgeClasses: "text-amber-400 bg-amber-500/15 border-amber-500/30",
             borderHover: "hover:border-amber-500/40",
             textHover: "group-hover:text-amber-400",
+            glowColor: "#f59e0b",
           },
         ];
 
@@ -246,7 +250,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                 <div
                   key={c.key}
                   onClick={() => setActiveTab(c.tab)}
-                  className={`bg-[#111615] border border-[#1B2320] ${c.borderHover} p-5 rounded-xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between`}
+                  style={{ ["--glow" as string]: c.glowColor }}
+                  className={`bg-[#111615] border border-[#1B2320] ${c.borderHover} hover:shadow-[0_0_32px_-6px_var(--glow)] p-5 rounded-xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between`}
                 >
                   <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-bold text-sm ${c.badgeClasses}`}>
                     {c.letter}
