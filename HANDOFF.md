@@ -5,13 +5,12 @@ l'a produit, ni à autre chose que ce dépôt. Lis-le en entier avant de
 toucher au code.
 
 > **État à la dernière mise à jour de ce document**
-> Branche `main`, dernier commit poussé : **`dfe149c`** (« Ajoute le statut
-> Compte DÉMO et le changement de mot de passe volontaire »), déployé avec
-> succès sur Railway (`status: SUCCESS` confirmé via
-> `railway deployment list --service propdesk --json`, et confirmé
-> visuellement par l'utilisateur).
+> Branche `main`, dernier commit poussé : **`9a8e6a0`** (« Remplace les
+> confirm() natifs par une modale, corrige le rôle auteur du forum »),
+> déployé avec succès sur Railway (`status: SUCCESS` confirmé via
+> `railway deployment list --service propdesk --json`).
 > **Répertoire de travail PROPRE** — `git status --short` ne renvoie rien.
-> `npm run lint` et `npm run build` passent sans erreur.
+> `npm run lint` (`tsc --noEmit`) passe sans erreur.
 > Application déployée sur **Railway**, domaine
 > `https://propdesk-academie.up.railway.app`.
 
@@ -20,34 +19,37 @@ toucher au code.
 ## 0. Où reprendre EXACTEMENT
 
 **Pas de chantier interrompu** — le répertoire de travail est propre et le
-dernier commit est déployé avec succès. **Aucun bug bloquant connu.**
-Quelques points ouverts, non bloquants, à connaître :
+dernier commit est déployé avec succès. **Aucun bug bloquant connu, et les
+trois points ouverts du HANDOFF précédent sont désormais réglés**
+(commit `9a8e6a0`) :
 
-1. **Suggestion en attente (chip), pas encore traitée** : deux
-   `window.confirm()` natifs subsistent dans `StudentTracking.tsx` (ligne
-   ~228, révocation d'accès élève ; ligne ~1036, suppression d'élève) —
-   peu fiables en prévisualisation et sur iOS en mode application (voir §2
-   et §7). **En creusant pour ce document, il s'avère qu'il y en a en fait
-   PLUS que ça** dans tout le projet : `ForumSection.tsx:306`,
-   `PendingChangesBanner.tsx:71`, `StaffAccountsModal.tsx:94`,
-   `UserProfileModal.tsx:185` (import de sauvegarde). Aucun n'a encore été
-   remplacé par une modale maison — seul `WalletManagement.tsx` a déjà reçu
-   ce traitement (session antérieure). Si l'utilisateur relance ce chantier,
-   élargis le périmètre à ces cinq fichiers, pas seulement les deux connus.
-2. **Formule non confirmée par l'utilisateur** : la "note globale" d'une
-   session de coaching (`computeSessionGlobalNote`,
-   `src/lib/coachingSessionStats.ts`) a été **déduite** d'une capture
-   d'écran de référence externe, pas communiquée explicitement par
-   l'utilisateur. Elle correspondait exactement aux deux exemples visibles
-   à l'époque, mais n'a jamais été confirmée depuis. Si un doute survient
-   dessus, redemander plutôt que de supposer que c'est acquis.
-3. **Comportement à surveiller, pas confirmé comme un bug** : la création
-   d'un sujet de forum (`ForumSection.tsx`, `handleCreateTopicSubmit`)
-   fixe `authorRole: "Élève Premium"` en dur, y compris si l'auteur est un
-   coach — repéré en marge d'un autre chantier, jamais creusé ni signalé à
-   l'utilisateur. Peut être volontaire (un topic n'a pas besoin du badge
-   coach, contrairement à une réponse) ou être un oubli. Ne pas le
-   corriger sans avoir vérifié l'intention réelle.
+1. **`window.confirm()` natifs → remplacés partout.** Les 7 usages restants
+   (`StudentTracking.tsx` ×2, `ForumSection.tsx`, `PendingChangesBanner.tsx`,
+   `StaffAccountsModal.tsx`, `UserProfileModal.tsx`, `App.tsx` — déconnexion)
+   utilisent désormais `confirmDialog()` (nouveau,
+   `src/lib/confirmDialog.tsx`) : une modale maison stylée comme le reste de
+   l'app (bouton rouge pour les actions destructives), pilotée par une file
+   d'attente module-level plutôt qu'un state prop-drillé, utilisable comme
+   `window.confirm()` mais en `Promise<boolean>` (`await confirmDialog(...)`).
+   **Piège rencontré et corrigé pendant ce chantier** : `App.tsx` a DEUX
+   shells racine distincts (`StudentAuthenticatedApp`, `AcademyApp`, voir
+   §3) — le host (`<ConfirmDialogHost />`) doit être monté dans CHACUN des
+   deux, pas une seule fois, sinon la modale ne s'affiche que dans un des
+   deux mondes (repéré en testant en live : la modale ne s'affichait pas
+   côté staff tant que le second host manquait). `WalletManagement.tsx`
+   avait déjà son propre traitement local (session antérieure), non
+   unifié avec `confirmDialog()` — pas retouché, fonctionne déjà.
+2. **Formule de note globale confirmée par l'utilisateur** — validée telle
+   quelle (`computeSessionGlobalNote`, `src/lib/coachingSessionStats.ts`,
+   moyenne de discipline/exécution du plan/performance + difficulté perçue
+   inversée). Plus un point ouvert.
+3. **`authorRole` forum corrigé** — la création d'un sujet
+   (`ForumSection.tsx`, `handleCreateTopicSubmit`) fixait
+   `authorRole: "Élève Premium"` en dur même pour un coach en mode
+   modération. Confirmé par l'utilisateur que oui, un coach doit apparaître
+   sous son vrai rôle : la création utilise désormais la même condition
+   `canModerate` que la réponse (`"Head Coach"` si vrai, `"Élève Premium"`
+   sinon) — voir §5 point 7 pour le détail.
 
 Tout le reste est terminé, vérifié, et déployé.
 
@@ -166,19 +168,22 @@ vérifié à plusieurs reprises cette période, toujours confirmé inoffensif.
 Un raccourci clavier simulé (`cmd+R`) ne recharge pas toujours vraiment la
 page non plus ; préférer `navigate()` vers la même URL, ou un onglet neuf.
 
-**⚠️ `window.confirm()`/`window.prompt()` natifs sont fiables NULLE PART
-où ils sont encore utilisés** — deux causes distinctes confirmées :
+**⚠️ `window.confirm()`/`window.prompt()` natifs ne sont fiables NULLE
+PART** — deux causes distinctes confirmées :
 1. Dans le Browser pane automatisé de dev : `confirm()` retourne
    silencieusement `false`, `prompt()` lève une exception.
 2. **En production, sur iOS, quand le site est ouvert en mode application**
    (icône ajoutée à l'écran d'accueil) : `confirm()`/`prompt()` restent
    muets. Bug réel signalé par l'utilisateur en usage réel sur iPhone.
 
-   Déjà corrigé dans `WalletManagement.tsx` (deux modales maison). **Six
-   autres usages restent** dans le projet (`StudentTracking.tsx` ×2,
-   `ForumSection.tsx`, `PendingChangesBanner.tsx`, `StaffAccountsModal.tsx`,
-   `UserProfileModal.tsx`) — voir §0 point 1. **Si tu retrouves un
-   `window.confirm()`/`prompt()` ailleurs, remplace-le proactivement.**
+   **Résolu cette période** : tous les usages restants remplacés par
+   `confirmDialog()` (`src/lib/confirmDialog.tsx`, voir §0 point 1). Seul
+   `WalletManagement.tsx` avait un traitement local antérieur, laissé tel
+   quel (fonctionne déjà, non unifié). **Si tu retrouves un
+   `window.confirm()`/`prompt()` ailleurs (nouveau code), utilise
+   `confirmDialog()` directement plutôt que le natif — et vérifie que le
+   host `<ConfirmDialogHost />` est bien monté dans le shell où le nouveau
+   code s'exécute (voir le piège documenté en §0 point 1).**
 
 **⚠️ Le flux de réinitialisation de mot de passe élève (§6) n'envoie aucun
 e-mail** — c'est assumé et documenté en commentaire dans le code
@@ -418,10 +423,20 @@ src/
                                décimales incohérent d'un montant à l'autre),
                                et ne peut plus afficher "-$0.00" sur un
                                résidu flottant négatif proche de zéro.
-    coachingSessionStats.ts       NOUVEAU (session antérieure à celle-ci,
-                               mais après le dernier HANDOFF) —
-                               `computeSessionGlobalNote`, formule non
-                               confirmée par l'utilisateur, voir §0.
+    coachingSessionStats.ts       `computeSessionGlobalNote` — formule
+                               désormais CONFIRMÉE par l'utilisateur cette
+                               période (voir §0).
+    confirmDialog.tsx              NOUVEAU cette période — remplace
+                               `window.confirm()` par une modale maison.
+                               `confirmDialog(message, options)` retourne
+                               une `Promise<boolean>` ; `<ConfirmDialogHost />`
+                               doit être monté une fois PAR SHELL racine
+                               (voir §0 point 1, piège des deux shells
+                               `App.tsx`). Pas de state à faire remonter
+                               dans l'appelant — file d'attente
+                               module-level (un seul listener actif à la
+                               fois, suffisant : un seul dialogue affiché
+                               en même temps dans l'app).
     pendingChanges.ts             plus de référence à `horizon_signals`.
   components/
     ChangeOwnPasswordModal.tsx    NOUVEAU — changement de mot de passe
@@ -504,7 +519,12 @@ src/
     ForumSection.tsx                filtre "Mes Sujets" compare désormais
                                `authorEmail` (stable) en priorité, repli
                                sur `authorName` pour les sujets créés avant
-                               l'ajout du champ.
+                               l'ajout du champ. DEPUIS CETTE PÉRIODE :
+                               `handleCreateTopicSubmit` fixe `authorRole`
+                               selon `canModerate` (`"Head Coach"`/`"Élève
+                               Premium"`), même logique que la réponse —
+                               avant : toujours "Élève Premium" même pour
+                               un coach (voir §0 point 3).
     MindsetJournalModal.tsx          clé `localStorage` namespacée par
                                compte côté élève (`storageKey` prop, email)
                                — avant : un historique de check-in
@@ -585,7 +605,7 @@ Lot" dans le Journal, reproduisant fidèlement une maquette externe
 
 ---
 
-## 5. Fonctionnalités terminées cette période (chronologique, 7 commits)
+## 5. Fonctionnalités terminées cette période (chronologique, 8 commits)
 
 *(Depuis le dernier HANDOFF documenté, commit `cdd72e9`. Pour l'historique
 antérieur : voir `git log`.)*
@@ -659,6 +679,21 @@ antérieur : voir `git log`.)*
      passe détruisait TOUTES les sessions, y compris celle de l'auteur du
      changement — invisible dans le flux forcé, mais cassant pour un
      changement volontaire depuis une session active.
+
+7. **Résolution des 3 points ouverts du HANDOFF précédent** (`9a8e6a0`) :
+   - **Modale de confirmation maison** (`src/lib/confirmDialog.tsx`)
+     remplaçant les 7 `window.confirm()`/`confirm()` natifs restants
+     (déconnexion staff, suppression élève, révocation d'accès,
+     suppression de sujet forum, révocation de compte staff, restauration
+     de sauvegarde, abandon de modifications hors ligne) — voir §0 point 1
+     pour le détail technique et le piège des deux shells `App.tsx`.
+   - **Rôle auteur du forum corrigé** : création de sujet aligné sur la
+     même logique `canModerate` que la réponse (voir §0 point 3).
+   - **Formule de note globale de coaching confirmée** par l'utilisateur,
+     sans modification de code (voir §0 point 2).
+   - Vérifié en live dans le Browser pane (modale de déconnexion testée
+     dans les deux shells, Annuler/Confirmer fonctionnels) ; `tsc --noEmit`
+     sans erreur.
 
 ---
 
@@ -760,7 +795,10 @@ forcer son remplacement ; changement de mot de passe volontaire
 déconnectant l'auteur lui-même ; double invitation concurrente en erreur
 500 au lieu de 409 ; forum "Mes Sujets" cassé par homonyme/renommage ;
 données émotionnelles (Mindset) partagées entre comptes sur poste
-partagé ; `authorAvatar` du forum échappant à la validation d'URL.
+partagé ; `authorAvatar` du forum échappant à la validation d'URL ; les 7
+`window.confirm()`/`confirm()` natifs restants (peu fiables en
+prévisualisation et sur iOS en mode application) ; rôle auteur du forum
+codé en dur à "Élève Premium" même pour un coach.
 
 *(Détail complet de chaque correctif dans l'historique git —
 `git log --oneline cdd72e9..HEAD` puis `git show <hash>` — ou dans la
@@ -780,38 +818,33 @@ accessible.)*
    complètement perdu son mot de passe n'a toujours aucun mécanisme
    self-service — seule la procédure de secours décrite dans le README
    (accès direct à la base) existe.
-4. **Six `window.confirm()`/`prompt()` natifs restants** dans le projet,
-   non fiables en prévisualisation et sur iOS en mode application — voir
-   §0 point 1 pour la liste exacte des fichiers.
-5. **`NotificationModal.tsx` : statut "Push Server Live" factice.**
-6. **`TradingPlanEditorModal.tsx` : persistance `localStorage`
+4. **`NotificationModal.tsx` : statut "Push Server Live" factice.**
+5. **`TradingPlanEditorModal.tsx` : persistance `localStorage`
    uniquement**, pas de synchronisation multi-appareils. Compromis
    assumé.
-7. **`MacroDashboard.tsx` : fil d'actualités statique.**
-8. **`UserProfileModal.tsx` : "NIVEAU 4" statique** (badge de rang, ligne
+6. **`MacroDashboard.tsx` : fil d'actualités statique.**
+7. **`UserProfileModal.tsx` : "NIVEAU 4" statique** (badge de rang, ligne
    ~731).
-9. **`package.json.name` reste `"react-example"`.**
-10. **`.gitignore` : règle `data/` matche aussi `src/data/`** — voir §2.
-11. **`syncAccountsWithTrades` écrase tout ajustement manuel de solde dès
+8. **`package.json.name` reste `"react-example"`.**
+9. **`.gitignore` : règle `data/` matche aussi `src/data/`** — voir §2.
+10. **`syncAccountsWithTrades` écrase tout ajustement manuel de solde dès
     qu'au moins un trade est rattaché au compte.** Compromis assumé.
-12. **Le badge de rating des coachs (`Coach.rating`) est optionnel et
+11. **Le badge de rating des coachs (`Coach.rating`) est optionnel et
     absent pour tout coach dérivé d'un vrai profil** — voulu, pas de note
     fictive.
-13. **Durée de vie de session sans plafond absolu, pas de révocation par
+12. **Durée de vie de session sans plafond absolu, pas de révocation par
     appareil précis** (seul un changement de mot de passe révoque tout,
     version "tout ou rien"). Relevé en audit de sécurité, sévérité basse,
     documenté comme choix produit assumé ("outil personnel d'usage
     quotidien") — laissé tel quel sur confirmation implicite de
     l'utilisateur (pas de demande de correction).
-14. **Fragilité théorique de validation** : `collectionItem` (schémas Zod
+13. **Fragilité théorique de validation** : `collectionItem` (schémas Zod
     des collections) est en `.passthrough()` — un élève peut inclure
     n'importe quel champ supplémentaire sur ses propres lignes. Sans
     danger aujourd'hui (aucun champ de collection n'est relu avec un
     privilège supérieur côté serveur), documenté en commentaire dans
     `server/schemas.ts` pour toute future fonctionnalité qui y accorderait
     une confiance implicite.
-15. **Points ouverts non confirmés** — voir §0 (formule de note globale
-    de coaching non confirmée, `authorRole` forum codé en dur à vérifier).
 
 ### Piège opérationnel : `AdminStudentView.tsx` est un overlay
 
@@ -829,14 +862,15 @@ Voir §3 — casse la compilation TypeScript avec une erreur peu claire.
 ### Anciennes décisions (toujours valides)
 
 Voir l'historique git de ce document pour le détail complet : plan de
-trading en localStorage, calculateur simplifié plutôt qu'enrichi,
-`window.confirm()`/`prompt()` à remplacer par des modales maison (défaut
-de plateforme confirmé, pas un cas isolé — la liste s'est même allongée
-cette période, voir §0/§7), deux shells applicatifs avec état de modale
-dupliqué par design, `SectionHeader` dupliqué à dessein dans chaque
-fichier, lien de reset "complet" à jeton plutôt qu'un mot de passe
-temporaire simplifié (choix explicite de l'utilisateur), Coach Attribué
-reconstruit depuis les vrais comptes staff jamais des noms inventés.
+trading en localStorage, calculateur simplifié plutôt qu'enrichi, deux
+shells applicatifs avec état de modale dupliqué par design,
+`SectionHeader` dupliqué à dessein dans chaque fichier, lien de reset
+"complet" à jeton plutôt qu'un mot de passe temporaire simplifié (choix
+explicite de l'utilisateur), Coach Attribué reconstruit depuis les vrais
+comptes staff jamais des noms inventés. **`window.confirm()`/`prompt()`
+à remplacer par des modales maison** — chantier désormais TERMINÉ cette
+période (`confirmDialog()`, voir §0/§5/§7), gardé ici comme rappel du
+principe pour tout futur `confirm()`/`prompt()` natif qui réapparaîtrait.
 
 ### Nouvelles décisions cette période
 
@@ -1007,8 +1041,8 @@ l'utilisateur.
 
 ### Points ouverts à garder en tête (pas des tâches, des choses à vérifier SI l'occasion se présente)
 
-- Voir §0 pour les trois points non bloquants (window.confirm() élargis,
-  formule de note globale non confirmée, `authorRole` forum à vérifier).
+- Les trois points du précédent §0 sont réglés (voir §0 actuel) — rien à
+  reprendre dessus sauf nouvelle demande.
 - Un flux de réinitialisation de mot de passe STAFF pour le cas de l'OUBLI
   complet (pas juste le changement volontaire, déjà fait) — le code de
   `createPasswordResetToken`/`consumePasswordResetToken`
@@ -1024,9 +1058,9 @@ l'utilisateur.
 - **Ajouter un envoi d'e-mail automatique** au flux de reset sans demande
   explicite.
 - **"Réparer" les limitations connues listées en §7** sans demande
-  explicite — en particulier ne pas remplacer les `window.confirm()`
-  restants ou toucher au principe "tous égaux" des comptes staff sans
-  qu'on te le demande, malgré leur mention répétée dans ce document.
+  explicite — en particulier ne pas toucher au principe "tous égaux" des
+  comptes staff sans qu'on te le demande, malgré sa mention répétée dans
+  ce document.
 - **Vérifier le déploiement Railway par des `curl` répétés.**
 - **Taper le mot de passe de l'utilisateur**, sous quelque prétexte que
   ce soit, y compris pour "juste vérifier" une fonctionnalité qu'il a
@@ -1036,19 +1070,21 @@ l'utilisateur.
 
 ## 12. État à la reprise
 
-- Branche `main`, dernier commit **poussé et déployé** `dfe149c`.
+- Branche `main`, dernier commit **poussé et déployé** `9a8e6a0`.
   Répertoire de travail **propre**.
-- `npm run lint` et `npm run build` passent sans erreur.
+- `npm run lint` (`tsc --noEmit`) passe sans erreur.
 - Application déployée et fonctionnelle sur Railway
   (`propdesk-academie.up.railway.app`), déploiement automatique
-  opérationnel, dernier déploiement confirmé `SUCCESS`, config
-  `NODE_ENV`/`DATA_DIR` vérifiée saine (aucun avertissement dans les logs).
-- **Aucun point bloquant.** Trois points ouverts non bloquants documentés
-  en §0. Tout le reste est terminé et vérifié.
+  opérationnel, dernier déploiement confirmé `SUCCESS`.
+- **Aucun point bloquant, aucun point ouvert.** Les trois points du §0
+  précédent (window.confirm() élargis, formule de note globale, rôle
+  auteur du forum) sont désormais réglés. Tout est terminé et vérifié.
 
 ### Par où commencer
 
-1. Lire §0 en entier (les trois points ouverts).
+1. Lire §0 en entier (contexte des correctifs les plus récents, en
+   particulier le piège des deux shells `App.tsx` pour tout futur usage de
+   `confirmDialog()`).
 2. `git status --short` et `git log --oneline -10` pour confirmer que
    l'état correspond toujours à ce document (peut avoir légèrement évolué
    si l'utilisateur a travaillé entre-temps sans mettre à jour ce
