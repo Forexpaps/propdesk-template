@@ -21,10 +21,12 @@ import {
   ShieldAlert,
   DatabaseBackup,
   Download,
+  KeyRound,
 } from "lucide-react";
 import { StudentProfile, TraderBadge } from "../types";
 import { resizeAvatar, AVATAR_SIZE } from "../lib/image";
 import { api } from "../lib/api";
+import { ChangeOwnPasswordModal } from "./ChangeOwnPasswordModal";
 
 const SectionHeader: React.FC<{ children?: React.ReactNode; color?: string }> = ({
   children,
@@ -140,6 +142,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   // badges, notifications, résultats de quiz). Aucune réinitialisation
   // destructrice ici, volontairement : voir `server/routes.ts`,
   // POST /state/restore.
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+
   const backupFileInputRef = useRef<HTMLInputElement>(null);
   const [backupStatus, setBackupStatus] = useState<
     | { kind: "idle" }
@@ -514,6 +518,34 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             </div>
             )}
 
+            {/* Mon mot de passe — n'importe quel compte staff peut changer le
+                sien, ce n'est pas réservé au fondateur (même route serveur
+                que le changement FORCÉ après invitation, `ChangePasswordScreen.tsx` —
+                ici volontaire, self-service, depuis une session déjà active).
+                Absent du mode élève (`avatarOnly`) : rien à voir avec la
+                photo de profil, et un élève a son propre flux dédié
+                (changement de mot de passe forcé après invitation, plus lien
+                de réinitialisation généré par le staff — voir
+                StudentTracking.tsx). */}
+            {!avatarOnly && (
+              <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <KeyRound className="w-6 h-6 text-[#00E676] shrink-0" />
+                  <div>
+                    <div className="text-sm font-bold text-white">Mon mot de passe</div>
+                    <p className="text-xs text-slate-400">Modifie le mot de passe de ce compte.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsChangePasswordOpen(true)}
+                  className="px-3 py-2 rounded-xl text-[11px] font-bold text-slate-950 bg-[#00E676] hover:bg-[#00c865] shrink-0 transition-colors"
+                >
+                  Modifier
+                </button>
+              </div>
+            )}
+
             {/* Journal de sécurité — réservé au compte fondateur. Le bouton
                 ne s'affiche que si le parent fournit onOpenSecurityLog
                 (conditionné par isOwner, jamais par isAdmin). */}
@@ -865,6 +897,11 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         )}
         </div>
       </div>
+
+      <ChangeOwnPasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+      />
     </div>
   );
 };

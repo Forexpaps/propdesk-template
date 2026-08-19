@@ -17,6 +17,7 @@ import {
   clearStudentSessionCookie,
   createStudentSession,
   destroyAllStudentSessions,
+  destroyOtherStudentSessions,
   destroyStudentSession,
   purgeExpiredStudentSessions,
   readStudentSessionToken,
@@ -245,11 +246,16 @@ studentProtectedRouter.post(
     }
 
     setStudentPassword(student.id, await hashPassword(parsed.data.newPassword));
-    const destroyed = destroyAllStudentSessions(student.id);
+    // Exclut la session courante — voir `destroyOtherStudentSessions` :
+    // sans ça, l'élève qui change volontairement son mot de passe se
+    // retrouvait lui aussi déconnecté juste après, alors que seuls les
+    // AUTRES appareils doivent l'être.
+    const currentToken = readStudentSessionToken(req)!;
+    const destroyed = destroyOtherStudentSessions(student.id, currentToken);
     recordSecurityEvent({
       eventType: "password_changed", severity: "info", accountKind: "student",
       accountEmail: student.email, ip: req.ip,
-      detail: `${Math.max(0, destroyed - 1)} autre(s) session(s) fermée(s)`,
+      detail: `${destroyed} autre(s) session(s) fermée(s)`,
     });
     res.json(authenticatedStudentPayload(student.id));
   })

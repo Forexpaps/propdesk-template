@@ -53,6 +53,7 @@ interface StudentTrackingProps {
 }
 
 const STATUS_TAG_STYLES: Record<StudentStatusTag, string> = {
+  "Compte DÉMO": "bg-sky-500/10 text-sky-400 border-sky-500/30",
   "Évaluation Étape 1": "bg-purple-500/10 text-purple-400 border-purple-500/30",
   "Évaluation Étape 2": "bg-blue-500/10 text-blue-400 border-blue-500/30",
   "Compte Financé": "bg-[#00E676]/20 text-[#00E676] border-[#00E676]/40 font-bold",
@@ -73,7 +74,7 @@ function getStatusTagLabel(tag: string | undefined): string {
   return STATUS_TAG_FALLBACK_LABEL;
 }
 
-const STATUS_TAGS: StudentStatusTag[] = ["Évaluation Étape 1", "Évaluation Étape 2", "Compte Financé", "Fonds Propres"];
+const STATUS_TAGS: StudentStatusTag[] = ["Compte DÉMO", "Évaluation Étape 1", "Évaluation Étape 2", "Compte Financé", "Fonds Propres"];
 
 /** Tuile d'affichage lecture seule pour une valeur du diagnostic initial — "—" si non renseignée. */
 const DiagnosticTile: React.FC<{

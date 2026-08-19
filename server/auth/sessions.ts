@@ -143,13 +143,26 @@ export function destroySession(token: string): void {
 }
 
 /**
- * Révoque toutes les sessions d'un compte. Pour un changement de mot de
- * passe. Renvoie le nombre de sessions détruites (inclut la session
- * courante de l'appelant) — utilisé par le journal de sécurité pour
- * afficher combien d'AUTRES sessions ont été fermées.
+ * Révoque toutes les sessions d'un compte SAUF celle qui vient de faire la
+ * requête. Pour un changement de mot de passe volontaire : l'auteur du
+ * changement doit rester connecté sur l'appareil qu'il utilise déjà (voir
+ * la modale "Mon mot de passe"), seuls les AUTRES appareils/onglets sont
+ * déconnectés.
+ *
+ * Distinct de `destroyAllSessions` (auparavant utilisée ici) : celle-ci
+ * détruisait aussi la session courante — la réponse HTTP renvoyait bien un
+ * 200 "changement réussi", mais la toute requête suivante du même
+ * navigateur échouait en 401, déconnectant silencieusement l'auteur du
+ * changement au moment même où il s'y attendait le moins. Trouvé en
+ * construisant le self-service volontaire (jusqu'ici seul le changement
+ * FORCÉ après invitation l'utilisait, où l'effet passait inaperçu — l'écran
+ * suivant est de toute façon le tableau de bord fraîchement chargé).
  */
-export function destroyAllSessions(userId: string): number {
-  return db.prepare("DELETE FROM sessions WHERE user_id = ?").run(userId).changes;
+export function destroyOtherSessions(userId: string, currentToken: string): number {
+  const currentId = fingerprint(currentToken);
+  return db
+    .prepare("DELETE FROM sessions WHERE user_id = ? AND id != ?")
+    .run(userId, currentId).changes;
 }
 
 /**

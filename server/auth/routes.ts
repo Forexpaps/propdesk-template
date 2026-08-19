@@ -31,7 +31,7 @@ import { get24hStats, listSecurityEvents, recordSecurityEvent } from "./security
 import {
   clearSessionCookie,
   createSession,
-  destroyAllSessions,
+  destroyOtherSessions,
   destroySession,
   purgeExpiredSessions,
   readSessionToken,
@@ -503,11 +503,15 @@ staffRouter.post(
     }
 
     setPassword(staff.id, await hashPassword(parsed.data.newPassword));
-    const destroyed = destroyAllSessions(staff.id);
+    // Le jeton courant est déjà connu (vérifié par `requireAuth` en amont) :
+    // on l'exclut de la révocation pour ne pas déconnecter l'auteur du
+    // changement — voir le commentaire de `destroyOtherSessions`.
+    const currentToken = readSessionToken(req)!;
+    const destroyed = destroyOtherSessions(staff.id, currentToken);
     recordSecurityEvent({
       eventType: "password_changed", severity: "info", accountKind: "staff",
       accountEmail: staff.email, ip: req.ip,
-      detail: `${Math.max(0, destroyed - 1)} autre(s) session(s) fermée(s)`,
+      detail: `${destroyed} autre(s) session(s) fermée(s)`,
     });
     res.json(authenticatedPayload(staff.id));
   })
