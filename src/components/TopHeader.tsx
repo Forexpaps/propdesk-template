@@ -95,8 +95,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         return "Module vidéo";
       case "journal":
         return "Journal de trading";
-      case "forum":
-        return "Badges & paliers";
       case "messaging":
         return "Messagerie Coach";
       case "analytics":

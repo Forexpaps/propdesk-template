@@ -8,7 +8,6 @@ export type CollectionName =
   | "trades"
   | "accounts"
   | "messages"
-  | "forumTopics"
   | "notifications"
   | "enrolledStudents"
   | "badges"
@@ -18,7 +17,6 @@ const TABLES: Record<CollectionName, string> = {
   trades: "trades",
   accounts: "trading_accounts",
   messages: "coach_messages",
-  forumTopics: "forum_topics",
   notifications: "notifications",
   enrolledStudents: "enrolled_students",
   badges: "badges",
@@ -73,36 +71,9 @@ export function listCollection<T extends WithId>(
     )
     .all(userId) as { id: string; payload: string }[];
 
-  const items = rows
+  return rows
     .map((r) => safeParsePayload<T>(r.payload, `${TABLES[name]}#${r.id}`))
     .filter((item): item is T => item !== null);
-
-  // Les réponses du forum vivent dans leur propre table : on les recompose
-  // pour que le client retrouve exactement la forme ForumTopic qu'il attend.
-  if (name === "forumTopics") {
-    return items.map((topic) => ({
-      ...topic,
-      replies: listForumReplies(topic.id, userId),
-    })) as T[];
-  }
-
-  return items;
-}
-
-/**
- * `AND user_id = ?` en plus de `topic_id = ?` : vérification de propriété au
- * niveau de la table elle-même, pas seulement via le `topic_id` déjà vérifié
- * par l'appelant — défense en profondeur (voir migration dans `db.ts`).
- */
-function listForumReplies(topicId: string, userId: string): unknown[] {
-  const rows = db
-    .prepare(
-      "SELECT id, payload FROM forum_replies WHERE topic_id = ? AND user_id = ? ORDER BY position ASC"
-    )
-    .all(topicId, userId) as { id: string; payload: string }[];
-  return rows
-    .map((r) => safeParsePayload(r.payload, `forum_replies#${r.id}`))
-    .filter((item) => item !== null);
 }
 
 /**
@@ -178,15 +149,7 @@ export function replaceCollection<T extends WithId>(
         ...promoted.map((col) => (item[col] ?? null) as string | number | null),
       ];
 
-      if (name === "forumTopics") {
-        // Les réponses sont stockées à part : on les retire du payload du sujet
-        // pour éviter d'avoir la même donnée à deux endroits.
-        const { replies, ...topic } = item as T & { replies?: WithId[] };
-        upsert.run(...values, JSON.stringify(topic));
-        replaceForumReplies(item.id, replies ?? [], userId);
-      } else {
-        upsert.run(...values, JSON.stringify(item));
-      }
+      upsert.run(...values, JSON.stringify(item));
     });
   });
 
@@ -223,22 +186,6 @@ export function updateCollectionItem<T extends WithId>(
     id,
     userId
   );
-}
-
-function replaceForumReplies(topicId: string, replies: WithId[], userId: string): void {
-  // `AND user_id = ?` en plus de `topic_id = ?` : même défense en profondeur
-  // que `listForumReplies` (voir son commentaire). Sans exploitabilité
-  // actuelle — `forumTopics` n'est jamais accessible en écriture aux élèves
-  // (absent de STUDENT_ALLOWED_COLLECTIONS), `userId` vaut donc toujours
-  // DEFAULT_USER_ID sur ce chemin — mais une suppression scopée au seul
-  // `topic_id` reste une incohérence latente avec le reste de ce fichier.
-  db.prepare("DELETE FROM forum_replies WHERE topic_id = ? AND user_id = ?").run(topicId, userId);
-  const insert = db.prepare(
-    "INSERT INTO forum_replies (id, topic_id, user_id, position, payload) VALUES (?, ?, ?, ?, ?)"
-  );
-  replies.forEach((reply, index) => {
-    insert.run(reply.id, topicId, userId, index, JSON.stringify(reply));
-  });
 }
 
 export function getProfile<T>(userId: string = DEFAULT_USER_ID): T | null {

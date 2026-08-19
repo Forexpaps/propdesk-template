@@ -28,7 +28,6 @@ import {
   initialModules,
   initialTrades,
   initialMessages,
-  initialForumTopics,
   initialTradingAccounts,
   initialTraderBadges,
   initialEnrolledStudents,
@@ -39,9 +38,6 @@ import {
   Trade,
   CoachMessage,
   StudentProfile,
-  ForumTopic,
-  ForumReply,
-  ForumRole,
   ModuleQuizResult,
   TradingAccount,
   EnrolledStudent,
@@ -78,9 +74,6 @@ const VideoAcademy = React.lazy(() =>
 );
 const TradingJournal = React.lazy(() =>
   import("./components/TradingJournal").then((m) => ({ default: m.TradingJournal }))
-);
-const ForumSection = React.lazy(() =>
-  import("./components/ForumSection").then((m) => ({ default: m.ForumSection }))
 );
 const CoachMessaging = React.lazy(() =>
   import("./components/CoachMessaging").then((m) => ({ default: m.CoachMessaging }))
@@ -655,7 +648,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
                 student={studentProfile}
                 trades={syncedTrades}
                 modules={syncedModules}
-                forumTopics={[]}
                 messages={syncedMessages}
                 courseCompletionPercentage={courseCompletionPercentage}
                 setActiveTab={setActiveTab}
@@ -951,14 +943,6 @@ function AcademyApp({
     "horizon_messages",
     seed(server?.messages, "horizon_messages", initialMessages),
     (v) => api.saveCollection("messages", v),
-    syncEnabled,
-    reportSyncError
-  );
-
-  const [forumTopics, setForumTopics] = useSyncedState<ForumTopic[]>(
-    "horizon_forum_topics",
-    seed(server?.forumTopics, "horizon_forum_topics", initialForumTopics),
-    (v) => api.saveCollection("forumTopics", v),
     syncEnabled,
     reportSyncError
   );
@@ -1295,112 +1279,6 @@ function AcademyApp({
     setMessages((prev) => [...prev, studentMsg]);
   };
 
-  // Forum Handlers
-  const handleCreateForumTopic = (newTopicData: Omit<ForumTopic, "id" | "createdAt" | "repliesCount" | "viewsCount" | "likesCount" | "isPinned" | "isSolved" | "isLocked" | "replies">) => {
-    const newTopic: ForumTopic = {
-      ...newTopicData,
-      id: `topic-${Date.now()}`,
-      createdAt: "À l'instant",
-      repliesCount: 0,
-      viewsCount: 1,
-      likesCount: 1,
-      isPinned: false,
-      isSolved: false,
-      isLocked: false,
-      replies: [],
-    };
-    setForumTopics((prev) => [newTopic, ...prev]);
-  };
-
-  const handleAddForumReply = (
-    topicId: string,
-    content: string,
-    role: ForumRole = "Élève Premium",
-    authorName: string = student.name,
-    isCoachCertified: boolean = false
-  ) => {
-    const isCoach = role === "Head Coach";
-    const avatar = isCoach
-      ? "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=250"
-      : student.avatar;
-
-    // `isSolved`/`isSolution` ne sont plus déduits automatiquement d'une
-    // réponse de coach : ça marquait le sujet "Résolu" et la réponse
-    // "SOLUTION VALIDÉE" quel que soit son contenu (même une simple question
-    // de clarification), sans lien avec une vraie résolution. Un modérateur
-    // dispose déjà d'une action manuelle dédiée pour ça, `onToggleSolveTopic`
-    // (bouton sur le sujet) — c'est désormais la seule façon de marquer un
-    // sujet résolu.
-    const newReply: ForumReply = {
-      id: `rep-${Date.now()}`,
-      authorName,
-      authorAvatar: avatar,
-      authorRole: role,
-      createdAt: "À l'instant",
-      content,
-      likesCount: 0,
-      isCoachCertified,
-      isSolution: false,
-    };
-
-    setForumTopics((prev) =>
-      prev.map((topic) => {
-        if (topic.id === topicId) {
-          return {
-            ...topic,
-            repliesCount: topic.repliesCount + 1,
-            replies: [...topic.replies, newReply],
-          };
-        }
-        return topic;
-      })
-    );
-  };
-
-  const handleToggleLikeTopic = (topicId: string) => {
-    setForumTopics((prev) =>
-      prev.map((t) => (t.id === topicId ? { ...t, likesCount: t.likesCount + 1 } : t))
-    );
-  };
-
-  const handleToggleLikeReply = (topicId: string, replyId: string) => {
-    setForumTopics((prev) =>
-      prev.map((t) => {
-        if (t.id === topicId) {
-          return {
-            ...t,
-            replies: t.replies.map((r) =>
-              r.id === replyId ? { ...r, likesCount: r.likesCount + 1 } : r
-            ),
-          };
-        }
-        return t;
-      })
-    );
-  };
-
-  const handleTogglePinTopic = (topicId: string) => {
-    setForumTopics((prev) =>
-      prev.map((t) => (t.id === topicId ? { ...t, isPinned: !t.isPinned } : t))
-    );
-  };
-
-  const handleToggleSolveTopic = (topicId: string) => {
-    setForumTopics((prev) =>
-      prev.map((t) => (t.id === topicId ? { ...t, isSolved: !t.isSolved } : t))
-    );
-  };
-
-  const handleToggleLockTopic = (topicId: string) => {
-    setForumTopics((prev) =>
-      prev.map((t) => (t.id === topicId ? { ...t, isLocked: !t.isLocked } : t))
-    );
-  };
-
-  const handleDeleteForumTopic = (topicId: string) => {
-    setForumTopics((prev) => prev.filter((t) => t.id !== topicId));
-  };
-
   // Stats for Sidebar
   const totalLessons = modules.reduce((acc, m) => acc + m.lessons.length, 0);
   const completedLessons = modules.reduce(
@@ -1510,7 +1388,6 @@ function AcademyApp({
               student={displayStudent}
               trades={trades}
               modules={modules}
-              forumTopics={forumTopics}
               messages={messages}
               courseCompletionPercentage={courseCompletionPercentage}
               setActiveTab={setActiveTab}
@@ -1573,22 +1450,6 @@ function AcademyApp({
               onOpenCalculator={() => setIsCalculatorOpen(true)}
               prefillDraft={journalDraft}
               onPrefillConsumed={() => setJournalDraft(null)}
-            />
-          )}
-
-          {activeTab === "forum" && (
-            <ForumSection
-              topics={forumTopics}
-              student={student}
-              coaches={founderCoaches}
-              onCreateTopic={handleCreateForumTopic}
-              onAddReply={handleAddForumReply}
-              onToggleLikeTopic={handleToggleLikeTopic}
-              onToggleLikeReply={handleToggleLikeReply}
-              onTogglePinTopic={handleTogglePinTopic}
-              onToggleSolveTopic={handleToggleSolveTopic}
-              onToggleLockTopic={handleToggleLockTopic}
-              onDeleteTopic={handleDeleteForumTopic}
             />
           )}
 
