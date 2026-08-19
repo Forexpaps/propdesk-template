@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { db, DEFAULT_USER_ID } from "../db";
+import { getProfile } from "../repositories";
 
 /**
  * Accès à la table `staff_accounts`.
@@ -144,9 +145,19 @@ export function listStaffAccounts(): StaffAccountSummary[] {
     )
     .all() as StaffAccountSummaryRow[];
 
+  // `staff_accounts.name` du fondateur date du tout premier bootstrap du
+  // compte (souvent dérivé de l'email, ex. "th.gauthey99") et peut diverger
+  // du nom complet qu'il a défini depuis dans son profil (`getProfile`,
+  // affiché partout ailleurs dans l'app). Un coach invité n'a pas ce
+  // problème : il n'a pas de profil séparé (bureau partagé), son nom de
+  // compte est directement celui tapé à l'invitation. Même principe que
+  // `buildCoachesForStudent` (server/routes.ts), qui reconstruit déjà le
+  // coach affiché à l'élève depuis ce même profil.
+  const ownerProfileName = getProfile<{ name?: string }>()?.name;
+
   return rows.map((row) => ({
     id: row.id,
-    name: row.name,
+    name: isOwnerRow(row.invited_by) && ownerProfileName ? ownerProfileName : row.name,
     email: row.email,
     mustChangePassword: row.must_change_password === 1,
     createdAt: row.created_at,
