@@ -178,7 +178,16 @@ export default function App() {
    */
   const [resetToken] = useState<string | null>(() => {
     if (window.location.pathname !== "/reset-password") return null;
-    return new URLSearchParams(window.location.search).get("token");
+    const token = new URLSearchParams(window.location.search).get("token");
+    // Retire le jeton de la barre d'adresse (et donc de l'historique local du
+    // navigateur) dès qu'il est lu — `replaceState` modifie l'entrée
+    // courante en place, sans en créer une nouvelle. Trouvé en audit de
+    // sécurité : un jeton de reset de mot de passe (usage unique, TTL 1h,
+    // donc impact limité) n'avait sinon aucune raison de rester lisible dans
+    // l'historique après consommation, notamment sur un appareil dont
+    // l'historique est synchronisé entre plusieurs machines.
+    if (token) window.history.replaceState(null, "", "/reset-password");
+    return token;
   });
 
   if (resetToken) {

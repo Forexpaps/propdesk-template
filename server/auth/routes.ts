@@ -413,13 +413,21 @@ staffRouter.post(
 );
 
 /**
- * Révoque un compte staff.
+ * Révoque un compte staff — réservé au compte fondateur (`requireOwner`).
  *
  * `deleteStaffAccount` porte les gardes — dernier compte restant, compte
  * fondateur — et réaffecte les filleuls du compte supprimé pour qu'aucun ne
  * devienne fondateur par effet de bord.
+ *
+ * `requireOwner` ajouté suite à un audit de sécurité : sans lui, n'importe
+ * quel coach invité (staff non-fondateur) pouvait supprimer n'importe quel
+ * AUTRE coach invité — un compte staff compromis devenait une primitive de
+ * purge de toute l'équipe. Décision explicite de l'utilisateur de restreindre
+ * cette action au fondateur, plutôt que de la laisser dans le principe
+ * "mêmes droits pour tous les coachs" qui s'applique par ailleurs (voir
+ * `credentials.ts`, `StaffAccountsModal.tsx`).
  */
-staffRouter.delete("/staff/:id", requireStaffKind, (req, res) => {
+staffRouter.delete("/staff/:id", requireStaffKind, requireOwner, (req, res) => {
   // Capturé avant suppression : la ligne n'existe plus pour retrouver
   // l'email une fois deleteStaffAccount passé.
   const revokedStaff = getStaffById(req.params.id);

@@ -40,12 +40,30 @@ api.get("/health", (_req, res) => {
 });
 
 /**
+ * Public non authentifié : contrairement à toute autre route de ce fichier,
+ * `/economic-calendar` et `/market-data` n'avaient aucun `createRateLimit` —
+ * incohérence trouvée en audit de sécurité. Le cache + verrou `inflight`
+ * (`economicCalendar.ts`/`marketData.ts`) empêche déjà toute amplification
+ * vers les fournisseurs externes, mais rien ne bornait un client local
+ * spammant ces deux routes (sérialisation/envoi JSON répété sans frein). Une
+ * limite large (le cache tient déjà 1 à 10 min, un usage légitime n'en
+ * approche jamais le seuil) plutôt que stricte, pour ne jamais gêner un vrai
+ * visiteur.
+ */
+const publicDataRateLimit = createRateLimit({
+  windowMs: 60_000,
+  max: 60,
+  message: "Trop de requêtes. Réessaie dans quelques instants.",
+});
+
+/**
  * Public : donnée non sensible, identique pour tout visiteur, qu'il soit
  * staff ou élève — pas de raison de la coupler à l'un des deux mondes
  * d'authentification.
  */
 api.get(
   "/economic-calendar",
+  publicDataRateLimit,
   wrap(async (_req, res) => {
     try {
       const events = await getEconomicCalendar();
@@ -60,6 +78,7 @@ api.get(
 /** Public, même raisonnement que `/economic-calendar` ci-dessus. */
 api.get(
   "/market-data",
+  publicDataRateLimit,
   wrap(async (_req, res) => {
     try {
       const quotes = await getMarketData();

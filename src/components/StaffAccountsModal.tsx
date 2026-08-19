@@ -52,6 +52,9 @@ export const StaffAccountsModal: React.FC<StaffAccountsModalProps> = ({
       .finally(() => setLoading(false));
   };
 
+  /** Le viewer courant est-il le fondateur ? Déterminé depuis la liste elle-même, pas une prop dédiée. */
+  const isCurrentUserOwner = accounts.some((a) => a.id === currentUserId && a.isOwner);
+
   useEffect(() => {
     if (isOpen) load();
     else {
@@ -244,8 +247,13 @@ export const StaffAccountsModal: React.FC<StaffAccountsModalProps> = ({
                 {/* Le compte principal n'est jamais révocable : c'est lui qui
                     porte le réglage des modules visibles, et le serveur refuse
                     sa suppression (409). Ne pas rendre le bouton évite de
-                    proposer une action vouée à échouer. */}
-                {account.id !== currentUserId && !account.isOwner && (
+                    proposer une action vouée à échouer.
+                    Réservé au fondateur (`requireOwner` côté serveur, suite à
+                    un audit de sécurité) : un coach invité voyait auparavant
+                    ce bouton pour tout AUTRE coach invité, alors que seul le
+                    fondateur peut réellement l'utiliser — même logique que
+                    ci-dessus, ne pas proposer une action vouée à échouer. */}
+                {account.id !== currentUserId && !account.isOwner && isCurrentUserOwner && (
                   <button
                     onClick={() => handleRemove(account)}
                     className="p-2 rounded-lg text-slate-500 hover:text-rose-300 hover:bg-rose-500/10 transition-colors shrink-0"

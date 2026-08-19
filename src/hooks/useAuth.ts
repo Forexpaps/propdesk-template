@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, UNAUTHENTICATED_EVENT, type AuthUser, type StudentAuthUser } from "../lib/api";
 
 /**
@@ -46,6 +46,14 @@ export function useAuth(): UseAuthResult {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [studentUser, setStudentUser] = useState<StudentAuthUser | null>(null);
   const [expired, setExpired] = useState(false);
+  /**
+   * Miroir de `status`, lu dans `onUnauthenticated` (effet à dépendances
+   * vides, donc fermé sur sa toute première valeur sans cette ref).
+   */
+  const statusRef = useRef<AuthStatus>("loading");
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   /**
    * Deux mondes de session possibles, deux cookies distincts : on interroge
@@ -94,9 +102,35 @@ export function useAuth(): UseAuthResult {
    * Une requête revenue en 401 pendant l'usage signifie que la session a expiré
    * ou été révoquée. On ramène à l'écran de connexion plutôt que de laisser
    * l'utilisateur travailler dans le vide.
+   *
+   * Pour une session ÉLÈVE, ceci vide aussi `localStorage` — même geste que
+   * la déconnexion volontaire (`App.tsx`, `StudentAuthenticatedApp.handleLogout`).
+   * Sans ça, l'expiration NATURELLE d'une session (cas de loin le plus
+   * fréquent en pratique — fermeture d'onglet, cookie qui expire tout seul —
+   * plutôt qu'un clic explicite sur "Déconnexion") laissait le cache
+   * `horizon_student_*` intact. Sur un poste partagé (salle de l'académie),
+   * l'élève suivant qui se connectait pouvait alors se voir *rejouer
+   * automatiquement* les données en attente du précédent
+   * (`useStudentBootstrap`, rejeu silencieux ajouté pour ne jamais laisser une
+   * sauvegarde échouée bloquée) — écrasant son propre journal avec celui d'un
+   * autre élève, sous sa propre session. Faille de sécurité réelle, trouvée en
+   * audit, corrigée ici à la source plutôt qu'au seul point d'entrée du clic.
+   *
+   * Le monde STAFF n'est volontairement pas concerné : `AcademyApp` a son
+   * propre mode hors ligne où le cache local est la SEULE copie de
+   * modifications non envoyées (voir son `handleLogout`, qui refuse même de
+   * se déconnecter hors ligne pour cette raison) — le vider automatiquement
+   * ici détruirait ce filet de sécurité au lieu de le protéger.
    */
   useEffect(() => {
     const onUnauthenticated = () => {
+      if (statusRef.current === "authenticated-student") {
+        try {
+          localStorage.clear();
+        } catch {
+          // Stockage indisponible : il n'y avait alors rien à oublier.
+        }
+      }
       setUser(null);
       setStudentUser(null);
       setExpired(true);
