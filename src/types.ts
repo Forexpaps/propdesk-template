@@ -296,7 +296,13 @@ export interface EnrolledStudent {
    */
   assignedCoach?: string;
   level: string;
-  statusTag: StudentStatusTag;
+  /**
+   * Optionnel : les anciennes valeurs "Besoin Coaching"/"Alerte Tilt"
+   * (retirées, sans équivalent dans le nouveau système, voir la migration
+   * `migrateStudentStatusTags` dans `server/db.ts`) laissent le champ vide
+   * plutôt que de forcer une valeur arbitraire.
+   */
+  statusTag?: StudentStatusTag;
   /** Absent pour les fiches créées avant l'ajout du champ. */
   tradingStyle?: TradingStyle;
   courseCompletionPercentage: number;

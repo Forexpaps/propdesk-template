@@ -409,6 +409,69 @@ migrateForumRepliesUserId();
 // ci-dessus) : l'index peut être posé sans risque, dans les deux cas.
 db.exec("CREATE INDEX IF NOT EXISTS idx_replies_user ON forum_replies(user_id);");
 
+/**
+ * Migration ponctuelle : `enrolled_students.payload.statusTag` a changé de
+ * système de valeurs — l'ancien statut ("En Évaluation FTMO" / "Prop Firm
+ * Financé" / "Besoin Coaching" / "Alerte Tilt") a été remplacé par 4
+ * nouvelles valeurs décrivant l'étape réelle du compte ("Évaluation Étape
+ * 1"/"2", "Compte Financé", "Fonds Propres"), sans migration au moment du
+ * changement de type. Décision explicite de l'utilisateur pour rattraper
+ * les fiches existantes :
+ * - "En Évaluation FTMO" et "Prop Firm Financé" ont une correspondance
+ *   directe et sans ambiguïté vers le nouveau système ;
+ * - "Besoin Coaching" et "Alerte Tilt" décrivaient un comportement/alerte
+ *   sans équivalent dans le nouveau système (centré sur l'étape du compte,
+ *   pas un jugement de suivi) — retirées plutôt que forcées vers une valeur
+ *   arbitraire. Le champ redevient simplement absent (`statusTag` est
+ *   optionnel dans le type, voir `src/types.ts`) ; l'UI affiche alors un
+ *   badge neutre "Statut non défini" (voir `getStatusTagStyle` dans
+ *   `StudentTracking.tsx`) jusqu'à ce que le staff renseigne le vrai statut.
+ *
+ * Protégée par un marqueur dans `meta`, comme les autres migrations
+ * ponctuelles de ce fichier : ne s'exécute qu'une fois.
+ */
+const STATUS_TAG_MIGRATION_KEY = "migrated_student_status_tags_v1";
+
+function migrateStudentStatusTags(): void {
+  const already = db.prepare("SELECT 1 FROM meta WHERE key = ?").get(STATUS_TAG_MIGRATION_KEY);
+  if (already) return;
+
+  const RENAMES: Record<string, string> = {
+    "En Évaluation FTMO": "Évaluation Étape 1",
+    "Prop Firm Financé": "Compte Financé",
+  };
+  const REMOVALS = new Set(["Besoin Coaching", "Alerte Tilt"]);
+
+  const rows = db.prepare("SELECT id, payload FROM enrolled_students").all() as {
+    id: string;
+    payload: string;
+  }[];
+  const update = db.prepare("UPDATE enrolled_students SET payload = ? WHERE id = ?");
+
+  db.transaction(() => {
+    for (const row of rows) {
+      const data = JSON.parse(row.payload) as { statusTag?: string };
+      const tag = data.statusTag;
+      if (typeof tag !== "string") continue;
+
+      if (tag in RENAMES) {
+        data.statusTag = RENAMES[tag];
+        update.run(JSON.stringify(data), row.id);
+      } else if (REMOVALS.has(tag)) {
+        delete data.statusTag;
+        update.run(JSON.stringify(data), row.id);
+      }
+    }
+
+    db.prepare("INSERT INTO meta (key, value) VALUES (?, ?)").run(
+      STATUS_TAG_MIGRATION_KEY,
+      new Date().toISOString()
+    );
+  })();
+}
+
+migrateStudentStatusTags();
+
 export function getMeta(key: string): string | null {
   const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as
     | { value: string }

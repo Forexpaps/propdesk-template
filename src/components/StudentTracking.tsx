@@ -58,6 +58,20 @@ const STATUS_TAG_STYLES: Record<StudentStatusTag, string> = {
   "Fonds Propres": "bg-amber-500/10 text-amber-400 border-amber-500/30",
 };
 
+/** Filet de sécurité : `statusTag` absent, ou valeur héritée d'un ancien système désormais retiré. */
+const STATUS_TAG_FALLBACK_STYLE = "bg-slate-500/10 text-slate-400 border-slate-500/30";
+const STATUS_TAG_FALLBACK_LABEL = "Statut non défini";
+
+function getStatusTagStyle(tag: string | undefined): string {
+  if (tag && tag in STATUS_TAG_STYLES) return STATUS_TAG_STYLES[tag as StudentStatusTag];
+  return STATUS_TAG_FALLBACK_STYLE;
+}
+
+function getStatusTagLabel(tag: string | undefined): string {
+  if (tag && tag in STATUS_TAG_STYLES) return tag;
+  return STATUS_TAG_FALLBACK_LABEL;
+}
+
 const STATUS_TAGS: StudentStatusTag[] = ["Évaluation Étape 1", "Évaluation Étape 2", "Compte Financé", "Fonds Propres"];
 
 const ACCOUNT_TYPES: AccountType[] = ["Compte DÉMO", "Broker Réel", "Prop Firm Evaluation", "Prop Firm Funded"];
@@ -384,8 +398,8 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-bold text-white text-base">{st.name}</h3>
-                      <span className={`px-2 py-0.5 rounded text-[10px] border ${STATUS_TAG_STYLES[st.statusTag]}`}>
-                        {st.statusTag}
+                      <span className={`px-2 py-0.5 rounded text-[10px] border ${getStatusTagStyle(st.statusTag)}`}>
+                        {getStatusTagLabel(st.statusTag)}
                       </span>
                       {st.tradingStyle && (
                         <span className="px-2 py-0.5 rounded text-[10px] border border-[#232D29] bg-[#1B2320] text-slate-300 flex items-center gap-1">
@@ -1212,8 +1226,8 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-xl font-black text-white">{selectedStudent.name}</h2>
-                    <span className={`px-2 py-0.5 rounded text-xs border ${STATUS_TAG_STYLES[selectedStudent.statusTag]}`}>
-                      {selectedStudent.statusTag}
+                    <span className={`px-2 py-0.5 rounded text-xs border ${getStatusTagStyle(selectedStudent.statusTag)}`}>
+                      {getStatusTagLabel(selectedStudent.statusTag)}
                     </span>
                     {selectedStudent.tradingStyle && (
                       <span className="px-2 py-0.5 rounded text-xs border border-[#232D29] bg-[#1B2320] text-slate-300 flex items-center gap-1">
