@@ -39,6 +39,7 @@ import {
 } from "../types";
 import { TabType, SidebarItemKey } from "./Sidebar";
 import { computeDisciplineStreak } from "../lib/badges";
+import { computeWeeklySummary } from "../lib/weeklySummary";
 
 /**
  * En-tête de section — barre verticale colorée + titre, motif repris tel
@@ -132,7 +133,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           Bonjour {firstName}.
         </h1>
         <p className="text-slate-400 text-xs sm:text-sm">
-          Semaine 30 · 4 sessions travaillées sur 5. Ton point faible du moment : la patience sur les retests.
+          {computeWeeklySummary(trades)}
         </p>
       </div>
 
@@ -241,6 +242,28 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             textHover: "group-hover:text-amber-400",
             glowColor: "#f59e0b",
           },
+          {
+            key: "analytics",
+            tab: "analytics",
+            letter: "R",
+            title: "Rentabilité",
+            description: "Analyse de performance.",
+            badgeClasses: "text-blue-400 bg-blue-500/15 border-blue-500/30",
+            borderHover: "hover:border-blue-500/40",
+            textHover: "group-hover:text-blue-400",
+            glowColor: "#3b82f6",
+          },
+          {
+            key: "calendar",
+            tab: "macro",
+            letter: "M",
+            title: "Macro",
+            description: "Marché en direct et calendrier économique.",
+            badgeClasses: "text-violet-400 bg-violet-500/15 border-violet-500/30",
+            borderHover: "hover:border-violet-500/40",
+            textHover: "group-hover:text-violet-400",
+            glowColor: "#8b5cf6",
+          },
         ];
 
         const visibleCards = cards.filter((c) => !hiddenItems.includes(c.key));
@@ -256,7 +279,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                   key={c.key}
                   onClick={() => setActiveTab(c.tab)}
                   style={{ ["--glow" as string]: c.glowColor }}
-                  className={`bg-[#111615] border border-[#1B2320] ${c.borderHover} shadow-[inset_0_0_28px_-8px_var(--glow)] p-5 rounded-xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between`}
+                  className={`bg-[#111615] border border-[#1B2320] ${c.borderHover} shadow-[inset_0_0_28px_-8px_var(--glow)] p-5 rounded-xl space-y-4 transition-all cursor-pointer group flex flex-col`}
                 >
                   <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-bold text-sm ${c.badgeClasses}`}>
                     {c.letter}

@@ -17,7 +17,6 @@ import { NotificationModal } from "./components/NotificationModal";
 import { MindsetJournalModal } from "./components/MindsetJournalModal";
 import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
 import { LegalNoticeModal } from "./components/LegalNoticeModal";
-import { SetupAnalyzerModal } from "./components/SetupAnalyzerModal";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
 import { ConfirmDialogHost, confirmDialog } from "./lib/confirmDialog";
 import { computeBadgeProgress } from "./lib/badges";
@@ -301,9 +300,9 @@ function resolveStudentValue<T>(serverValue: T, localKey: string): T {
  * Espace personnel d'un élève — jamais `AcademyApp` (le bureau staff). Un
  * élève ne voit et ne modifie que ses propres données : son Journal, sa
  * copie personnelle du programme de formation, son fil de messagerie avec
- * le coach, et les outils sans donnée propre à un élève (Audit Setup, Prop
- * Firm, Mindset). Ni Portefeuille/Rentabilité/Macro ni Suivi des Élèves :
- * hors périmètre de l'accès élève.
+ * le coach, et les outils sans donnée propre à un élève (Prop Firm,
+ * Mindset). Ni Portefeuille/Rentabilité/Macro ni Suivi des Élèves : hors
+ * périmètre de l'accès élève.
  */
 function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const { status, trades, accounts, modules, messages, badges, quizResults, student, setStudent, coaches } = useStudentBootstrap();
@@ -456,15 +455,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [activeTab, setActiveTab] = useState<TabType>("journal");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isSetupAnalyzerOpen, setIsSetupAnalyzerOpen] = useState(false);
-  /**
-   * Ébauche de trade venue du Setup Analyzer — même mécanisme que côté staff
-   * (`journalDraft`/`prefillDraft` plus bas dans ce fichier). Sans lui,
-   * "Valider & Transférer au Journal" fermait silencieusement la modale sans
-   * rien transférer pour un élève : `onApplyToJournal` n'était jamais fourni,
-   * et le bouton n'affichait pourtant aucune différence, aucun message.
-   */
-  const [journalDraft, setJournalDraft] = useState<TradeDraft | null>(null);
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
   const [isLegalNoticeOpen, setIsLegalNoticeOpen] = useState(false);
@@ -623,7 +613,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         }}
         onLogout={handleLogout}
         onOpenTradingPlan={() => setIsTradingPlanOpen(true)}
-        onOpenSetupAnalyzer={() => setIsSetupAnalyzerOpen(true)}
         onOpenMindset={() => setIsMindsetModalOpen(true)}
         canManageSidebar={false}
       />
@@ -663,8 +652,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
                 onDeleteTrade={handleDeleteTrade}
                 onSendTradeToCoach={() => undefined}
                 hideAiAndCoachActions
-                prefillDraft={journalDraft}
-                onPrefillConsumed={() => setJournalDraft(null)}
               />
             )}
 
@@ -718,20 +705,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         </footer>
       </div>
 
-      <SetupAnalyzerModal
-        isOpen={isSetupAnalyzerOpen}
-        onClose={() => setIsSetupAnalyzerOpen(false)}
-        onApplyToJournal={(setup) => {
-          setJournalDraft({
-            pair: setup.pair,
-            direction: setup.direction,
-            strategy: `Setup SMC ${setup.verdict} (${setup.score}/100)`,
-            notes: setup.notes,
-          });
-          setIsSetupAnalyzerOpen(false);
-          setActiveTab("journal");
-        }}
-      />
       <LegalNoticeModal isOpen={isLegalNoticeOpen} onClose={() => setIsLegalNoticeOpen(false)} />
       <ConfirmDialogHost />
       <MindsetJournalModal
@@ -971,11 +944,10 @@ function AcademyApp({
     undefined
   );
 
-  // Ébauche de trade poussée vers le Journal par le calculateur ou l'analyseur de setup
+  // Ébauche de trade poussée vers le Journal par le calculateur de position
   const [journalDraft, setJournalDraft] = useState<TradeDraft | null>(null);
 
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState<boolean>(false);
-  const [isSetupAnalyzerOpen, setIsSetupAnalyzerOpen] = useState<boolean>(false);
 
   // L'écriture dans localStorage est désormais assurée par usePersistentState.
 
@@ -1312,7 +1284,6 @@ function AcademyApp({
         }}
         onLogout={handleLogout}
         onOpenTradingPlan={() => setIsTradingPlanOpen(true)}
-        onOpenSetupAnalyzer={() => setIsSetupAnalyzerOpen(true)}
         onOpenMindset={() => setIsMindsetModalOpen(true)}
         canManageSidebar={isOwner}
         onToggleSidebarItem={(key) => {
@@ -1572,22 +1543,6 @@ function AcademyApp({
         onMarkAllAsRead={handleMarkAllNotificationsAsRead}
         onClearAll={handleClearAllNotifications}
         onNavigateToTab={handleNavigateFromNotification}
-      />
-
-      {/* Setup & Confluence Matrix Modal */}
-      <SetupAnalyzerModal
-        isOpen={isSetupAnalyzerOpen}
-        onClose={() => setIsSetupAnalyzerOpen(false)}
-        onApplyToJournal={(setup) => {
-          setJournalDraft({
-            pair: setup.pair,
-            direction: setup.direction,
-            strategy: `Setup SMC ${setup.verdict} (${setup.score}/100)`,
-            notes: setup.notes,
-          });
-          setIsSetupAnalyzerOpen(false);
-          setActiveTab("journal");
-        }}
       />
 
       <SyncErrorBanner message={syncErrorMessage} onDismiss={() => setSyncErrorMessage(null)} />

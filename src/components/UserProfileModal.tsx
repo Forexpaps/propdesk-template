@@ -66,6 +66,56 @@ interface UserProfileModalProps {
   avatarOnly?: boolean;
 }
 
+/**
+ * Titres de rang par niveau — 5 paliers répartis sur le total d'XP
+ * réellement disponible (somme de `rewardXP` sur le catalogue de badges
+ * fourni), jamais une borne fixe. Avant ce correctif, "NIVEAU 4" et
+ * "Progression Niveau 5 : X / 3 000 XP" étaient codés en dur, indépendants
+ * du vrai total (repéré par l'utilisateur : 3650 XP affiché comme
+ * "en cours vers 3000", donc au-delà de son propre objectif).
+ */
+const LEVEL_TITLES = [
+  "Trader Débutant",
+  "Trader Initié",
+  "Trader SMC Confirmé",
+  "Trader SMC Avancé",
+  "Trader SMC Élite",
+];
+
+interface LevelInfo {
+  levelIndex: number;
+  title: string;
+  isMaxLevel: boolean;
+  xpFloor: number;
+  xpCeil: number;
+  progressPercent: number;
+}
+
+function computeLevelInfo(totalXP: number, badges: TraderBadge[]): LevelInfo {
+  const maxXP = badges.reduce((sum, b) => sum + (b.rewardXP || 0), 0);
+  const levelCount = LEVEL_TITLES.length;
+
+  if (maxXP <= 0) {
+    return { levelIndex: 1, title: LEVEL_TITLES[0], isMaxLevel: false, xpFloor: 0, xpCeil: 0, progressPercent: 0 };
+  }
+
+  const thresholds = Array.from({ length: levelCount + 1 }, (_, i) => Math.round((maxXP * i) / levelCount));
+
+  let levelIndex = 1;
+  while (levelIndex < levelCount && totalXP >= thresholds[levelIndex]) {
+    levelIndex++;
+  }
+
+  const xpFloor = thresholds[levelIndex - 1];
+  const xpCeil = thresholds[levelIndex];
+  const isMaxLevel = levelIndex === levelCount && totalXP >= xpCeil;
+  const progressPercent = isMaxLevel
+    ? 100
+    : Math.min(100, Math.round(((totalXP - xpFloor) / Math.max(1, xpCeil - xpFloor)) * 100));
+
+  return { levelIndex, title: LEVEL_TITLES[levelIndex - 1], isMaxLevel, xpFloor, xpCeil, progressPercent };
+}
+
 const AVATAR_PRESETS = [
   "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250",
   "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=250",
@@ -245,34 +295,48 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
+  /**
+   * Construit le profil à envoyer, à partir de l'état local du formulaire.
+   * Extrait de `handleSubmit` pour être aussi appelable depuis l'onglet
+   * Badges & Succès (bouton "Enregistrer" hors `<form>`) : l'état des champs
+   * du formulaire persiste entre les deux onglets (pas de reset au
+   * changement d'onglet), donc un enregistrement déclenché depuis Badges
+   * capture bien les mêmes modifications que depuis Profil & Options.
+   */
+  const buildUpdatedProfile = (): StudentProfile =>
+    avatarOnly
+      ? // Seule la photo peut changer ici : le reste part de `student`
+        // (la source de vérité), jamais de l'état local du formulaire — au
+        // cas où celui-ci contiendrait une frappe dans un champ pourtant
+        // désactivé (ex: autofill du navigateur).
+        { ...student, avatar }
+      : {
+          ...student,
+          name,
+          email,
+          avatar,
+          level,
+          role,
+          phone,
+          bio,
+          preferredPairs,
+          // `startingCapital`/`currentCapital` ne sont plus édités ici : ils sont
+          // dérivés des portefeuilles réels à l'affichage (voir `App.tsx`,
+          // `displayStudent`/`studentProfile`). Le `...student` initial les
+          // conserve tels quels dans le payload envoyé au serveur.
+          // `isAdmin` n'est volontairement pas renvoyé : le serveur l'ignore dans le
+          // corps et réinjecte sa propre valeur. Le `...student` initial le conserve
+          // pour que l'état local reste cohérent d'ici au prochain rechargement.
+        };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveProfile(
-      avatarOnly
-        ? // Seule la photo peut changer ici : le reste part de `student`
-          // (la source de vérité), jamais de l'état local du formulaire — au
-          // cas où celui-ci contiendrait une frappe dans un champ pourtant
-          // désactivé (ex: autofill du navigateur).
-          { ...student, avatar }
-        : {
-            ...student,
-            name,
-            email,
-            avatar,
-            level,
-            role,
-            phone,
-            bio,
-            preferredPairs,
-            // `startingCapital`/`currentCapital` ne sont plus édités ici : ils sont
-            // dérivés des portefeuilles réels à l'affichage (voir `App.tsx`,
-            // `displayStudent`/`studentProfile`). Le `...student` initial les
-            // conserve tels quels dans le payload envoyé au serveur.
-            // `isAdmin` n'est volontairement pas renvoyé : le serveur l'ignore dans le
-            // corps et réinjecte sa propre valeur. Le `...student` initial le conserve
-            // pour que l'état local reste cohérent d'ici au prochain rechargement.
-          }
-    );
+    onSaveProfile(buildUpdatedProfile());
+    onClose();
+  };
+
+  const handleSaveFromBadgesTab = () => {
+    onSaveProfile(buildUpdatedProfile());
     onClose();
   };
 
@@ -281,6 +345,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const totalXP = badges
     .filter((b) => b.unlocked)
     .reduce((acc, b) => acc + (b.rewardXP || 200), 0);
+  const levelInfo = computeLevelInfo(totalXP, badges);
 
   const getBadgeIcon = (iconName: string, unlocked: boolean) => {
     const cls = unlocked ? "w-5 h-5 text-[#00E676]" : "w-5 h-5 text-slate-500";
@@ -728,9 +793,9 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   <div className="flex items-center gap-2">
                     <SectionHeader />
                     <Crown className="w-5 h-5 text-amber-400" />
-                    <h4 className="text-base font-bold text-white">Rang : Trader SMC Confirmé</h4>
+                    <h4 className="text-base font-bold text-white">Rang : {levelInfo.title}</h4>
                     <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 text-[10px] font-mono font-bold border border-amber-500/30">
-                      NIVEAU 4
+                      NIVEAU {levelInfo.levelIndex}
                     </span>
                   </div>
                   <p className="text-xs text-slate-400">
@@ -756,13 +821,21 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               {/* Progress Bar to next level */}
               <div className="space-y-1.5 pt-1">
                 <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
-                  <span>Progression Niveau 5</span>
-                  <span>{totalXP} / 3 000 XP</span>
+                  <span>
+                    {levelInfo.isMaxLevel
+                      ? "Niveau maximum atteint"
+                      : `Progression Niveau ${levelInfo.levelIndex + 1}`}
+                  </span>
+                  <span>
+                    {levelInfo.isMaxLevel
+                      ? `${totalXP} XP · tous les badges débloqués`
+                      : `${totalXP} / ${levelInfo.xpCeil} XP`}
+                  </span>
                 </div>
                 <div className="w-full h-2.5 bg-[#1B2320] rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-[#00E676] to-amber-400 rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(100, Math.round((totalXP / 3000) * 100))}%` }}
+                    style={{ width: `${levelInfo.progressPercent}%` }}
                   />
                 </div>
               </div>
@@ -894,6 +967,23 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                   </div>
                 );
               })}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1B2320]">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 font-bold"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveFromBadgesTab}
+                className="px-5 py-2.5 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold flex items-center gap-1.5 shadow-md"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Enregistrer
+              </button>
             </div>
           </div>
         )}
