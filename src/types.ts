@@ -238,13 +238,14 @@ export interface StudentProfile {
 }
 
 /**
- * Statut du compte de trading de l'élève — étape d'évaluation Prop Firm,
- * compte financé, ou capital propre. Remplace l'ancien statut ("En
- * Évaluation FTMO" / "Prop Firm Financé" / "Besoin Coaching" / "Alerte
+ * Statut du compte de trading de l'élève — compte démo, étape d'évaluation
+ * Prop Firm, compte financé, ou capital propre. Remplace l'ancien statut
+ * ("En Évaluation FTMO" / "Prop Firm Financé" / "Besoin Coaching" / "Alerte
  * Tilt") sur demande explicite : un seul statut, centré sur l'étape réelle
  * du compte plutôt que sur un jugement de suivi (coaching/tilt).
  */
 export type StudentStatusTag =
+  | "Compte DÉMO"
   | "Évaluation Étape 1"
   | "Évaluation Étape 2"
   | "Compte Financé"

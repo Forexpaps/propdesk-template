@@ -92,9 +92,25 @@ export function destroyStudentSession(token: string): void {
   db.prepare("DELETE FROM student_sessions WHERE id = ?").run(fingerprint(token));
 }
 
-/** Renvoie le nombre de sessions détruites (inclut la session courante). */
+/**
+ * Renvoie le nombre de sessions détruites (inclut la session courante s'il y
+ * en a une). Correct pour un mot de passe FIXÉ PAR UN TIERS (staff qui
+ * définit le mot de passe d'un élève, ou lien de reset consommé hors
+ * session) — il n'y a alors aucune "session courante de l'élève" à
+ * préserver. Pour un changement VOLONTAIRE par l'élève lui-même, connecté,
+ * voir `destroyOtherStudentSessions` à la place (même raison que
+ * `destroyOtherSessions` côté staff, `sessions.ts`).
+ */
 export function destroyAllStudentSessions(studentAccountId: string): number {
   return db.prepare("DELETE FROM student_sessions WHERE user_id = ?").run(studentAccountId).changes;
+}
+
+/** Même principe que `destroyOtherSessions` (staff), pour le monde élève. */
+export function destroyOtherStudentSessions(studentAccountId: string, currentToken: string): number {
+  const currentId = fingerprint(currentToken);
+  return db
+    .prepare("DELETE FROM student_sessions WHERE user_id = ? AND id != ?")
+    .run(studentAccountId, currentId).changes;
 }
 
 export function purgeExpiredStudentSessions(): number {
