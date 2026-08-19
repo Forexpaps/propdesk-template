@@ -40,6 +40,7 @@ import {
 import { TabType, SidebarItemKey } from "./Sidebar";
 import { computeDisciplineStreak } from "../lib/badges";
 import { computeWeeklySummary } from "../lib/weeklySummary";
+import { computeJournalSummary } from "../lib/performanceStats";
 
 /**
  * En-tête de section — barre verticale colorée + titre, motif repris tel
@@ -122,6 +123,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   const isPnLPositive = totalPnL >= 0;
 
   const disciplineStreak = computeDisciplineStreak(trades);
+  const { avgRR, profitFactor } = computeJournalSummary(trades);
 
   const firstName = student.name.split(" ")[0] || "Yoann";
 
@@ -137,8 +139,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         </p>
       </div>
 
-      {/* 2. Top 3 KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* 2. Top KPI Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* Card 1: Win Rate Journal */}
         <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between">
           <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
@@ -196,6 +198,28 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                 ? "Jours de trading sans écart émotionnel"
                 : "Aucune série en cours"}
             </p>
+          </div>
+        </div>
+
+        {/* Card 4: RR Moyen */}
+        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between">
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+            RR MOYEN
+          </div>
+          <div className="space-y-1">
+            <div className="text-xl font-black text-purple-400 font-mono">1:{avgRR}</div>
+            <p className="text-xs text-slate-400">Risque / Récompense moyen</p>
+          </div>
+        </div>
+
+        {/* Card 5: Profit Factor */}
+        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between">
+          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
+            PROFIT FACTOR
+          </div>
+          <div className="space-y-1">
+            <div className="text-xl font-black text-white font-mono">{profitFactor}</div>
+            <p className="text-xs text-slate-400">Gains / Pertes</p>
           </div>
         </div>
       </div>
