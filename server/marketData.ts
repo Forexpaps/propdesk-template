@@ -28,18 +28,21 @@ export interface MarketQuote {
  * prix brut renvoyé par Yahoo avant affichage (voir `fetchQuote`) — absent
  * équivaut à 1 (aucune correction).
  *
- * `^TNX` (rendement du 10 ans US) est le seul symbole concerné : Yahoo le
- * renvoie multiplié par 10 (convention CBOE, ex. 46.3 pour un vrai rendement
- * de 4.63 %). Champ déclaré une première fois avec `scale: 1` (un facteur
- * neutre, donc sans effet) sans jamais être lu dans `fetchQuote` — le taux
- * s'affichait alors avec une erreur d'un facteur 10 (« 46.3 » au lieu de
- * « 4.63 »), et le commentaire d'alors renvoyait vers une fonction
- * `normalize()` qui n'existe nulle part dans ce fichier. Corrigé ici : le
- * diviseur est réellement `10`, et appliqué.
+ * `^TNX` (rendement du 10 ans US) n'a PAS besoin de correction sur ce point
+ * d'accès (`/v8/finance/chart`, interrogé ici) : vérifié en direct, Yahoo y
+ * renvoie déjà la valeur réelle (`4.67` pour un vrai rendement de 4.67 %),
+ * sans le facteur 10 propre à d'autres points d'accès Yahoo (ex. l'ancien
+ * endpoint `/v7/finance/quote`, qui applique la convention CBOE ×10). Un
+ * `scale: 10` avait été ajouté ici sur cette hypothèse sans revérification
+ * empirique sur CE point d'accès précis — il divisait une valeur déjà
+ * correcte par 10, affichant « 0.4668 » au lieu de « 4.668 ». Avant de
+ * réintroduire une correction de ce type, revérifier empiriquement (`curl`
+ * direct sur le point d'accès réellement utilisé), pas seulement par
+ * référence à une convention Yahoo générale.
  */
 export const MARKET_SYMBOLS: { symbol: string; label: string; scale?: number }[] = [
   { symbol: "DX-Y.NYB", label: "Dollar (DXY)" },
-  { symbol: "^TNX", label: "Taux US 10Y", scale: 10 },
+  { symbol: "^TNX", label: "Taux US 10Y" },
   { symbol: "^GSPC", label: "S&P 500" },
   { symbol: "^IXIC", label: "Nasdaq" },
   { symbol: "^VIX", label: "VIX (peur)" },
