@@ -50,7 +50,6 @@ export const ALL_TABS = [
   "wallets",
   "academy",
   "journal",
-  "forum",
   "messaging",
   "analytics",
   "macro",

@@ -3,7 +3,6 @@ import {
   Trade,
   TradingAccount,
   CoachMessage,
-  ForumTopic,
   AppNotification,
   EnrolledStudent,
   TraderBadge,
@@ -17,7 +16,6 @@ export interface ServerCollections {
   trades: Trade[];
   accounts: TradingAccount[];
   messages: CoachMessage[];
-  forumTopics: ForumTopic[];
   notifications: AppNotification[];
   enrolledStudents: EnrolledStudent[];
   badges: TraderBadge[];

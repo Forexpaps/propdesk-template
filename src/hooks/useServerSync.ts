@@ -13,7 +13,6 @@ const LEGACY_KEYS = {
     trades: "horizon_trades",
     accounts: "horizon_accounts",
     messages: "horizon_messages",
-    forumTopics: "horizon_forum_topics",
     notifications: "horizon_notifications",
     enrolledStudents: "horizon_enrolled_students",
     badges: "horizon_badges",

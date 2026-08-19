@@ -11,19 +11,14 @@ import { z } from "zod";
  */
 
 /**
- * `chartUrl`/`avatar`/`authorAvatar` ne sont aujourd'hui rendus qu'en
- * `<img src>`, jamais en lien cliquable ou en navigation — une URL
- * `javascript:` n'y est donc pas exploitable en pratique. Verrou défensif
- * tout de même : n'accepte que des images `https://` ou des `data:image/...`
- * (captures d'écran redimensionnées côté client), pour qu'un futur refactor
- * de ces champs en lien/iframe ne réintroduise pas silencieusement un risque.
- *
- * `authorAvatar` (sujets/réponses du forum, `src/types.ts`) manquait de cette
- * liste — trouvé en audit de sécurité : `PUT /collections/forumTopics`
- * (réservée au staff) acceptait n'importe quelle chaîne pour ce champ, rendu
- * ensuite en `<img src>` dans `ForumSection.tsx` pour tout visiteur du forum.
+ * `chartUrl`/`avatar` ne sont aujourd'hui rendus qu'en `<img src>`, jamais en
+ * lien cliquable ou en navigation — une URL `javascript:` n'y est donc pas
+ * exploitable en pratique. Verrou défensif tout de même : n'accepte que des
+ * images `https://` ou des `data:image/...` (captures d'écran redimensionnées
+ * côté client), pour qu'un futur refactor de ces champs en lien/iframe ne
+ * réintroduise pas silencieusement un risque.
  */
-const SAFE_MEDIA_URL_FIELDS = ["chartUrl", "avatar", "authorAvatar"] as const;
+const SAFE_MEDIA_URL_FIELDS = ["chartUrl", "avatar"] as const;
 /**
  * `value == null` (absent ou explicitement `null`) est le seul cas où le
  * champ n'est pas concerné — tout ce qui n'est PAS une chaîne (nombre, objet,

@@ -194,7 +194,6 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
                 student={readOnlyStudent}
                 trades={studentData.trades}
                 modules={studentData.modules}
-                forumTopics={[]}
                 messages={[]}
                 courseCompletionPercentage={courseCompletionPercentage}
                 setActiveTab={setActiveTab}

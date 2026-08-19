@@ -67,26 +67,6 @@ db.exec(`
     payload  TEXT NOT NULL
   );
 
-  CREATE TABLE IF NOT EXISTS forum_topics (
-    id       TEXT PRIMARY KEY,
-    user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    position INTEGER NOT NULL,
-    payload  TEXT NOT NULL
-  );
-
-  -- user_id n'est indexée qu'après migrateForumRepliesUserId() plus bas :
-  -- sur une base déjà existante, CREATE TABLE IF NOT EXISTS est un no-op
-  -- (la table garde son ancien schéma sans user_id), un index dessus ici
-  -- échouerait donc avant que la migration n'ait eu la main.
-  CREATE TABLE IF NOT EXISTS forum_replies (
-    id       TEXT PRIMARY KEY,
-    topic_id TEXT NOT NULL REFERENCES forum_topics(id) ON DELETE CASCADE,
-    user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    position INTEGER NOT NULL,
-    payload  TEXT NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS idx_replies_topic ON forum_replies(topic_id, position);
-
   CREATE TABLE IF NOT EXISTS notifications (
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -356,77 +336,6 @@ function migrateToStaffAccounts(): void {
 
 migrateToStaffAccounts();
 
-/**
- * Migration ponctuelle : ajoute `user_id` à `forum_replies`, absente à la
- * création de la table. Sans cette colonne, aucune vérification de propriété
- * n'est possible au niveau de la table elle-même — latent, jamais exploité
- * en pratique (le Forum est exclu de STUDENT_ALLOWED_COLLECTIONS et
- * `replaceForumReplies` n'est appelée que pour un `topic_id` déjà vérifié
- * appartenir à l'appelant), mais une vraie lacune structurelle à combler.
- *
- * Rétrocompatible par construction (backfill via jointure sur `forum_topics`,
- * qui porte déjà `user_id`) : idempotente par simple vérification de la
- * colonne, pas besoin de clé `meta` dédiée.
- */
-function migrateForumRepliesUserId(): void {
-  const columns = db.pragma("table_info(forum_replies)") as { name: string }[];
-  const hasUserId = columns.some((c) => c.name === "user_id");
-  if (hasUserId) return;
-
-  // `user_id` étant NOT NULL sur la nouvelle table, la jointure ci-dessous
-  // exclut de fait toute ligne dont le `topic_id` ne correspond à aucun
-  // `forum_topics` existant (normalement impossible via l'usage normal de
-  // l'app, protégé par `ON DELETE CASCADE` + `foreign_keys = ON` depuis le
-  // tout premier commit introduisant ces tables — voir le commentaire de
-  // `migrateForumRepliesUserId` ci-dessus). Un tel cas ne pourrait venir que
-  // d'une intervention externe sur la base (import manuel, restauration
-  // partielle) contournant les FK. Plutôt que de perdre ces lignes en
-  // silence, on le signale : la migration reste idempotente et sans perte
-  // dans tous les cas normaux, mais l'opérateur est prévenu si ce n'en est
-  // pas un.
-  const orphanCount = (
-    db
-      .prepare(
-        `SELECT COUNT(*) AS n FROM forum_replies r
-         WHERE NOT EXISTS (SELECT 1 FROM forum_topics t WHERE t.id = r.topic_id)`
-      )
-      .get() as { n: number }
-  ).n;
-  if (orphanCount > 0) {
-    console.warn(
-      `[horizon] Migration forum_replies : ${orphanCount} réponse(s) orpheline(s) ` +
-        `(topic_id sans forum_topics correspondant) seront perdues — base modifiée hors de l'app ?`
-    );
-  }
-
-  db.transaction(() => {
-    db.exec(`
-      CREATE TABLE forum_replies_new (
-        id       TEXT PRIMARY KEY,
-        topic_id TEXT NOT NULL REFERENCES forum_topics(id) ON DELETE CASCADE,
-        user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        position INTEGER NOT NULL,
-        payload  TEXT NOT NULL
-      );
-
-      INSERT INTO forum_replies_new (id, topic_id, user_id, position, payload)
-      SELECT r.id, r.topic_id, t.user_id, r.position, r.payload
-      FROM forum_replies r
-      JOIN forum_topics t ON t.id = r.topic_id;
-
-      DROP TABLE forum_replies;
-      ALTER TABLE forum_replies_new RENAME TO forum_replies;
-      CREATE INDEX IF NOT EXISTS idx_replies_topic ON forum_replies(topic_id, position);
-      CREATE INDEX IF NOT EXISTS idx_replies_user  ON forum_replies(user_id);
-    `);
-  })();
-}
-
-migrateForumRepliesUserId();
-
-// Colonne garantie présente à ce stade (création fraîche ou migration
-// ci-dessus) : l'index peut être posé sans risque, dans les deux cas.
-db.exec("CREATE INDEX IF NOT EXISTS idx_replies_user ON forum_replies(user_id);");
 
 /**
  * Migration ponctuelle : `enrolled_students.payload.statusTag` a changé de
@@ -504,6 +413,23 @@ function migrateDropCoachSignals(): void {
 }
 
 migrateDropCoachSignals();
+
+/**
+ * Migration ponctuelle : supprime `forum_topics`/`forum_replies`, tables du
+ * module Forum retiré entièrement de l'application sur demande explicite de
+ * l'utilisateur (composant, routes de rendu, types, sidebar — voir git log
+ * et HANDOFF.md). Confirmées vides avant suppression : le forum n'a jamais
+ * eu d'entrée dans la sidebar, aucun élève ni coach n'a donc jamais pu y
+ * écrire depuis l'UI. `forum_replies` d'abord (clé étrangère vers
+ * `forum_topics`), `DROP TABLE IF EXISTS` idempotent par construction — pas
+ * besoin de clé `meta` dédiée.
+ */
+function migrateDropForum(): void {
+  db.exec("DROP TABLE IF EXISTS forum_replies;");
+  db.exec("DROP TABLE IF EXISTS forum_topics;");
+}
+
+migrateDropForum();
 
 export function getMeta(key: string): string | null {
   const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as

@@ -35,7 +35,6 @@ import {
   StudentProfile,
   Trade,
   Module,
-  ForumTopic,
   CoachMessage,
 } from "../types";
 import { TabType, SidebarItemKey } from "./Sidebar";
@@ -59,7 +58,6 @@ interface MainDashboardProps {
   student: StudentProfile;
   trades: Trade[];
   modules: Module[];
-  forumTopics: ForumTopic[];
   messages: CoachMessage[];
   courseCompletionPercentage: number;
   setActiveTab: (tab: TabType) => void;
@@ -69,7 +67,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   student,
   trades,
   modules,
-  forumTopics,
   messages,
   courseCompletionPercentage,
   setActiveTab,
