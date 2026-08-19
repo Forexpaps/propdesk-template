@@ -711,7 +711,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         </main>
 
         <footer className="px-4 sm:px-8 py-4 flex items-center justify-between gap-4 text-[11px] text-slate-500 max-w-7xl w-full mx-auto">
-          <span>© {new Date().getFullYear()} Thomas Gauthey — Auto-entrepreneur</span>
+          <span>© {new Date().getFullYear()} Thomas Gauthey — Trader</span>
           <button onClick={() => setIsLegalNoticeOpen(true)} className="hover:text-[#00E676] transition-colors">
             Mentions légales
           </button>
@@ -1477,7 +1477,7 @@ function AcademyApp({
         </main>
 
         <footer className="px-4 sm:px-8 py-4 flex items-center justify-between gap-4 text-[11px] text-slate-500 max-w-7xl w-full mx-auto">
-          <span>© {new Date().getFullYear()} Thomas Gauthey — Auto-entrepreneur</span>
+          <span>© {new Date().getFullYear()} Thomas Gauthey — Trader</span>
           <button onClick={() => setIsLegalNoticeOpen(true)} className="hover:text-[#00E676] transition-colors">
             Mentions légales
           </button>
