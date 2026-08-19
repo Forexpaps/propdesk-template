@@ -21,6 +21,37 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const isProd = process.env.NODE_ENV === "production";
 
+/**
+ * `isProd` gouverne silencieusement `trust proxy`, la CSP, HSTS, et le flag
+ * `secure` des cookies de session (voir sessions.ts/studentSessions.ts) — tout
+ * en dépend, mais rien ne vérifiait jusqu'ici que `NODE_ENV` était réellement
+ * positionné comme attendu. `NODE_ENV` vit dans la configuration Railway
+ * (dashboard), pas dans ce dépôt : une suppression ou une faute de frappe
+ * accidentelle y repasserait silencieusement toute l'app en posture "dev" en
+ * production (cookies envoyables en clair, pas de CSP/HSTS, rate limiting par
+ * IP cassé si le proxy Railway n'est plus fait confiance) — sans qu'aucune
+ * erreur ne le signale nulle part. Trouvé en audit de sécurité, corrigé par
+ * un avertissement impossible à manquer dans les logs de démarrage plutôt que
+ * par un blocage strict (un `throw` casserait le tout premier déploiement,
+ * avant même que `NODE_ENV` n'y soit configuré).
+ *
+ * `DATA_DIR` sert de signal indépendant d'un déploiement voulu en production
+ * (positionné à `/data` dans le dashboard Railway, jamais en développement
+ * local) : s'il est défini alors que `NODE_ENV` ne vaut pas "production",
+ * c'est presque certainement une configuration incohérente plutôt qu'un choix
+ * délibéré.
+ */
+if (process.env.DATA_DIR && !isProd) {
+  console.warn(
+    "\n⚠️  ATTENTION SÉCURITÉ : DATA_DIR est positionné (déploiement visiblement voulu en production) " +
+      `mais NODE_ENV="${process.env.NODE_ENV ?? "(absent)"}" n'est PAS "production". ` +
+      "L'app démarre donc en posture dev : cookies non sécurisés, pas de CSP/HSTS, rate limiting par IP " +
+      "potentiellement contournable. Vérifie la variable NODE_ENV dans la configuration de déploiement.\n"
+  );
+} else if (!isProd) {
+  console.log(`[propdesk] Démarrage en mode développement (NODE_ENV="${process.env.NODE_ENV ?? "(absent)"}").`);
+}
+
 // Déployé derrière un reverse proxy en production (1 saut) : sans ce
 // réglage, `req.ip` (utilisé par le rate limiter, voir
 // server/middleware/rateLimit.ts) retombe sur l'IP du proxy pour TOUT le

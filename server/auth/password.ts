@@ -36,15 +36,20 @@ function scryptAsync(
 /**
  * Paramètres courants.
  *
- * La mémoire requise vaut environ 128 × N × r, soit **32 Mio** ici. C'est
- * exactement la limite `maxmem` par défaut de Node : il faut donc la relever
- * explicitement, sinon scrypt échoue sur ERR_CRYPTO_INVALID_SCRYPT_PARAMS.
+ * La mémoire requise vaut environ 128 × N × r, soit **128 Mio** ici — bien
+ * au-dessus de la limite `maxmem` par défaut de Node, d'où le `MAXMEM`
+ * explicite plus bas (sinon scrypt échoue sur ERR_CRYPTO_INVALID_SCRYPT_PARAMS).
  *
- * N = 2^15 plutôt que 2^14 parce que 2^14 ne coûtait que ~40 ms sur cette
- * machine. Le coût est le but : il ralentit une attaque hors ligne si la base
- * fuit, tout en restant imperceptible sur une connexion légitime.
+ * N = 2^17, le minimum recommandé par l'OWASP Password Storage Cheat Sheet
+ * actuel pour scrypt (r=8, p=1). Un précédent réglage à 2^15 (~80 ms sur une
+ * machine de dev) était calibré sur "ce qui semblait rapide", pas sur cette
+ * recommandation — trouvé et corrigé en audit de sécurité : en cas de fuite
+ * de la base (backup exposé, disque compromis), 2^15 cassait ~4× plus vite
+ * qu'avec ce réglage. `needsRehash()` fait remonter en douceur tout hash
+ * ancien à la prochaine connexion réussie — aucun mot de passe existant n'est
+ * invalidé par ce changement.
  */
-const CURRENT = { N: 32768, r: 8, p: 1, keylen: 64 } as const;
+const CURRENT = { N: 131072, r: 8, p: 1, keylen: 64 } as const;
 
 /**
  * Plafond mémoire accordé à scrypt.

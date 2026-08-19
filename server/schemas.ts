@@ -11,14 +11,19 @@ import { z } from "zod";
  */
 
 /**
- * `chartUrl`/`avatar` ne sont aujourd'hui rendus qu'en `<img src>`, jamais en
- * lien cliquable ou en navigation — une URL `javascript:` n'y est donc pas
- * exploitable en pratique. Verrou défensif tout de même : n'accepte que des
- * images `https://` ou des `data:image/...` (captures d'écran redimensionnées
- * côté client), pour qu'un futur refactor de ces champs en lien/iframe ne
- * réintroduise pas silencieusement un risque.
+ * `chartUrl`/`avatar`/`authorAvatar` ne sont aujourd'hui rendus qu'en
+ * `<img src>`, jamais en lien cliquable ou en navigation — une URL
+ * `javascript:` n'y est donc pas exploitable en pratique. Verrou défensif
+ * tout de même : n'accepte que des images `https://` ou des `data:image/...`
+ * (captures d'écran redimensionnées côté client), pour qu'un futur refactor
+ * de ces champs en lien/iframe ne réintroduise pas silencieusement un risque.
+ *
+ * `authorAvatar` (sujets/réponses du forum, `src/types.ts`) manquait de cette
+ * liste — trouvé en audit de sécurité : `PUT /collections/forumTopics`
+ * (réservée au staff) acceptait n'importe quelle chaîne pour ce champ, rendu
+ * ensuite en `<img src>` dans `ForumSection.tsx` pour tout visiteur du forum.
  */
-const SAFE_MEDIA_URL_FIELDS = ["chartUrl", "avatar"] as const;
+const SAFE_MEDIA_URL_FIELDS = ["chartUrl", "avatar", "authorAvatar"] as const;
 /**
  * `value == null` (absent ou explicitement `null`) est le seul cas où le
  * champ n'est pas concerné — tout ce qui n'est PAS une chaîne (nombre, objet,
@@ -45,7 +50,21 @@ const isSafeMediaUrl = (value: unknown): boolean =>
 const isValidInitialBalance = (value: unknown): boolean =>
   value == null || (typeof value === "number" && value > 0);
 
-/** Tout élément de collection doit porter un id non vide et unique. */
+/**
+ * Tout élément de collection doit porter un id non vide et unique.
+ *
+ * ⚠️ `.passthrough()` : un élève écrivant dans une collection qui lui est
+ * autorisée (`trades`/`accounts`/`modules`/`badges`/`messages`) peut inclure
+ * n'importe quel champ supplémentaire sur SES PROPRES lignes. Sans danger
+ * aujourd'hui — aucun champ de collection n'est relu avec un privilège
+ * supérieur côté serveur (`isAdmin` ne vit jamais dans une collection, voir
+ * `buildStudentProfile`/`buildStaffProfile`) — mais à garder en tête : une
+ * future fonctionnalité qui accorderait une confiance implicite à un champ
+ * passthrough (ex. un flag `verified`/`role` sur un `trade`) réintroduirait
+ * une auto-élévation de privilège silencieuse. Relevé en audit de sécurité,
+ * documenté ici plutôt que "corrigé" faute de vulnérabilité actuelle à
+ * fermer sans casser le passthrough dont dépendent des champs légitimes.
+ */
 const collectionItem = z
   .object({ id: z.string().min(1).max(200) })
   .passthrough()
