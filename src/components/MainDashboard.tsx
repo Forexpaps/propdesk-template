@@ -30,9 +30,6 @@ function EquityCurvePlaceholder() {
     <div className="h-full w-full rounded-xl bg-[#0D1110]/40 animate-pulse" aria-hidden="true" />
   );
 }
-import {
-  ChevronRight,
-} from "lucide-react";
 import { formatCurrency } from "../lib/format";
 import {
   StudentProfile,
@@ -66,7 +63,6 @@ interface MainDashboardProps {
   messages: CoachMessage[];
   courseCompletionPercentage: number;
   setActiveTab: (tab: TabType) => void;
-  onOpenChecklist?: () => void;
 }
 
 export const MainDashboard: React.FC<MainDashboardProps> = ({
@@ -77,7 +73,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   messages,
   courseCompletionPercentage,
   setActiveTab,
-  onOpenChecklist,
 }) => {
   // Calculate Metrics
   const capitalDiff = student.currentCapital - student.startingCapital;
@@ -293,99 +288,41 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         );
       })()}
 
-      {/* 4. Bottom Main Section: Courbe de progression (2/3) + Ta semaine (1/3) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 pt-2">
-        {/* Left Column: Courbe de progression (2 cols) */}
-        <div className="lg:col-span-2 bg-[#111615] border border-[#1B2320] rounded-xl p-6 space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <SectionHeader color="bg-[#00E676]">Courbe de progression</SectionHeader>
-              <p className="text-xs text-slate-400 mt-1">Capital réel issu de tes trades journalisés</p>
-            </div>
-            <button
-              onClick={() => setActiveTab("journal")}
-              className="px-3 py-1.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 text-xs font-medium border border-[#232D29]/60 transition-colors self-start sm:self-auto"
-            >
-              Ouvrir le journal
-            </button>
+      {/* 4. Bottom Main Section: Courbe de progression (pleine largeur) */}
+      <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-6 space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <SectionHeader color="bg-[#00E676]">Courbe de progression</SectionHeader>
+            <p className="text-xs text-slate-400 mt-1">Capital réel issu de tes trades journalisés</p>
           </div>
-
-          {/* Total Capital display */}
-          <div className="space-y-1">
-            <div className="flex items-baseline gap-3">
-              <span className="text-3xl sm:text-4xl font-black text-white font-mono">
-                {formatCurrency(student.currentCapital)}
-              </span>
-              <span className="px-2 py-0.5 rounded bg-[#00E676]/10 text-[#00E676] text-xs font-mono font-bold border border-[#00E676]/20">
-                {isCapitalUp ? "+" : ""}{capitalDiffPercent}%
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">
-              {isCapitalUp ? "+" : ""}{formatCurrency(capitalDiff)} depuis le départ
-            </p>
-          </div>
-
-          {/* Chart Graphic */}
-          <div className="h-64 w-full pt-4">
-            <React.Suspense fallback={<EquityCurvePlaceholder />}>
-              <EquityCurveChart data={equityData} />
-            </React.Suspense>
-          </div>
+          <button
+            onClick={() => setActiveTab("journal")}
+            className="px-3 py-1.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 text-xs font-medium border border-[#232D29]/60 transition-colors self-start sm:self-auto"
+          >
+            Ouvrir le journal
+          </button>
         </div>
 
-        {/* Right Column: Ta semaine (1 col) */}
-        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-6 space-y-4 flex flex-col justify-between">
-          <div>
-            <SectionHeader color="bg-blue-500">Ta semaine</SectionHeader>
+        {/* Total Capital display */}
+        <div className="space-y-1">
+          <div className="flex items-baseline gap-3">
+            <span className="text-3xl sm:text-4xl font-black text-white font-mono">
+              {formatCurrency(student.currentCapital)}
+            </span>
+            <span className="px-2 py-0.5 rounded bg-[#00E676]/10 text-[#00E676] text-xs font-mono font-bold border border-[#00E676]/20">
+              {isCapitalUp ? "+" : ""}{capitalDiffPercent}%
+            </span>
           </div>
+          <p className="text-xs text-slate-400">
+            {isCapitalUp ? "+" : ""}{formatCurrency(capitalDiff)} depuis le départ
+          </p>
+        </div>
 
-          <div className="space-y-3 flex-1">
-            {/* Task 1: Exercice du jour */}
-            <div
-              onClick={onOpenChecklist}
-              className="p-3.5 rounded-xl bg-[#0D1110] border border-[#1B2320] hover:border-[#00E676]/30 cursor-pointer transition-all space-y-1"
-            >
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#00E676]" />
-                <h4 className="text-xs font-bold text-white">Exercice du jour terminé</h4>
-              </div>
-              <p className="text-[11px] text-slate-400 pl-4">5/5 · biais et zones</p>
-            </div>
-
-            {/* Task 2: Examen à repasser */}
-            <div
-              onClick={() => setActiveTab("exam")}
-              className="p-3.5 rounded-xl bg-[#0D1110] border border-[#1B2320] hover:border-amber-500/30 cursor-pointer transition-all space-y-1"
-            >
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#FFB800]" />
-                <h4 className="text-xs font-bold text-white">Examen à repasser</h4>
-              </div>
-              <p className="text-[11px] text-slate-400 pl-4">Dernier score 78/100 · objectif 85</p>
-            </div>
-
-            {/* Task 3: Revue 1:1 avec Marc */}
-            <div
-              onClick={() => setActiveTab("messaging")}
-              className="p-3.5 rounded-xl bg-[#0D1110] border border-[#1B2320] hover:border-blue-500/30 cursor-pointer transition-all space-y-1"
-            >
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-blue-400" />
-                <h4 className="text-xs font-bold text-white">Revue 1:1 avec Marc</h4>
-              </div>
-              <p className="text-[11px] text-slate-400 pl-4">Vendredi 17h · préparer 3 trades</p>
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-[#1B2320]">
-            <button
-              onClick={() => setActiveTab("academy")}
-              className="w-full py-2.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 text-xs font-medium flex items-center justify-center gap-2 transition-colors"
-            >
-              <span>Voir le programme complet</span>
-              <ChevronRight className="w-4 h-4 text-slate-400" />
-            </button>
-          </div>
+        {/* Chart Graphic */}
+        <div className="h-64 w-full pt-4">
+          <React.Suspense fallback={<EquityCurvePlaceholder />}>
+            <EquityCurveChart data={equityData} />
+          </React.Suspense>
         </div>
       </div>
     </div>

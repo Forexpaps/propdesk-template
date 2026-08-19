@@ -604,7 +604,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
                 messages={syncedMessages}
                 courseCompletionPercentage={courseCompletionPercentage}
                 setActiveTab={setActiveTab}
-                onOpenChecklist={() => setIsChecklistOpen(true)}
               />
             )}
 
@@ -1461,7 +1460,6 @@ function AcademyApp({
               messages={messages}
               courseCompletionPercentage={courseCompletionPercentage}
               setActiveTab={setActiveTab}
-              onOpenChecklist={() => setIsChecklistOpen(true)}
             />
           )}
 
