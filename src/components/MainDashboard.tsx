@@ -251,7 +251,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
                   key={c.key}
                   onClick={() => setActiveTab(c.tab)}
                   style={{ ["--glow" as string]: c.glowColor }}
-                  className={`bg-[#111615] border border-[#1B2320] ${c.borderHover} hover:shadow-[0_0_32px_-6px_var(--glow)] p-5 rounded-xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between`}
+                  className={`bg-[#111615] border border-[#1B2320] ${c.borderHover} shadow-[inset_0_0_28px_-8px_var(--glow)] p-5 rounded-xl space-y-4 transition-all cursor-pointer group flex flex-col justify-between`}
                 >
                   <div className={`w-8 h-8 rounded-xl border flex items-center justify-center font-bold text-sm ${c.badgeClasses}`}>
                     {c.letter}
