@@ -65,6 +65,19 @@ export const authRouter = Router();
  */
 export const staffRouter = Router();
 
+/**
+ * Une double invitation concurrente (deux clics rapides, deux onglets) sur le
+ * même email/la même fiche passe toutes deux le contrôle de doublon avant
+ * qu'aucune n'ait écrit — seule l'écriture elle-même est protégée par un
+ * index unique. La seconde à s'exécuter levait jusqu'ici une `SqliteError`
+ * non interceptée, remontant en 500 générique avec un message peu clair au
+ * lieu du 409 attendu. Détecte ce cas précis pour répondre pareil qu'au
+ * contrôle de doublon normal, plutôt que de laisser fuiter l'erreur brute.
+ */
+function isUniqueConstraintViolation(err: unknown): boolean {
+  return err instanceof Error && (err as { code?: string }).code === "SQLITE_CONSTRAINT_UNIQUE";
+}
+
 const wrap =
   (fn: (req: Request, res: Response) => Promise<void>) =>
   (req: Request, res: Response, next: NextFunction) => {
@@ -369,12 +382,21 @@ staffRouter.post(
     const temporaryPassword = randomBytes(9).toString("base64url");
     const passwordHash = await hashPassword(temporaryPassword);
 
-    const id = createInvitedStaffAccount({
-      name: parsed.data.name,
-      email: parsed.data.email,
-      passwordHash,
-      invitedBy: req.auth!.userId,
-    });
+    let id: string;
+    try {
+      id = createInvitedStaffAccount({
+        name: parsed.data.name,
+        email: parsed.data.email,
+        passwordHash,
+        invitedBy: req.auth!.userId,
+      });
+    } catch (err) {
+      if (isUniqueConstraintViolation(err)) {
+        res.status(409).json({ error: "Un compte existe déjà avec cette adresse." });
+        return;
+      }
+      throw err;
+    }
 
     recordSecurityEvent({
       eventType: "staff_invited", severity: "info", accountKind: "staff",
@@ -539,7 +561,9 @@ staffRouter.post(
     const temporaryPassword = randomBytes(9).toString("base64url");
     const passwordHash = await hashPassword(temporaryPassword);
 
-    const created = db.transaction(() => {
+    let created: { id: string; userId: string };
+    try {
+      created = db.transaction(() => {
       const account = createStudentAccount({
         enrolledStudentId: student.id,
         email: student.email,
@@ -597,7 +621,14 @@ staffRouter.post(
       }
 
       return account;
-    })();
+      })();
+    } catch (err) {
+      if (isUniqueConstraintViolation(err)) {
+        res.status(409).json({ error: "Cette fiche a déjà un accès actif." });
+        return;
+      }
+      throw err;
+    }
 
     recordSecurityEvent({
       eventType: "student_access_created", severity: "info", accountKind: "student",
@@ -672,7 +703,9 @@ staffRouter.put(
     }
 
     const passwordHash = await hashPassword(parsed.data.newPassword);
-    setStudentPassword(account.id, passwordHash);
+    // `true` : c'est le staff qui choisit cette valeur, pas l'élève — voir le
+    // commentaire de `setStudentPassword` (studentCredentials.ts).
+    setStudentPassword(account.id, passwordHash, true);
     destroyAllStudentSessions(account.id);
 
     recordSecurityEvent({
@@ -776,6 +809,14 @@ staffRouter.post(
  * foi, à la place de la saisie manuelle `EnrolledStudent.accounts` — sans
  * quoi la fiche affichée au coach ne refléterait jamais les vrais comptes
  * ouverts par l'élève depuis son propre espace Portefeuille.
+ *
+ * `email` : le vrai email de connexion (`student_accounts.email`), distinct
+ * de `EnrolledStudent.email` (la fiche staff, un simple champ de contact une
+ * fois l'accès créé — voir son commentaire dans `src/types.ts`). Le
+ * formulaire d'édition préchargeait jusqu'ici le champ "Identifiant (email
+ * de connexion)" avec l'email de la fiche, pas le vrai email de connexion —
+ * les deux peuvent diverger dès que l'un des deux est modifié séparément de
+ * l'autre. Corrigé en renvoyant ici la valeur qui fait réellement foi.
  */
 staffRouter.get(
   "/students/:enrolledStudentId/trades",
@@ -795,6 +836,7 @@ staffRouter.get(
     res.json({
       trades: listCollection("trades", account.userId),
       accounts: listCollection("accounts", account.userId),
+      email: account.email,
     });
   }
 );

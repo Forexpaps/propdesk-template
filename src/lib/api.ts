@@ -2,7 +2,6 @@ import {
   StudentProfile,
   Trade,
   TradingAccount,
-  CoachSignal,
   CoachMessage,
   ForumTopic,
   AppNotification,
@@ -17,7 +16,6 @@ import {
 export interface ServerCollections {
   trades: Trade[];
   accounts: TradingAccount[];
-  signals: CoachSignal[];
   messages: CoachMessage[];
   forumTopics: ForumTopic[];
   notifications: AppNotification[];
@@ -326,9 +324,13 @@ export const api = {
       body: JSON.stringify({ newPassword }),
     }),
 
-  /** Vrais trades d'un élève, en lecture — pour la fiche côté coach. */
+  /**
+   * Vrais trades d'un élève, en lecture — pour la fiche côté coach.
+   * `email` : le vrai email de connexion (`student_accounts.email`),
+   * distinct du champ "Email" de la fiche (`EnrolledStudent.email`).
+   */
   fetchStudentTrades: (enrolledStudentId: string) =>
-    request<{ trades: Trade[]; accounts: TradingAccount[] }>(
+    request<{ trades: Trade[]; accounts: TradingAccount[]; email: string }>(
       `/api/auth/students/${encodeURIComponent(enrolledStudentId)}/trades`
     ),
 
@@ -386,4 +388,11 @@ export const api = {
         body: JSON.stringify({ currentPassword, newPassword }),
       }
     ),
+
+  /** Un élève choisit sa propre photo de profil — voir server/auth/studentRoutes.ts pour le détail. */
+  updateStudentAvatar: (avatar: string) =>
+    request<void>("/api/auth/profile/avatar", {
+      method: "PUT",
+      body: JSON.stringify({ avatar }),
+    }),
 };

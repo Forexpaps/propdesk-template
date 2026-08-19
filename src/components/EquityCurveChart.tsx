@@ -41,9 +41,26 @@ export interface EquityPoint {
 
 interface EquityCurveChartProps {
   data: EquityPoint[];
+  /**
+   * Palier optionnel à matérialiser sur la courbe (ex: objectif de profit
+   * d'un compte précis). Absent : aucune ligne de repère n'est dessinée.
+   *
+   * **Historique** : ce composant a longtemps dessiné une `ReferenceLine`
+   * fixe à `y={11500}` avec le libellé "PALIER $11,500 · ATTEINT", codée en
+   * dur et donc affichée à l'identique à tout élève quel que soit son vrai
+   * capital — un reliquat de maquette/démo jamais retiré, qui affirmait à
+   * tort avoir atteint un palier inexistant. Ce graphique agrège les trades
+   * de TOUS les comptes de l'élève (`MainDashboard.tsx`) : il n'existe pas
+   * un unique palier non-arbitraire à calculer pour l'ensemble (chaque
+   * compte a son propre `profitTargetPercent`, voir `WalletManagement.tsx`).
+   * Plutôt que d'inventer une formule, la ligne de repère devient optionnelle
+   * et n'est dessinée que si un appelant fournit une vraie valeur.
+   */
+  referenceValue?: number;
+  referenceLabel?: string;
 }
 
-export const EquityCurveChart: React.FC<EquityCurveChartProps> = ({ data }) => (
+export const EquityCurveChart: React.FC<EquityCurveChartProps> = ({ data, referenceValue, referenceLabel }) => (
   <ResponsiveContainer width="100%" height="100%">
     <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
       <defs>
@@ -72,17 +89,19 @@ export const EquityCurveChart: React.FC<EquityCurveChartProps> = ({ data }) => (
         }}
         formatter={(value: any) => [formatCurrency(Number(value)), "Capital"]}
       />
-      <ReferenceLine
-        y={11500}
-        stroke="#00E676"
-        strokeDasharray="4 4"
-        label={{
-          value: "PALIER $11,500 · ATTEINT",
-          fill: "#00E676",
-          fontSize: 10,
-          position: "insideBottomLeft",
-        }}
-      />
+      {referenceValue !== undefined && (
+        <ReferenceLine
+          y={referenceValue}
+          stroke="#00E676"
+          strokeDasharray="4 4"
+          label={{
+            value: referenceLabel ?? formatCurrency(referenceValue),
+            fill: "#00E676",
+            fontSize: 10,
+            position: "insideBottomLeft",
+          }}
+        />
+      )}
       <Area
         type="monotone"
         dataKey="capital"

@@ -143,10 +143,27 @@ export function updateStudentEmail(id: string, email: string): void {
 }
 
 /** Remplace le mot de passe ET lève l'obligation de changement, en une écriture. */
-export function setStudentPassword(id: string, passwordHash: string): void {
+/**
+ * `mustChangePassword` par défaut à `false` : les deux appels historiques
+ * (élève qui change son propre mot de passe après vérification de l'ancien,
+ * élève qui consomme un lien de réinitialisation) sont du self-service — la
+ * valeur vient de l'élève lui-même, rien à forcer. Le seul appel qui doit
+ * passer `true` est celui où le STAFF fixe directement la valeur pour
+ * l'élève (`PUT .../students/:id/password`, server/auth/routes.ts) : comme
+ * pour l'invitation (`createStudentAccount`, qui pose déjà `1`), c'est
+ * quelqu'un d'autre qui a choisi ce mot de passe, potentiellement transmis
+ * par un canal peu sûr — sans ce forçage, l'élève pouvait continuer à
+ * l'utiliser indéfiniment sans jamais être invité à en choisir un qui
+ * n'appartient qu'à lui.
+ */
+export function setStudentPassword(
+  id: string,
+  passwordHash: string,
+  mustChangePassword: boolean = false
+): void {
   db.prepare(
-    "UPDATE student_accounts SET password_hash = ?, must_change_password = 0, updated_at = ? WHERE id = ?"
-  ).run(passwordHash, new Date().toISOString(), id);
+    "UPDATE student_accounts SET password_hash = ?, must_change_password = ?, updated_at = ? WHERE id = ?"
+  ).run(passwordHash, mustChangePassword ? 1 : 0, new Date().toISOString(), id);
 }
 
 /**
@@ -290,10 +307,18 @@ export function buildStudentProfile(studentAccountId: string): Record<string, un
   const staffProfile = getProfile<{ hiddenSidebarItems?: string[] }>(DEFAULT_USER_ID);
   const sharedHidden = staffProfile?.hiddenSidebarItems ?? [];
 
+  // Le bureau personnel de l'élève (`account.userId`, distinct du bureau
+  // staff partagé lu juste au-dessus) ne porte quasiment jamais rien d'autre
+  // qu'un `avatar` : c'est le seul champ de profil qu'un élève peut modifier
+  // lui-même (`PUT /auth/profile/avatar`), le reste restant géré par le
+  // coach sur la fiche `enrolledStudents`. Présent → il prime sur la photo
+  // fixée par le coach ; absent → on retombe sur `enrolled.avatar`.
+  const ownProfile = getProfile<{ avatar?: string }>(account.userId);
+
   return {
     name: enrolled.name,
     email: enrolled.email,
-    avatar: enrolled.avatar,
+    avatar: ownProfile?.avatar || enrolled.avatar,
     level: enrolled.level,
     joinedDate: enrolled.joinedDate,
     currentCapital: enrolled.currentCapital,

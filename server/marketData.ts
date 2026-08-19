@@ -24,13 +24,22 @@ export interface MarketQuote {
 
 /**
  * Symboles Yahoo Finance affichés dans le tableau de bord Macro, avec leur
- * libellé français. `^TNX` est le rendement du 10 ans US en points de base
- * divisé par 10 chez Yahoo (ex. 46.3 → 4.63 %) — voir la correction dans
- * `normalize()`.
+ * libellé français. `scale`, quand présent, est le **diviseur** appliqué au
+ * prix brut renvoyé par Yahoo avant affichage (voir `fetchQuote`) — absent
+ * équivaut à 1 (aucune correction).
+ *
+ * `^TNX` (rendement du 10 ans US) est le seul symbole concerné : Yahoo le
+ * renvoie multiplié par 10 (convention CBOE, ex. 46.3 pour un vrai rendement
+ * de 4.63 %). Champ déclaré une première fois avec `scale: 1` (un facteur
+ * neutre, donc sans effet) sans jamais être lu dans `fetchQuote` — le taux
+ * s'affichait alors avec une erreur d'un facteur 10 (« 46.3 » au lieu de
+ * « 4.63 »), et le commentaire d'alors renvoyait vers une fonction
+ * `normalize()` qui n'existe nulle part dans ce fichier. Corrigé ici : le
+ * diviseur est réellement `10`, et appliqué.
  */
 export const MARKET_SYMBOLS: { symbol: string; label: string; scale?: number }[] = [
   { symbol: "DX-Y.NYB", label: "Dollar (DXY)" },
-  { symbol: "^TNX", label: "Taux US 10Y", scale: 1 },
+  { symbol: "^TNX", label: "Taux US 10Y", scale: 10 },
   { symbol: "^GSPC", label: "S&P 500" },
   { symbol: "^IXIC", label: "Nasdaq" },
   { symbol: "^VIX", label: "VIX (peur)" },
@@ -60,19 +69,24 @@ async function fetchQuote(entry: (typeof MARKET_SYMBOLS)[number]): Promise<Marke
     const meta = result?.meta;
     if (!meta || typeof meta.regularMarketPrice !== "number") return null;
 
-    const previousClose: number =
+    const scale = entry.scale ?? 1;
+    const rawPreviousClose: number =
       typeof meta.previousClose === "number" ? meta.previousClose : meta.chartPreviousClose;
     const rawPrice: number = meta.regularMarketPrice;
+    const price = rawPrice / scale;
+    const previousClose = rawPreviousClose / scale;
 
     const closes: unknown[] = result?.indicators?.quote?.[0]?.close ?? [];
-    const sparkline = closes.filter((c): c is number => typeof c === "number");
+    const sparkline = closes
+      .filter((c): c is number => typeof c === "number")
+      .map((c) => c / scale);
 
     return {
       symbol: entry.symbol,
       label: entry.label,
-      price: rawPrice,
+      price,
       previousClose,
-      changePercent: previousClose ? ((rawPrice - previousClose) / previousClose) * 100 : 0,
+      changePercent: previousClose ? ((price - previousClose) / previousClose) * 100 : 0,
       sparkline,
     };
   } catch (err) {

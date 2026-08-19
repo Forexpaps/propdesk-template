@@ -52,6 +52,15 @@ interface UserProfileModalProps {
    * qui décide de fournir ou non ce callback (réservé au fondateur).
    */
   onOpenSecurityLog?: () => void;
+  /**
+   * Restreint le formulaire à la seule photo de profil — mode élève. Le
+   * reste de la fiche (nom, email, rôle, niveau, bio) est géré par le coach
+   * sur `StudentTracking.tsx`, jamais par l'élève lui-même : ces champs
+   * passent en lecture seule et le bloc "Mode Administrateur / Staff" (qui ne
+   * concerne que le bureau staff) ne s'affiche pas. `onSaveProfile` ne reçoit
+   * alors qu'un objet dont seul `avatar` a pu changer.
+   */
+  avatarOnly?: boolean;
 }
 
 const AVATAR_PRESETS = [
@@ -73,6 +82,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   initialTab = "profile",
   onOpenStaffAccounts,
   onOpenSecurityLog,
+  avatarOnly = false,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<"profile" | "badges">(initialTab);
   const [badgeFilter, setBadgeFilter] = useState<string>("ALL");
@@ -103,10 +113,24 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   /** Photo téléversée (data URI) plutôt qu'une URL distante. */
   const isImported = avatar.startsWith("data:");
 
-  // La modale reste montée entre deux ouvertures : sans cela, `initialTab`
-  // ne serait pris en compte qu'au tout premier rendu.
+  // La modale reste montée entre deux ouvertures : sans cette resynchronisation,
+  // tous les champs du formulaire (pas seulement `initialTab`) restaient figés
+  // à leur toute première valeur de montage — annuler une modification sans
+  // sauvegarder, puis rouvrir la modale, réaffichait la valeur "annulée" au
+  // lieu de la vraie valeur de `student`, avec le risque de la persister par
+  // erreur à la sauvegarde suivante.
   useEffect(() => {
-    if (isOpen) setActiveSubTab(initialTab);
+    if (!isOpen) return;
+    setActiveSubTab(initialTab);
+    setName(student.name);
+    setEmail(student.email);
+    setAvatar(student.avatar);
+    setLevel(student.level);
+    setRole(student.role || (student.isAdmin ? "Fondateur / Head Coach" : "Élève Premium"));
+    setPhone(student.phone || "+33 6 12 34 56 78");
+    setBio(student.bio || "");
+    setPreferredPairs(student.preferredPairs || "EUR/USD, XAU/USD, NAS100");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialTab]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -217,24 +241,32 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSaveProfile({
-      ...student,
-      name,
-      email,
-      avatar,
-      level,
-      role,
-      phone,
-      bio,
-      preferredPairs,
-      // `startingCapital`/`currentCapital` ne sont plus édités ici : ils sont
-      // dérivés des portefeuilles réels à l'affichage (voir `App.tsx`,
-      // `displayStudent`/`studentProfile`). Le `...student` initial les
-      // conserve tels quels dans le payload envoyé au serveur.
-      // `isAdmin` n'est volontairement pas renvoyé : le serveur l'ignore dans le
-      // corps et réinjecte sa propre valeur. Le `...student` initial le conserve
-      // pour que l'état local reste cohérent d'ici au prochain rechargement.
-    });
+    onSaveProfile(
+      avatarOnly
+        ? // Seule la photo peut changer ici : le reste part de `student`
+          // (la source de vérité), jamais de l'état local du formulaire — au
+          // cas où celui-ci contiendrait une frappe dans un champ pourtant
+          // désactivé (ex: autofill du navigateur).
+          { ...student, avatar }
+        : {
+            ...student,
+            name,
+            email,
+            avatar,
+            level,
+            role,
+            phone,
+            bio,
+            preferredPairs,
+            // `startingCapital`/`currentCapital` ne sont plus édités ici : ils sont
+            // dérivés des portefeuilles réels à l'affichage (voir `App.tsx`,
+            // `displayStudent`/`studentProfile`). Le `...student` initial les
+            // conserve tels quels dans le payload envoyé au serveur.
+            // `isAdmin` n'est volontairement pas renvoyé : le serveur l'ignore dans le
+            // corps et réinjecte sa propre valeur. Le `...student` initial le conserve
+            // pour que l'état local reste cohérent d'ici au prochain rechargement.
+          }
+    );
     onClose();
   };
 
@@ -439,7 +471,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
             </div>
 
-            {/* Admin Toggle */}
+            {/* Admin Toggle — bureau staff uniquement, aucun sens pour un élève */}
+            {!avatarOnly && (
             <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <Crown className="w-6 h-6 text-[#00E676] shrink-0" />
@@ -479,6 +512,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </span>
               )}
             </div>
+            )}
 
             {/* Journal de sécurité — réservé au compte fondateur. Le bouton
                 ne s'affiche que si le parent fournit onOpenSecurityLog
@@ -564,6 +598,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               )}
             </div>
 
+            {avatarOnly && (
+              <p className="text-[11px] text-slate-500 -mt-1">
+                Seule ta photo de profil est modifiable ici — le reste de ta fiche est géré par ton coach,
+                contacte-le via la Messagerie pour une modification.
+              </p>
+            )}
+
             {/* Inputs Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -571,9 +612,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <input
                   type="text"
                   required
+                  disabled={avatarOnly}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -582,9 +624,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <input
                   type="email"
                   required
+                  disabled={avatarOnly}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -592,9 +635,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <label className="block font-medium text-slate-300 mb-1">Rôle / Titre</label>
                 <input
                   type="text"
+                  disabled={avatarOnly}
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -602,9 +646,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <label className="block font-medium text-slate-300 mb-1">Niveau SMC</label>
                 <input
                   type="text"
+                  disabled={avatarOnly}
                   value={level}
                   onChange={(e) => setLevel(e.target.value)}
-                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -614,9 +659,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               <label className="block font-medium text-slate-300 mb-1">Bio & Présentation</label>
               <textarea
                 rows={2}
+                disabled={avatarOnly}
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl p-3 text-white focus:outline-none focus:border-[#00E676]"
+                className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl p-3 text-white focus:outline-none focus:border-[#00E676] disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
 

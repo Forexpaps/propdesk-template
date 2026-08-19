@@ -286,9 +286,18 @@ function writeCollectionForAuth(
       auth.dataUserId
     ).filter((m) => m.sender === "coach");
 
+    // Filtrer sur `sender !== "coach"` seul ne suffit pas : `replaceCollection`
+    // fait un upsert par `id` (`ON CONFLICT(id) DO UPDATE`), donc un item
+    // soumis avec un `id` identique à celui d'un vrai message coach — même
+    // avec un `sender` différent — écraserait ce message à l'écriture, l'ordre
+    // du tri par `timestamp` (contrôlé par l'élève sur son propre item)
+    // décidant lequel des deux gagne. On exclut donc en plus tout id qui
+    // appartient déjà à un message coach existant : un tel item est
+    // simplement abandonné plutôt qu'admis sous un id qui n'est pas le sien.
+    const existingCoachIds = new Set(existingCoachMessages.map((m) => m.id));
     const submittedNonCoach = (
       parsed.data as { id: string; sender?: string; [key: string]: unknown }[]
-    ).filter((item) => item.sender !== "coach");
+    ).filter((item) => item.sender !== "coach" && !existingCoachIds.has(item.id));
 
     // Fusionnés puis triés par `timestamp` (ISO 8601 des deux côtés — voir
     // `handleSendMessage` côté élève et la route de réponse du coach) : les
@@ -373,11 +382,19 @@ api.put("/profile", profileRateLimit, (req, res) => {
   // entière lui interdirait de changer son propre profil à cause d'un champ
   // qu'il n'a même pas touché — le client renvoie fidèlement l'objet reçu.
   //
-  // La clé n'est réintroduite que si elle existait : l'ajouter à `undefined`
-  // créerait un champ absent du profil d'origine.
+  // Forcé à `true`, jamais redérivé de `current?.isAdmin` : cette route a
+  // déjà rejeté toute session non-staff plus haut (ligne 356), et tout compte
+  // staff a `isAdmin: true` par invariant (voir `buildStaffProfile`, plus
+  // bas dans ce fichier — même règle, même raison). `current?.isAdmin ===
+  // true` semblait équivalent mais ne l'était pas : sur une base migrée
+  // avant l'ajout de ce champ, `current.isAdmin` vaut `false`/absent, et
+  // cette ligne écrivait alors `isAdmin: false` en base — une valeur que
+  // plus rien ne corrigeait ensuite, puisque chaque futur PUT la relisait
+  // pour la réécrire à l'identique. `buildStaffProfile` masquait le symptôme
+  // en la forçant à `true` en lecture, mais la valeur stockée restait fausse.
   const profile: Record<string, unknown> = {
     ...parsed.data,
-    isAdmin: current?.isAdmin === true,
+    isAdmin: true,
   };
 
   if (req.auth?.isOwner !== true) {

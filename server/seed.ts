@@ -12,7 +12,6 @@ import {
   initialMessages,
   initialForumTopics,
   initialTradingAccounts,
-  initialCoachSignals,
   initialTraderBadges,
   initialEnrolledStudents,
   initialNotifications,
@@ -66,7 +65,6 @@ export function seedDemoData(): void {
     collections: {
       trades: initialTrades,
       accounts: initialTradingAccounts,
-      signals: initialCoachSignals,
       messages: initialMessages,
       forumTopics: initialForumTopics,
       notifications: initialNotifications,

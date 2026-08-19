@@ -309,8 +309,14 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   // Seules les clés fournies écrasent les valeurs par défaut ci-dessus.
   useEffect(() => {
     if (!prefillDraft) return;
-    setFormData((prev) => {
-      const next = { ...prev };
+    setFormData(() => {
+      // Partir de `formulaireVierge()`, jamais de l'état précédent : sans ça,
+      // le commentaire "écrasent les valeurs par défaut" mentait sur ce que
+      // faisait le code. Rouvrir un vieux trade en édition (PnL, capture
+      // d'écran, tags d'erreur), l'annuler, puis appliquer une ébauche du
+      // calculateur conservait silencieusement tous ces champs — absents de
+      // `TradeDraft` — sur le nouveau trade créé depuis l'ébauche.
+      const next = formulaireVierge();
       (Object.keys(prefillDraft) as (keyof TradeDraft)[]).forEach((key) => {
         const value = prefillDraft[key];
         if (value !== undefined) {
@@ -407,7 +413,19 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     // Géométrie pure, indépendante de l'instrument : recalculable sans risque.
     const risque = Math.abs(formData.entryPrice - formData.stopLoss);
     const gain = Math.abs(formData.takeProfit - formData.entryPrice);
-    const riskReward = risque > 0 ? Number((gain / risque).toFixed(1)) : 1;
+
+    // `risque === 0` (stop = entrée) n'a pas de ratio R:R réel — l'ancien
+    // repli sur "1" enregistrait un 1:1 fictif, indiscernable d'un vrai
+    // trade 1:1, faussant silencieusement la moyenne R:R du Journal
+    // (`performanceStats.ts`). `riskRewardRatio` est un champ obligatoire du
+    // type `Trade` : plutôt que d'inventer une valeur, on bloque la saisie
+    // d'un setup sans distance de stop définie, invalide dans tous les cas.
+    if (risque === 0) {
+      alert("Le Stop Loss ne peut pas être égal au Prix d'Entrée — aucune distance de risque définie.");
+      return;
+    }
+
+    const riskReward = Number((gain / risque).toFixed(1));
 
     // Le PnL vient du champ, jamais d'un recalcul ni d'une conversion.
     //
@@ -423,14 +441,17 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
     let result: TradeResult = "OPEN";
     if (formData.exitPrice) {
-      if (formData.pnlUnit === "PERCENT") {
-        // Pas de marge morte pour un pourcentage saisi à la main : contrairement
-        // au seuil ±50 $ (qui absorbe le bruit d'une proposition automatique),
-        // ici l'utilisateur tape un résultat réel.
-        result = pnl > 0 ? "WIN" : pnl < 0 ? "LOSS" : "BREAKEVEN";
-      } else {
-        result = pnl > 50 ? "WIN" : pnl < -50 ? "LOSS" : "BREAKEVEN";
-      }
+      // Même règle stricte pour les deux unités : l'utilisateur tape un
+      // résultat réel dans les deux cas (voir le commentaire au-dessus de
+      // `pnl`, "aucune formule ne propose plus de valeur par défaut"). Une
+      // marge morte de ±50$ existait ici auparavant pour absorber le bruit
+      // d'une proposition *automatique* de PnL — un mécanisme qui n'existe
+      // plus depuis ce changement. Elle classait à tort un trade réellement
+      // gagnant/perdant (ex. +30$) en "BREAKEVEN", exclu du Win Rate
+      // (`t.result === "WIN"`) tout en restant compté dans `totalPnL`/
+      // `avgWin`/`profitFactor` (qui utilisent le signe brut du PnL) — deux
+      // cartes du même tableau de bord se contredisaient sur un même trade.
+      result = pnl > 0 ? "WIN" : pnl < 0 ? "LOSS" : "BREAKEVEN";
     }
 
     const champs = {
@@ -851,6 +872,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <input
                     type="date"
                     value={formData.date}
+                    max={new Date().toISOString().split("T")[0]}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
                     required
@@ -960,6 +982,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <input
                     type="number"
                     step="any"
+                    min="0"
                     value={formData.entryPrice}
                     onChange={(e) => setFormData({ ...formData, entryPrice: parseFloat(e.target.value) || 0 })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
@@ -972,6 +995,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <input
                     type="number"
                     step="any"
+                    min="0"
                     value={formData.stopLoss}
                     onChange={(e) => setFormData({ ...formData, stopLoss: parseFloat(e.target.value) || 0 })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
@@ -984,6 +1008,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <input
                     type="number"
                     step="any"
+                    min="0"
                     value={formData.takeProfit}
                     onChange={(e) => setFormData({ ...formData, takeProfit: parseFloat(e.target.value) || 0 })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
@@ -998,6 +1023,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <input
                     type="number"
                     step="any"
+                    min="0"
                     value={formData.exitPrice}
                     onChange={(e) => setFormData({ ...formData, exitPrice: parseFloat(e.target.value) || 0 })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
@@ -1009,8 +1035,20 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <input
                     type="number"
                     step="any"
+                    min="0"
                     value={formData.lotSize}
-                    onChange={(e) => setFormData({ ...formData, lotSize: parseFloat(e.target.value) || 1 })}
+                    onChange={(e) => {
+                      // `|| 1` forçait la valeur à 1 dès que `parseFloat`
+                      // renvoyait `0` — un résultat parfaitement valide (pas
+                      // seulement `NaN` sur un champ vide/invalide), qui
+                      // rendait impossible de saisir toute taille de lot
+                      // commençant par 0 (0.01, 0.1, 0.5…) : au premier "0"
+                      // tapé, le champ affiché sautait déjà à "1". Les autres
+                      // champs numériques de ce formulaire retombent tous sur
+                      // `0`, pas `1`, sur une saisie invalide — même repli ici.
+                      const parsed = parseFloat(e.target.value);
+                      setFormData({ ...formData, lotSize: Number.isNaN(parsed) ? 0 : parsed });
+                    }}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />

@@ -29,7 +29,6 @@ import {
   initialMessages,
   initialForumTopics,
   initialTradingAccounts,
-  initialCoachSignals,
   initialTraderBadges,
   initialEnrolledStudents,
   initialNotifications,
@@ -44,7 +43,6 @@ import {
   ForumRole,
   ModuleQuizResult,
   TradingAccount,
-  CoachSignal,
   EnrolledStudent,
   AppNotification,
   TraderBadge,
@@ -93,9 +91,6 @@ const PerformanceDashboard = React.lazy(() =>
 );
 const WalletManagement = React.lazy(() =>
   import("./components/WalletManagement").then((m) => ({ default: m.WalletManagement }))
-);
-const CoachSignals = React.lazy(() =>
-  import("./components/CoachSignals").then((m) => ({ default: m.CoachSignals }))
 );
 const StudentTracking = React.lazy(() =>
   import("./components/StudentTracking").then((m) => ({ default: m.StudentTracking }))
@@ -308,7 +303,7 @@ function resolveStudentValue<T>(serverValue: T, localKey: string): T {
  * hors périmètre de l'accès élève.
  */
 function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
-  const { status, trades, accounts, modules, messages, badges, quizResults, student, coaches } = useStudentBootstrap();
+  const { status, trades, accounts, modules, messages, badges, quizResults, student, setStudent, coaches } = useStudentBootstrap();
   const syncEnabled = status === "online";
 
   // Bandeau d'avertissement immédiat quand une sauvegarde échoue en
@@ -459,6 +454,14 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isSetupAnalyzerOpen, setIsSetupAnalyzerOpen] = useState(false);
+  /**
+   * Ébauche de trade venue du Setup Analyzer — même mécanisme que côté staff
+   * (`journalDraft`/`prefillDraft` plus bas dans ce fichier). Sans lui,
+   * "Valider & Transférer au Journal" fermait silencieusement la modale sans
+   * rien transférer pour un élève : `onApplyToJournal` n'était jamais fourni,
+   * et le bouton n'affichait pourtant aucune différence, aucun message.
+   */
+  const [journalDraft, setJournalDraft] = useState<TradeDraft | null>(null);
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
   const [isLegalNoticeOpen, setIsLegalNoticeOpen] = useState(false);
@@ -555,10 +558,27 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     (m) => m.sender === "coach" && m.status !== "read"
   ).length;
 
+  /**
+   * Le cache est effacé délibérément, comme côté staff (`AcademyApp.handleLogout`,
+   * même raison) : sur un poste partagé (salle de l'académie, ordinateur
+   * familial), laisser `horizon_student_*` en place après une déconnexion
+   * exposerait les trades/comptes/messages de cet élève à la personne
+   * suivante — et pire, si une sauvegarde était restée "en attente"
+   * (`markPending`), le compte suivant à se connecter se la verrait réinjectée
+   * par `resolveStudentValue` puis repoussée sur LE SERVEUR sous sa propre
+   * session, écrasant ses propres données. Bug réel corrigé ici.
+   */
   const handleLogout = async () => {
     try {
       await api.studentLogout();
+    } catch (err) {
+      console.warn("[propdesk] Déconnexion serveur échouée.", err);
     } finally {
+      try {
+        localStorage.clear();
+      } catch {
+        // Stockage indisponible : il n'y avait alors rien à oublier.
+      }
       onLoggedOut();
     }
   };
@@ -641,6 +661,8 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
                 onDeleteTrade={handleDeleteTrade}
                 onSendTradeToCoach={() => undefined}
                 hideAiAndCoachActions
+                prefillDraft={journalDraft}
+                onPrefillConsumed={() => setJournalDraft(null)}
               />
             )}
 
@@ -694,9 +716,26 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         </footer>
       </div>
 
-      <SetupAnalyzerModal isOpen={isSetupAnalyzerOpen} onClose={() => setIsSetupAnalyzerOpen(false)} />
+      <SetupAnalyzerModal
+        isOpen={isSetupAnalyzerOpen}
+        onClose={() => setIsSetupAnalyzerOpen(false)}
+        onApplyToJournal={(setup) => {
+          setJournalDraft({
+            pair: setup.pair,
+            direction: setup.direction,
+            strategy: `Setup SMC ${setup.verdict} (${setup.score}/100)`,
+            notes: setup.notes,
+          });
+          setIsSetupAnalyzerOpen(false);
+          setActiveTab("journal");
+        }}
+      />
       <LegalNoticeModal isOpen={isLegalNoticeOpen} onClose={() => setIsLegalNoticeOpen(false)} />
-      <MindsetJournalModal isOpen={isMindsetModalOpen} onClose={() => setIsMindsetModalOpen(false)} />
+      <MindsetJournalModal
+        isOpen={isMindsetModalOpen}
+        onClose={() => setIsMindsetModalOpen(false)}
+        storageKey={studentProfile.email}
+      />
       <TradingPlanEditorModal isOpen={isTradingPlanOpen} onClose={() => setIsTradingPlanOpen(false)} />
       <NotificationModal
         isOpen={isNotificationsModalOpen}
@@ -719,11 +758,16 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         badges={liveBadges}
         initialTab={profileModalTab}
         onClaimBadge={handleClaimBadge}
-        onSaveProfile={() =>
-          alert(
-            "Ton profil (nom, avatar, niveau) est géré par ton coach — contacte-le via la Messagerie pour une modification."
-          )
-        }
+        avatarOnly
+        onSaveProfile={async (updatedProfile) => {
+          if (updatedProfile.avatar === studentProfile.avatar) return;
+          try {
+            await api.updateStudentAvatar(updatedProfile.avatar);
+            setStudent((prev) => (prev ? { ...prev, avatar: updatedProfile.avatar } : prev));
+          } catch (err) {
+            alert((err as Error).message || "La mise à jour de la photo de profil a échoué.");
+          }
+        }}
       />
       <SyncErrorBanner message={syncErrorMessage} onDismiss={() => setSyncErrorMessage(null)} />
     </div>
@@ -872,14 +916,6 @@ function AcademyApp({
     "horizon_accounts",
     seed(server?.accounts, "horizon_accounts", initialTradingAccounts),
     (v) => api.saveCollection("accounts", v),
-    syncEnabled,
-    reportSyncError
-  );
-
-  const [signals, setSignals] = useSyncedState<CoachSignal[]>(
-    "horizon_signals",
-    seed(server?.signals, "horizon_signals", initialCoachSignals),
-    (v) => api.saveCollection("signals", v),
     syncEnabled,
     reportSyncError
   );
@@ -1162,29 +1198,6 @@ function AcademyApp({
     setAccounts((prev) => prev.filter((acc) => acc.id !== id));
   };
 
-  const handleImportSignalToJournal = (sig: CoachSignal) => {
-    const newTrade: Trade = {
-      id: `trade-sig-${Date.now()}`,
-      date: new Date().toISOString().split("T")[0],
-      pair: sig.pair,
-      marketCategory: sig.pair.includes("USD") ? "Forex" : sig.pair.includes("NAS") ? "Indices" : "Matières Premières",
-      direction: sig.direction,
-      entryPrice: sig.entryPrice,
-      stopLoss: sig.stopLoss,
-      takeProfit: sig.takeProfit1,
-      lotSize: 1.0,
-      pnl: sig.pnlResultPips ? sig.pnlResultPips * 10 : 0,
-      riskRewardRatio: 2.5,
-      result: sig.status === "TP_ATTEINT" ? "WIN" : sig.status === "SL_ATTEINT" ? "LOSS" : "OPEN",
-      strategy: `Signal Coach ${sig.coachName}`,
-      emotion: "Disciplined",
-      notes: `Signal importé depuis le centre de signaux par Coach ${sig.coachName}. Zone: ${sig.entryZone}. TP1: ${sig.takeProfit1}, TP2: ${sig.takeProfit2}. Notes: ${sig.smcNotes}`,
-    };
-
-    setTrades((prev) => [newTrade, ...prev]);
-    alert(`Trade ${sig.pair} (${sig.direction}) importé avec succès dans votre Journal de Trading !`);
-  };
-
   // Handlers
   const handleToggleLessonCompletion = (
     moduleId: string,
@@ -1298,6 +1311,13 @@ function AcademyApp({
       ? "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=250"
       : student.avatar;
 
+    // `isSolved`/`isSolution` ne sont plus déduits automatiquement d'une
+    // réponse de coach : ça marquait le sujet "Résolu" et la réponse
+    // "SOLUTION VALIDÉE" quel que soit son contenu (même une simple question
+    // de clarification), sans lien avec une vraie résolution. Un modérateur
+    // dispose déjà d'une action manuelle dédiée pour ça, `onToggleSolveTopic`
+    // (bouton sur le sujet) — c'est désormais la seule façon de marquer un
+    // sujet résolu.
     const newReply: ForumReply = {
       id: `rep-${Date.now()}`,
       authorName,
@@ -1307,7 +1327,7 @@ function AcademyApp({
       content,
       likesCount: 0,
       isCoachCertified,
-      isSolution: isCoach,
+      isSolution: false,
     };
 
     setForumTopics((prev) =>
@@ -1316,7 +1336,6 @@ function AcademyApp({
           return {
             ...topic,
             repliesCount: topic.repliesCount + 1,
-            isSolved: isCoach ? true : topic.isSolved,
             replies: [...topic.replies, newReply],
           };
         }
@@ -1517,13 +1536,6 @@ function AcademyApp({
               onAddAccount={handleAddAccount}
               onUpdateAccountBalance={handleUpdateAccountBalance}
               onDeleteAccount={handleDeleteAccount}
-            />
-          )}
-
-          {activeTab === "signals" && (
-            <CoachSignals
-              signals={signals}
-              onImportSignalToJournal={handleImportSignalToJournal}
             />
           )}
 
