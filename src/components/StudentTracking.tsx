@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { EnrolledStudent, StudentStatusTag, TradingStyle, TradingAccount, Trade } from "../types";
 import { formatCurrency } from "../lib/format";
-import { api } from "../lib/api";
+import { api, type StaffAccountSummary } from "../lib/api";
 import { AdminStudentView } from "./AdminStudentView";
 
 /**
@@ -66,6 +66,20 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
   // Edit form state
   const [editForm, setEditForm] = useState<Partial<EnrolledStudent>>({});
 
+  // Coachs attribuables au champ "Coach Attribué" — les vrais comptes staff
+  // (StaffAccountsModal), jamais des noms inventés. Chargé une fois au
+  // montage : la liste ne change pas pendant qu'on remplit une fiche.
+  const [staffCoaches, setStaffCoaches] = useState<StaffAccountSummary[]>([]);
+  React.useEffect(() => {
+    api
+      .listStaff()
+      .then((r) => setStaffCoaches(r.accounts))
+      .catch(() => {
+        // Silencieux : le champ Coach Attribué reste vide plutôt que de
+        // bloquer toute la fiche élève pour une info secondaire.
+      });
+  }, []);
+
   // Accès élève : invitation en cours, résultat à afficher une seule fois,
   // et vrais trades chargés pour la fiche en mode lecture (si un compte est actif).
   const [invitingId, setInvitingId] = useState<string | null>(null);
@@ -101,7 +115,8 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
   const filteredStudents = students.filter((st) => {
     const matchesSearch =
       st.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      st.email.toLowerCase().includes(searchTerm.toLowerCase());
+      st.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (st.assignedCoach ?? "").toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTag = selectedTagFilter === "ALL" || st.statusTag === selectedTagFilter;
     return matchesSearch && matchesTag;
   });
@@ -165,6 +180,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
       avatar: editForm.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250",
       phone: editForm.phone || "+33 6 00 00 00 00",
       joinedDate: new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }),
+      assignedCoach: editForm.assignedCoach,
       level: editForm.level || "Élève Débutant",
       statusTag: (editForm.statusTag as StudentStatusTag) || "En Évaluation FTMO",
       tradingStyle: (editForm.tradingStyle as TradingStyle) || "Intraday",
@@ -227,6 +243,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
             onClick={() => {
               setEditForm({
                 statusTag: "En Évaluation FTMO",
+                assignedCoach: staffCoaches[0]?.name,
                 level: "Élève Débutant",
                 riskStatus: "🟢 Risque Maîtrisé",
                 startingCapital: 10000,
@@ -304,6 +321,9 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                       )}
                     </div>
                     <p className="text-xs text-slate-400">{st.email} • {st.level}</p>
+                    {st.assignedCoach && (
+                      <p className="text-[11px] text-slate-500">Coach attribué : <span className="text-[#00E676]">{st.assignedCoach}</span></p>
+                    )}
                   </div>
                 </div>
 
@@ -469,6 +489,22 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
                   />
+                </div>
+
+                <div>
+                  <label className="block font-medium text-slate-300 mb-1">Coach Attribué</label>
+                  <select
+                    value={editForm.assignedCoach || ""}
+                    onChange={(e) => setEditForm({ ...editForm, assignedCoach: e.target.value || undefined })}
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
+                  >
+                    <option value="">Aucun</option>
+                    {staffCoaches.map((coach) => (
+                      <option key={coach.id} value={coach.name}>
+                        {coach.name}{coach.isOwner ? " (Fondateur)" : ""}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -638,14 +674,31 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Capital Départ ($)</label>
-                <input
-                  type="number"
-                  value={editForm.startingCapital || 10000}
-                  onChange={(e) => setEditForm({ ...editForm, startingCapital: Number(e.target.value) })}
-                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Capital Départ ($)</label>
+                  <input
+                    type="number"
+                    value={editForm.startingCapital || 10000}
+                    onChange={(e) => setEditForm({ ...editForm, startingCapital: Number(e.target.value) })}
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">Coach Attribué</label>
+                  <select
+                    value={editForm.assignedCoach || ""}
+                    onChange={(e) => setEditForm({ ...editForm, assignedCoach: e.target.value || undefined })}
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
+                  >
+                    <option value="">Aucun</option>
+                    {staffCoaches.map((coach) => (
+                      <option key={coach.id} value={coach.name}>
+                        {coach.name}{coach.isOwner ? " (Fondateur)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -727,6 +780,9 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     )}
                   </div>
                   <p className="text-xs text-slate-400">{selectedStudent.email} • Inscrit le {selectedStudent.joinedDate}</p>
+                  {selectedStudent.assignedCoach && (
+                    <p className="text-xs text-[#00E676]">Coach Référent : {selectedStudent.assignedCoach}</p>
+                  )}
                 </div>
               </div>
 

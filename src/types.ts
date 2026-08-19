@@ -249,6 +249,12 @@ export interface EnrolledStudent {
   avatar: string;
   phone?: string;
   joinedDate: string;
+  /**
+   * Nom du coach attribué — doit correspondre au nom d'un vrai compte staff
+   * (`StaffAccountSummary.name`, voir `api.listStaff`), jamais un nom
+   * inventé. Optionnel : une fiche peut n'avoir aucun coach attribué.
+   */
+  assignedCoach?: string;
   level: string;
   statusTag: StudentStatusTag;
   /** Absent pour les fiches créées avant l'ajout du champ. */
