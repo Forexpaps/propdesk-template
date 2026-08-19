@@ -11,7 +11,7 @@ import { Trade, Module, TraderBadge } from "../types";
  *
  * Certains badges reposent sur une donnée qu'on ne suit pas du tout
  * aujourd'hui (% de risque engagé par trade, cumul en unité "R", score
- * d'examen — l'onglet Examen est un placeholder vide). Plutôt que d'inventer
+ * d'examen — le module Examen a été retiré de l'app). Plutôt que d'inventer
  * une progression, ils sont marqués `trackable: false` et restent à 0%
  * jusqu'à ce que le suivi correspondant existe réellement.
  */

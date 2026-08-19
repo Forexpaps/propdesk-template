@@ -103,8 +103,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         return "Messagerie Coach";
       case "analytics":
         return "Rentabilité";
-      case "exam":
-        return "Examen";
       case "macro":
         return "Macro";
       default:

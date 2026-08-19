@@ -5,7 +5,6 @@ import {
   BookMarked,
   MessageSquare,
   LineChart,
-  Award,
   ShieldCheck,
   Users,
   Menu,
@@ -56,7 +55,6 @@ export const ALL_TABS = [
   "forum",
   "messaging",
   "analytics",
-  "exam",
   "macro",
 ] as const;
 
@@ -85,8 +83,6 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
   "wallets",
   "analytics",
   "students",
-  "exam",
-  "checklist",
   "academy",
   "messaging",
   "audit",
@@ -110,8 +106,6 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   wallets: "wallets",
   analytics: "analytics",
   students: "students",
-  exam: "exam",
-  checklist: null,
   academy: "academy",
   messaging: "messaging",
   audit: null,
@@ -155,7 +149,6 @@ interface SidebarProps {
    * bouton n'est alors pas rendu plutôt que de rester inerte.
    */
   onLogout?: () => void;
-  onOpenChecklist?: () => void;
   onOpenTradingPlan?: () => void;
   // Section OUTILS : chaque entrée ouvre une modale.
   onOpenSetupAnalyzer?: () => void;
@@ -185,7 +178,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsCollapsed,
   onOpenProfileModal,
   onLogout,
-  onOpenChecklist,
   onOpenTradingPlan,
   onOpenSetupAnalyzer,
   onOpenMindset,
@@ -226,8 +218,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // « Badges & paliers » ne figure plus ici : les badges restent accessibles par
   // le profil (UserProfileModal, onglet Badges).
   const pratiqueItems: SidebarEntry[] = [
-    { key: "exam", id: "exam", label: "Examen", icon: Award },
-    { key: "checklist", id: null, label: "Exercice du jour", icon: Sliders, onOpen: onOpenChecklist },
     { key: "tradingPlan", id: null, label: "Plan de trading", icon: ClipboardList, onOpen: onOpenTradingPlan },
   ];
 
