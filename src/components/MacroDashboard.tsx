@@ -2,14 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { api, EconomicCalendarEvent, MarketQuote } from "../lib/api";
 
-const MARKET_NEWS = [
-  "WTI Price Forecast: Edges lower to near $74.50 with bearish bias intact below 100-day SMA",
-  "British Pound: Consolidation with limited upside scope against US Dollar – UOB",
-  "Euro holds gains against the Pound awaiting Eurozone and UK Services PMIs",
-  "Japanese Yen: Joint action fails to secure lasting gains – Commerzbank",
-  "Forex Today: US Dollar struggles as risk flows dominate markets",
-];
-
 const CURRENCY_FLAGS: Record<string, string> = {
   USD: "🇺🇸",
   EUR: "🇪🇺",
@@ -206,7 +198,7 @@ export const MacroDashboard: React.FC = () => {
 
       <div>
         <h1 className="text-2xl font-bold text-white">Macro</h1>
-        <p className="text-xs text-slate-400">Marché en direct, calendrier économique et actualités</p>
+        <p className="text-xs text-slate-400">Marché en direct et calendrier économique</p>
       </div>
 
       {/* Sentiment de risque */}
@@ -338,36 +330,6 @@ export const MacroDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Actualités marché */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-bold text-white flex items-center gap-2">
-          <span className="w-1 h-4 rounded-full bg-violet-500" />
-          Actualités marché
-        </h4>
-        <div className="space-y-2.5">
-          {MARKET_NEWS.map((headline, i) => (
-            <div key={i} className="flex items-start gap-2.5 text-sm text-slate-300">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00E676] shrink-0 mt-1.5" />
-              <span>{headline}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Repères macro */}
-      <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 text-xs text-slate-300 space-y-1">
-        <p>
-          <strong className="text-white">Repères macro.</strong> Un <strong className="text-white">DXY</strong>{" "}
-          (dollar) qui monte pèse souvent sur l'or et les actions. Des{" "}
-          <strong className="text-white">taux US 10Y</strong> en hausse tendent à peser sur les valeurs de
-          croissance (Nasdaq). Un <strong className="text-white">VIX</strong> élevé = nervosité (risk-off).
-        </p>
-        <p className="text-slate-500">
-          Ces données de marché et cette analyse ont un but éducatif — ce n'est pas un conseil en investissement. Le
-          trading comporte un risque de perte en capital. Sources : Forex Factory (calendrier), Yahoo Finance
-          (marché).
-        </p>
-      </div>
     </div>
   );
 };
