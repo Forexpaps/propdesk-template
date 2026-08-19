@@ -29,6 +29,7 @@ import {
 import { formatCurrency } from "../lib/format";
 import { api, type StaffAccountSummary } from "../lib/api";
 import { AdminStudentView } from "./AdminStudentView";
+import { StudentEvolutionSection } from "./StudentEvolutionSection";
 
 /**
  * En-tête de section — barre verticale colorée + titre, motif repris tel
@@ -73,6 +74,21 @@ function getStatusTagLabel(tag: string | undefined): string {
 }
 
 const STATUS_TAGS: StudentStatusTag[] = ["Évaluation Étape 1", "Évaluation Étape 2", "Compte Financé", "Fonds Propres"];
+
+/** Tuile d'affichage lecture seule pour une valeur du diagnostic initial — "—" si non renseignée. */
+const DiagnosticTile: React.FC<{
+  label: string;
+  value: number | string | undefined;
+  suffix?: string;
+  currency?: boolean;
+}> = ({ label, value, suffix, currency }) => (
+  <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5">
+    <span className="block text-[10px] uppercase tracking-wide text-slate-500 mb-0.5">{label}</span>
+    <span className="font-mono font-bold text-white text-sm">
+      {value === undefined || value === "" ? "—" : currency ? formatCurrency(Number(value)) : `${value}${suffix ?? ""}`}
+    </span>
+  </div>
+);
 
 const ACCOUNT_TYPES: AccountType[] = ["Compte DÉMO", "Broker Réel", "Prop Firm Evaluation", "Prop Firm Funded"];
 
@@ -814,6 +830,12 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 />
               </div>
 
+              {/* Suivi d'évolution : graphique + notes de session */}
+              <StudentEvolutionSection
+                sessions={editForm.coachingSessions ?? []}
+                onChange={(sessions) => setEditForm({ ...editForm, coachingSessions: sessions })}
+              />
+
               {/* Accès & connexion */}
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-xl p-4 space-y-3">
                 <div>
@@ -1342,6 +1364,85 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Diagnostic initial & historique (lecture seule) */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <SectionHeader />
+                Diagnostic initial & historique
+              </h4>
+              {selectedStudent.initialDiagnostic ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  <DiagnosticTile label="Win Rate %" value={selectedStudent.initialDiagnostic.winRatePercent} suffix="%" />
+                  <DiagnosticTile label="R/R Moyen" value={selectedStudent.initialDiagnostic.avgRR} />
+                  <DiagnosticTile label="Drawdown Max %" value={selectedStudent.initialDiagnostic.maxDrawdownPercent} suffix="%" />
+                  <DiagnosticTile label="Trades / Semaine" value={selectedStudent.initialDiagnostic.tradesPerWeek} />
+                  <DiagnosticTile label="Capital Tradé" value={selectedStudent.initialDiagnostic.tradedCapital} currency />
+                  <DiagnosticTile label="Type de Compte" value={selectedStudent.initialDiagnostic.accountType} />
+                </div>
+              ) : (
+                <div className="bg-[#0D1110] p-4 rounded-xl text-center text-slate-500 text-xs italic">
+                  Aucun diagnostic initial renseigné.
+                </div>
+              )}
+            </div>
+
+            {/* Erreurs récurrentes identifiées (lecture seule) */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <SectionHeader />
+                Erreurs récurrentes identifiées
+              </h4>
+              {selectedStudent.recurringMistakes && selectedStudent.recurringMistakes.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {selectedStudent.recurringMistakes.map((m) => (
+                    <span
+                      key={m}
+                      className="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px] font-medium"
+                    >
+                      {m}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-[#0D1110] p-4 rounded-xl text-center text-slate-500 text-xs italic">
+                  Aucune erreur récurrente identifiée.
+                </div>
+              )}
+            </div>
+
+            {/* Suivi d'évolution : graphique + notes de session (lecture seule) */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <SectionHeader />
+                Suivi d'évolution
+              </h4>
+              <StudentEvolutionSection sessions={selectedStudent.coachingSessions ?? []} />
+            </div>
+
+            {/* Accès & connexion (lecture seule, aucune action sensible ici) */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                <SectionHeader />
+                Accès & connexion
+              </h4>
+              <div className="bg-[#0D1110] p-3 rounded-xl border border-[#1B2320] text-xs flex items-center gap-2">
+                {selectedStudent.studentAccountId ? (
+                  <>
+                    <ShieldCheck className="w-4 h-4 text-[#00E676] shrink-0" />
+                    <span className="text-slate-300">
+                      Accès élève actif — connexion via{" "}
+                      <span className="text-white font-medium">{selectedStudent.email}</span>
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldOff className="w-4 h-4 text-slate-500 shrink-0" />
+                    <span className="text-slate-500">Aucun accès élève actif pour cette fiche.</span>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Private Coach Notes */}

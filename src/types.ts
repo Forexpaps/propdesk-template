@@ -282,6 +282,26 @@ export const RECURRING_MISTAKES = [
 ] as const;
 export type RecurringMistake = (typeof RECURRING_MISTAKES)[number];
 
+/**
+ * Une session de coaching notée — texte libre + 4 notes sur 10, saisies par
+ * le coach. `label` ("Coaching N") est calculé à la création à partir du
+ * nombre de sessions déjà présentes, jamais renumboté après coup (une
+ * suppression au milieu ne renomme pas les suivantes). La note globale
+ * n'est pas stockée : voir `computeSessionGlobalNote` dans
+ * `src/lib/coachingSessionStats.ts`, seule implémentation, ne jamais la
+ * dupliquer.
+ */
+export interface CoachingSessionNote {
+  id: string;
+  label: string;
+  date: string;
+  notes?: string;
+  discipline: number;
+  perceivedDifficulty: number;
+  planExecution: number;
+  performance: number;
+}
+
 export interface EnrolledStudent {
   id: string;
   name: string;
@@ -316,6 +336,8 @@ export interface EnrolledStudent {
   initialDiagnostic?: StudentInitialDiagnostic;
   /** Points faibles récurrents identifiés, catalogue fermé (voir `RECURRING_MISTAKES`). */
   recurringMistakes?: RecurringMistake[];
+  /** Historique des sessions de coaching notées — voir `CoachingSessionNote`. */
+  coachingSessions?: CoachingSessionNote[];
   accounts: TradingAccount[];
   recentTrades: Trade[];
   /**
