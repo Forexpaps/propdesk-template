@@ -298,6 +298,34 @@ export const api = {
       method: "DELETE",
     }),
 
+  /** Fixe directement le mot de passe d'un compte élève. Déconnecte ses sessions en cours. */
+  setStudentPassword: (enrolledStudentId: string, newPassword: string) =>
+    request<void>(`/api/auth/students/${encodeURIComponent(enrolledStudentId)}/password`, {
+      method: "PUT",
+      body: JSON.stringify({ newPassword }),
+    }),
+
+  /** Change l'identifiant (email) de connexion d'un compte élève déjà créé. */
+  updateStudentEmail: (enrolledStudentId: string, email: string) =>
+    request<void>(`/api/auth/students/${encodeURIComponent(enrolledStudentId)}/email`, {
+      method: "PUT",
+      body: JSON.stringify({ email }),
+    }),
+
+  /** Génère un lien de réinitialisation à transmettre à la main. Le lien n'est renvoyé qu'ici, une seule fois. */
+  generateStudentResetLink: (enrolledStudentId: string) =>
+    request<{ link: string; expiresAt: string }>(
+      `/api/auth/students/${encodeURIComponent(enrolledStudentId)}/reset-link`,
+      { method: "POST" }
+    ),
+
+  /** Consomme un lien de réinitialisation — public, aucune session requise. */
+  consumePasswordReset: (token: string, newPassword: string) =>
+    request<void>(`/api/auth/reset-password/${encodeURIComponent(token)}`, {
+      method: "POST",
+      body: JSON.stringify({ newPassword }),
+    }),
+
   /** Vrais trades d'un élève, en lecture — pour la fiche côté coach. */
   fetchStudentTrades: (enrolledStudentId: string) =>
     request<{ trades: Trade[]; accounts: TradingAccount[] }>(

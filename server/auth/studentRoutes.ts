@@ -1,11 +1,12 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
-import { loginSchema, changePasswordSchema } from "../schemas";
+import { loginSchema, changePasswordSchema, consumeResetTokenSchema } from "../schemas";
 import { createRateLimit } from "../middleware/rateLimit";
 import { normalizeEmail } from "./credentials";
 import { getLockoutStatus, registerFailedLogin, clearLoginFailures } from "./loginLockout";
 import { hashPassword, verifyPassword, needsRehash, verifyAgainstDecoy } from "./password";
 import { recordSecurityEvent } from "./securityEvents";
 import {
+  consumePasswordResetToken,
   getStudentByEmail,
   getStudentById,
   setStudentPassword,
@@ -171,6 +172,49 @@ studentAuthRouter.post("/student-logout", (req, res) => {
   clearStudentSessionCookie(res);
   res.status(204).end();
 });
+
+/**
+ * Consomme un jeton de réinitialisation (« Générer un lien de
+ * réinitialisation » côté staff, `StudentTracking.tsx`) — accessible sans
+ * session, exactement comme `/student-login` : c'est le point d'entrée d'un
+ * élève qui n'a plus accès à son compte. Le jeton lui-même prouve l'identité,
+ * pas de mot de passe actuel à fournir (au contraire de
+ * `/student-change-password`).
+ */
+studentAuthRouter.post(
+  "/reset-password/:token",
+  createRateLimit({
+    windowMs: 15 * 60_000,
+    max: 10,
+    message: "Trop de tentatives. Réessaie dans quelques minutes.",
+  }),
+  wrap(async (req, res) => {
+    const parsed = consumeResetTokenSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Mot de passe invalide." });
+      return;
+    }
+
+    const token = typeof req.params.token === "string" ? req.params.token : "";
+    const result = consumePasswordResetToken(token);
+    if (!result) {
+      res.status(400).json({ error: "Ce lien est invalide, déjà utilisé, ou expiré." });
+      return;
+    }
+
+    const passwordHash = await hashPassword(parsed.data.newPassword);
+    setStudentPassword(result.studentAccountId, passwordHash);
+    destroyAllStudentSessions(result.studentAccountId);
+
+    const student = getStudentById(result.studentAccountId);
+    recordSecurityEvent({
+      eventType: "student_password_reset_completed", severity: "info", accountKind: "student",
+      accountEmail: student?.email ?? "", ip: req.ip, detail: "",
+    });
+
+    res.status(204).end();
+  })
+);
 
 studentProtectedRouter.post(
   "/student-change-password",

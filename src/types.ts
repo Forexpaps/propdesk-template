@@ -237,10 +237,50 @@ export interface StudentProfile {
   hiddenSidebarItems?: string[];
 }
 
-export type StudentStatusTag = "En Évaluation FTMO" | "Prop Firm Financé" | "Besoin Coaching" | "Alerte Tilt";
+/**
+ * Statut du compte de trading de l'élève — étape d'évaluation Prop Firm,
+ * compte financé, ou capital propre. Remplace l'ancien statut ("En
+ * Évaluation FTMO" / "Prop Firm Financé" / "Besoin Coaching" / "Alerte
+ * Tilt") sur demande explicite : un seul statut, centré sur l'étape réelle
+ * du compte plutôt que sur un jugement de suivi (coaching/tilt).
+ */
+export type StudentStatusTag =
+  | "Évaluation Étape 1"
+  | "Évaluation Étape 2"
+  | "Compte Financé"
+  | "Fonds Propres";
 
 /** Horizon de tenue des positions travaillé par l'élève. */
 export type TradingStyle = "Scalping" | "Intraday" | "Swing Trading";
+
+/**
+ * Statistiques de départ de l'élève, saisies une fois au diagnostic initial
+ * — distinct de `winRate`/`totalTrades` sur `EnrolledStudent`, qui suivent
+ * la performance en cours dans l'app. Tous les champs sont optionnels : rien
+ * n'est inventé tant que le coach ne les a pas renseignés.
+ */
+export interface StudentInitialDiagnostic {
+  winRatePercent?: number;
+  avgRR?: number;
+  maxDrawdownPercent?: number;
+  tradesPerWeek?: number;
+  tradedCapital?: number;
+  /** Même catalogue que `TradingAccount.type` (voir `AccountType`) — pas de liste distincte à maintenir. */
+  accountType?: AccountType;
+}
+
+/** Catalogue fermé de points faibles récurrents, cochables sur la fiche. */
+export const RECURRING_MISTAKES = [
+  "Entrées trop tôt (impatience)",
+  "FOMO",
+  "Non-respect du plan",
+  "Sorties trop tôt (peur)",
+  "Revenge trading",
+  "Over trading",
+  "Mauvaise gestion du risque",
+  "Autre",
+] as const;
+export type RecurringMistake = (typeof RECURRING_MISTAKES)[number];
 
 export interface EnrolledStudent {
   id: string;
@@ -266,6 +306,10 @@ export interface EnrolledStudent {
   winRate: number;
   riskStatus: "🟢 Risque Maîtrisé" | "⚠️ Attention Risk" | "🔴 Sur-Risque" | "🏆 Challenge Validé";
   privateCoachNotes: string;
+  /** Diagnostic initial — statistiques de départ, distinctes du suivi en cours (`winRate`/`totalTrades`). */
+  initialDiagnostic?: StudentInitialDiagnostic;
+  /** Points faibles récurrents identifiés, catalogue fermé (voir `RECURRING_MISTAKES`). */
+  recurringMistakes?: RecurringMistake[];
   accounts: TradingAccount[];
   recentTrades: Trade[];
   /**
