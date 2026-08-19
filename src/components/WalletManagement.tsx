@@ -378,8 +378,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 </div>
                 <h2 className="text-xl font-bold text-white mt-1">{selectedAccount.name}</h2>
                 <p className="text-xs text-slate-400">
-                  Fournisseur / Broker: <span className="text-slate-200 font-bold">{selectedAccount.firmOrBroker}</span> | N° Compte:{" "}
-                  <span className="text-[#00E676] font-mono">{selectedAccount.accountNumber}</span>
+                  Fournisseur / Broker: <span className="text-slate-200 font-bold">{selectedAccount.firmOrBroker}</span>
                 </p>
               </div>
 
