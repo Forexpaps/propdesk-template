@@ -28,6 +28,7 @@ import {
 } from "../types";
 import { formatCurrency } from "../lib/format";
 import { api, type StaffAccountSummary } from "../lib/api";
+import { confirmDialog } from "../lib/confirmDialog";
 import { AdminStudentView } from "./AdminStudentView";
 import { StudentEvolutionSection } from "./StudentEvolutionSection";
 
@@ -225,7 +226,14 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
   };
 
   const handleRevokeAccess = async (student: EnrolledStudent) => {
-    if (!confirm(`Révoquer l'accès élève de ${student.name} ? Ses trades restent conservés.`)) return;
+    if (
+      !(await confirmDialog(`Révoquer l'accès élève de ${student.name} ? Ses trades restent conservés.`, {
+        title: "Révoquer l'accès",
+        confirmLabel: "Révoquer",
+        danger: true,
+      }))
+    )
+      return;
     try {
       await api.revokeStudentAccess(student.id);
       const { studentAccountId, ...rest } = student;
@@ -1032,8 +1040,14 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               <div className="flex items-center justify-between pt-4 border-t border-[#1B2320]">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (confirm("Voulez-vous vraiment supprimer cet élève de l'académie ?")) {
+                  onClick={async () => {
+                    if (
+                      await confirmDialog("Voulez-vous vraiment supprimer cet élève de l'académie ?", {
+                        title: "Supprimer l'élève",
+                        confirmLabel: "Supprimer",
+                        danger: true,
+                      })
+                    ) {
                       onDeleteStudent(selectedStudent.id);
                       setIsEditingFile(false);
                     }

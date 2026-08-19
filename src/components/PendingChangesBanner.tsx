@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { AlertTriangle, Upload, Trash2, X } from "lucide-react";
 import { describePending, replayPending } from "../lib/pendingChanges";
+import { confirmDialog } from "../lib/confirmDialog";
 
 /**
  * Bandeau proposé quand des modifications faites hors ligne n'ont jamais été
@@ -66,11 +67,12 @@ export const PendingChangesBanner: React.FC<PendingChangesBannerProps> = ({
     }
   };
 
-  const abandonner = () => {
+  const abandonner = async () => {
     if (busy) return;
-    const ok = window.confirm(
+    const ok = await confirmDialog(
       `Abandonner définitivement les modifications hors ligne (${libelles.join(", ")}) ?\n\n` +
-        "Elles seront remplacées par la version du serveur. C'est irréversible."
+        "Elles seront remplacées par la version du serveur. C'est irréversible.",
+      { title: "Abandonner les modifications", confirmLabel: "Abandonner", danger: true }
     );
     if (!ok) return;
     onDiscard();
