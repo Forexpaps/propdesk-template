@@ -16,6 +16,7 @@ import { SecurityLogModal } from "./components/SecurityLogModal";
 import { NotificationModal } from "./components/NotificationModal";
 import { MindsetJournalModal } from "./components/MindsetJournalModal";
 import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
+import { LegalNoticeModal } from "./components/LegalNoticeModal";
 import { SetupAnalyzerModal } from "./components/SetupAnalyzerModal";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
 import { computeBadgeProgress } from "./lib/badges";
@@ -434,6 +435,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [isSetupAnalyzerOpen, setIsSetupAnalyzerOpen] = useState(false);
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
+  const [isLegalNoticeOpen, setIsLegalNoticeOpen] = useState(false);
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileModalTab, setProfileModalTab] = useState<"profile" | "badges">("profile");
@@ -657,9 +659,17 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
             )}
           </React.Suspense>
         </main>
+
+        <footer className="px-4 sm:px-8 py-4 flex items-center justify-between gap-4 text-[11px] text-slate-500 max-w-7xl w-full mx-auto">
+          <span>© {new Date().getFullYear()} Thomas Gauthey — Auto-entrepreneur</span>
+          <button onClick={() => setIsLegalNoticeOpen(true)} className="hover:text-[#00E676] transition-colors">
+            Mentions légales
+          </button>
+        </footer>
       </div>
 
       <SetupAnalyzerModal isOpen={isSetupAnalyzerOpen} onClose={() => setIsSetupAnalyzerOpen(false)} />
+      <LegalNoticeModal isOpen={isLegalNoticeOpen} onClose={() => setIsLegalNoticeOpen(false)} />
       <MindsetJournalModal isOpen={isMindsetModalOpen} onClose={() => setIsMindsetModalOpen(false)} />
       <TradingPlanEditorModal isOpen={isTradingPlanOpen} onClose={() => setIsTradingPlanOpen(false)} />
       <NotificationModal
@@ -780,6 +790,7 @@ function AcademyApp({
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
+  const [isLegalNoticeOpen, setIsLegalNoticeOpen] = useState(false);
   const [isStaffAccountsOpen, setIsStaffAccountsOpen] = useState(false);
   const [isSecurityLogOpen, setIsSecurityLogOpen] = useState(false);
 
@@ -1552,7 +1563,16 @@ function AcademyApp({
           {activeTab === "macro" && <MacroDashboard />}
           </React.Suspense>
         </main>
+
+        <footer className="px-4 sm:px-8 py-4 flex items-center justify-between gap-4 text-[11px] text-slate-500 max-w-7xl w-full mx-auto">
+          <span>© {new Date().getFullYear()} Thomas Gauthey — Auto-entrepreneur</span>
+          <button onClick={() => setIsLegalNoticeOpen(true)} className="hover:text-[#00E676] transition-colors">
+            Mentions légales
+          </button>
+        </footer>
       </div>
+
+      <LegalNoticeModal isOpen={isLegalNoticeOpen} onClose={() => setIsLegalNoticeOpen(false)} />
 
       {/* User Profile Edition Modal */}
       <UserProfileModal
