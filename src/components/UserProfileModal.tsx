@@ -26,6 +26,7 @@ import {
 import { StudentProfile, TraderBadge } from "../types";
 import { resizeAvatar, AVATAR_SIZE } from "../lib/image";
 import { api } from "../lib/api";
+import { confirmDialog } from "../lib/confirmDialog";
 import { ChangeOwnPasswordModal } from "./ChangeOwnPasswordModal";
 
 const SectionHeader: React.FC<{ children?: React.ReactNode; color?: string }> = ({
@@ -182,9 +183,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     // règles qu'un PUT /collections/:name normal, voir server/routes.ts) —
     // ce n'est pas un ajout. Confirmation explicite avant d'agir.
     if (
-      !confirm(
-        "Importer ce fichier va remplacer tes données actuelles (trades, comptes, modules, badges...) par celles du fichier. Cette action ne peut pas être annulée. Continuer ?"
-      )
+      !(await confirmDialog(
+        "Importer ce fichier va remplacer tes données actuelles (trades, comptes, modules, badges...) par celles du fichier. Cette action ne peut pas être annulée. Continuer ?",
+        { title: "Restaurer une sauvegarde", confirmLabel: "Importer", danger: true }
+      ))
     ) {
       return;
     }

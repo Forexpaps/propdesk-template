@@ -25,6 +25,7 @@ import {
   StudentProfile,
   Coach
 } from "../types";
+import { confirmDialog } from "../lib/confirmDialog";
 
 interface ForumSectionProps {
   topics: ForumTopic[];
@@ -124,7 +125,7 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
       authorName: student.name,
       authorEmail: student.email,
       authorAvatar: student.avatar,
-      authorRole: "Élève Premium",
+      authorRole: canModerate ? "Head Coach" : "Élève Premium",
       content: newContent,
     });
 
@@ -302,8 +303,14 @@ export const ForumSection: React.FC<ForumSectionProps> = ({
                 </button>
 
                 <button
-                  onClick={() => {
-                    if (confirm("Voulez-vous vraiment supprimer ce sujet ?")) {
+                  onClick={async () => {
+                    if (
+                      await confirmDialog("Voulez-vous vraiment supprimer ce sujet ?", {
+                        title: "Supprimer le sujet",
+                        confirmLabel: "Supprimer",
+                        danger: true,
+                      })
+                    ) {
                       onDeleteTopic(selectedTopic.id);
                       setSelectedTopicId(null);
                     }

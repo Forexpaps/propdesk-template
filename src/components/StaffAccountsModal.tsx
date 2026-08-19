@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { UserPlus, Trash2, Clock, X, Copy, Check, Crown } from "lucide-react";
 import { api, type StaffAccountSummary } from "../lib/api";
+import { confirmDialog } from "../lib/confirmDialog";
 
 interface StaffAccountsModalProps {
   isOpen: boolean;
@@ -91,9 +92,10 @@ export const StaffAccountsModal: React.FC<StaffAccountsModalProps> = ({
 
   const handleRemove = async (account: StaffAccountSummary) => {
     if (
-      !confirm(
-        `Révoquer le compte de ${account.name} ? Il ne pourra plus se connecter.`
-      )
+      !(await confirmDialog(
+        `Révoquer le compte de ${account.name} ? Il ne pourra plus se connecter.`,
+        { title: "Révoquer un compte staff", confirmLabel: "Révoquer", danger: true }
+      ))
     ) {
       return;
     }

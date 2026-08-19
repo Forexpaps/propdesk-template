@@ -19,6 +19,7 @@ import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
 import { LegalNoticeModal } from "./components/LegalNoticeModal";
 import { SetupAnalyzerModal } from "./components/SetupAnalyzerModal";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
+import { ConfirmDialogHost, confirmDialog } from "./lib/confirmDialog";
 import { computeBadgeProgress } from "./lib/badges";
 import { listPending } from "./lib/pendingChanges";
 
@@ -740,6 +741,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         }}
       />
       <LegalNoticeModal isOpen={isLegalNoticeOpen} onClose={() => setIsLegalNoticeOpen(false)} />
+      <ConfirmDialogHost />
       <MindsetJournalModal
         isOpen={isMindsetModalOpen}
         onClose={() => setIsMindsetModalOpen(false)}
@@ -1050,8 +1052,9 @@ function AcademyApp({
    * machine.
    *
    * Note : `useSyncedState` regroupe ses écritures sur 400 ms. Une déconnexion
-   * confirmée en moins de 400 ms perdrait la dernière modification — théorique
-   * avec un `confirm()` bloquant, à revoir si on le remplace par une modale.
+   * confirmée en moins de 400 ms perdrait la dernière modification — reste
+   * théorique même avec `confirmDialog()` (asynchrone, contrairement à
+   * l'ancien `confirm()` natif), mais à garder en tête.
    */
   const handleLogout = async () => {
     // Hors ligne, le cache local est la SEULE copie des données : le vider
@@ -1065,14 +1068,15 @@ function AcademyApp({
 
     let confirmed: boolean;
     try {
-      confirmed = confirm(
-        "Se déconnecter ? Tes données restent enregistrées sur le serveur. Le cache de cet appareil sera effacé."
+      confirmed = await confirmDialog(
+        "Se déconnecter ? Tes données restent enregistrées sur le serveur. Le cache de cet appareil sera effacé.",
+        { title: "Déconnexion", confirmLabel: "Se déconnecter" }
       );
     } catch (err) {
-      // Certains contextes (iframe sandboxée, extension bloquant les dialogues
-      // natifs) font lever confirm() plutôt que renvoyer false. Sans ce
-      // filet, le clic resterait sans aucun effet ni message.
-      console.error("[propdesk] confirm() a levé une exception.", err);
+      // Filet de sécurité conservé au cas où : la modale maison ne lève
+      // normalement jamais, contrairement à l'ancien confirm() natif dans
+      // certains contextes (iframe sandboxée, dialogues natifs bloqués).
+      console.error("[propdesk] confirmDialog() a levé une exception.", err);
       alert("La déconnexion n'a pas pu être confirmée. Réessaie, ou recharge la page.");
       return;
     }
@@ -1620,6 +1624,7 @@ function AcademyApp({
       </div>
 
       <LegalNoticeModal isOpen={isLegalNoticeOpen} onClose={() => setIsLegalNoticeOpen(false)} />
+      <ConfirmDialogHost />
 
       {/* User Profile Edition Modal */}
       <UserProfileModal
