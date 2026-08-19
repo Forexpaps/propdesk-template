@@ -24,7 +24,6 @@ import {
   Check,
   Brain,
   Calendar,
-  Target,
   LogOut,
   ClipboardList,
 } from "lucide-react";
@@ -82,7 +81,6 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
   "students",
   "academy",
   "messaging",
-  "audit",
   "mindset",
   "calendar",
   "tradingPlan",
@@ -90,7 +88,7 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
 
 export type SidebarItemKey = (typeof SIDEBAR_TOGGLEABLE_KEYS)[number];
 
-type SectionName = "suivi" | "pratique" | "formation" | "outils";
+type SectionName = "suivi";
 
 /**
  * Onglet atteint par chaque entrée masquable, `null` pour celles qui ouvrent
@@ -105,7 +103,6 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   students: "students",
   academy: "academy",
   messaging: "messaging",
-  audit: null,
   mindset: null,
   calendar: "macro",
   tradingPlan: null,
@@ -148,7 +145,6 @@ interface SidebarProps {
   onLogout?: () => void;
   onOpenTradingPlan?: () => void;
   // Section OUTILS : chaque entrée ouvre une modale.
-  onOpenSetupAnalyzer?: () => void;
   onOpenMindset?: () => void;
   /** Masque ou réaffiche une entrée. Réservé au compte fondateur. */
   onToggleSidebarItem?: (key: SidebarItemKey) => void;
@@ -176,7 +172,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenProfileModal,
   onLogout,
   onOpenTradingPlan,
-  onOpenSetupAnalyzer,
   onOpenMindset,
   onToggleSidebarItem,
   canManageSidebar = false,
@@ -202,6 +197,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     icon: LayoutDashboard,
   };
 
+  /**
+   * Tous les modules regroupés dans une seule section — sur demande
+   * explicite de l'utilisateur, les anciennes sections PRATIQUE/FORMATION/
+   * OUTILS ont été fusionnées ici, sans changement de fonction (mêmes
+   * `id`/`onOpen`, seule la présentation change).
+   *
+   * « Badges & paliers » ne figure pas ici : les badges restent accessibles
+   * par le profil (UserProfileModal, onglet Badges). « Calendrier » n'y
+   * figure plus non plus : devenu l'onglet « Macro », ce n'est plus une
+   * modale. « Audit Setup » retiré entièrement sur demande explicite
+   * antérieure (module Setup & Confluence Matrix).
+   */
   const suiviItems: SidebarEntry[] = [
     { key: "journal", id: "journal", label: "Journal de trading", icon: BookMarked },
     { key: "wallets", id: "wallets", label: "Portefeuille", icon: Wallet },
@@ -210,27 +217,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ...(student.isAdmin
       ? [{ key: "students" as const, id: "students" as const, label: "Suivi des Élèves", icon: UserCheck }]
       : []),
-  ];
-
-  // « Badges & paliers » ne figure plus ici : les badges restent accessibles par
-  // le profil (UserProfileModal, onglet Badges).
-  const pratiqueItems: SidebarEntry[] = [
     { key: "tradingPlan", id: null, label: "Plan de trading", icon: ClipboardList, onOpen: onOpenTradingPlan },
-  ];
-
-  const formationItems: SidebarEntry[] = [
     { key: "academy", id: "academy", label: "Module vidéo", icon: BookOpen, badge: `${courseCompletionPercentage}%` },
     { key: "messaging", id: "messaging", label: "Messagerie Coach", icon: MessageSquare, badge: totalUnreadMessages > 0 ? "1" : null },
-  ];
-
-  /**
-   * Section OUTILS : deux modales, sans onglet associé.
-   *
-   * « Calendrier » n'y figure plus : devenu l'onglet « Macro » (section
-   * SUIVI), ce n'est plus une modale.
-   */
-  const outilsItems: SidebarEntry[] = [
-    { key: "audit", id: null, label: "Audit Setup", icon: Target, onOpen: onOpenSetupAnalyzer },
     { key: "mindset", id: null, label: "Mindset", icon: Brain, onOpen: onOpenMindset },
   ];
 
@@ -484,10 +473,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
 
-            {renderSection("SUIVI", "suivi", suiviItems)}
-            {renderSection("PRATIQUE", "pratique", pratiqueItems)}
-            {renderSection("FORMATION", "formation", formationItems)}
-            {renderSection("OUTILS", "outils", outilsItems)}
+            {renderSection("SUIVIE TRADING", "suivi", suiviItems)}
           </nav>
 
           {/* Reduce Sidebar Button */}
