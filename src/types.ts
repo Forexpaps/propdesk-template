@@ -249,7 +249,6 @@ export interface EnrolledStudent {
   avatar: string;
   phone?: string;
   joinedDate: string;
-  assignedCoach: string;
   level: string;
   statusTag: StudentStatusTag;
   /** Absent pour les fiches créées avant l'ajout du champ. */
