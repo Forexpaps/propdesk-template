@@ -131,23 +131,9 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         </p>
       </div>
 
-      {/* 2. Top 4 KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Score Examen — module Examen pas encore disponible dans l'app */}
-        <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between">
-          <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
-            SCORE EXAMEN
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-black text-slate-500 font-mono">—</span>
-              <span className="text-xs text-slate-500 font-medium">/100</span>
-            </div>
-            <p className="text-xs text-slate-500">Bientôt disponible</p>
-          </div>
-        </div>
-
-        {/* Card 2: Win Rate Journal */}
+      {/* 2. Top 3 KPI Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Card 1: Win Rate Journal */}
         <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between">
           <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
             WIN RATE JOURNAL
@@ -162,7 +148,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           </div>
         </div>
 
-        {/* Card 3: PnL Cumulé */}
+        {/* Card 2: PnL Cumulé */}
         <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between">
           <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
             PNL CUMULÉ
@@ -187,7 +173,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           </div>
         </div>
 
-        {/* Card 4: Série de Discipline */}
+        {/* Card 3: Série de Discipline */}
         <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-4 flex flex-col justify-between">
           <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">
             SÉRIE DE DISCIPLINE
@@ -235,16 +221,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             badgeClasses: "text-[#00E676] bg-[#00E676]/15 border-[#00E676]/30",
             borderHover: "hover:border-[#00E676]/40",
             textHover: "group-hover:text-[#00E676]",
-          },
-          {
-            key: "exam",
-            tab: "exam",
-            letter: "E",
-            title: "Examen",
-            description: "20 graphiques inédits, notés et corrigés un par un.",
-            badgeClasses: "text-blue-400 bg-blue-500/15 border-blue-500/30",
-            borderHover: "hover:border-blue-500/40",
-            textHover: "group-hover:text-blue-400",
           },
           {
             key: "academy",

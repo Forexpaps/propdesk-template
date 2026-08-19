@@ -8,7 +8,6 @@ import {
 import { TopHeader } from "./components/TopHeader";
 import { MainDashboard } from "./components/MainDashboard";
 import { PositionCalculatorModal } from "./components/PositionCalculatorModal";
-import { TradingPlanModal } from "./components/TradingPlanModal";
 import { MacroDashboard } from "./components/MacroDashboard";
 import { UserProfileModal } from "./components/UserProfileModal";
 import { PendingChangesBanner } from "./components/PendingChangesBanner";
@@ -434,7 +433,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isSetupAnalyzerOpen, setIsSetupAnalyzerOpen] = useState(false);
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
-  const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -573,7 +571,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
           setIsProfileModalOpen(true);
         }}
         onLogout={handleLogout}
-        onOpenChecklist={() => setIsChecklistOpen(true)}
         onOpenTradingPlan={() => setIsTradingPlanOpen(true)}
         onOpenSetupAnalyzer={() => setIsSetupAnalyzerOpen(true)}
         onOpenMindset={() => setIsMindsetModalOpen(true)}
@@ -638,15 +635,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
 
             {activeTab === "macro" && <MacroDashboard />}
 
-            {activeTab === "exam" && (
-              <div className="space-y-6">
-                <h1 className="text-2xl font-bold text-white">Examen</h1>
-                <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-8 min-h-96 flex items-center justify-center">
-                  <p className="text-slate-400">Contenu à venir</p>
-                </div>
-              </div>
-            )}
-
             {activeTab === "academy" && (
               <VideoAcademy
                 modules={syncedModules}
@@ -673,7 +661,6 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
 
       <SetupAnalyzerModal isOpen={isSetupAnalyzerOpen} onClose={() => setIsSetupAnalyzerOpen(false)} />
       <MindsetJournalModal isOpen={isMindsetModalOpen} onClose={() => setIsMindsetModalOpen(false)} />
-      <TradingPlanModal isOpen={isChecklistOpen} onClose={() => setIsChecklistOpen(false)} />
       <TradingPlanEditorModal isOpen={isTradingPlanOpen} onClose={() => setIsTradingPlanOpen(false)} />
       <NotificationModal
         isOpen={isNotificationsModalOpen}
@@ -792,7 +779,6 @@ function AcademyApp({
   const [profileModalTab, setProfileModalTab] = useState<"profile" | "badges">("profile");
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
-  const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
   const [isStaffAccountsOpen, setIsStaffAccountsOpen] = useState(false);
   const [isSecurityLogOpen, setIsSecurityLogOpen] = useState(false);
@@ -1378,7 +1364,6 @@ function AcademyApp({
           setIsProfileModalOpen(true);
         }}
         onLogout={handleLogout}
-        onOpenChecklist={() => setIsChecklistOpen(true)}
         onOpenTradingPlan={() => setIsTradingPlanOpen(true)}
         onOpenSetupAnalyzer={() => setIsSetupAnalyzerOpen(true)}
         onOpenMindset={() => setIsMindsetModalOpen(true)}
@@ -1564,15 +1549,6 @@ function AcademyApp({
             />
           )}
 
-          {activeTab === "exam" && (
-            <div className="space-y-6">
-              <h1 className="text-2xl font-bold text-white">Examen</h1>
-              <div className="bg-[#111615] border border-[#1B2320] rounded-2xl p-8 min-h-96 flex items-center justify-center">
-                <p className="text-slate-400">Contenu à venir</p>
-              </div>
-            </div>
-          )}
-
           {activeTab === "macro" && <MacroDashboard />}
           </React.Suspense>
         </main>
@@ -1642,13 +1618,7 @@ function AcademyApp({
         }}
       />
 
-      {/* Trading Plan Checklist Modal */}
-      <TradingPlanModal
-        isOpen={isChecklistOpen}
-        onClose={() => setIsChecklistOpen(false)}
-      />
-
-      {/* Module Pratique : plan de trading (règles personnelles, distinct de la checklist ci-dessus) */}
+      {/* Module Pratique : plan de trading (règles personnelles) */}
       <TradingPlanEditorModal
         isOpen={isTradingPlanOpen}
         onClose={() => setIsTradingPlanOpen(false)}
