@@ -101,8 +101,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
   const filteredStudents = students.filter((st) => {
     const matchesSearch =
       st.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      st.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      st.assignedCoach.toLowerCase().includes(searchTerm.toLowerCase());
+      st.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTag = selectedTagFilter === "ALL" || st.statusTag === selectedTagFilter;
     return matchesSearch && matchesTag;
   });
@@ -166,7 +165,6 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
       avatar: editForm.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=250",
       phone: editForm.phone || "+33 6 00 00 00 00",
       joinedDate: new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }),
-      assignedCoach: editForm.assignedCoach || "Thomas Laurent",
       level: editForm.level || "Élève Débutant",
       statusTag: (editForm.statusTag as StudentStatusTag) || "En Évaluation FTMO",
       tradingStyle: (editForm.tradingStyle as TradingStyle) || "Intraday",
@@ -229,7 +227,6 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
             onClick={() => {
               setEditForm({
                 statusTag: "En Évaluation FTMO",
-                assignedCoach: "Thomas Laurent",
                 level: "Élève Débutant",
                 riskStatus: "🟢 Risque Maîtrisé",
                 startingCapital: 10000,
@@ -307,7 +304,6 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                       )}
                     </div>
                     <p className="text-xs text-slate-400">{st.email} • {st.level}</p>
-                    <p className="text-[11px] text-slate-500">Coach attribué : <span className="text-[#00E676]">{st.assignedCoach}</span></p>
                   </div>
                 </div>
 
@@ -473,19 +469,6 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
                   />
-                </div>
-
-                <div>
-                  <label className="block font-medium text-slate-300 mb-1">Coach Attribué</label>
-                  <select
-                    value={editForm.assignedCoach || "Thomas Laurent"}
-                    onChange={(e) => setEditForm({ ...editForm, assignedCoach: e.target.value })}
-                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
-                  >
-                    <option value="Thomas Laurent">Thomas Laurent (Head Coach)</option>
-                    <option value="Sarah Benali">Sarah Benali (Psychologie & Risk)</option>
-                    <option value="Marc Dupuis">Marc Dupuis (Indices & Crypto)</option>
-                  </select>
                 </div>
 
                 <div>
@@ -655,27 +638,14 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Capital Départ ($)</label>
-                  <input
-                    type="number"
-                    value={editForm.startingCapital || 10000}
-                    onChange={(e) => setEditForm({ ...editForm, startingCapital: Number(e.target.value) })}
-                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Coach</label>
-                  <select
-                    value={editForm.assignedCoach || "Thomas Laurent"}
-                    onChange={(e) => setEditForm({ ...editForm, assignedCoach: e.target.value })}
-                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
-                  >
-                    <option value="Thomas Laurent">Thomas Laurent</option>
-                    <option value="Sarah Benali">Sarah Benali</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">Capital Départ ($)</label>
+                <input
+                  type="number"
+                  value={editForm.startingCapital || 10000}
+                  onChange={(e) => setEditForm({ ...editForm, startingCapital: Number(e.target.value) })}
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
+                />
               </div>
 
               <div>
@@ -757,7 +727,6 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     )}
                   </div>
                   <p className="text-xs text-slate-400">{selectedStudent.email} • Inscrit le {selectedStudent.joinedDate}</p>
-                  <p className="text-xs text-[#00E676]">Coach Référent : {selectedStudent.assignedCoach}</p>
                 </div>
               </div>
 
