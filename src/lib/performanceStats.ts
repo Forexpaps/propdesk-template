@@ -77,12 +77,12 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   let runningCapital = student.startingCapital;
   const equityData = [
     { date: `Début (${student.joinedDate})`, capital: student.startingCapital, pnl: 0 },
-    ...sortedTrades.map((t, idx) => {
+    ...sortedTrades.map((t) => {
       // Un trade en % n'est pas une somme d'argent : il reste dans la courbe
       // temporelle mais n'ajoute rien au capital cumulé.
       if ((t.pnlUnit ?? "USD") !== "PERCENT") runningCapital += t.pnl;
       return {
-        date: `Trade #${idx + 1} (${t.pair})`,
+        date: t.date,
         capital: runningCapital,
         pnl: t.pnl,
       };
