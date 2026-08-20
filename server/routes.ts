@@ -145,6 +145,10 @@ const STUDENT_ALLOWED_COLLECTIONS = new Set<CollectionName>([
   // entièrement dérivé des messages/badges, sans mécanisme pour pousser
   // une notification arbitraire.
   "notifications",
+  // Stratégies de trading définies par l'élève (module Setups) — voir
+  // `Setup`, `src/types.ts`. Source du multi-choix `authorizedSetups` du
+  // Plan de trading et du champ Stratégie du Journal.
+  "setups",
 ]);
 
 /**

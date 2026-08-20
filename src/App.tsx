@@ -32,6 +32,7 @@ import {
   initialTraderBadges,
   initialEnrolledStudents,
   initialNotifications,
+  initialSetups,
 } from "./data/mockData";
 import {
   Module,
@@ -47,6 +48,7 @@ import {
   Coach,
   FOUNDER_COACH_ID,
   TradingPlanData,
+  Setup,
 } from "./types";
 import { isTabType, type TabType as SidebarTabType } from "./components/Sidebar";
 
@@ -89,6 +91,9 @@ const WalletManagement = React.lazy(() =>
 );
 const StudentTracking = React.lazy(() =>
   import("./components/StudentTracking").then((m) => ({ default: m.StudentTracking }))
+);
+const SetupManagement = React.lazy(() =>
+  import("./components/SetupManagement").then((m) => ({ default: m.SetupManagement }))
 );
 
 /**
@@ -307,7 +312,7 @@ function resolveStudentValue<T>(serverValue: T, localKey: string): T {
  * périmètre de l'accès élève.
  */
 function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
-  const { status, trades, accounts, modules, messages, badges, notifications, quizResults, student, setStudent, coaches, tradingPlan } = useStudentBootstrap();
+  const { status, trades, accounts, modules, messages, badges, setups, notifications, quizResults, student, setStudent, coaches, tradingPlan } = useStudentBootstrap();
   const syncEnabled = status === "online";
 
   // Bandeau d'avertissement immédiat quand une sauvegarde échoue en
@@ -362,6 +367,14 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     syncEnabled,
     reportSyncError
   );
+  /** Stratégies de trading définies par l'élève (module Setups) — voir `Setup` dans `src/types.ts`. */
+  const [syncedSetups, setSyncedSetups] = useSyncedState<Setup[]>(
+    "horizon_student_setups",
+    setups,
+    (v) => api.saveCollection("setups", v),
+    syncEnabled,
+    reportSyncError
+  );
   /**
    * Collection réelle, ajoutée pour porter les alertes de non-respect du
    * plan de trading (voir `src/lib/planCompliance.ts`) — avant, un élève
@@ -406,6 +419,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     setSyncedBadges(resolveStudentValue(badges, "horizon_student_badges"));
     setSyncedNotifications(resolveStudentValue(notifications, "horizon_student_notifications"));
     setSyncedQuizResults(resolveStudentValue(quizResults, "horizon_student_quiz_results"));
+    setSyncedSetups(resolveStudentValue(setups, "horizon_student_setups"));
     setSyncedTradingPlan(
       resolveStudentValue(tradingPlan ?? EMPTY_TRADING_PLAN, getTradingPlanStorageKey(student?.email))
     );
@@ -540,6 +554,18 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
 
   const handleDeleteTrade = (id: string) => {
     setSyncedTrades((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const handleAddSetup = (setup: Setup) => {
+    setSyncedSetups((prev) => [setup, ...prev]);
+  };
+
+  const handleUpdateSetup = (setup: Setup) => {
+    setSyncedSetups((prev) => prev.map((s) => (s.id === setup.id ? setup : s)));
+  };
+
+  const handleDeleteSetup = (id: string) => {
+    setSyncedSetups((prev) => prev.filter((s) => s.id !== id));
   };
 
   const handleAddAccount = (account: TradingAccount) => {
@@ -718,6 +744,16 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
                 onDeleteTrade={handleDeleteTrade}
                 onSendTradeToCoach={() => undefined}
                 hideAiAndCoachActions
+                setups={syncedSetups}
+              />
+            )}
+
+            {activeTab === "setups" && (
+              <SetupManagement
+                setups={syncedSetups}
+                onAddSetup={handleAddSetup}
+                onUpdateSetup={handleUpdateSetup}
+                onDeleteSetup={handleDeleteSetup}
               />
             )}
 
@@ -784,6 +820,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         storageKey={studentProfile.email}
         plan={syncedTradingPlan}
         onChange={setSyncedTradingPlan}
+        setups={syncedSetups}
       />
       <NotificationModal
         isOpen={isNotificationsModalOpen}
@@ -1008,6 +1045,14 @@ function AcademyApp({
     reportSyncError
   );
 
+  const [setups, setSetups] = useSyncedState<Setup[]>(
+    "horizon_setups",
+    seed(server?.setups, "horizon_setups", initialSetups),
+    (v) => api.saveCollection("setups", v),
+    syncEnabled,
+    reportSyncError
+  );
+
   // Pre-filled Messaging Navigation state
   const [prefilledLessonTitle, setPrefilledLessonTitle] = useState<
     string | undefined
@@ -1188,6 +1233,18 @@ function AcademyApp({
 
   const handleSaveProfile = (updatedProfile: StudentProfile) => {
     setStudent(updatedProfile);
+  };
+
+  const handleAddSetup = (setup: Setup) => {
+    setSetups((prev) => [setup, ...prev]);
+  };
+
+  const handleUpdateSetup = (setup: Setup) => {
+    setSetups((prev) => prev.map((s) => (s.id === setup.id ? setup : s)));
+  };
+
+  const handleDeleteSetup = (id: string) => {
+    setSetups((prev) => prev.filter((s) => s.id !== id));
   };
 
   const handleClaimBadge = (badgeId: string) => {
@@ -1509,6 +1566,16 @@ function AcademyApp({
               onOpenCalculator={() => setIsCalculatorOpen(true)}
               prefillDraft={journalDraft}
               onPrefillConsumed={() => setJournalDraft(null)}
+              setups={setups}
+            />
+          )}
+
+          {activeTab === "setups" && (
+            <SetupManagement
+              setups={setups}
+              onAddSetup={handleAddSetup}
+              onUpdateSetup={handleUpdateSetup}
+              onDeleteSetup={handleDeleteSetup}
             />
           )}
 
@@ -1614,6 +1681,7 @@ function AcademyApp({
       <TradingPlanEditorModal
         isOpen={isTradingPlanOpen}
         onClose={() => setIsTradingPlanOpen(false)}
+        setups={setups}
       />
 
       {/* Mindset & Tilt Radar Modal */}

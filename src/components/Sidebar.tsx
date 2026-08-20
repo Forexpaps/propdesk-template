@@ -26,6 +26,7 @@ import {
   Calendar,
   LogOut,
   ClipboardList,
+  Target,
 } from "lucide-react";
 import { StudentProfile } from "../types";
 
@@ -52,6 +53,7 @@ export const ALL_TABS = [
   "messaging",
   "analytics",
   "macro",
+  "setups",
 ] as const;
 
 export type TabType = (typeof ALL_TABS)[number];
@@ -84,6 +86,7 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
   "mindset",
   "calendar",
   "tradingPlan",
+  "setups",
 ] as const;
 
 export type SidebarItemKey = (typeof SIDEBAR_TOGGLEABLE_KEYS)[number];
@@ -106,6 +109,7 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   mindset: null,
   calendar: "macro",
   tradingPlan: null,
+  setups: "setups",
 };
 
 /**
@@ -203,8 +207,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
    * « Badges & paliers » ne figure pas ici : les badges restent accessibles
    * par le profil (UserProfileModal, onglet Badges). « Calendrier » n'y
    * figure plus non plus : devenu l'onglet « Macro », ce n'est plus une
-   * modale. « Audit Setup » retiré entièrement sur demande explicite
-   * antérieure (module Setup & Confluence Matrix).
+   * modale. « Audit Setup » (scoring de confluences SMC codé en dur) retiré
+   * entièrement sur demande explicite antérieure — « Setups » ci-dessous est
+   * un module distinct (fiches de stratégies libres, sans scoring), ne pas
+   * confondre les deux.
    */
   const suiviItems: SidebarEntry[] = [
     { key: "journal", id: "journal", label: "Journal de trading", icon: BookMarked },
@@ -214,6 +220,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ...(student.isAdmin
       ? [{ key: "students" as const, id: "students" as const, label: "Suivi des Élèves", icon: UserCheck }]
       : []),
+    { key: "setups", id: "setups", label: "Setups", icon: Target },
     { key: "tradingPlan", id: null, label: "Plan de trading", icon: ClipboardList, onOpen: onOpenTradingPlan },
     { key: "academy", id: "academy", label: "Module vidéo", icon: BookOpen, badge: `${courseCompletionPercentage}%` },
     { key: "messaging", id: "messaging", label: "Messagerie Coach", icon: MessageSquare, badge: totalUnreadMessages > 0 ? "1" : null },

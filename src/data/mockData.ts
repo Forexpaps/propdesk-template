@@ -1,4 +1,4 @@
-import { Module, Trade, CoachMessage, StudentProfile, TradingAccount, TraderBadge, EnrolledStudent, AppNotification } from "../types";
+import { Module, Trade, CoachMessage, StudentProfile, TradingAccount, TraderBadge, EnrolledStudent, AppNotification, Setup } from "../types";
 
 /**
  * Définitions des badges — catalogue de ce qu'il est possible de débloquer.
@@ -173,3 +173,4 @@ export const initialTradingAccounts: TradingAccount[] = [];
 export const initialEnrolledStudents: EnrolledStudent[] = [];
 
 export const initialNotifications: AppNotification[] = [];
+export const initialSetups: Setup[] = [];

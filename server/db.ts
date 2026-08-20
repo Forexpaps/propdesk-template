@@ -58,6 +58,13 @@ db.exec(`
     payload TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS setups (
+    id       TEXT PRIMARY KEY,
+    user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    payload  TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS trading_accounts (
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

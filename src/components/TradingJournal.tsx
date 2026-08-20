@@ -27,6 +27,7 @@ import {
   TradingAccount,
   PnlUnit,
   TradeMistake,
+  Setup,
 } from "../types";
 import { formatCurrency } from "../lib/format";
 import { resizeChartScreenshot } from "../lib/image";
@@ -96,6 +97,14 @@ interface TradingJournalProps {
   hideAiAndCoachActions?: boolean;
   /** Mode lecture seule : masque les boutons d'ajout, édition, suppression. */
   readOnly?: boolean;
+  /**
+   * Stratégies définies par l'élève (module Setups, voir `SetupManagement.tsx`)
+   * — remplace l'ancienne liste de 6 stratégies codées en dur comme source du
+   * champ « Stratégie / Setup » du formulaire de trade. `Trade.strategy` reste
+   * une chaîne libre (le nom du setup) : un setup renommé ou supprimé après
+   * coup ne modifie jamais les trades déjà enregistrés.
+   */
+  setups?: Setup[];
 }
 
 export const TradingJournal: React.FC<TradingJournalProps> = ({
@@ -110,6 +119,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   onPrefillConsumed,
   hideAiAndCoachActions = false,
   readOnly = false,
+  setups = [],
 }) => {
   const [searchPair, setSearchPair] = useState("");
   const [selectedMarket, setSelectedMarket] = useState<string>("Tous");
@@ -229,7 +239,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     takeProfit: 1.0910,
     exitPrice: 1.0910,
     lotSize: 1.0,
-    strategy: "SMC Orderblock",
+    strategy: "",
     emotion: "Disciplined" as EmotionState,
     mistakes: [] as TradeMistake[],
     notes: "Validation FVG H1 + Chasse de liquidité.",
@@ -253,7 +263,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     takeProfit: 1.091,
     exitPrice: 1.091,
     lotSize: 1.0,
-    strategy: "SMC Orderblock",
+    strategy: "",
     emotion: "Disciplined" as EmotionState,
     mistakes: [] as TradeMistake[],
     notes: "",
@@ -1083,17 +1093,24 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Stratégie / Setup</label>
-                  <select
-                    value={formData.strategy}
-                    onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
-                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
-                  >
-                    <option value="SMC Orderblock">SMC Orderblock</option>
-                    <option value="Breakout FVG">Breakout Fair Value Gap</option>
-                    <option value="Liquidity Sweep">Liquidity Sweep (BSL/SSL)</option>
-                    <option value="Trend Following">Trend Following</option>
-                    <option value="Reversal CHoCH">Reversal CHoCH</option>
-                  </select>
+                  {setups.length > 0 ? (
+                    <select
+                      value={formData.strategy}
+                      onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
+                      className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
+                    >
+                      <option value="">— Choisis un setup —</option>
+                      {setups.map((setup) => (
+                        <option key={setup.id} value={setup.name}>
+                          {setup.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 bg-[#0D1110] border border-dashed border-[#1B2320] rounded-lg p-2.5">
+                      Aucun setup enregistré — ajoutes-en un dans l'onglet « Setups ».
+                    </p>
+                  )}
                 </div>
               </div>
 

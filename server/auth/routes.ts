@@ -890,6 +890,7 @@ staffRouter.get(
         trades: listCollection("trades", account.userId),
         modules: listCollection("modules", account.userId),
         messages: listCollection("messages", account.userId),
+        setups: listCollection("setups", account.userId),
       },
       // Lecture seule : aucune route d'écriture n'est exposée au staff pour
       // le plan de trading, seule `PUT /auth/trading-plan` (élève, sur sa

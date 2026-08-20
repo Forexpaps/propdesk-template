@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type ServerState } from "../lib/api";
 import { clearPending, listPending, markPending, replayPending } from "../lib/pendingChanges";
-import type { Trade, TradingAccount, Module, CoachMessage, ModuleQuizResult, StudentProfile, TraderBadge, Coach, AppNotification, TradingPlanData } from "../types";
+import type { Trade, TradingAccount, Module, CoachMessage, ModuleQuizResult, StudentProfile, TraderBadge, Coach, AppNotification, TradingPlanData, Setup } from "../types";
 
 export type SyncStatus = "loading" | "online" | "offline";
 
@@ -17,6 +17,7 @@ const LEGACY_KEYS = {
     enrolledStudents: "horizon_enrolled_students",
     badges: "horizon_badges",
     modules: "horizon_modules",
+    setups: "horizon_setups",
   },
 } as const;
 
@@ -191,6 +192,7 @@ export function useStudentBootstrap() {
   const [modules, setModules] = useState<Module[]>([]);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [badges, setBadges] = useState<TraderBadge[]>([]);
+  const [setups, setSetups] = useState<Setup[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [quizResults, setQuizResults] = useState<Record<string, ModuleQuizResult>>({});
   const [student, setStudent] = useState<StudentProfile | null>(null);
@@ -213,6 +215,7 @@ export function useStudentBootstrap() {
           setModules(serverState.collections.modules ?? []);
           setMessages(serverState.collections.messages ?? []);
           setBadges(serverState.collections.badges ?? []);
+          setSetups(serverState.collections.setups ?? []);
           setNotifications(serverState.collections.notifications ?? []);
           setQuizResults(serverState.quizResults ?? {});
           setStudent((serverState.student as StudentProfile | null) ?? null);
@@ -231,7 +234,7 @@ export function useStudentBootstrap() {
     };
   }, []);
 
-  return { status, trades, accounts, modules, messages, badges, notifications, quizResults, student, setStudent, coaches, tradingPlan };
+  return { status, trades, accounts, modules, messages, badges, setups, notifications, quizResults, student, setStudent, coaches, tradingPlan };
 }
 
 /**
