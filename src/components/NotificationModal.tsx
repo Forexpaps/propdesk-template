@@ -82,14 +82,13 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                Centre d'Alertes SMC
+                Centre d'alerte
                 {unreadCount > 0 && (
                   <span className="px-2 py-0.5 rounded-full bg-[#00E676]/10 text-[#00E676] text-[10px] font-mono border border-[#00E676]/20">
                     {unreadCount} non lue{unreadCount > 1 ? "s" : ""}
                   </span>
                 )}
               </h3>
-              <p className="text-[11px] text-slate-400">Signaux coach, jalons académie & risques</p>
             </div>
           </div>
 
@@ -228,7 +227,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
 
         {/* Footer info */}
         <div className="p-3 bg-[#0D1110] border-t border-[#1B2320] text-[11px] text-slate-400 flex items-center justify-between">
-          <span>Horizon SMC Push Server: <strong className="text-[#00E676] font-mono">Connecté (Live)</strong></span>
+          <span>PropDesk Push Server: <strong className="text-[#00E676] font-mono">Connecté (Live)</strong></span>
           <span className="font-mono text-[10px] text-slate-500">v2.4.0</span>
         </div>
       </div>
