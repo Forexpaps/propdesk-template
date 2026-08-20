@@ -24,7 +24,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   onNavigateToTab,
   onAddTestNotification,
 }) => {
-  const [filter, setFilter] = useState<"all" | "unread" | "signal" | "risk" | "academy">("all");
+  const [filter, setFilter] = useState<"all" | "unread" | "risk" | "academy">("all");
   const [soundEnabled, setSoundEnabled] = usePersistentState<boolean>(
     "horizon_sound_alerts",
     true
@@ -36,7 +36,6 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
 
   const filteredNotifications = notifications.filter((n) => {
     if (filter === "unread") return !n.read;
-    if (filter === "signal") return n.type === "signal";
     if (filter === "risk") return n.type === "risk" || n.type === "trade";
     if (filter === "academy") return n.type === "academy";
     return true;
@@ -133,14 +132,6 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
               }`}
             >
               Non Lues ({unreadCount})
-            </button>
-            <button
-              onClick={() => setFilter("signal")}
-              className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition-colors ${
-                filter === "signal" ? "bg-[#00E676] text-slate-950 font-bold" : "bg-[#1B2320] text-slate-400 hover:text-white"
-              }`}
-            >
-              Signaux
             </button>
             <button
               onClick={() => setFilter("risk")}

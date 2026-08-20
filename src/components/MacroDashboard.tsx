@@ -22,6 +22,17 @@ const IMPACT_DOT: Record<string, string> = {
   Holiday: "bg-slate-700",
 };
 
+/**
+ * Filtre par impact — "Fort"/"Moyen"/"Faible" seulement, "Holiday" (jour
+ * férié, pas un vrai niveau d'impact) reste toujours affiché quel que soit
+ * le filtre actif.
+ */
+const IMPACT_FILTER_OPTIONS: { id: "High" | "Medium" | "Low"; label: string; activeClasses: string }[] = [
+  { id: "Low", label: "Faible", activeClasses: "bg-slate-500/15 border-slate-400/40 text-slate-300" },
+  { id: "Medium", label: "Moyen", activeClasses: "bg-amber-500/15 border-amber-500/40 text-amber-400" },
+  { id: "High", label: "Fort", activeClasses: "bg-rose-500/15 border-rose-500/40 text-rose-400" },
+];
+
 const MARKET_REFRESH_MS = 60_000;
 const CALENDAR_REFRESH_MS = 10 * 60_000;
 
@@ -109,6 +120,9 @@ export const MacroDashboard: React.FC = () => {
   const [marketError, setMarketError] = useState<string | null>(null);
   const [rawEvents, setRawEvents] = useState<EconomicCalendarEvent[] | null>(null);
   const [calendarError, setCalendarError] = useState<string | null>(null);
+  // Exclusif, façon boutons radio : un seul niveau d'impact actif à la fois
+  // (ou "Tous"), pas un ensemble de cases à cocher indépendantes.
+  const [selectedImpact, setSelectedImpact] = useState<"All" | "High" | "Medium" | "Low">("All");
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30_000);
@@ -176,6 +190,10 @@ export const MacroDashboard: React.FC = () => {
   }, [rawEvents, now]);
 
   const highImpactCount = events.filter((e) => e.impact === "High").length;
+  // "Holiday" n'est pas un niveau d'impact filtrable : toujours affiché.
+  const filteredEvents = events.filter(
+    (e) => e.impact === "Holiday" || selectedImpact === "All" || e.impact === selectedImpact
+  );
   const riskScore = quotes ? computeRiskSentiment(quotes) : 50;
   const riskLabel = riskScore >= 60 ? "Risk-On" : riskScore <= 40 ? "Risk-Off" : "Neutre";
 
@@ -277,6 +295,40 @@ export const MacroDashboard: React.FC = () => {
           )}
         </div>
 
+        {rawEvents && events.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap text-xs font-medium">
+            <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mr-1">Impact</span>
+            {IMPACT_FILTER_OPTIONS.map((opt) => {
+              const isActive = selectedImpact === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setSelectedImpact(opt.id)}
+                  className={`px-3 py-1.5 rounded-xl border transition-all whitespace-nowrap ${
+                    isActive
+                      ? `${opt.activeClasses} font-bold`
+                      : "bg-[#0D1110] border-[#1B2320] text-slate-500 hover:text-white"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => setSelectedImpact("All")}
+              className={`px-3 py-1.5 rounded-xl border transition-all whitespace-nowrap ${
+                selectedImpact === "All"
+                  ? "bg-[#00E676]/15 border-[#00E676]/40 text-[#00E676] font-bold"
+                  : "bg-[#0D1110] border-[#1B2320] text-slate-500 hover:text-white"
+              }`}
+            >
+              Tous
+            </button>
+          </div>
+        )}
+
         {!rawEvents && !calendarError && (
           <div className="flex items-center gap-2 text-xs text-slate-500 py-6 justify-center">
             <Loader2 className="w-4 h-4 animate-spin" /> Chargement du calendrier…
@@ -292,9 +344,14 @@ export const MacroDashboard: React.FC = () => {
             Aucune annonce prévue aujourd'hui.
           </div>
         )}
-        {rawEvents && events.length > 0 && (
+        {rawEvents && events.length > 0 && filteredEvents.length === 0 && (
+          <div className="p-4 text-center text-xs text-slate-500 italic">
+            Aucune annonce ne correspond aux filtres d'impact sélectionnés.
+          </div>
+        )}
+        {rawEvents && filteredEvents.length > 0 && (
           <div className="border border-[#1B2320] rounded-xl divide-y divide-[#1B2320] overflow-hidden">
-            {events.map((item) => {
+            {filteredEvents.map((item) => {
               const isImminent = item.countdown !== null && item.minutesUntil <= 15;
               return (
                 <div key={item.id} className="flex items-start gap-4 p-3.5">
