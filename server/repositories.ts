@@ -137,10 +137,39 @@ export function replaceCollection<T extends WithId>(
 
     if (staleIds.length > 0) {
       const placeholdersForDelete = staleIds.map(() => "?").join(", ");
+
+      // Effacement RGPD (Article 17) : supprimer une fiche élève ne doit pas
+      // laisser son bureau personnel (trades, plan de trading, setups,
+      // progression, badges...) orphelin en base. `student_accounts.
+      // enrolled_student_id` cascade déjà (ON DELETE CASCADE) quand la ligne
+      // `enrolled_students` disparaît juste en dessous — mais cascade
+      // seulement jusqu'à `student_accounts`, jamais jusqu'à `users`, qui n'a
+      // aucune FK entrante depuis cette table. Il faut donc lire les
+      // `user_id` concernés AVANT la suppression (sans quoi la ligne
+      // `student_accounts` qui les portait aura déjà disparu), puis
+      // supprimer ces lignes `users` explicitement — leur propre `ON DELETE
+      // CASCADE` (voir server/db.ts) entraîne alors trades/trading_accounts/
+      // coach_messages/notifications/badges/modules/setups/trading_plans/
+      // quiz_results dans la foulée, en une seule transaction.
+      let orphanedUserIds: string[] = [];
+      if (name === "enrolledStudents") {
+        const rows = db
+          .prepare(
+            `SELECT user_id FROM student_accounts WHERE enrolled_student_id IN (${placeholdersForDelete})`
+          )
+          .all(...staleIds) as { user_id: string }[];
+        orphanedUserIds = rows.map((r) => r.user_id);
+      }
+
       db.prepare(`DELETE FROM ${table} WHERE user_id = ? AND id IN (${placeholdersForDelete})`).run(
         userId,
         ...staleIds
       );
+
+      if (orphanedUserIds.length > 0) {
+        const placeholdersForUsers = orphanedUserIds.map(() => "?").join(", ");
+        db.prepare(`DELETE FROM users WHERE id IN (${placeholdersForUsers})`).run(...orphanedUserIds);
+      }
     }
 
     rows.forEach((item, index) => {
