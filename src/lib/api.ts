@@ -459,4 +459,14 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ avatar }),
     }),
+
+  /**
+   * Export RGPD (Article 20) des données personnelles de l'élève connecté —
+   * profil, plan de trading, progression modules, badges obtenus. Voir
+   * `server/auth/exportData.ts`. Distinct de `fetchState`/`restoreState`
+   * (sauvegarde technique complète de tout le bureau) : celui-ci est le
+   * sous-ensemble scoping RGPD, présenté et nommé comme tel côté UI.
+   */
+  exportStudentData: () =>
+    request<Record<string, unknown>>("/api/auth/export"),
 };
