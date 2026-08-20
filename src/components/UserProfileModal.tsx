@@ -29,6 +29,7 @@ import { api } from "../lib/api";
 import { confirmDialog } from "../lib/confirmDialog";
 import { ChangeOwnPasswordModal } from "./ChangeOwnPasswordModal";
 import { TwoFactorSetupModal } from "./TwoFactorSetupModal";
+import { ExportDataButton } from "./ExportDataButton";
 
 const SectionHeader: React.FC<{ children?: React.ReactNode; color?: string }> = ({
   children,
@@ -186,7 +187,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setEmail(student.email);
     setAvatar(student.avatar);
     setLevel(student.level);
-    setRole(student.role || (student.isAdmin ? "Fondateur / Head Coach" : "Élève Premium"));
+    setRole(student.role || (student.isAdmin ? "Fondateur / Head Coach" : student.level));
     setPhone(student.phone || "+33 6 12 34 56 78");
     setBio(student.bio || "");
     setPreferredPairs(student.preferredPairs || "EUR/USD, XAU/USD, NAS100");
@@ -728,6 +729,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </p>
               )}
             </div>
+
+            {/* Export RGPD (Article 20) — réservé à l'élève, sur sa propre
+                fiche : ce sont ses données. Distinct du bloc générique
+                juste au-dessus (sauvegarde technique complète). */}
+            {avatarOnly && (
+              <ExportDataButton className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320]" />
+            )}
 
             {avatarOnly && (
               <p className="text-[11px] text-slate-500 -mt-1">

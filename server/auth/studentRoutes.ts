@@ -25,6 +25,7 @@ import {
   validateStudentSession,
 } from "./studentSessions";
 import { requireStudentKind } from "./middleware";
+import { addStudentExportRoute } from "./exportData";
 
 /** Routes accessibles sans session : `/student-me`, `/student-login`, `/student-logout`. */
 export const studentAuthRouter = Router();
@@ -328,3 +329,6 @@ studentProtectedRouter.put(
     res.status(204).end();
   })
 );
+
+// Export des données personnelles (Article 20 RGPD) — voir exportData.ts.
+addStudentExportRoute(studentProtectedRouter);
