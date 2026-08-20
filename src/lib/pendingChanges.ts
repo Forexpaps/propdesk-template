@@ -47,6 +47,7 @@ const LABELS: Record<string, string> = {
   horizon_student_modules: "Modules vidéo",
   horizon_student_messages: "Messagerie",
   horizon_student_badges: "Badges",
+  horizon_student_notifications: "Notifications",
   horizon_student_quiz_results: "Résultats de quiz",
 };
 
@@ -64,6 +65,7 @@ const COLLECTION_BY_KEY: Record<string, CollectionName> = {
   horizon_student_modules: "modules",
   horizon_student_messages: "messages",
   horizon_student_badges: "badges",
+  horizon_student_notifications: "notifications",
 };
 
 function read(): string[] {

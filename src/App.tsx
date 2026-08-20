@@ -19,6 +19,7 @@ import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
 import { LegalNoticeModal } from "./components/LegalNoticeModal";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
 import { ConfirmDialogHost, confirmDialog } from "./lib/confirmDialog";
+import { loadTradingPlan, checkPlanViolations, upsertPlanAlert } from "./lib/planCompliance";
 import { computeBadgeProgress } from "./lib/badges";
 import { listPending } from "./lib/pendingChanges";
 
@@ -305,7 +306,7 @@ function resolveStudentValue<T>(serverValue: T, localKey: string): T {
  * périmètre de l'accès élève.
  */
 function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
-  const { status, trades, accounts, modules, messages, badges, quizResults, student, setStudent, coaches } = useStudentBootstrap();
+  const { status, trades, accounts, modules, messages, badges, notifications, quizResults, student, setStudent, coaches } = useStudentBootstrap();
   const syncEnabled = status === "online";
 
   // Bandeau d'avertissement immédiat quand une sauvegarde échoue en
@@ -360,6 +361,22 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     syncEnabled,
     reportSyncError
   );
+  /**
+   * Collection réelle, ajoutée pour porter les alertes de non-respect du
+   * plan de trading (voir `src/lib/planCompliance.ts`) — avant, un élève
+   * n'avait aucune notification persistée, seulement des notifications
+   * DÉRIVÉES des messages/badges (voir `messageNotifications`/
+   * `badgeNotifications` plus bas), sans mécanisme pour en pousser une
+   * arbitraire. `"notifications"` a été ajoutée à
+   * `STUDENT_ALLOWED_COLLECTIONS` côté serveur pour permettre ceci.
+   */
+  const [syncedNotifications, setSyncedNotifications] = useSyncedState<AppNotification[]>(
+    "horizon_student_notifications",
+    notifications,
+    (v) => api.saveCollection("notifications", v),
+    syncEnabled,
+    reportSyncError
+  );
 
   // `useSyncedState` initialise sa valeur une seule fois, au montage — tant
   // que le chargement serveur n'est pas revenu, on affiche un état vide plutôt
@@ -371,6 +388,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     setSyncedModules(resolveStudentValue(modules, "horizon_student_modules"));
     setSyncedMessages(resolveStudentValue(messages, "horizon_student_messages"));
     setSyncedBadges(resolveStudentValue(badges, "horizon_student_badges"));
+    setSyncedNotifications(resolveStudentValue(notifications, "horizon_student_notifications"));
     setSyncedQuizResults(resolveStudentValue(quizResults, "horizon_student_quiz_results"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
@@ -404,9 +422,10 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     []
   );
 
-  // Notifications élève : messages du coach + débloquages de badge. Dérivées
-  // à chaque rendu depuis des données déjà synchronisées — pas de collection
-  // `notifications` dédiée côté élève (hors périmètre de l'accès élève).
+  // Notifications élève : messages du coach + débloquages de badge (dérivées
+  // à chaque rendu depuis des données déjà synchronisées) + alertes de
+  // non-respect du plan de trading (`syncedNotifications`, collection réelle
+  // depuis cette période — voir plus haut).
   const messageNotifications: AppNotification[] = syncedMessages
     .filter((m) => m.sender === "coach")
     .map((m) => ({
@@ -428,14 +447,17 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
       type: "academy",
       read: readBadgeNotificationIds.includes(b.id),
     }));
-  const studentNotifications: AppNotification[] = [...messageNotifications, ...badgeNotifications].sort(
-    (a, b) => (a.time < b.time ? 1 : a.time > b.time ? -1 : 0)
-  );
+  const studentNotifications: AppNotification[] = [
+    ...messageNotifications,
+    ...badgeNotifications,
+    ...syncedNotifications,
+  ].sort((a, b) => (a.time < b.time ? 1 : a.time > b.time ? -1 : 0));
 
   /**
-   * Marque une notification comme lue. Aucune collection dédiée à ce statut
-   * côté élève : un message se marque via son propre champ `status`
-   * (persisté, déjà synchronisé), un badge via le registre local ci-dessus.
+   * Marque une notification comme lue. Message/badge : statut dérivé
+   * (champ `status`/registre local, voir ci-dessus). Toute autre id (ex.
+   * `plan-alert-...`) : bascule `read` dans la vraie collection
+   * `syncedNotifications`.
    */
   const handleMarkStudentNotificationAsRead = (id: string) => {
     if (id.startsWith("msg-notif-")) {
@@ -444,12 +466,20 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     } else if (id.startsWith("badge-notif-")) {
       const badgeId = id.slice("badge-notif-".length);
       setReadBadgeNotificationIds((prev) => (prev.includes(badgeId) ? prev : [...prev, badgeId]));
+    } else {
+      setSyncedNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
     }
   };
 
   const handleMarkAllStudentNotificationsAsRead = () => {
     setSyncedMessages((prev) => prev.map((m) => (m.sender === "coach" ? { ...m, status: "read" } : m)));
     setReadBadgeNotificationIds(liveBadges.filter((b) => b.unlocked).map((b) => b.id));
+    setSyncedNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  /** N'efface que la vraie collection — messages/badges restent dérivés de leurs propres données, rien à "effacer" là-bas. */
+  const handleClearStudentNotifications = () => {
+    setSyncedNotifications([]);
   };
 
   const [activeTab, setActiveTab] = useState<TabType>("journal");
@@ -466,10 +496,27 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const handleAddTrade = (newTrade: Omit<Trade, "id">) => {
     const tradeWithId: Trade = { ...newTrade, id: `trd-${Date.now()}` };
     setSyncedTrades((prev) => [tradeWithId, ...prev]);
+    applyPlanCompliance(tradeWithId, [tradeWithId, ...syncedTrades]);
   };
 
   const handleUpdateTrade = (updated: Trade) => {
     setSyncedTrades((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    applyPlanCompliance(updated, syncedTrades.map((t) => (t.id === updated.id ? updated : t)));
+  };
+
+  /**
+   * Vérifie le respect du plan de trading pour un trade donné et upsert/
+   * retire l'alerte correspondante — voir `src/lib/planCompliance.ts`.
+   * Plan namespacé par email élève (`storageKey`, même motif que
+   * `MindsetJournalModal`) : nécessaire, l'ancien plan côté élève était
+   * partagé sans distinction entre comptes sur un même poste.
+   */
+  const applyPlanCompliance = (trade: Trade, allTrades: Trade[]) => {
+    const plan = loadTradingPlan(studentProfile.email);
+    if (!plan) return;
+    const sameDayTrades = allTrades.filter((t) => t.date === trade.date);
+    const reasons = checkPlanViolations(trade, sameDayTrades, plan, studentProfile.startingCapital);
+    setSyncedNotifications((prev) => upsertPlanAlert(prev, trade, reasons));
   };
 
   const handleDeleteTrade = (id: string) => {
@@ -712,17 +759,21 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         onClose={() => setIsMindsetModalOpen(false)}
         storageKey={studentProfile.email}
       />
-      <TradingPlanEditorModal isOpen={isTradingPlanOpen} onClose={() => setIsTradingPlanOpen(false)} />
+      <TradingPlanEditorModal
+        isOpen={isTradingPlanOpen}
+        onClose={() => setIsTradingPlanOpen(false)}
+        storageKey={studentProfile.email}
+      />
       <NotificationModal
         isOpen={isNotificationsModalOpen}
         onClose={() => setIsNotificationsModalOpen(false)}
         notifications={studentNotifications}
         onMarkAsRead={handleMarkStudentNotificationAsRead}
         onMarkAllAsRead={handleMarkAllStudentNotificationsAsRead}
-        // Pas de suppression réelle possible : ces notifications sont dérivées
-        // des messages/badges, pas une collection à part — « tout effacer »
-        // revient donc à tout marquer lu, seule action équivalente sensée ici.
-        onClearAll={handleMarkAllStudentNotificationsAsRead}
+        // Messages/badges restent dérivés (rien à "effacer" là), mais les
+        // alertes de plan (`syncedNotifications`) sont une vraie collection
+        // depuis cette période — "tout effacer" les vide réellement.
+        onClearAll={handleClearStudentNotifications}
         onNavigateToTab={(tab) => {
           if (isTabType(tab)) setActiveTab(tab);
         }}
@@ -1200,10 +1251,26 @@ function AcademyApp({
       id: `trd-${Date.now()}`,
     };
     setTrades((prev) => [tradeWithId, ...prev]);
+    applyPlanCompliance(tradeWithId, [tradeWithId, ...trades]);
   };
 
   const handleUpdateTrade = (updated: Trade) => {
     setTrades((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    applyPlanCompliance(updated, trades.map((t) => (t.id === updated.id ? updated : t)));
+  };
+
+  /**
+   * Vérifie le respect du plan de trading pour un trade donné (ajout ou
+   * modification) et upsert/retire l'alerte correspondante — voir
+   * `src/lib/planCompliance.ts`. Clé de plan partagée (bureau staff), pas de
+   * `storageKey`.
+   */
+  const applyPlanCompliance = (trade: Trade, allTrades: Trade[]) => {
+    const plan = loadTradingPlan();
+    if (!plan) return;
+    const sameDayTrades = allTrades.filter((t) => t.date === trade.date);
+    const reasons = checkPlanViolations(trade, sameDayTrades, plan, student.startingCapital);
+    setNotifications((prev) => upsertPlanAlert(prev, trade, reasons));
   };
 
   const handleDeleteTrade = (id: string) => {

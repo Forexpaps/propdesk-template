@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type ServerState } from "../lib/api";
 import { clearPending, listPending, markPending, replayPending } from "../lib/pendingChanges";
-import type { Trade, TradingAccount, Module, CoachMessage, ModuleQuizResult, StudentProfile, TraderBadge, Coach } from "../types";
+import type { Trade, TradingAccount, Module, CoachMessage, ModuleQuizResult, StudentProfile, TraderBadge, Coach, AppNotification } from "../types";
 
 export type SyncStatus = "loading" | "online" | "offline";
 
@@ -191,6 +191,7 @@ export function useStudentBootstrap() {
   const [modules, setModules] = useState<Module[]>([]);
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [badges, setBadges] = useState<TraderBadge[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [quizResults, setQuizResults] = useState<Record<string, ModuleQuizResult>>({});
   const [student, setStudent] = useState<StudentProfile | null>(null);
   const [coaches, setCoaches] = useState<Coach[]>([]);
@@ -211,6 +212,7 @@ export function useStudentBootstrap() {
           setModules(serverState.collections.modules ?? []);
           setMessages(serverState.collections.messages ?? []);
           setBadges(serverState.collections.badges ?? []);
+          setNotifications(serverState.collections.notifications ?? []);
           setQuizResults(serverState.quizResults ?? {});
           setStudent((serverState.student as StudentProfile | null) ?? null);
           setCoaches(serverState.coaches ?? []);
@@ -227,7 +229,7 @@ export function useStudentBootstrap() {
     };
   }, []);
 
-  return { status, trades, accounts, modules, messages, badges, quizResults, student, setStudent, coaches };
+  return { status, trades, accounts, modules, messages, badges, notifications, quizResults, student, setStudent, coaches };
 }
 
 /**
