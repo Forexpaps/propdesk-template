@@ -117,6 +117,7 @@ import { usePersistentState } from "./hooks/usePersistentState";
 import { useBootstrap, useSyncedState, useStudentBootstrap } from "./hooks/useServerSync";
 import { useAuth } from "./hooks/useAuth";
 import { LoginScreen } from "./components/auth/LoginScreen";
+import { TwoFactorVerifyScreen } from "./components/auth/TwoFactorVerifyScreen";
 import { SetupScreen } from "./components/auth/SetupScreen";
 import { ChangePasswordScreen } from "./components/auth/ChangePasswordScreen";
 import { ResetPasswordScreen } from "./components/auth/ResetPasswordScreen";
@@ -155,6 +156,9 @@ export default function App() {
     studentUser,
     expired,
     login,
+    verifyTwoFactor,
+    verifyTwoFactorRecovery,
+    cancelTwoFactor,
     setup,
     changePassword,
     studentLogin,
@@ -248,6 +252,16 @@ export default function App() {
             </button>
           </>
         }
+      />
+    );
+  }
+
+  if (status === "2fa-required") {
+    return (
+      <TwoFactorVerifyScreen
+        onVerifyCode={verifyTwoFactor}
+        onVerifyRecoveryCode={verifyTwoFactorRecovery}
+        onCancel={cancelTwoFactor}
       />
     );
   }

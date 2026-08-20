@@ -263,6 +263,36 @@ export const setStudentPasswordSchema = z
   })
   .strict();
 
+/** Code TOTP à 6 chiffres — confirmation de configuration 2FA (`POST /auth/2fa/enable`). */
+export const totpCodeSchema = z
+  .object({
+    code: z.string().regex(/^\d{6}$/, "Code à 6 chiffres requis."),
+  })
+  .strict();
+
+/**
+ * Étape 2 de connexion (2FA), après un mot de passe déjà vérifié — voir
+ * `POST /auth/login/2fa`. `code` (TOTP) et `recoveryCode` sont mutuellement
+ * exclusifs, exactement l'un des deux doit être fourni.
+ */
+export const twoFactorLoginSchema = z
+  .object({
+    pendingToken: z.string().min(1).max(200),
+    code: z.string().regex(/^\d{6}$/).optional(),
+    recoveryCode: z.string().trim().min(1).max(50).optional(),
+  })
+  .strict()
+  .refine((v) => (v.code ? 1 : 0) + (v.recoveryCode ? 1 : 0) === 1, {
+    message: "Fournis soit un code, soit un code de récupération.",
+  });
+
+/** Désactivation de la 2FA — mot de passe actuel requis, même raisonnement que `changePasswordSchema`. */
+export const disableTotpSchema = z
+  .object({
+    password: z.string().min(1).max(200),
+  })
+  .strict();
+
 /** Changement de l'identifiant (email) de connexion d'un compte élève. */
 export const updateStudentEmailSchema = z
   .object({

@@ -10,6 +10,9 @@ import {
   securityEventsQuerySchema,
   setStudentPasswordSchema,
   updateStudentEmailSchema,
+  totpCodeSchema,
+  twoFactorLoginSchema,
+  disableTotpSchema,
 } from "../schemas";
 import { createRateLimit } from "../middleware/rateLimit";
 import { hashPassword, verifyPassword, needsRehash, verifyAgainstDecoy } from "./password";
@@ -50,6 +53,21 @@ import {
 } from "./studentCredentials";
 import { destroyAllStudentSessions } from "./studentSessions";
 import { requireOwner, requireStaffKind } from "./middleware";
+import { buildOtpauthUri, formatSecretForDisplay } from "./totp";
+import {
+  isTotpEnabled,
+  startTotpSetup,
+  confirmTotpSetup,
+  disableTotp,
+  verifyStaffTotpCode,
+  generateRecoveryCodes,
+  consumeRecoveryCode,
+  countRemainingRecoveryCodes,
+  createTwoFactorChallenge,
+  peekTwoFactorChallenge,
+  consumeTwoFactorChallenge,
+  purgeExpiredTwoFactorChallenges,
+} from "./twoFactor";
 
 /** Routes accessibles sans session : `/me`, `/setup`, `/login`, `/logout`. */
 export const authRouter = Router();
@@ -302,6 +320,20 @@ authRouter.post(
       updatePasswordHash(staff.id, await hashPassword(password));
     }
 
+    // Mot de passe vérifié, mais 2FA active sur ce compte : pas de session
+    // créée ici — seulement un défi temporaire (5 min), à échanger contre
+    // une vraie session via POST /auth/login/2fa. Le mot de passe seul ne
+    // suffit donc plus à authentifier un compte 2FA.
+    if (isTotpEnabled(staff.id)) {
+      const pendingToken = createTwoFactorChallenge(staff.id);
+      recordSecurityEvent({
+        eventType: "login_2fa_required", severity: "info", accountKind: "staff",
+        accountEmail: staff.email, ip: req.ip, detail: "",
+      });
+      res.json({ state: "2fa-required", pendingToken });
+      return;
+    }
+
     // Les sessions existantes sont conservées : plusieurs appareils peuvent
     // rester connectés en parallèle.
     const token = createSession(staff.id, req.headers["user-agent"]);
@@ -309,6 +341,79 @@ authRouter.post(
     recordSecurityEvent({
       eventType: "login_success", severity: "info", accountKind: "staff",
       accountEmail: staff.email, ip: req.ip, detail: "rôle admin",
+    });
+    res.json(authenticatedPayload(staff.id));
+  })
+);
+
+/**
+ * Étape 2 de connexion, uniquement pour un compte avec 2FA active — échange
+ * un défi temporaire (`pendingToken`, obtenu à l'étape 1) contre une vraie
+ * session, après vérification d'un code TOTP ou d'un code de récupération.
+ * Verrouillage PAR COMPTE partagé avec l'étape 1 (même bucket `("staff",
+ * emailLower)`) : un attaquant qui a le mot de passe mais pas le second
+ * facteur épuise le même compteur qu'un mauvais mot de passe.
+ */
+authRouter.post(
+  "/login/2fa",
+  createRateLimit({
+    windowMs: 15 * 60_000,
+    max: 10,
+    message: "Trop de tentatives. Réessaie dans quelques minutes.",
+  }),
+  wrap(async (req, res) => {
+    const parsed = twoFactorLoginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Code requis." });
+      return;
+    }
+
+    purgeExpiredTwoFactorChallenges();
+
+    const staffId = peekTwoFactorChallenge(parsed.data.pendingToken);
+    const staff = staffId ? getStaffById(staffId) : null;
+    if (!staff) {
+      res.status(401).json({ error: "Session de connexion expirée, recommence depuis le début." });
+      return;
+    }
+
+    const emailLower = normalizeEmail(staff.email);
+    const lockout = getLockoutStatus("staff", emailLower);
+    if (lockout.lockedUntil) {
+      res.status(403).json({ error: "Trop de tentatives. Réessaie dans quelques minutes.", code: "ACCOUNT_LOCKED" });
+      return;
+    }
+
+    const valid = parsed.data.code
+      ? verifyStaffTotpCode(staff.id, parsed.data.code)
+      : consumeRecoveryCode(staff.id, parsed.data.recoveryCode!);
+
+    if (!valid) {
+      const { locked } = registerFailedLogin("staff", emailLower);
+      recordSecurityEvent({
+        eventType: "login_failed", severity: "warning", accountKind: "staff",
+        accountEmail: staff.email, ip: req.ip,
+        detail: parsed.data.code ? "code 2FA incorrect" : "code de récupération incorrect",
+      });
+      if (locked) {
+        recordSecurityEvent({
+          eventType: "account_locked", severity: "critical", accountKind: "staff",
+          accountEmail: staff.email, ip: req.ip, detail: "5 échecs en 15 min",
+        });
+      }
+      res.status(401).json({ error: "Code incorrect." });
+      return;
+    }
+
+    clearLoginFailures("staff", emailLower);
+    consumeTwoFactorChallenge(parsed.data.pendingToken);
+
+    const token = createSession(staff.id, req.headers["user-agent"]);
+    setSessionCookie(res, token);
+    recordSecurityEvent({
+      eventType: "login_success", severity: "info", accountKind: "staff",
+      accountEmail: staff.email, ip: req.ip,
+      detail: parsed.data.code ? "2FA (TOTP)" : "2FA (code de récupération)",
     });
     res.json(authenticatedPayload(staff.id));
   })
@@ -514,6 +619,123 @@ staffRouter.post(
       detail: `${destroyed} autre(s) session(s) fermée(s)`,
     });
     res.json(authenticatedPayload(staff.id));
+  })
+);
+
+// --- 2FA (TOTP) — configuration, depuis une session déjà active ----------
+
+const twoFactorRateLimit = createRateLimit({
+  windowMs: 15 * 60_000,
+  max: 10,
+  message: "Trop de tentatives. Réessaie dans quelques minutes.",
+});
+
+staffRouter.get("/2fa/status", requireStaffKind, (req, res) => {
+  res.json({
+    enabled: isTotpEnabled(req.auth!.userId),
+    remainingRecoveryCodes: countRemainingRecoveryCodes(req.auth!.userId),
+  });
+});
+
+/**
+ * Démarre une configuration 2FA : nouveau secret stocké mais PAS encore
+ * actif (voir `startTotpSetup`). Le compte doit confirmer avec un code
+ * valide (`POST /2fa/enable`) avant que la 2FA ne s'applique réellement à sa
+ * prochaine connexion — sans quoi une configuration commencée puis
+ * abandonnée à mi-chemin (secret enregistré nulle part côté élève) le
+ * verrouillerait hors de son propre compte.
+ */
+staffRouter.post("/2fa/setup", requireStaffKind, twoFactorRateLimit, (req, res) => {
+  const staff = getStaffById(req.auth!.userId);
+  if (!staff) {
+    res.status(404).json({ error: "Compte introuvable." });
+    return;
+  }
+
+  const secret = startTotpSetup(staff.id);
+  res.json({
+    secret: formatSecretForDisplay(secret),
+    otpauthUri: buildOtpauthUri(secret, staff.email),
+  });
+});
+
+/**
+ * Confirme la configuration en cours et active la 2FA. Génère les codes de
+ * récupération à cet instant précis (jamais avant : les générer plus tôt
+ * laisserait des codes valides pour une 2FA jamais réellement activée) et
+ * les renvoie une seule fois, comme un mot de passe temporaire d'invitation.
+ */
+staffRouter.post("/2fa/enable", requireStaffKind, twoFactorRateLimit, (req, res) => {
+  const parsed = totpCodeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Code à 6 chiffres requis." });
+    return;
+  }
+
+  const staff = getStaffById(req.auth!.userId);
+  if (!staff || !confirmTotpSetup(staff.id, parsed.data.code)) {
+    res.status(400).json({ error: "Code incorrect ou expiré." });
+    return;
+  }
+
+  const recoveryCodes = generateRecoveryCodes(staff.id);
+  recordSecurityEvent({
+    eventType: "two_factor_enabled", severity: "info", accountKind: "staff",
+    accountEmail: staff.email, ip: req.ip, detail: "",
+  });
+  res.json({ recoveryCodes });
+});
+
+/** Désactive la 2FA — mot de passe actuel requis, même garde que `/change-password`. */
+staffRouter.post("/2fa/disable", requireStaffKind, twoFactorRateLimit, wrap(async (req, res) => {
+  const parsed = disableTotpSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Mot de passe requis." });
+    return;
+  }
+
+  const staff = getStaffById(req.auth!.userId);
+  if (!staff || !(await verifyPassword(parsed.data.password, staff.passwordHash))) {
+    res.status(403).json({ error: "Mot de passe incorrect." });
+    return;
+  }
+
+  disableTotp(staff.id);
+  recordSecurityEvent({
+    eventType: "two_factor_disabled", severity: "warning", accountKind: "staff",
+    accountEmail: staff.email, ip: req.ip, detail: "",
+  });
+  res.status(204).end();
+}));
+
+/** Régénère les codes de récupération — invalide tous les précédents, mot de passe requis. */
+staffRouter.post(
+  "/2fa/recovery-codes/regenerate",
+  requireStaffKind,
+  twoFactorRateLimit,
+  wrap(async (req, res) => {
+    const parsed = disableTotpSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Mot de passe requis." });
+      return;
+    }
+
+    const staff = getStaffById(req.auth!.userId);
+    if (!staff || !(await verifyPassword(parsed.data.password, staff.passwordHash))) {
+      res.status(403).json({ error: "Mot de passe incorrect." });
+      return;
+    }
+    if (!isTotpEnabled(staff.id)) {
+      res.status(400).json({ error: "La 2FA n'est pas activée sur ce compte." });
+      return;
+    }
+
+    const recoveryCodes = generateRecoveryCodes(staff.id);
+    recordSecurityEvent({
+      eventType: "two_factor_recovery_regenerated", severity: "info", accountKind: "staff",
+      accountEmail: staff.email, ip: req.ip, detail: "",
+    });
+    res.json({ recoveryCodes });
   })
 );
 

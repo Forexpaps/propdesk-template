@@ -7,6 +7,8 @@ import { api, UNAUTHENTICATED_EVENT, type AuthUser, type StudentAuthUser } from 
  * - `loading` : la sonde de démarrage est en cours.
  * - `no-account` : la base n'a aucun identifiant staff → première installation.
  * - `unauthenticated` : aucune session (ni staff, ni élève) valide.
+ * - `2fa-required` : mot de passe staff vérifié, en attente du second
+ *   facteur (`TwoFactorVerifyScreen`) avant qu'une session existe.
  * - `authenticated` : session staff valide, `AcademyApp` peut se monter.
  * - `authenticated-student` : session élève valide, le Journal cloisonné peut
  *   se monter — jamais `AcademyApp`.
@@ -19,6 +21,7 @@ export type AuthStatus =
   | "loading"
   | "no-account"
   | "unauthenticated"
+  | "2fa-required"
   | "authenticated"
   | "authenticated-student"
   | "offline";
@@ -30,7 +33,14 @@ export interface UseAuthResult {
   studentUser: StudentAuthUser | null;
   /** Renseigné quand la session vient d'expirer, pour l'expliquer à l'écran. */
   expired: boolean;
+  /** Peut faire passer `status` à `"2fa-required"` au lieu de `"authenticated"` — voir `AuthState`. */
   login: (email: string, password: string) => Promise<void>;
+  /** Jeton de l'étape 2 en attente, renseigné seulement quand `status === "2fa-required"`. */
+  pendingTwoFactorToken: string | null;
+  verifyTwoFactor: (code: string) => Promise<void>;
+  verifyTwoFactorRecovery: (recoveryCode: string) => Promise<void>;
+  /** Revient à l'écran de connexion sans appeler le serveur. */
+  cancelTwoFactor: () => void;
   setup: (email: string, password: string) => Promise<void>;
   /** Change le mot de passe et lève `mustChangePassword`. */
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -46,6 +56,7 @@ export function useAuth(): UseAuthResult {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [studentUser, setStudentUser] = useState<StudentAuthUser | null>(null);
   const [expired, setExpired] = useState(false);
+  const [pendingTwoFactorToken, setPendingTwoFactorToken] = useState<string | null>(null);
   /**
    * Miroir de `status`, lu dans `onUnauthenticated` (effet à dépendances
    * vides, donc fermé sur sa toute première valeur sans cette ref).
@@ -145,9 +156,50 @@ export function useAuth(): UseAuthResult {
 
   const login = useCallback(async (email: string, password: string) => {
     const result = await api.login(email, password);
+    if (result.state === "2fa-required") {
+      setPendingTwoFactorToken(result.pendingToken);
+      setExpired(false);
+      setStatus("2fa-required");
+      return;
+    }
+    // `/auth/login` ne renvoie jamais "no-account"/"unauthenticated" côté
+    // serveur (seul `authenticatedPayload` ou l'état 2FA ci-dessus) —
+    // `AuthState` reste large car partagée avec `fetchMe`, d'où cette garde.
+    if (result.state !== "authenticated") {
+      throw new Error("Réponse de connexion inattendue.");
+    }
     setUser(result.user);
     setExpired(false);
     setStatus("authenticated");
+  }, []);
+
+  const verifyTwoFactor = useCallback(
+    async (code: string) => {
+      if (!pendingTwoFactorToken) throw new Error("Aucune connexion en attente de 2FA.");
+      const result = await api.verifyTwoFactor(pendingTwoFactorToken, code);
+      setUser(result.user);
+      setPendingTwoFactorToken(null);
+      setExpired(false);
+      setStatus("authenticated");
+    },
+    [pendingTwoFactorToken]
+  );
+
+  const verifyTwoFactorRecovery = useCallback(
+    async (recoveryCode: string) => {
+      if (!pendingTwoFactorToken) throw new Error("Aucune connexion en attente de 2FA.");
+      const result = await api.verifyTwoFactorRecovery(pendingTwoFactorToken, recoveryCode);
+      setUser(result.user);
+      setPendingTwoFactorToken(null);
+      setExpired(false);
+      setStatus("authenticated");
+    },
+    [pendingTwoFactorToken]
+  );
+
+  const cancelTwoFactor = useCallback(() => {
+    setPendingTwoFactorToken(null);
+    setStatus("unauthenticated");
   }, []);
 
   const setup = useCallback(async (email: string, password: string) => {
@@ -180,6 +232,7 @@ export function useAuth(): UseAuthResult {
   const markLoggedOut = useCallback(() => {
     setUser(null);
     setStudentUser(null);
+    setPendingTwoFactorToken(null);
     setExpired(false);
     setStatus("unauthenticated");
   }, []);
@@ -190,6 +243,10 @@ export function useAuth(): UseAuthResult {
     studentUser,
     expired,
     login,
+    pendingTwoFactorToken,
+    verifyTwoFactor,
+    verifyTwoFactorRecovery,
+    cancelTwoFactor,
     setup,
     changePassword,
     studentLogin,

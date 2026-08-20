@@ -86,7 +86,13 @@ export interface AuthUser {
 export type AuthState =
   | { state: "no-account" }
   | { state: "unauthenticated" }
-  | { state: "authenticated"; user: AuthUser };
+  | { state: "authenticated"; user: AuthUser }
+  /**
+   * Mot de passe vérifié, mais la 2FA du compte exige un second facteur
+   * avant qu'une session ne soit créée — voir `POST /auth/login/2fa`.
+   * `pendingToken` doit lui être transmis, il expire après 5 minutes.
+   */
+  | { state: "2fa-required"; pendingToken: string };
 
 /** État d'authentification élève, renvoyé par `/api/auth/student-me`. */
 export interface StudentAuthUser {
@@ -260,10 +266,53 @@ export const api = {
   /** Sonde d'état du démarrage. Répond toujours 200. */
   fetchMe: () => request<AuthState>("/api/auth/me"),
 
+  /** Peut renvoyer `{ state: "2fa-required" }` — voir `AuthState`. */
   login: (email: string, password: string) =>
-    request<Extract<AuthState, { state: "authenticated" }>>("/api/auth/login", {
+    request<AuthState>("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
+    }),
+
+  /** Étape 2 de connexion : code TOTP à 6 chiffres. */
+  verifyTwoFactor: (pendingToken: string, code: string) =>
+    request<Extract<AuthState, { state: "authenticated" }>>("/api/auth/login/2fa", {
+      method: "POST",
+      body: JSON.stringify({ pendingToken, code }),
+    }),
+
+  /** Étape 2 de connexion, avec un code de récupération à usage unique à la place du TOTP. */
+  verifyTwoFactorRecovery: (pendingToken: string, recoveryCode: string) =>
+    request<Extract<AuthState, { state: "authenticated" }>>("/api/auth/login/2fa", {
+      method: "POST",
+      body: JSON.stringify({ pendingToken, recoveryCode }),
+    }),
+
+  /** État 2FA du compte staff connecté. */
+  fetch2FAStatus: () =>
+    request<{ enabled: boolean; remainingRecoveryCodes: number }>("/api/auth/2fa/status"),
+
+  /** Démarre une configuration 2FA — secret pas encore actif tant que `enable2FA` n'a pas confirmé un code. */
+  setup2FA: () =>
+    request<{ secret: string; otpauthUri: string }>("/api/auth/2fa/setup", { method: "POST" }),
+
+  /** Confirme la configuration et active la 2FA. Les codes de récupération ne sont renvoyés qu'ici, une seule fois. */
+  enable2FA: (code: string) =>
+    request<{ recoveryCodes: string[] }>("/api/auth/2fa/enable", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    }),
+
+  disable2FA: (password: string) =>
+    request<void>("/api/auth/2fa/disable", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    }),
+
+  /** Invalide les codes de récupération existants et en génère 8 nouveaux, renvoyés une seule fois. */
+  regenerateRecoveryCodes: (password: string) =>
+    request<{ recoveryCodes: string[] }>("/api/auth/2fa/recovery-codes/regenerate", {
+      method: "POST",
+      body: JSON.stringify({ password }),
     }),
 
   /** Première installation : rattache des identifiants au profil existant. */
