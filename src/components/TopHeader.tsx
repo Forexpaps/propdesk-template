@@ -17,14 +17,15 @@ import { TabType } from "./Sidebar";
  * — Londres/New York se recouvrent l'après-midi UTC, la session la plus
  * active de la journée).
  */
-const FOREX_SESSIONS: { name: string; startUTC: number; endUTC: number }[] = [
+export const FOREX_SESSIONS: { name: string; startUTC: number; endUTC: number }[] = [
   { name: "Sydney", startUTC: 21, endUTC: 6 }, // traverse minuit UTC
   { name: "Tokyo", startUTC: 0, endUTC: 9 },
   { name: "Londres", startUTC: 7, endUTC: 16 },
   { name: "New York", startUTC: 12, endUTC: 21 },
 ];
 
-function isSessionActive(session: { startUTC: number; endUTC: number }, hourUTC: number): boolean {
+/** Exportée pour réutilisation par `src/lib/planCompliance.ts` (règle de session autorisée du plan de trading) — table UTC unique, ne jamais la dupliquer. */
+export function isSessionActive(session: { startUTC: number; endUTC: number }, hourUTC: number): boolean {
   if (session.startUTC < session.endUTC) {
     return hourUTC >= session.startUTC && hourUTC < session.endUTC;
   }

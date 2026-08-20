@@ -1,14 +1,21 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ClipboardList, X, Check } from "lucide-react";
 import { TradingPlanData } from "../types";
+import { getTradingPlanStorageKey } from "../lib/planCompliance";
 
 interface TradingPlanEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /**
+   * Namespace la persistance par compte (même motif que `MindsetJournalModal`)
+   * — email de l'élève côté élève, absent côté staff (clé partagée bureau,
+   * inchangé). Sans ça, un poste partagé comparerait les trades de l'un au
+   * plan de l'autre (voir `src/lib/planCompliance.ts`).
+   */
+  storageKey?: string;
 }
 
 const SESSIONS = ["Asie", "Londres", "New York"];
-const STORAGE_KEY = "horizon_trading_plan";
 
 const EMPTY_PLAN: TradingPlanData = {
   authorizedSessions: [],
@@ -23,9 +30,9 @@ const EMPTY_PLAN: TradingPlanData = {
   goldenRules: "",
 };
 
-const loadPlan = (): TradingPlanData => {
+const loadPlan = (storageKey?: string): TradingPlanData => {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(getTradingPlanStorageKey(storageKey));
     return saved ? { ...EMPTY_PLAN, ...JSON.parse(saved) } : EMPTY_PLAN;
   } catch {
     return EMPTY_PLAN;
@@ -38,15 +45,16 @@ const inputClass =
 export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
   isOpen,
   onClose,
+  storageKey,
 }) => {
-  const [plan, setPlan] = useState<TradingPlanData>(loadPlan);
+  const [plan, setPlan] = useState<TradingPlanData>(() => loadPlan(storageKey));
   const [showSaved, setShowSaved] = useState(false);
 
   // Recharge depuis le stockage à chaque ouverture — au cas où un autre
   // onglet du même navigateur aurait modifié le plan entre-temps.
   useEffect(() => {
-    if (isOpen) setPlan(loadPlan());
-  }, [isOpen]);
+    if (isOpen) setPlan(loadPlan(storageKey));
+  }, [isOpen, storageKey]);
 
   // Enregistrement automatique (500ms après la dernière frappe) — conservé
   // tel quel. Un bouton "Enregistrer" explicite a été ajouté en plus (voir
@@ -61,7 +69,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
     }
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
+        localStorage.setItem(getTradingPlanStorageKey(storageKey), JSON.stringify(plan));
       } catch {
         // Quota dépassé ou navigation privée : rien à faire de plus ici.
       }
@@ -79,7 +87,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
 
   const handleSaveNow = () => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
+      localStorage.setItem(getTradingPlanStorageKey(storageKey), JSON.stringify(plan));
     } catch {
       // Quota dépassé ou navigation privée : rien à faire de plus ici.
     }

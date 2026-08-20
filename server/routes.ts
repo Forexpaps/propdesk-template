@@ -137,6 +137,13 @@ const STUDENT_ALLOWED_COLLECTIONS = new Set<CollectionName>([
   "modules",
   "messages",
   "badges",
+  // Alertes de non-respect du plan de trading (client, voir
+  // src/lib/planCompliance.ts) : un élève a désormais besoin d'une vraie
+  // collection persistée pour ces notifications, au même titre que le
+  // bureau staff — avant, `studentNotifications` (App.tsx) était
+  // entièrement dérivé des messages/badges, sans mécanisme pour pousser
+  // une notification arbitraire.
+  "notifications",
 ]);
 
 /**
