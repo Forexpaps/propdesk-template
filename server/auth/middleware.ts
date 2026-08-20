@@ -98,6 +98,18 @@ const PUBLIC_PATHS = new Set([
 ]);
 
 /**
+ * Préfixes publics, pour les routes paramétrées qu'un `Set` de chemins exacts
+ * ne peut structurellement pas couvrir — repéré en audit : la consommation
+ * du lien de reset élève (`POST /auth/reset-password/:token`,
+ * `studentAuthRouter`) reposait uniquement sur l'ordre de montage des
+ * routeurs pour rester accessible sans session, sans filet ici. Aujourd'hui
+ * sans conséquence (l'ordre actuel la protège déjà), mais un futur refactor
+ * qui regrouperait les routeurs après la barrière `requireAuth` l'aurait
+ * silencieusement cassée.
+ */
+const PUBLIC_PATH_PREFIXES = ["/auth/reset-password/"];
+
+/**
  * Seule route accessible à une session dont le mot de passe est encore
  * temporaire. Le client se gouverne déjà sur `mustChangePassword` renvoyé par
  * `/auth/me` et n'appelle normalement jamais les autres routes dans cet état
@@ -166,7 +178,7 @@ function tryStudentAuth(req: Request, res: Response): AuthContext | "blocked" | 
 }
 
 export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-  if (PUBLIC_PATHS.has(req.path)) {
+  if (PUBLIC_PATHS.has(req.path) || PUBLIC_PATH_PREFIXES.some((prefix) => req.path.startsWith(prefix))) {
     next();
     return;
   }

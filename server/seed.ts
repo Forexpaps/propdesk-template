@@ -1,4 +1,4 @@
-import { getMeta, setMeta } from "./db";
+import { db, getMeta, setMeta } from "./db";
 import {
   replaceCollection,
   replaceQuizResults,
@@ -30,22 +30,34 @@ function markBootstrapped(): void {
  * Écrit un jeu de données complet, quelle qu'en soit l'origine, et marque la
  * base comme amorcée. Sert à la fois au seed de démonstration et à l'import
  * des données que l'utilisateur avait dans son localStorage.
+ *
+ * L'ensemble tourne dans une seule transaction (`replaceCollection`/
+ * `replaceQuizResults` s'imbriquent dedans via savepoint, better-sqlite3 le
+ * supporte nativement) : repéré en audit, un échec en cours de boucle
+ * (ex. `CollectionOwnershipConflictError` sur un import corrompu) laissait
+ * auparavant les collections déjà écrites en base alors que
+ * `bootstrapped_at` n'était jamais posé — état partiel visible par une
+ * lecture concurrente. Toute erreur fait maintenant tout annuler.
  */
 export function writeFullState(state: {
   student: unknown;
   collections: Partial<Record<CollectionName, { id: string }[]>>;
   quizResults?: Record<string, unknown>;
 }): void {
-  saveProfile(state.student);
+  const run = db.transaction(() => {
+    saveProfile(state.student);
 
-  (Object.entries(state.collections) as [CollectionName, { id: string }[]][]).forEach(
-    ([name, items]) => {
-      if (Array.isArray(items)) replaceCollection(name, items);
-    }
-  );
+    (Object.entries(state.collections) as [CollectionName, { id: string }[]][]).forEach(
+      ([name, items]) => {
+        if (Array.isArray(items)) replaceCollection(name, items);
+      }
+    );
 
-  replaceQuizResults(state.quizResults ?? {});
-  markBootstrapped();
+    replaceQuizResults(state.quizResults ?? {});
+    markBootstrapped();
+  });
+
+  run();
 }
 
 /**
