@@ -1127,3 +1127,33 @@ l'utilisateur.
 > vérifie par la lecture directe des fichiers sources et par
 > `git status`/`git diff`/`sqlite3`, et corrige ce document en
 > conséquence.
+
+
+---
+
+## MISE À JOUR 20/08/2026 — CGU plateforme + alignement du statut juridique (fichiers déjà écrits, à commit + déployer)
+
+> Les modifications décrites ci-dessous sont **déjà présentes dans les fichiers** du dépôt (écrites le 20/08/2026). Elles ne sont **pas encore commitées ni poussées**. Cette section dit à un développeur (ou à Claude Code) exactement quoi faire.
+
+### Ce qui a changé, fichier par fichier
+
+- **`src/components/CGUModal.tsx`** — NOUVEAU COMPOSANT. Modal de Conditions Générales d'Utilisation de la plateforme (objet, accès, compte/identifiants, usage conforme, propriété intellectuelle, disponibilité, données personnelles, nature éducative + risques, suspension/résiliation, responsabilité, modification, droit applicable). Style calqué **à l'identique** sur `LegalNoticeModal.tsx` (mêmes classes, palette `#00E676`/`#111615`/`#1B2320`, composants locaux `SectionTitle` et `P`, prop `isOpen`/`onClose`). Icône `FileText`.
+- **`src/components/LegalNoticeModal.tsx`** — statut juridique aligné : « Auto-entrepreneur » → « Entrepreneur individuel (micro-entreprise) » (section 1 et pied de modal). Date passée au 20/08/2026. (La section Cookies n'a volontairement pas été retouchée ici — hors périmètre de cette mise à jour.)
+- **`src/App.tsx`** — câblage du modal CGU dans les **deux shells** :
+  - import `import { CGUModal } from "./components/CGUModal";` ajouté ;
+  - état `const [isCguOpen, setIsCguOpen] = useState(false);` ajouté à côté de `isLegalNoticeOpen` (2 endroits) ;
+  - bouton « CGU » ajouté dans le `<footer>` à côté de « Mentions légales » (2 endroits) ;
+  - `<CGUModal isOpen={isCguOpen} onClose={() => setIsCguOpen(false)} />` monté à côté de `<LegalNoticeModal .../>` (2 endroits) ;
+  - texte de pied de page « Thomas Gauthey — Trader » → « Thomas Gauthey — Entrepreneur individuel » (2 endroits).
+
+### Action attendue de Claude Code
+
+1. Relire `CGUModal.tsx`, `LegalNoticeModal.tsx` et les 2 blocs footer de `App.tsx`.
+2. `npm run lint` (`tsc --noEmit`) — doit passer (déjà vérifié OK au 20/08/2026).
+3. Commit (ex. « Ajoute les CGU de la plateforme (modal + câblage 2 shells) et aligne le statut juridique »).
+4. Pousser sur GitHub `Forexpaps/propdesk` → **déploiement automatique Railway sur push** (vérifier `railway deployment list --service propdesk --json` : `status: SUCCESS`).
+
+### Reste à la charge du propriétaire (hors code)
+
+- **SIRET** à renseigner dans `LegalNoticeModal.tsx` et `CGUModal.tsx` dès attribution (actuellement « en cours d'attribution »).
+- La **politique de confidentialité** vit sur le site vitrine (`09 - PropDesk-Site/app/confidentialite`) ; si tu veux la rendre accessible depuis la plateforme, prévoir un lien ou un modal dédié (non fait dans cette mise à jour).
