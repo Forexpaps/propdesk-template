@@ -1157,3 +1157,28 @@ l'utilisateur.
 
 - **SIRET** à renseigner dans `LegalNoticeModal.tsx` et `CGUModal.tsx` dès attribution (actuellement « en cours d'attribution »).
 - La **politique de confidentialité** vit sur le site vitrine (`09 - PropDesk-Site/app/confidentialite`) ; si tu veux la rendre accessible depuis la plateforme, prévoir un lien ou un modal dédié (non fait dans cette mise à jour).
+
+---
+
+## AUDIT 20/08/2026 — Points de conformité légale à corriger (source : ebook "Conformité légale — sites & apps Lovable")
+
+> Comparaison de la plateforme avec le guide de conformité France 2026, chapitre "App & SaaS" (comptes utilisateurs, sécurité des données). Ce qui suit sont des **écarts identifiés, pas encore corrigés**. À traiter par ordre de priorité.
+
+### 🔴 Priorité haute — sécurité des comptes admin
+
+- **Authentification à double facteur (2FA) absente sur les comptes admin.** Aucune trace de TOTP/2FA dans `server/auth/`. Le guide cite explicitement l'absence de 2FA sur les comptes admin comme motif de plusieurs sanctions CNIL récentes — c'est le point de sécurité le plus critique d'une app avec authentification, plus sensible que les mentions légales elles-mêmes vu la volumétrie de données élèves (journal de trading, progression, coordonnées). À prioriser avant tout autre chantier de conformité sur ce dépôt.
+
+### 🟡 Priorité moyenne — droits RGPD des utilisateurs
+
+- **Export des données (portabilité) manquant.** `handleDeleteAccount` existe (suppression), mais aucune fonctionnalité permettant à un élève de télécharger ses propres données (CSV/JSON — journal de trades, progression, profil) n'a été trouvée dans `src/App.tsx` ni dans `server/`. Le RGPD impose un droit à la portabilité ; un simple bouton dans les paramètres du compte suffit.
+- **Registre des traitements** — document interne non versionné dans le dépôt donc non vérifiable ici. C'est le premier document demandé en cas de contrôle CNIL. À confirmer que Thomas en a un à jour (modèle gratuit sur cnil.fr) ; sinon le créer.
+- **Lien vers la politique de confidentialité absent de la plateforme** (déjà signalé dans la mise à jour du 20/08/2026 ci-dessus, toujours en attente) : la politique vit sur le site vitrine (`09 - PropDesk-Site/app/confidentialite`), pas d'accès direct depuis l'app. Prévoir un lien ou un modal dédié.
+- **SIRET « en cours d'attribution »** dans `CGUModal.tsx` et `LegalNoticeModal.tsx` — à mettre à jour dès attribution (déjà signalé, toujours en attente).
+
+### 🟢 Vérifié conforme / pas d'action requise
+
+- **Mots de passe** : hachage scrypt avec paramètres OWASP à jour (`server/auth/password.ts`), comparaison en temps constant, hash factice anti-énumération. Au-dessus du niveau exigé par le guide.
+- **Sessions** : jeton 256 bits, empreinte SHA-256 en base (jamais le jeton en clair), cookie `httpOnly`, `secure` en prod, `sameSite: lax`, purge automatique des sessions expirées. Conforme aux bonnes pratiques citées dans le guide (chapitre 5.2).
+- **Base de données** : SQLite auto-hébergée sur Railway (pas de Supabase), donc le piège "Row Level Security ouverte" du guide (spécifique aux projets Lovable + Supabase) ne s'applique pas ici — les requêtes passent par un serveur Express qui contrôle les accès, pas par des règles de base exposées côté client.
+- **CGU de la plateforme** : présentes et à jour (`CGUModal.tsx`), couvrent accès, compte, usage conforme, propriété intellectuelle, responsabilité — chapitre 5.1 du guide.
+- Pas de chatbot IA identifié sur la plateforme → obligation de transparence IA (AI Act, depuis le 2 août 2026) non applicable en l'état.
