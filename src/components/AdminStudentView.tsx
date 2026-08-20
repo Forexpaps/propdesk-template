@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, AlertCircle, Loader, Send } from "lucide-react";
-import { EnrolledStudent, StudentProfile, Trade, TradingAccount, Module, CoachMessage } from "../types";
+import { EnrolledStudent, StudentProfile, Trade, TradingAccount, Module, CoachMessage, TradingPlanData } from "../types";
 import { api } from "../lib/api";
 import { TradingJournal } from "./TradingJournal";
 import { PerformanceDashboard } from "./PerformanceDashboard";
@@ -9,6 +9,8 @@ import { MainDashboard } from "./MainDashboard";
 import { MacroDashboard } from "./MacroDashboard";
 import { Sidebar, SidebarItemKey, TabType } from "./Sidebar";
 import { TopHeader } from "./TopHeader";
+import { TradingPlanEditorModal } from "./TradingPlanEditorModal";
+import { EMPTY_TRADING_PLAN } from "../lib/planCompliance";
 
 interface AdminStudentViewProps {
   enrolledStudentId: string;
@@ -34,9 +36,11 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
     trades: Trade[];
     modules: Module[];
     messages: CoachMessage[];
+    tradingPlan: TradingPlanData | null;
   } | null>(null);
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
+  const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
 
   const loadStudentView = async () => {
     setLoading(true);
@@ -50,6 +54,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
         trades: data.collections.trades,
         modules: data.collections.modules,
         messages: data.collections.messages,
+        tradingPlan: data.tradingPlan,
       });
     } catch (err) {
       setError((err as Error).message || "Impossible de charger la vue de l'élève.");
@@ -182,6 +187,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
           isCollapsed={isCollapsed}
           setIsCollapsed={setIsCollapsed}
           onOpenProfileModal={() => {}}
+          onOpenTradingPlan={() => setIsTradingPlanOpen(true)}
           canManageSidebar={false}
         />
 
@@ -297,6 +303,13 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
           </main>
         </div>
       </div>
+
+      <TradingPlanEditorModal
+        isOpen={isTradingPlanOpen}
+        onClose={() => setIsTradingPlanOpen(false)}
+        plan={studentData.tradingPlan ?? EMPTY_TRADING_PLAN}
+        readOnly
+      />
     </div>
   );
 };

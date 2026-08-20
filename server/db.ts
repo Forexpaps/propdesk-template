@@ -53,6 +53,11 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_trades_user ON trades(user_id, position);
   CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(user_id, date);
 
+  CREATE TABLE IF NOT EXISTS trading_plans (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    payload TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS trading_accounts (
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

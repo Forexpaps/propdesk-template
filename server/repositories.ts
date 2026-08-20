@@ -203,6 +203,27 @@ export function saveProfile(profile: unknown, userId: string = DEFAULT_USER_ID):
   ).run(userId, JSON.stringify(profile));
 }
 
+/**
+ * Plan de trading d'un élève — objet unique, pas une collection : même
+ * modèle « une ligne par utilisateur » que `getProfile`/`saveProfile`, sur
+ * sa propre table plutôt que forcé dans le moule `CollectionName` (voir
+ * `TradingPlanData`, `src/types.ts` : pas de tableau `id`/position).
+ */
+export function getTradingPlan<T>(userId: string = DEFAULT_USER_ID): T | null {
+  const row = db.prepare("SELECT payload FROM trading_plans WHERE user_id = ?").get(userId) as
+    | { payload: string }
+    | undefined;
+  if (!row) return null;
+  return safeParsePayload<T>(row.payload, `trading_plans#${userId}`);
+}
+
+export function saveTradingPlan(plan: unknown, userId: string = DEFAULT_USER_ID): void {
+  db.prepare(
+    `INSERT INTO trading_plans (user_id, payload) VALUES (?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET payload = excluded.payload`
+  ).run(userId, JSON.stringify(plan));
+}
+
 export function getQuizResults<T>(
   userId: string = DEFAULT_USER_ID
 ): Record<string, T> {

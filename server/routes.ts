@@ -6,6 +6,7 @@ import {
   saveProfile,
   getQuizResults,
   replaceQuizResults,
+  getTradingPlan,
   COLLECTION_NAMES,
   CollectionOwnershipConflictError,
   type CollectionName,
@@ -220,6 +221,7 @@ api.get("/state", (req, res) => {
       bootstrapped: isBootstrapped(),
       student: buildStudentProfile(req.auth!.userId),
       quizResults: getQuizResults(dataUserId),
+      tradingPlan: getTradingPlan(dataUserId),
       coaches: buildCoachesForStudent(),
       collections: Object.fromEntries(
         [...STUDENT_ALLOWED_COLLECTIONS].map((name) => [name, listCollection(name, dataUserId)])

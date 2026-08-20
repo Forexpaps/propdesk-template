@@ -3,6 +3,19 @@ import { FOREX_SESSIONS, isSessionActive } from "../components/TopHeader";
 
 const BASE_STORAGE_KEY = "horizon_trading_plan";
 
+export const EMPTY_TRADING_PLAN: TradingPlanData = {
+  authorizedSessions: [],
+  tradingHours: "",
+  trackedAssets: "",
+  authorizedSetups: "",
+  riskPerTradePercent: "",
+  maxTradesPerDay: "",
+  maxDailyLossPercent: "",
+  entryConditions: "",
+  stopConditions: "",
+  goldenRules: "",
+};
+
 /**
  * Même motif que `MindsetJournalModal.tsx` (`storageKey` prop) : côté
  * élève, namespacé par email pour qu'un poste partagé ne compare jamais les

@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { randomBytes } from "node:crypto";
 import { db, DEFAULT_USER_ID, FOUNDER_COACH_ID } from "../db";
-import { getProfile, saveProfile, listCollection, updateCollectionItem, replaceCollection } from "../repositories";
+import { getProfile, saveProfile, listCollection, updateCollectionItem, replaceCollection, getTradingPlan } from "../repositories";
 import {
   setupSchema,
   loginSchema,
@@ -891,6 +891,10 @@ staffRouter.get(
         modules: listCollection("modules", account.userId),
         messages: listCollection("messages", account.userId),
       },
+      // Lecture seule : aucune route d'écriture n'est exposée au staff pour
+      // le plan de trading, seule `PUT /auth/trading-plan` (élève, sur sa
+      // propre session) peut l'écrire — voir `studentRoutes.ts`.
+      tradingPlan: getTradingPlan(account.userId),
     });
   }
 );

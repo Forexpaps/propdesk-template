@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type ServerState } from "../lib/api";
 import { clearPending, listPending, markPending, replayPending } from "../lib/pendingChanges";
-import type { Trade, TradingAccount, Module, CoachMessage, ModuleQuizResult, StudentProfile, TraderBadge, Coach, AppNotification } from "../types";
+import type { Trade, TradingAccount, Module, CoachMessage, ModuleQuizResult, StudentProfile, TraderBadge, Coach, AppNotification, TradingPlanData } from "../types";
 
 export type SyncStatus = "loading" | "online" | "offline";
 
@@ -195,6 +195,7 @@ export function useStudentBootstrap() {
   const [quizResults, setQuizResults] = useState<Record<string, ModuleQuizResult>>({});
   const [student, setStudent] = useState<StudentProfile | null>(null);
   const [coaches, setCoaches] = useState<Coach[]>([]);
+  const [tradingPlan, setTradingPlan] = useState<TradingPlanData | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -216,6 +217,7 @@ export function useStudentBootstrap() {
           setQuizResults(serverState.quizResults ?? {});
           setStudent((serverState.student as StudentProfile | null) ?? null);
           setCoaches(serverState.coaches ?? []);
+          setTradingPlan(serverState.tradingPlan ?? null);
           setStatus("online");
         }
       } catch (err) {
@@ -229,7 +231,7 @@ export function useStudentBootstrap() {
     };
   }, []);
 
-  return { status, trades, accounts, modules, messages, badges, notifications, quizResults, student, setStudent, coaches };
+  return { status, trades, accounts, modules, messages, badges, notifications, quizResults, student, setStudent, coaches, tradingPlan };
 }
 
 /**

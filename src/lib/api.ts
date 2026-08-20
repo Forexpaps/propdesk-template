@@ -9,6 +9,7 @@ import {
   Module,
   ModuleQuizResult,
   Coach,
+  TradingPlanData,
 } from "../types";
 
 /** Collections synchronisées avec le serveur, dans les formes de src/types.ts. */
@@ -57,6 +58,11 @@ export interface ServerState {
    * propre entrée directement depuis son profil déjà en mémoire.
    */
   coaches?: Coach[];
+  /**
+   * Présent uniquement pour une session élève — `null` si l'élève n'a jamais
+   * enregistré de plan. Voir `getTradingPlan`, `server/repositories.ts`.
+   */
+  tradingPlan?: TradingPlanData | null;
 }
 
 /** État d'authentification renvoyé par `/api/auth/me`. */
@@ -194,6 +200,13 @@ export const api = {
     request<{ success: true }>("/api/profile", {
       method: "PUT",
       body: JSON.stringify(student),
+    }),
+
+  /** Enregistre le plan de trading de l'élève connecté (lui seul peut l'écrire). */
+  saveTradingPlan: (plan: TradingPlanData) =>
+    request<void>("/api/auth/trading-plan", {
+      method: "PUT",
+      body: JSON.stringify(plan),
     }),
 
   saveQuizResults: (results: Record<string, ModuleQuizResult>) =>
@@ -343,6 +356,7 @@ export const api = {
         modules: Module[];
         messages: CoachMessage[];
       };
+      tradingPlan: TradingPlanData | null;
     }>(`/api/auth/admin/students/${encodeURIComponent(enrolledStudentId)}/view`),
 
   /**
