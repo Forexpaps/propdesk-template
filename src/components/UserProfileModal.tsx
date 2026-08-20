@@ -28,6 +28,7 @@ import { resizeAvatar, AVATAR_SIZE } from "../lib/image";
 import { api } from "../lib/api";
 import { confirmDialog } from "../lib/confirmDialog";
 import { ChangeOwnPasswordModal } from "./ChangeOwnPasswordModal";
+import { TwoFactorSetupModal } from "./TwoFactorSetupModal";
 
 const SectionHeader: React.FC<{ children?: React.ReactNode; color?: string }> = ({
   children,
@@ -144,8 +145,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const [email, setEmail] = useState(student.email);
   const [avatar, setAvatar] = useState(student.avatar);
   const [level, setLevel] = useState(student.level);
+  // Repli du sous-titre affiché sous le nom (voir le rendu plus bas) : un
+  // élève qui n'a jamais eu de `role` personnalisé voyait jusqu'ici
+  // "Élève Premium", une étiquette générique sans rapport avec sa vraie
+  // progression — remplacé par son niveau réel (`student.level`, déjà le
+  // champ affiché en bas de la sidebar élève, voir Sidebar.tsx), sur
+  // demande explicite de l'utilisateur.
   const [role, setRole] = useState(
-    student.role || (student.isAdmin ? "Fondateur / Head Coach" : "Élève Premium")
+    student.role || (student.isAdmin ? "Fondateur / Head Coach" : student.level)
   );
   const [phone, setPhone] = useState(student.phone || "+33 6 12 34 56 78");
   const [bio, setBio] = useState(student.bio || "");
@@ -194,6 +201,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   // destructrice ici, volontairement : voir `server/routes.ts`,
   // POST /state/restore.
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isTwoFactorOpen, setIsTwoFactorOpen] = useState(false);
 
   const backupFileInputRef = useRef<HTMLInputElement>(null);
   const [backupStatus, setBackupStatus] = useState<
@@ -613,6 +621,30 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
             )}
 
+            {/* Authentification à deux facteurs — n'importe quel compte
+                staff peut l'activer pour lui-même, ce n'est pas réservé au
+                fondateur (même raisonnement que "Mon mot de passe"
+                juste au-dessus). Absent du mode élève (`avatarOnly`) : les
+                comptes élève n'ont pas de 2FA. */}
+            {!avatarOnly && (
+              <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <ShieldCheck className="w-6 h-6 text-[#00E676] shrink-0" />
+                  <div>
+                    <div className="text-sm font-bold text-white">Authentification à deux facteurs</div>
+                    <p className="text-xs text-slate-400">Ajoute un code à usage unique à la connexion.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsTwoFactorOpen(true)}
+                  className="px-3 py-2 rounded-xl text-[11px] font-bold text-slate-950 bg-[#00E676] hover:bg-[#00c865] shrink-0 transition-colors"
+                >
+                  Gérer
+                </button>
+              </div>
+            )}
+
             {/* Journal de sécurité — réservé au compte fondateur. Le bouton
                 ne s'affiche que si le parent fournit onOpenSecurityLog
                 (conditionné par isOwner, jamais par isAdmin). */}
@@ -993,6 +1025,10 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       <ChangeOwnPasswordModal
         isOpen={isChangePasswordOpen}
         onClose={() => setIsChangePasswordOpen(false)}
+      />
+      <TwoFactorSetupModal
+        isOpen={isTwoFactorOpen}
+        onClose={() => setIsTwoFactorOpen(false)}
       />
     </div>
   );

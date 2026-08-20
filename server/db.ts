@@ -134,10 +134,41 @@ db.exec(`
     -- /auth/setup, qui choisit son propre mot de passe).
     must_change_password INTEGER NOT NULL DEFAULT 0,
     invited_by           TEXT REFERENCES staff_accounts(id) ON DELETE SET NULL,
+    -- 2FA (TOTP), voir server/auth/twoFactor.ts. totp_secret : présent dès
+    -- qu'un compte a démarré une configuration, même non encore confirmée
+    -- (voir startTotpSetup) — totp_enabled_at NULL est ce qui distingue "en
+    -- cours de configuration" de "activé". Colonnes ajoutées ici pour une
+    -- base neuve ; migrateAddTotpColumns() plus bas les ajoute à une base
+    -- existante.
+    totp_secret           TEXT,
+    totp_enabled_at        TEXT,
     created_at           TEXT NOT NULL,
     updated_at           TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS idx_staff_accounts_email ON staff_accounts(email_lower);
+
+  -- Codes de récupération 2FA à usage unique, un hash SHA-256 par code (pas
+  -- de sel : chaque code est déjà un secret aléatoire de forte entropie,
+  -- même raisonnement que sessions.ts). used_at NULL = encore valide.
+  CREATE TABLE IF NOT EXISTS staff_recovery_codes (
+    id         TEXT PRIMARY KEY,
+    staff_id   TEXT NOT NULL REFERENCES staff_accounts(id) ON DELETE CASCADE,
+    code_hash  TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    used_at    TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_staff_recovery_codes_staff ON staff_recovery_codes(staff_id);
+
+  -- Défi 2FA en attente entre "mot de passe vérifié" et "session créée" —
+  -- voir POST /auth/login puis POST /auth/login/2fa. Jeton à usage unique,
+  -- courte durée de vie (5 min, voir twoFactor.ts), empreinte SHA-256 en
+  -- base comme les sessions (server/auth/sessions.ts).
+  CREATE TABLE IF NOT EXISTS staff_2fa_challenges (
+    token_hash TEXT PRIMARY KEY,
+    staff_id   TEXT NOT NULL REFERENCES staff_accounts(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+  );
 
   -- Sessions actives. La colonne id est le SHA-256 du jeton, jamais le jeton
   -- lui-même : le fichier de base vit en clair sur le disque (et dans le WAL, et
@@ -442,6 +473,31 @@ function migrateDropForum(): void {
 }
 
 migrateDropForum();
+
+/**
+ * Ajoute `totp_secret`/`totp_enabled_at` à `staff_accounts` sur une base
+ * EXISTANTE créée avant l'introduction de la 2FA — le `CREATE TABLE IF NOT
+ * EXISTS` plus haut ne les crée que sur une base neuve, où ces colonnes
+ * existent donc déjà : vérifier leur présence via `PRAGMA table_info` (et
+ * non une clé `meta`, qui déclencherait un `ALTER TABLE` en double sur une
+ * base neuve — "duplicate column name") est ce qui rend cette migration
+ * réellement idempotente dans les deux cas.
+ */
+function migrateAddTotpColumns(): void {
+  const columns = db.prepare("PRAGMA table_info(staff_accounts)").all() as { name: string }[];
+  const hasColumn = (name: string) => columns.some((c) => c.name === name);
+
+  db.transaction(() => {
+    if (!hasColumn("totp_secret")) {
+      db.exec("ALTER TABLE staff_accounts ADD COLUMN totp_secret TEXT;");
+    }
+    if (!hasColumn("totp_enabled_at")) {
+      db.exec("ALTER TABLE staff_accounts ADD COLUMN totp_enabled_at TEXT;");
+    }
+  })();
+}
+
+migrateAddTotpColumns();
 
 export function getMeta(key: string): string | null {
   const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as
