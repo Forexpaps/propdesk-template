@@ -152,7 +152,14 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
   const readOnlyStudent: StudentProfile = {
     name: enrolledStudent.name,
     email: enrolledStudent.email,
-    avatar: enrolledStudent.avatar,
+    // `studentData.student.avatar` vient de `buildStudentProfile` côté
+    // serveur, qui donne déjà la priorité à la photo perso de l'élève
+    // (`PUT /auth/profile/avatar`) sur celle figée dans la fiche —
+    // `enrolledStudent.avatar` en repli seulement si l'élève n'a jamais
+    // téléversé sa propre photo. Corrige la Vue Complète qui affichait
+    // jusqu'ici la photo de fiche même après que l'élève ait changé la
+    // sienne (bug signalé par l'utilisateur).
+    avatar: studentData.student?.avatar || enrolledStudent.avatar,
     level: enrolledStudent.level,
     joinedDate: enrolledStudent.joinedDate,
     currentCapital: enrolledStudent.currentCapital,

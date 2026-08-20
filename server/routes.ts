@@ -24,7 +24,7 @@ import { requireAuth, type AuthContext } from "./auth/middleware";
 import { createRateLimit } from "./middleware/rateLimit";
 import { getEconomicCalendar } from "./economicCalendar";
 import { getMarketData } from "./marketData";
-import { buildStudentProfile } from "./auth/studentCredentials";
+import { buildStudentProfile, getStudentByEnrolledId } from "./auth/studentCredentials";
 import { DEFAULT_USER_ID, FOUNDER_COACH_ID } from "./db";
 
 export const api = Router();
@@ -209,6 +209,35 @@ function buildCoachesForStudent(): Array<Record<string, unknown>> {
 }
 
 /**
+ * Fusionne, pour chaque fiche élève, sa vraie photo de profil personnelle
+ * (téléversée par l'élève lui-même, `PUT /auth/profile/avatar`) par-dessus
+ * `avatar` de la fiche — même résolution que `buildStudentProfile`
+ * (`ownProfile.avatar` prioritaire sur `enrolled.avatar`), mais appliquée à
+ * TOUTE la collection d'un coup, pour la carte résumé du Suivi des Élèves
+ * (`StudentTracking.tsx`), qui affichait jusqu'ici la photo figée sur la
+ * fiche même après que l'élève ait changé la sienne — bug signalé par
+ * l'utilisateur, la fiche n'ayant jamais eu accès au bureau personnel de
+ * l'élève avant ce correctif.
+ *
+ * Une fiche sans accès élève actif (`getStudentByEnrolledId` renvoie `null`)
+ * n'a par construction aucun bureau personnel à consulter : elle repart
+ * inchangée.
+ */
+function withResolvedStudentAvatars<T extends { id: string; avatar?: unknown }>(
+  enrolledStudents: T[]
+): T[] {
+  return enrolledStudents.map((enrolled) => {
+    const account = getStudentByEnrolledId(enrolled.id);
+    if (!account) return enrolled;
+
+    const ownProfile = getProfile<{ avatar?: string }>(account.userId);
+    if (!ownProfile?.avatar) return enrolled;
+
+    return { ...enrolled, avatar: ownProfile.avatar };
+  });
+}
+
+/**
  * Payload de démarrage : toutes les collections en un aller-retour, dans les
  * formes exactes attendues par le client.
  *
@@ -243,6 +272,9 @@ api.get("/state", (req, res) => {
       // s'il est vide — c'est l'état correct.
       if (collection.length === 0 && (name === "badges" || name === "modules")) {
         return [name, undefined];
+      }
+      if (name === "enrolledStudents") {
+        return [name, withResolvedStudentAvatars(collection as { id: string; avatar?: unknown }[])];
       }
       return [name, collection];
     })
