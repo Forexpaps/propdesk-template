@@ -18,6 +18,7 @@ import { MindsetJournalModal } from "./components/MindsetJournalModal";
 import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
 import { LegalNoticeModal } from "./components/LegalNoticeModal";
 import { CGUModal } from "./components/CGUModal";
+import { PRIVACY_POLICY_URL } from "./lib/links";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
 import { ConfirmDialogHost, confirmDialog } from "./lib/confirmDialog";
 import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, getTradingPlanStorageKey, EMPTY_TRADING_PLAN } from "./lib/planCompliance";
@@ -823,6 +824,18 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
           <button onClick={() => setIsCguOpen(true)} className="hover:text-[#00E676] transition-colors">
             CGU
           </button>
+          {/* Politique de confidentialité : hébergée sur le site vitrine, pas
+              dans la plateforme (voir HANDOFF.md) — lien externe plutôt qu'un
+              modal. URL centralisée dans lib/links.ts (Vercel provisoire, pas
+              encore de domaine personnalisé). */}
+          <a
+            href={PRIVACY_POLICY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-[#00E676] transition-colors"
+          >
+            Politique de confidentialité
+          </a>
         </footer>
       </div>
 
@@ -1631,6 +1644,18 @@ function AcademyApp({
           <button onClick={() => setIsCguOpen(true)} className="hover:text-[#00E676] transition-colors">
             CGU
           </button>
+          {/* Politique de confidentialité : hébergée sur le site vitrine, pas
+              dans la plateforme (voir HANDOFF.md) — lien externe plutôt qu'un
+              modal. URL centralisée dans lib/links.ts (Vercel provisoire, pas
+              encore de domaine personnalisé). */}
+          <a
+            href={PRIVACY_POLICY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-[#00E676] transition-colors"
+          >
+            Politique de confidentialité
+          </a>
         </footer>
       </div>
 
