@@ -28,7 +28,7 @@ export const LegalNoticeModal: React.FC<LegalNoticeModalProps> = ({ isOpen, onCl
             </div>
             <div>
               <h3 className="text-base font-bold text-white">Mentions Légales</h3>
-              <p className="text-xs text-slate-400">Accompagnement Trading 1-to-1 — Version en vigueur au 19 août 2026</p>
+              <p className="text-xs text-slate-400">Accompagnement Trading 1-to-1 — Version en vigueur au 20 août 2026</p>
             </div>
           </div>
           <button
@@ -42,7 +42,7 @@ export const LegalNoticeModal: React.FC<LegalNoticeModalProps> = ({ isOpen, onCl
         <div className="flex-1 overflow-y-auto p-5 sm:p-6">
           <SectionTitle>1. Éditeur du site / de l'offre</SectionTitle>
           <P>
-            Thomas Gauthey — Auto-entrepreneur
+            Thomas Gauthey — Entrepreneur individuel (micro-entreprise)
             <br />
             SIRET : en cours d'attribution
             <br />
@@ -162,7 +162,7 @@ export const LegalNoticeModal: React.FC<LegalNoticeModalProps> = ({ isOpen, onCl
           </P>
 
           <div className="mt-5 pt-4 border-t border-[#1B2320] text-[11px] text-slate-500">
-            Dernière mise à jour : 19 août 2026 — Thomas Gauthey, Auto-entrepreneur
+            Dernière mise à jour : 20 août 2026 — Thomas Gauthey, entrepreneur individuel
           </div>
         </div>
 

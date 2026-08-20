@@ -17,6 +17,7 @@ import { NotificationModal } from "./components/NotificationModal";
 import { MindsetJournalModal } from "./components/MindsetJournalModal";
 import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
 import { LegalNoticeModal } from "./components/LegalNoticeModal";
+import { CGUModal } from "./components/CGUModal";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
 import { ConfirmDialogHost, confirmDialog } from "./lib/confirmDialog";
 import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, getTradingPlanStorageKey, EMPTY_TRADING_PLAN } from "./lib/planCompliance";
@@ -521,6 +522,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
   const [isLegalNoticeOpen, setIsLegalNoticeOpen] = useState(false);
+  const [isCguOpen, setIsCguOpen] = useState(false);
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileModalTab, setProfileModalTab] = useState<"profile" | "badges">("profile");
@@ -800,14 +802,18 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         </main>
 
         <footer className="px-4 sm:px-8 py-4 flex items-center justify-between gap-4 text-[11px] text-slate-500 max-w-7xl w-full mx-auto">
-          <span>© {new Date().getFullYear()} Thomas Gauthey — Trader</span>
+          <span>© {new Date().getFullYear()} Thomas Gauthey — Entrepreneur individuel</span>
           <button onClick={() => setIsLegalNoticeOpen(true)} className="hover:text-[#00E676] transition-colors">
             Mentions légales
+          </button>
+          <button onClick={() => setIsCguOpen(true)} className="hover:text-[#00E676] transition-colors">
+            CGU
           </button>
         </footer>
       </div>
 
       <LegalNoticeModal isOpen={isLegalNoticeOpen} onClose={() => setIsLegalNoticeOpen(false)} />
+      <CGUModal isOpen={isCguOpen} onClose={() => setIsCguOpen(false)} />
       <ConfirmDialogHost />
       <MindsetJournalModal
         isOpen={isMindsetModalOpen}
@@ -946,6 +952,7 @@ function AcademyApp({
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
   const [isLegalNoticeOpen, setIsLegalNoticeOpen] = useState(false);
+  const [isCguOpen, setIsCguOpen] = useState(false);
   const [isStaffAccountsOpen, setIsStaffAccountsOpen] = useState(false);
   const [isSecurityLogOpen, setIsSecurityLogOpen] = useState(false);
 
@@ -1603,14 +1610,18 @@ function AcademyApp({
         </main>
 
         <footer className="px-4 sm:px-8 py-4 flex items-center justify-between gap-4 text-[11px] text-slate-500 max-w-7xl w-full mx-auto">
-          <span>© {new Date().getFullYear()} Thomas Gauthey — Trader</span>
+          <span>© {new Date().getFullYear()} Thomas Gauthey — Entrepreneur individuel</span>
           <button onClick={() => setIsLegalNoticeOpen(true)} className="hover:text-[#00E676] transition-colors">
             Mentions légales
+          </button>
+          <button onClick={() => setIsCguOpen(true)} className="hover:text-[#00E676] transition-colors">
+            CGU
           </button>
         </footer>
       </div>
 
       <LegalNoticeModal isOpen={isLegalNoticeOpen} onClose={() => setIsLegalNoticeOpen(false)} />
+      <CGUModal isOpen={isCguOpen} onClose={() => setIsCguOpen(false)} />
       <ConfirmDialogHost />
 
       {/* User Profile Edition Modal */}
