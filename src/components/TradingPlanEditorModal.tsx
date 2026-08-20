@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ClipboardList, X, Check } from "lucide-react";
 import { TradingPlanData } from "../types";
-import { getTradingPlanStorageKey } from "../lib/planCompliance";
+import { getTradingPlanStorageKey, EMPTY_TRADING_PLAN } from "../lib/planCompliance";
 
 interface TradingPlanEditorModalProps {
   isOpen: boolean;
@@ -13,63 +13,87 @@ interface TradingPlanEditorModalProps {
    * plan de l'autre (voir `src/lib/planCompliance.ts`).
    */
   storageKey?: string;
+  /**
+   * Mode contrôlé : la valeur et sa persistance (serveur + cache local) sont
+   * portées par l'appelant (`App.tsx`, via `useSyncedState`), pas par ce
+   * composant. Sans ces deux props, le composant retombe sur son ancien
+   * comportement autonome (lecture/écriture directe de `localStorage`) —
+   * c'est le cas de l'instance côté bureau staff, jamais synchronisée au
+   * serveur.
+   */
+  plan?: TradingPlanData;
+  onChange?: (plan: TradingPlanData) => void;
+  /**
+   * Vue Complète du coach : consultation seule, aucune saisie ni bouton
+   * "Enregistrer" — le plan appartient à l'élève, voir `saveTradingPlan`
+   * (`server/repositories.ts`), qui n'a pas de route d'écriture côté staff.
+   */
+  readOnly?: boolean;
 }
 
 const SESSIONS = ["Asie", "Londres", "New York"];
 
-const EMPTY_PLAN: TradingPlanData = {
-  authorizedSessions: [],
-  tradingHours: "",
-  trackedAssets: "",
-  authorizedSetups: "",
-  riskPerTradePercent: "",
-  maxTradesPerDay: "",
-  maxDailyLossPercent: "",
-  entryConditions: "",
-  stopConditions: "",
-  goldenRules: "",
-};
-
 const loadPlan = (storageKey?: string): TradingPlanData => {
   try {
     const saved = localStorage.getItem(getTradingPlanStorageKey(storageKey));
-    return saved ? { ...EMPTY_PLAN, ...JSON.parse(saved) } : EMPTY_PLAN;
+    return saved ? { ...EMPTY_TRADING_PLAN, ...JSON.parse(saved) } : EMPTY_TRADING_PLAN;
   } catch {
-    return EMPTY_PLAN;
+    return EMPTY_TRADING_PLAN;
   }
 };
 
 const inputClass =
-  "w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-[#00E676]/50 placeholder-slate-600";
+  "w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none focus:border-[#00E676]/50 placeholder-slate-600 disabled:opacity-70 disabled:cursor-not-allowed";
 
 export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
   isOpen,
   onClose,
   storageKey,
+  plan: controlledPlan,
+  onChange,
+  readOnly = false,
 }) => {
-  const [plan, setPlan] = useState<TradingPlanData>(() => loadPlan(storageKey));
+  // `onChange` est facultatif quand `readOnly` : la Vue Complète du coach
+  // passe `plan` sans jamais avoir besoin d'écrire dessus.
+  const isControlled = controlledPlan !== undefined;
+
+  const [localPlan, setLocalPlan] = useState<TradingPlanData>(() => loadPlan(storageKey));
   const [showSaved, setShowSaved] = useState(false);
 
+  const plan = isControlled ? (controlledPlan as TradingPlanData) : localPlan;
+  const setPlan: React.Dispatch<React.SetStateAction<TradingPlanData>> = (update) => {
+    if (isControlled) {
+      onChange?.(typeof update === "function" ? (update as (p: TradingPlanData) => TradingPlanData)(plan) : update);
+    } else {
+      setLocalPlan(update);
+    }
+  };
+
   // Recharge depuis le stockage à chaque ouverture — au cas où un autre
-  // onglet du même navigateur aurait modifié le plan entre-temps.
+  // onglet du même navigateur aurait modifié le plan entre-temps. Non
+  // pertinent en mode contrôlé : la valeur vient déjà de l'état synchronisé
+  // de l'appelant, toujours à jour.
   useEffect(() => {
-    if (isOpen) setPlan(loadPlan(storageKey));
-  }, [isOpen, storageKey]);
+    if (isOpen && !isControlled) setLocalPlan(loadPlan(storageKey));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, storageKey, isControlled]);
 
   // Enregistrement automatique (500ms après la dernière frappe) — conservé
-  // tel quel. Un bouton "Enregistrer" explicite a été ajouté en plus (voir
+  // tel quel, mode non-contrôlé uniquement (en mode contrôlé, l'appelant
+  // gère déjà son propre débounce de synchronisation, voir `useSyncedState`).
+  // Un bouton "Enregistrer" explicite a été ajouté en plus (voir
   // `handleSaveNow` plus bas) : l'auto-save seul laissait l'utilisateur
   // sans action claire à poser une fois son plan rempli.
   const isFirstRun = useRef(true);
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || isControlled) return;
     if (isFirstRun.current) {
       isFirstRun.current = false;
       return;
     }
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem(getTradingPlanStorageKey(storageKey), JSON.stringify(plan));
+        localStorage.setItem(getTradingPlanStorageKey(storageKey), JSON.stringify(localPlan));
       } catch {
         // Quota dépassé ou navigation privée : rien à faire de plus ici.
       }
@@ -77,7 +101,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
       setTimeout(() => setShowSaved(false), 1500);
     }, 500);
     return () => clearTimeout(timer);
-  }, [plan, isOpen]);
+  }, [localPlan, isOpen, isControlled, storageKey]);
 
   useEffect(() => {
     if (isOpen) isFirstRun.current = true;
@@ -86,8 +110,16 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
   if (!isOpen) return null;
 
   const handleSaveNow = () => {
+    if (isControlled) {
+      // La sauvegarde elle-même est déjà déclenchée par `onChange` à chaque
+      // frappe (débounce porté par `useSyncedState`) — ce bouton ne fait
+      // qu'offrir le même retour visuel immédiat qu'en mode autonome.
+      setShowSaved(true);
+      setTimeout(() => setShowSaved(false), 1500);
+      return;
+    }
     try {
-      localStorage.setItem(getTradingPlanStorageKey(storageKey), JSON.stringify(plan));
+      localStorage.setItem(getTradingPlanStorageKey(storageKey), JSON.stringify(localPlan));
     } catch {
       // Quota dépassé ou navigation privée : rien à faire de plus ici.
     }
@@ -114,16 +146,20 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
               <ClipboardList className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white">Mon plan de trading</h3>
+              <h3 className="text-base font-bold text-white">
+                {readOnly ? "Plan de trading" : "Mon plan de trading"}
+              </h3>
               <p className="text-xs text-slate-400 flex items-center gap-1.5">
-                Ta discipline en un écran.
-                <span
-                  className={`transition-opacity duration-300 flex items-center gap-1 text-[#00E676] font-semibold ${
-                    showSaved ? "opacity-100" : "opacity-0"
-                  }`}
-                >
-                  <Check className="w-3 h-3" /> Enregistré
-                </span>
+                {readOnly ? "Consultation seule — écrit par l'élève." : "Ta discipline en un écran."}
+                {!readOnly && (
+                  <span
+                    className={`transition-opacity duration-300 flex items-center gap-1 text-[#00E676] font-semibold ${
+                      showSaved ? "opacity-100" : "opacity-0"
+                    }`}
+                  >
+                    <Check className="w-3 h-3" /> Enregistré
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -144,8 +180,9 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
                 <button
                   key={session}
                   type="button"
+                  disabled={readOnly}
                   onClick={() => toggleSession(session)}
-                  className={`px-3.5 py-1.5 rounded-lg border text-xs font-bold transition-all ${
+                  className={`px-3.5 py-1.5 rounded-lg border text-xs font-bold transition-all disabled:cursor-not-allowed ${
                     plan.authorizedSessions.includes(session)
                       ? "bg-[#00E676]/15 border-[#00E676] text-[#00E676]"
                       : "bg-[#0D1110] border-[#1B2320] text-slate-400 hover:text-white"
@@ -167,6 +204,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
                 onChange={(e) => setPlan((p) => ({ ...p, tradingHours: e.target.value }))}
                 placeholder="ex : 09h–12h et 15h–18h"
                 className={inputClass}
+                disabled={readOnly}
               />
             </div>
             <div>
@@ -177,6 +215,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
                 onChange={(e) => setPlan((p) => ({ ...p, trackedAssets: e.target.value }))}
                 placeholder="EUR/USD, XAU, NAS100, BTC..."
                 className={inputClass}
+                disabled={readOnly}
               />
             </div>
           </div>
@@ -190,6 +229,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
               onChange={(e) => setPlan((p) => ({ ...p, authorizedSetups: e.target.value }))}
               placeholder="Breakout retest, FVG H1, order block..."
               className={inputClass}
+              disabled={readOnly}
             />
           </div>
 
@@ -204,6 +244,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
                 onChange={(e) => setPlan((p) => ({ ...p, riskPerTradePercent: e.target.value }))}
                 placeholder="1"
                 className={`${inputClass} font-mono`}
+                disabled={readOnly}
               />
             </div>
             <div>
@@ -214,6 +255,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
                 onChange={(e) => setPlan((p) => ({ ...p, maxTradesPerDay: e.target.value }))}
                 placeholder="3"
                 className={`${inputClass} font-mono`}
+                disabled={readOnly}
               />
             </div>
             <div>
@@ -225,6 +267,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
                 onChange={(e) => setPlan((p) => ({ ...p, maxDailyLossPercent: e.target.value }))}
                 placeholder="3"
                 className={`${inputClass} font-mono`}
+                disabled={readOnly}
               />
             </div>
           </div>
@@ -239,6 +282,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
                 onChange={(e) => setPlan((p) => ({ ...p, entryConditions: e.target.value }))}
                 placeholder="Ce qui doit être réuni pour entrer..."
                 className={`${inputClass} resize-none`}
+                disabled={readOnly}
               />
             </div>
             <div>
@@ -249,6 +293,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
                 onChange={(e) => setPlan((p) => ({ ...p, stopConditions: e.target.value }))}
                 placeholder="Quand j'arrête : -3%, 2 pertes d'affilée, tilt..."
                 className={`${inputClass} resize-none`}
+                disabled={readOnly}
               />
             </div>
           </div>
@@ -262,6 +307,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
               onChange={(e) => setPlan((p) => ({ ...p, goldenRules: e.target.value }))}
               placeholder="Ne jamais bouger mon stop. Pas de trade sur émotion. Respecter le plan."
               className={`${inputClass} resize-none`}
+              disabled={readOnly}
             />
           </div>
         </div>
@@ -274,12 +320,14 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
           >
             Fermer
           </button>
-          <button
-            onClick={handleSaveNow}
-            className="px-5 py-2.5 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-xs shadow-lg shadow-[#00E676]/20 flex items-center gap-1.5"
-          >
-            <Check className="w-3.5 h-3.5" /> Enregistrer
-          </button>
+          {!readOnly && (
+            <button
+              onClick={handleSaveNow}
+              className="px-5 py-2.5 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-xs shadow-lg shadow-[#00E676]/20 flex items-center gap-1.5"
+            >
+              <Check className="w-3.5 h-3.5" /> Enregistrer
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -138,6 +138,25 @@ export const updateAvatarSchema = z.object({
 });
 
 /**
+ * Plan de trading d'un élève (`TradingPlanData`, `src/types.ts`) — un objet
+ * unique, jamais un tableau. Bornes larges (les champs texte sont saisis à la
+ * main dans un formulaire) mais présentes, même raisonnement que
+ * `quizResultEntrySchema` juste en dessous.
+ */
+export const tradingPlanSchema = z.object({
+  authorizedSessions: z.array(z.string().max(50)).max(20),
+  tradingHours: z.string().max(200),
+  trackedAssets: z.string().max(500),
+  authorizedSetups: z.string().max(500),
+  riskPerTradePercent: z.string().max(20),
+  maxTradesPerDay: z.string().max(20),
+  maxDailyLossPercent: z.string().max(20),
+  entryConditions: z.string().max(2000),
+  stopConditions: z.string().max(2000),
+  goldenRules: z.string().max(2000),
+});
+
+/**
  * Un seul résultat de quiz de module — voir `ModuleQuizResult` dans
  * `src/types.ts`. Bornée (au lieu de `z.unknown()`) : la seule protection
  * précédente était la limite globale de 8 Mo sur le corps de la requête,

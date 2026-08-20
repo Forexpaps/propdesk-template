@@ -19,7 +19,7 @@ import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
 import { LegalNoticeModal } from "./components/LegalNoticeModal";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
 import { ConfirmDialogHost, confirmDialog } from "./lib/confirmDialog";
-import { loadTradingPlan, checkPlanViolations, upsertPlanAlert } from "./lib/planCompliance";
+import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, getTradingPlanStorageKey, EMPTY_TRADING_PLAN } from "./lib/planCompliance";
 import { computeBadgeProgress } from "./lib/badges";
 import { listPending } from "./lib/pendingChanges";
 
@@ -46,6 +46,7 @@ import {
   TradeDraft,
   Coach,
   FOUNDER_COACH_ID,
+  TradingPlanData,
 } from "./types";
 import { isTabType, type TabType as SidebarTabType } from "./components/Sidebar";
 
@@ -306,7 +307,7 @@ function resolveStudentValue<T>(serverValue: T, localKey: string): T {
  * périmètre de l'accès élève.
  */
 function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
-  const { status, trades, accounts, modules, messages, badges, notifications, quizResults, student, setStudent, coaches } = useStudentBootstrap();
+  const { status, trades, accounts, modules, messages, badges, notifications, quizResults, student, setStudent, coaches, tradingPlan } = useStudentBootstrap();
   const syncEnabled = status === "online";
 
   // Bandeau d'avertissement immédiat quand une sauvegarde échoue en
@@ -377,6 +378,21 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     syncEnabled,
     reportSyncError
   );
+  /**
+   * Plan de trading — même clé de cache que `TradingPlanEditorModal`/
+   * `planCompliance.ts` (namespacée par email, voir `getTradingPlanStorageKey`)
+   * pour que `applyPlanCompliance` (qui relit ce cache directement, plus bas)
+   * voie toujours la même valeur que celle réellement synchronisée au
+   * serveur. `EMPTY_TRADING_PLAN` en solde par défaut : un élève qui n'a
+   * jamais enregistré son plan édite un formulaire vide, pas une erreur.
+   */
+  const [syncedTradingPlan, setSyncedTradingPlan] = useSyncedState<TradingPlanData>(
+    getTradingPlanStorageKey(student?.email),
+    tradingPlan ?? EMPTY_TRADING_PLAN,
+    (v) => api.saveTradingPlan(v),
+    syncEnabled,
+    reportSyncError
+  );
 
   // `useSyncedState` initialise sa valeur une seule fois, au montage — tant
   // que le chargement serveur n'est pas revenu, on affiche un état vide plutôt
@@ -390,6 +406,9 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     setSyncedBadges(resolveStudentValue(badges, "horizon_student_badges"));
     setSyncedNotifications(resolveStudentValue(notifications, "horizon_student_notifications"));
     setSyncedQuizResults(resolveStudentValue(quizResults, "horizon_student_quiz_results"));
+    setSyncedTradingPlan(
+      resolveStudentValue(tradingPlan ?? EMPTY_TRADING_PLAN, getTradingPlanStorageKey(student?.email))
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
@@ -763,6 +782,8 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         isOpen={isTradingPlanOpen}
         onClose={() => setIsTradingPlanOpen(false)}
         storageKey={studentProfile.email}
+        plan={syncedTradingPlan}
+        onChange={setSyncedTradingPlan}
       />
       <NotificationModal
         isOpen={isNotificationsModalOpen}

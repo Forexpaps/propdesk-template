@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
-import { loginSchema, changePasswordSchema, consumeResetTokenSchema, updateAvatarSchema } from "../schemas";
+import { loginSchema, changePasswordSchema, consumeResetTokenSchema, updateAvatarSchema, tradingPlanSchema } from "../schemas";
 import { createRateLimit } from "../middleware/rateLimit";
-import { getProfile, saveProfile } from "../repositories";
+import { getProfile, saveProfile, saveTradingPlan } from "../repositories";
 import { normalizeEmail } from "./credentials";
 import { getLockoutStatus, registerFailedLogin, clearLoginFailures } from "./loginLockout";
 import { hashPassword, verifyPassword, needsRehash, verifyAgainstDecoy } from "./password";
@@ -293,6 +293,38 @@ studentProtectedRouter.put(
     const current = getProfile<Record<string, unknown>>(student.userId) ?? {};
     saveProfile({ ...current, avatar: parsed.data.avatar }, student.userId);
 
+    res.status(204).end();
+  })
+);
+
+/**
+ * Enregistre le plan de trading de l'élève connecté — seul propriétaire
+ * autorisé à l'écrire (voir `getTradingPlan` dans la Vue Complète du coach,
+ * `server/auth/routes.ts`, qui ne l'expose qu'en lecture, aucune route
+ * d'écriture n'étant proposée au staff).
+ */
+studentProtectedRouter.put(
+  "/trading-plan",
+  requireStudentKind,
+  createRateLimit({
+    windowMs: 15 * 60_000,
+    max: 60,
+    message: "Trop d'écritures. Réessaie dans quelques minutes.",
+  }),
+  wrap(async (req, res) => {
+    const parsed = tradingPlanSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Plan de trading invalide." });
+      return;
+    }
+
+    const student = getStudentById(req.auth!.userId);
+    if (!student) {
+      res.status(404).json({ error: "Compte introuvable." });
+      return;
+    }
+
+    saveTradingPlan(parsed.data, student.userId);
     res.status(204).end();
   })
 );
