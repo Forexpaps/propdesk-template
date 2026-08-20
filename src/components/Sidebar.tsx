@@ -339,9 +339,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         // Les entrées-modales n'ont pas d'onglet : jamais actives.
         const isActive = item.id !== null && activeTab === item.id;
+        // Une entrée-modale (id null) sans callback fourni par le parent ne
+        // peut rien ouvrir — cas de `AdminStudentView.tsx` (Vue Complète en
+        // lecture seule), qui ne branche jamais `onOpenTradingPlan`/
+        // `onOpenMindset` : ces outils vivent en `localStorage` sur
+        // l'appareil de l'ÉLÈVE, jamais synchronisés sur le serveur, donc
+        // structurellement impossibles à consulter depuis le navigateur du
+        // coach. Repéré en audit : le clic ne faisait auparavant RIEN de
+        // visible (juste un survol), ce qui ressemblait à un bug plutôt qu'à
+        // une limite connue — désormais visuellement désactivé, avec
+        // l'explication en infobulle.
+        const isUnavailableModalEntry = item.id === null && !item.onOpen;
         return (
           <button
             key={item.key}
+            disabled={isUnavailableModalEntry}
             onClick={() => {
               if (item.onOpen) {
                 item.onOpen();
@@ -350,9 +362,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }
               setMobileOpen(false);
             }}
-            title={isCollapsed ? item.label : undefined}
+            title={
+              isUnavailableModalEntry
+                ? "Outil personnel de l'élève (stocké sur son appareil), non consultable depuis cette vue."
+                : isCollapsed
+                ? item.label
+                : undefined
+            }
             className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-all ${
-              isActive
+              isUnavailableModalEntry
+                ? "text-slate-600 opacity-50 cursor-not-allowed"
+                : isActive
                 ? "bg-[#131B18] text-white border border-[#00E676]/30 font-semibold"
                 : "text-slate-400 hover:text-slate-100 hover:bg-[#131816]"
             }`}
