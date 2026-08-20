@@ -45,7 +45,7 @@ voir la note en bas de page pour la méthode. Les champs marqués
 | **Personnes concernées** | Élèves. |
 | **Données traitées** | Historique de trades (paire, direction, PnL, stratégie, notes, captures d'écran éventuelles), portefeuilles/comptes de trading déclarés (capital, type de compte), plan de trading personnel, setups/stratégies définis, progression aux modules vidéo et résultats de quiz, badges obtenus. **Aucune donnée financière réelle** (pas de connexion à un compte de courtage, pas de moyen de paiement) — ce sont des données déclaratives saisies par l'élève lui-même. |
 | **Destinataires** | L'élève lui-même, et le staff dans le cadre du suivi (Vue Complète en lecture seule pour le plan de trading et les setups — voir HANDOFF.md). |
-| **Durée de conservation** | Tant que le compte élève est actif. **[À COMPLÉTER — décision produit]** : durée de conservation après résiliation/fin d'accompagnement (recommandation CNIL usuelle : pas au-delà de la durée nécessaire, souvent 3 ans après la fin de la relation pour un usage probatoire, sinon suppression). |
+| **Durée de conservation** | Tant que le compte élève est actif. **À la résiliation (suppression de la fiche par le staff) : suppression immédiate et complète**, aucune conservation différée — décision explicite de l'utilisateur, mise en œuvre via l'effacement en cascade (voir §6, point 1). |
 | **Destinataires hors UE** | Aucun. |
 | **Mesures de sécurité** | Cloisonnement strict par compte (chaque élève n'accède qu'à ses propres données), séparation des bureaux de données (`user_id`), aucune donnée élève visible d'un autre élève. |
 
@@ -60,7 +60,7 @@ voir la note en bas de page pour la méthode. Les champs marqués
 | **Personnes concernées** | Élèves et staff. |
 | **Données traitées** | Contenu des messages, horodatage, statut de lecture. |
 | **Destinataires** | Les deux parties de la conversation uniquement. |
-| **Durée de conservation** | Tant que le compte élève est actif — **[À COMPLÉTER]** si une purge après un délai est souhaitée. |
+| **Durée de conservation** | Tant que le compte élève est actif. Suppression immédiate à la résiliation, même politique que §2 — les messages sont stockés dans le bureau personnel de l'élève, donc couverts par le même effacement en cascade. |
 | **Mesures de sécurité** | Filtrage par identifiant de conversation, aucun accès croisé entre élèves. |
 
 ---
@@ -111,9 +111,10 @@ en le rédigeant, à trancher :
    garde la fiche + l'historique pour le suivi du coach — comportement
    volontairement différent, l'effacement complet passe uniquement par la
    suppression de la fiche.
-2. **Durées de conservation "tant que le compte est actif"** (§2, §3) : pas
-   de politique explicite de purge après résiliation. À trancher — c'est une
-   décision produit, pas technique.
+2. ✅ **Durée de conservation après résiliation — tranchée.** Décision
+   explicite de l'utilisateur : suppression immédiate et complète à la
+   résiliation (suppression de la fiche), pas de délai de rétention
+   différé. Techniquement déjà en place (point 1 ci-dessus).
 3. **Sous-traitant technique (Railway)** : hébergeur en UE (Amsterdam), mais
    pas de DPA (Data Processing Agreement) formellement identifié dans ce
    dépôt. Railway propose un DPA standard sur demande — à vérifier/signer
