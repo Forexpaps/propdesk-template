@@ -48,9 +48,10 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
     if (isOpen) setPlan(loadPlan());
   }, [isOpen]);
 
-  // Enregistrement automatique — pas de bouton "Enregistrer", le texte
-  // "Enregistré automatiquement" doit être vrai. Sauvegarde en localStorage
-  // (voir la note dans `TradingPlanData`, `types.ts`, pour le choix).
+  // Enregistrement automatique (500ms après la dernière frappe) — conservé
+  // tel quel. Un bouton "Enregistrer" explicite a été ajouté en plus (voir
+  // `handleSaveNow` plus bas) : l'auto-save seul laissait l'utilisateur
+  // sans action claire à poser une fois son plan rempli.
   const isFirstRun = useRef(true);
   useEffect(() => {
     if (!isOpen) return;
@@ -75,6 +76,16 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const handleSaveNow = () => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
+    } catch {
+      // Quota dépassé ou navigation privée : rien à faire de plus ici.
+    }
+    setShowSaved(true);
+    setTimeout(() => setShowSaved(false), 1500);
+  };
 
   const toggleSession = (session: string) => {
     setPlan((prev) => ({
@@ -248,12 +259,18 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end px-5 sm:px-6 py-4 border-t border-[#1B2320] shrink-0">
+        <div className="flex items-center justify-end gap-3 px-5 sm:px-6 py-4 border-t border-[#1B2320] shrink-0">
           <button
             onClick={onClose}
-            className="px-5 py-2.5 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-xs shadow-lg shadow-[#00E676]/20"
+            className="px-4 py-2.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 font-bold text-xs"
           >
             Fermer
+          </button>
+          <button
+            onClick={handleSaveNow}
+            className="px-5 py-2.5 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-xs shadow-lg shadow-[#00E676]/20 flex items-center gap-1.5"
+          >
+            <Check className="w-3.5 h-3.5" /> Enregistrer
           </button>
         </div>
       </div>
