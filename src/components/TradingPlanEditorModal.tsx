@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { ClipboardList, X, Check } from "lucide-react";
-import { TradingPlanData } from "../types";
+import { TradingPlanData, Setup } from "../types";
 import { getTradingPlanStorageKey, EMPTY_TRADING_PLAN } from "../lib/planCompliance";
 
 interface TradingPlanEditorModalProps {
@@ -29,9 +29,24 @@ interface TradingPlanEditorModalProps {
    * (`server/repositories.ts`), qui n'a pas de route d'écriture côté staff.
    */
   readOnly?: boolean;
+  /**
+   * Setups de l'élève (module Setups, voir `SetupManagement.tsx`) — source du
+   * multi-choix `authorizedSetups`, qui reste stocké comme une chaîne de noms
+   * séparés par des virgules (voir le commentaire de `TradingPlanData` dans
+   * `src/types.ts`). Vide côté bureau staff (son plan personnel n'est pas
+   * relié à une liste de setups).
+   */
+  setups?: Setup[];
 }
 
 const SESSIONS = ["Asie", "Londres", "New York"];
+
+/** `authorizedSetups` "A, B, C" -> `["A", "B", "C"]`, en filtrant les entrées vides. */
+const parseAuthorizedSetups = (value: string): string[] =>
+  value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
 const loadPlan = (storageKey?: string): TradingPlanData => {
   try {
@@ -52,6 +67,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
   plan: controlledPlan,
   onChange,
   readOnly = false,
+  setups = [],
 }) => {
   // `onChange` est facultatif quand `readOnly` : la Vue Complète du coach
   // passe `plan` sans jamais avoir besoin d'écrire dessus.
@@ -134,6 +150,15 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
         ? prev.authorizedSessions.filter((s) => s !== session)
         : [...prev.authorizedSessions, session],
     }));
+  };
+
+  const authorizedSetupNames = parseAuthorizedSetups(plan.authorizedSetups);
+  const toggleSetup = (name: string) => {
+    setPlan((prev) => {
+      const current = parseAuthorizedSetups(prev.authorizedSetups);
+      const next = current.includes(name) ? current.filter((s) => s !== name) : [...current, name];
+      return { ...prev, authorizedSetups: next.join(", ") };
+    });
   };
 
   return (
@@ -222,15 +247,32 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
 
           {/* Setups autorisés */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 mb-1.5">Setups autorisés</label>
-            <input
-              type="text"
-              value={plan.authorizedSetups}
-              onChange={(e) => setPlan((p) => ({ ...p, authorizedSetups: e.target.value }))}
-              placeholder="Breakout retest, FVG H1, order block..."
-              className={inputClass}
-              disabled={readOnly}
-            />
+            <label className="block text-xs font-bold text-slate-300 mb-2">Setups autorisés</label>
+            {setups.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {setups.map((setup) => (
+                  <button
+                    key={setup.id}
+                    type="button"
+                    disabled={readOnly}
+                    onClick={() => toggleSetup(setup.name)}
+                    className={`px-3.5 py-1.5 rounded-lg border text-xs font-bold transition-all disabled:cursor-not-allowed ${
+                      authorizedSetupNames.includes(setup.name)
+                        ? "bg-[#00E676]/15 border-[#00E676] text-[#00E676]"
+                        : "bg-[#0D1110] border-[#1B2320] text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {setup.name}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-500 bg-[#0D1110] border border-dashed border-[#1B2320] rounded-xl px-3.5 py-2.5">
+                {readOnly
+                  ? "L'élève n'a encore défini aucun setup."
+                  : "Décris d'abord tes setups dans l'onglet « Setups » pour pouvoir les autoriser ici."}
+              </p>
+            )}
           </div>
 
           {/* Risque / Nb trades / Perte max */}

@@ -10,6 +10,7 @@ import {
   ModuleQuizResult,
   Coach,
   TradingPlanData,
+  Setup,
 } from "../types";
 
 /** Collections synchronisées avec le serveur, dans les formes de src/types.ts. */
@@ -21,6 +22,7 @@ export interface ServerCollections {
   enrolledStudents: EnrolledStudent[];
   badges: TraderBadge[];
   modules: Module[];
+  setups: Setup[];
 }
 
 export type CollectionName = keyof ServerCollections;
@@ -355,6 +357,7 @@ export const api = {
         trades: Trade[];
         modules: Module[];
         messages: CoachMessage[];
+        setups: Setup[];
       };
       tradingPlan: TradingPlanData | null;
     }>(`/api/auth/admin/students/${encodeURIComponent(enrolledStudentId)}/view`),

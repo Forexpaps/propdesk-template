@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { X, AlertCircle, Loader, Send } from "lucide-react";
-import { EnrolledStudent, StudentProfile, Trade, TradingAccount, Module, CoachMessage, TradingPlanData } from "../types";
+import { EnrolledStudent, StudentProfile, Trade, TradingAccount, Module, CoachMessage, TradingPlanData, Setup } from "../types";
 import { api } from "../lib/api";
 import { TradingJournal } from "./TradingJournal";
 import { PerformanceDashboard } from "./PerformanceDashboard";
@@ -10,6 +10,7 @@ import { MacroDashboard } from "./MacroDashboard";
 import { Sidebar, SidebarItemKey, TabType } from "./Sidebar";
 import { TopHeader } from "./TopHeader";
 import { TradingPlanEditorModal } from "./TradingPlanEditorModal";
+import { SetupManagement } from "./SetupManagement";
 import { EMPTY_TRADING_PLAN } from "../lib/planCompliance";
 
 interface AdminStudentViewProps {
@@ -37,6 +38,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
     modules: Module[];
     messages: CoachMessage[];
     tradingPlan: TradingPlanData | null;
+    setups: Setup[];
   } | null>(null);
   const [replyText, setReplyText] = useState("");
   const [sending, setSending] = useState(false);
@@ -55,6 +57,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
         modules: data.collections.modules,
         messages: data.collections.messages,
         tradingPlan: data.tradingPlan,
+        setups: data.collections.setups,
       });
     } catch (err) {
       setError((err as Error).message || "Impossible de charger la vue de l'élève.");
@@ -140,7 +143,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
   // dès que le réglage de visibilité les autorise pour les élèves (fusionné
   // plus haut), mais n'a pas d'équivalent lecture seule ici — un clic
   // affichait auparavant une page vide plutôt qu'un message explicite.
-  const SUPPORTED_TABS: TabType[] = ["dashboard", "journal", "wallets", "analytics", "macro", "messaging"];
+  const SUPPORTED_TABS: TabType[] = ["dashboard", "journal", "wallets", "analytics", "macro", "messaging", "setups"];
 
   // Sidebar restreinte via `hiddenSidebarItems` fusionné depuis le serveur.
   // Le profil élève (studentData.student) contient déjà la fusion du réglage
@@ -239,6 +242,16 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
 
             {activeTab === "macro" && <MacroDashboard />}
 
+            {activeTab === "setups" && (
+              <SetupManagement
+                setups={studentData.setups}
+                onAddSetup={() => {}}
+                onUpdateSetup={() => {}}
+                onDeleteSetup={() => {}}
+                readOnly
+              />
+            )}
+
             {activeTab === "messaging" && (
               <div className="space-y-4">
                 <h1 className="text-2xl font-bold text-white">Messagerie — {studentData.enrolledStudents.find((s) => s.id === enrolledStudentId)?.name}</h1>
@@ -308,6 +321,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
         isOpen={isTradingPlanOpen}
         onClose={() => setIsTradingPlanOpen(false)}
         plan={studentData.tradingPlan ?? EMPTY_TRADING_PLAN}
+        setups={studentData.setups}
         readOnly
       />
     </div>

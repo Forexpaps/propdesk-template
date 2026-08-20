@@ -192,11 +192,18 @@ export interface CoachMessage {
 /**
  * Contenu du module « Plan de trading » (section Pratique).
  *
- * Persisté en `localStorage` (`horizon_trading_plan`) et non sur le profil
- * serveur — même choix que `MindsetJournalModal`, voir ce composant : la
- * route `PUT /api/profile` est réservée au staff (le profil élève n'existe
- * pas en tant que tel), un vrai module multi-appareils demanderait une
- * collection serveur dédiée, hors périmètre de cette demande.
+ * Élève : synchronisé serveur (`PUT /auth/trading-plan`, `getTradingPlan`/
+ * `saveTradingPlan` dans `server/repositories.ts`), avec mise en cache locale
+ * via `useSyncedState` — voir `src/App.tsx`. Le coach le consulte en lecture
+ * seule dans la Vue Complète (`AdminStudentView.tsx`), sans route d'écriture
+ * exposée côté staff. L'instance du bureau staff (son propre plan personnel)
+ * reste en `localStorage` seul, non synchronisée — hors périmètre demandé.
+ *
+ * `authorizedSetups` : chaîne de noms de `Setup` séparés par des virgules,
+ * choisis parmi ceux de l'élève (voir `SetupManagement.tsx`) — même format
+ * texte que `matchesAny` (`src/lib/planCompliance.ts`) attendait déjà, donc
+ * aucun changement de schéma nécessaire pour passer d'un champ libre à une
+ * sélection dans une liste.
  */
 export interface TradingPlanData {
   authorizedSessions: string[];
@@ -209,6 +216,24 @@ export interface TradingPlanData {
   entryConditions: string;
   stopConditions: string;
   goldenRules: string;
+}
+
+/**
+ * Une stratégie de trading définie par l'élève — remplace la liste figée de
+ * 6 stratégies codées en dur dans `TradingJournal.tsx` (`Trade.strategy`) et
+ * sert de source pour la sélection multiple `authorizedSetups` du Plan de
+ * trading. Ne pas confondre avec l'ancien module "Audit Setup" (retiré sur
+ * demande explicite) : pas de scoring de confluences, juste une fiche
+ * descriptive libre par stratégie.
+ */
+export interface Setup {
+  id: string;
+  name: string;
+  description: string;
+  entryConditions: string;
+  exitConditions: string;
+  timeframes: string;
+  assets: string;
 }
 
 export interface StudentProfile {
