@@ -101,8 +101,12 @@ export const profileSchema = z
       .refine((v) => v === "" || z.email().safeParse(v).success, {
         message: "Adresse e-mail invalide.",
       }),
-    startingCapital: z.number().finite(),
-    currentCapital: z.number().finite(),
+    // `>= 0`, pas `> 0` comme `isValidInitialBalance` : contrairement à un
+    // compte de trading, un profil sans aucun portefeuille encore créé a
+    // légitimement `startingCapital: 0` (voir `App.tsx`, dérivé de la somme
+    // des comptes réels). Négatif en revanche n'a aucun sens ici.
+    startingCapital: z.number().finite().min(0),
+    currentCapital: z.number().finite().min(0),
   })
   .passthrough()
   .refine((profile) => isSafeMediaUrl((profile as Record<string, unknown>).avatar), {

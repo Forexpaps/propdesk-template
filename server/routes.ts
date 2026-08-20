@@ -271,8 +271,15 @@ function writeCollectionForAuth(
     return { ok: false, status: 403, error: "Action réservée au staff." };
   }
 
-  // Les fiches élèves contiennent les notes privées du coach : sans ce contrôle,
-  // la protection de la vue côté client ne serait que cosmétique.
+  // Repéré en audit : cette branche ne peut aujourd'hui jamais se déclencher
+  // — un élève est déjà arrêté juste au-dessus (`STUDENT_ALLOWED_COLLECTIONS`
+  // n'inclut pas `enrolledStudents`), et tout compte staff a `isAdmin: true`
+  // forcé (`buildStaffProfile`, `tryStaffAuth` ci-dessous) : "tous les
+  // comptes staff ont les mêmes droits" est le principe actuel du projet
+  // (voir HANDOFF.md). Gardée telle quelle en défense en profondeur pour le
+  // jour où des rôles staff différenciés seraient réintroduits — mais elle
+  // n'offre aucune protection réelle tant que ce jour n'est pas arrivé,
+  // contrairement à ce que suggérait l'ancien commentaire de cette ligne.
   if (ADMIN_ONLY_COLLECTIONS.has(name) && auth.isAdmin !== true) {
     return { ok: false, status: 403, error: "Action réservée à l'administrateur." };
   }

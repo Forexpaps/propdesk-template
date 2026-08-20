@@ -176,9 +176,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleSidebarItem,
   canManageSidebar = false,
 }) => {
-  const capitalDiff = student.currentCapital - student.startingCapital;
-  const capitalDiffPercent = ((capitalDiff / student.startingCapital) * 100).toFixed(1);
-
   // Section dont le fondateur règle actuellement la visibilité.
   const [editingSection, setEditingSection] = React.useState<SectionName | null>(
     null
