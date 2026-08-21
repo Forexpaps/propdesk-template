@@ -229,16 +229,16 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     exitDate: new Date().toISOString().split("T")[0],
     exitTime: "16:00",
     accountId: SANS_COMPTE,
-    pnl: 0,
+    pnl: "0",
     pnlUnit: "USD" as PnlUnit,
     pair: "EUR/USD",
     marketCategory: "Forex" as MarketCategory,
     direction: "LONG" as TradeDirection,
-    entryPrice: 1.0850,
-    stopLoss: 1.0830,
-    takeProfit: 1.0910,
-    exitPrice: 1.0910,
-    lotSize: 1.0,
+    entryPrice: "1.0850",
+    stopLoss: "1.0830",
+    takeProfit: "1.0910",
+    exitPrice: "1.0910",
+    lotSize: "1",
     strategy: "",
     emotion: "Disciplined" as EmotionState,
     mistakes: [] as TradeMistake[],
@@ -253,16 +253,16 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     exitDate: new Date().toISOString().split("T")[0],
     exitTime: "16:00",
     accountId: SANS_COMPTE,
-    pnl: 0,
+    pnl: "0",
     pnlUnit: "USD" as PnlUnit,
     pair: "EUR/USD",
     marketCategory: "Forex" as MarketCategory,
     direction: "LONG" as TradeDirection,
-    entryPrice: 1.085,
-    stopLoss: 1.083,
-    takeProfit: 1.091,
-    exitPrice: 1.091,
-    lotSize: 1.0,
+    entryPrice: "1.085",
+    stopLoss: "1.083",
+    takeProfit: "1.091",
+    exitPrice: "1.091",
+    lotSize: "1",
     strategy: "",
     emotion: "Disciplined" as EmotionState,
     mistakes: [] as TradeMistake[],
@@ -291,16 +291,16 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       exitDate: trade.exitDate ?? "",
       exitTime: trade.exitTime ?? "",
       accountId: trade.accountId ?? SANS_COMPTE,
-      pnl: trade.pnl,
+      pnl: String(trade.pnl),
       pnlUnit: trade.pnlUnit ?? "USD",
       pair: trade.pair,
       marketCategory: trade.marketCategory,
       direction: trade.direction,
-      entryPrice: trade.entryPrice,
-      stopLoss: trade.stopLoss,
-      takeProfit: trade.takeProfit,
-      exitPrice: trade.exitPrice ?? 0,
-      lotSize: trade.lotSize,
+      entryPrice: String(trade.entryPrice),
+      stopLoss: String(trade.stopLoss),
+      takeProfit: String(trade.takeProfit),
+      exitPrice: String(trade.exitPrice ?? 0),
+      lotSize: String(trade.lotSize),
       strategy: trade.strategy,
       emotion: trade.emotion,
       mistakes: trade.mistakes ?? [],
@@ -417,12 +417,32 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     }
   };
 
+  /**
+   * Champs prix/PnL saisis en texte libre, jamais en `type="number"` : un
+   * input number renvoie une `value` DOM vide dès que son contenu n'est pas
+   * un nombre valide pour le *locale* du navigateur (virgule au lieu du
+   * point, point superflu, "0" qu'on essaie d'effacer pour retaper devant).
+   * Le champ contrôlé réaffichait alors aussitôt "0", effaçant la saisie en
+   * cours. Ici, la valeur reste une chaîne pendant toute la frappe (virgule
+   * convertie en point) et n'est convertie en nombre qu'à la soumission.
+   */
+  const handleDecimalChange = (
+    field: "entryPrice" | "stopLoss" | "takeProfit" | "exitPrice" | "lotSize" | "pnl",
+    raw: string,
+    { allowNegative = false }: { allowNegative?: boolean } = {},
+  ) => {
+    const normalized = raw.replace(",", ".");
+    const pattern = allowNegative ? /^-?\d*\.?\d*$/ : /^\d*\.?\d*$/;
+    if (!pattern.test(normalized)) return;
+    setFormData((prev) => ({ ...prev, [field]: normalized }));
+  };
+
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     // Géométrie pure, indépendante de l'instrument : recalculable sans risque.
-    const risque = Math.abs(formData.entryPrice - formData.stopLoss);
-    const gain = Math.abs(formData.takeProfit - formData.entryPrice);
+    const risque = Math.abs(Number(formData.entryPrice) - Number(formData.stopLoss));
+    const gain = Math.abs(Number(formData.takeProfit) - Number(formData.entryPrice));
 
     // `risque === 0` (stop = entrée) n'a pas de ratio R:R réel — l'ancien
     // repli sur "1" enregistrait un 1:1 fictif, indiscernable d'un vrai
@@ -450,7 +470,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         : Math.round(Number(formData.pnl) || 0);
 
     let result: TradeResult = "OPEN";
-    if (formData.exitPrice) {
+    if (Number(formData.exitPrice)) {
       // Même règle stricte pour les deux unités : l'utilisateur tape un
       // résultat réel dans les deux cas (voir le commentaire au-dessus de
       // `pnl`, "aucune formule ne propose plus de valeur par défaut"). Une
@@ -990,11 +1010,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Prix d'Entrée</label>
                   <input
-                    type="number"
-                    step="any"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={formData.entryPrice}
-                    onChange={(e) => setFormData({ ...formData, entryPrice: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => handleDecimalChange("entryPrice", e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
@@ -1003,11 +1022,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Stop Loss</label>
                   <input
-                    type="number"
-                    step="any"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={formData.stopLoss}
-                    onChange={(e) => setFormData({ ...formData, stopLoss: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => handleDecimalChange("stopLoss", e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
@@ -1016,11 +1034,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Take Profit</label>
                   <input
-                    type="number"
-                    step="any"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={formData.takeProfit}
-                    onChange={(e) => setFormData({ ...formData, takeProfit: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => handleDecimalChange("takeProfit", e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
@@ -1031,11 +1048,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Prix de Sortie (si fermé)</label>
                   <input
-                    type="number"
-                    step="any"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={formData.exitPrice}
-                    onChange={(e) => setFormData({ ...formData, exitPrice: parseFloat(e.target.value) || 0 })}
+                    onChange={(e) => handleDecimalChange("exitPrice", e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                   />
                 </div>
@@ -1043,22 +1059,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Taille de Lot / Position</label>
                   <input
-                    type="number"
-                    step="any"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={formData.lotSize}
-                    onChange={(e) => {
-                      // `|| 1` forçait la valeur à 1 dès que `parseFloat`
-                      // renvoyait `0` — un résultat parfaitement valide (pas
-                      // seulement `NaN` sur un champ vide/invalide), qui
-                      // rendait impossible de saisir toute taille de lot
-                      // commençant par 0 (0.01, 0.1, 0.5…) : au premier "0"
-                      // tapé, le champ affiché sautait déjà à "1". Les autres
-                      // champs numériques de ce formulaire retombent tous sur
-                      // `0`, pas `1`, sur une saisie invalide — même repli ici.
-                      const parsed = parseFloat(e.target.value);
-                      setFormData({ ...formData, lotSize: Number.isNaN(parsed) ? 0 : parsed });
-                    }}
+                    onChange={(e) => handleDecimalChange("lotSize", e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
@@ -1071,10 +1075,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <label className="block text-xs font-semibold text-slate-400 mb-1">PnL</label>
                   <div className="flex gap-2">
                     <input
-                      type="number"
-                      step="any"
+                      type="text"
+                      inputMode="decimal"
                       value={formData.pnl}
-                      onChange={(e) => setFormData({ ...formData, pnl: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) => handleDecimalChange("pnl", e.target.value, { allowNegative: true })}
                       className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     />
                     <select
