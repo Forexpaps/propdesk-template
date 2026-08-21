@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Zap } from "lucide-react";
 import { api, EconomicCalendarEvent, MarketQuote } from "../lib/api";
+import { MarketMapWidget } from "./MarketMapWidget";
 
 const CURRENCY_FLAGS: Record<string, string> = {
   USD: "🇺🇸",
@@ -15,22 +16,32 @@ const CURRENCY_FLAGS: Record<string, string> = {
 };
 const FALLBACK_FLAG = "🌐";
 
+type ImpactLevel = "High" | "Medium" | "Low" | "Holiday";
+
 const IMPACT_DOT: Record<string, string> = {
   High: "bg-rose-500",
   Medium: "bg-amber-500",
   Low: "bg-slate-500",
-  Holiday: "bg-slate-700",
+  Holiday: "bg-violet-500",
 };
 
 /**
- * Filtre par impact — "Fort"/"Moyen"/"Faible" seulement, "Holiday" (jour
- * férié, pas un vrai niveau d'impact) reste toujours affiché quel que soit
- * le filtre actif.
+ * Filtre par impact — sélection MULTIPLE et indépendante (chaque pastille
+ * est son propre interrupteur, pas un groupe façon boutons radio) : demande
+ * explicite de l'utilisateur, qui revient sur le comportement exclusif
+ * choisi précédemment. "Férié" est désormais un niveau filtrable comme les
+ * autres, plus un cas toujours affiché à part.
  */
-const IMPACT_FILTER_OPTIONS: { id: "High" | "Medium" | "Low"; label: string; activeClasses: string }[] = [
-  { id: "Low", label: "Faible", activeClasses: "bg-slate-500/15 border-slate-400/40 text-slate-300" },
-  { id: "Medium", label: "Moyen", activeClasses: "bg-amber-500/15 border-amber-500/40 text-amber-400" },
-  { id: "High", label: "Fort", activeClasses: "bg-rose-500/15 border-rose-500/40 text-rose-400" },
+const IMPACT_FILTER_OPTIONS: {
+  id: ImpactLevel;
+  label: string;
+  dotClass: string;
+  activeClasses: string;
+}[] = [
+  { id: "High", label: "Fort", dotClass: "bg-rose-500", activeClasses: "bg-rose-500/15 border-rose-500/60 text-rose-400" },
+  { id: "Medium", label: "Moyen", dotClass: "bg-amber-500", activeClasses: "bg-amber-500/15 border-amber-500/60 text-amber-400" },
+  { id: "Low", label: "Faible", dotClass: "bg-slate-400", activeClasses: "bg-slate-500/15 border-slate-400/60 text-slate-300" },
+  { id: "Holiday", label: "Férié", dotClass: "bg-violet-500", activeClasses: "bg-violet-500/15 border-violet-500/60 text-violet-400" },
 ];
 
 const MARKET_REFRESH_MS = 60_000;
@@ -55,6 +66,35 @@ function isToday(isoDate: string, reference: Date): boolean {
     d.getMonth() === reference.getMonth() &&
     d.getDate() === reference.getDate()
   );
+}
+
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+/** `false` si `isoDate` tombe avant le début du jour de `reference` — jours déjà passés de la semaine du flux, exclus de la vue "Cette semaine". */
+function isTodayOrLater(isoDate: string, reference: Date): boolean {
+  return new Date(isoDate).getTime() >= startOfDay(reference).getTime();
+}
+
+/**
+ * `true` du lundi au vendredi seulement — les marchés actions/indices/Forex
+ * classiques sont fermés le week-end, les quelques annonces du flux datées
+ * samedi/dimanche (fuseaux d'Océanie surtout) n'ont donc pas leur place ici,
+ * sur demande explicite de l'utilisateur.
+ */
+function isWeekday(isoDate: string): boolean {
+  const day = new Date(isoDate).getDay(); // 0 = dimanche, 6 = samedi
+  return day >= 1 && day <= 5;
+}
+
+/** "Aujourd'hui" / "Demain" / "lundi 24 août" — en-tête de groupe pour la vue "Cette semaine". */
+function dayLabel(isoDate: string, reference: Date): string {
+  const d = new Date(isoDate);
+  const diffDays = Math.round((startOfDay(d).getTime() - startOfDay(reference).getTime()) / 86_400_000);
+  if (diffDays === 0) return "Aujourd'hui";
+  if (diffDays === 1) return "Demain";
+  return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 }
 
 function formatPrice(value: number): string {
@@ -120,9 +160,24 @@ export const MacroDashboard: React.FC = () => {
   const [marketError, setMarketError] = useState<string | null>(null);
   const [rawEvents, setRawEvents] = useState<EconomicCalendarEvent[] | null>(null);
   const [calendarError, setCalendarError] = useState<string | null>(null);
-  // Exclusif, façon boutons radio : un seul niveau d'impact actif à la fois
-  // (ou "Tous"), pas un ensemble de cases à cocher indépendantes.
-  const [selectedImpact, setSelectedImpact] = useState<"All" | "High" | "Medium" | "Low">("All");
+  // Sélection multiple indépendante — chaque niveau d'impact est son propre
+  // interrupteur, pas un groupe exclusif façon boutons radio (revenu sur ce
+  // comportement sur demande explicite de l'utilisateur). Tout activé par
+  // défaut : rien n'est filtré tant que personne n'a désactivé un niveau.
+  const [selectedImpacts, setSelectedImpacts] = useState<Set<ImpactLevel>>(
+    () => new Set<ImpactLevel>(["High", "Medium", "Low", "Holiday"])
+  );
+  const toggleImpact = (level: ImpactLevel) => {
+    setSelectedImpacts((prev) => {
+      const next = new Set(prev);
+      if (next.has(level)) next.delete(level);
+      else next.add(level);
+      return next;
+    });
+  };
+
+  /** Portée de la liste — "Aujourd'hui" (comportement historique) ou "Cette semaine" (tout le flux, à partir d'aujourd'hui). Exclusif : les deux vues n'ont pas de sens combinées. */
+  const [scope, setScope] = useState<"today" | "week">("today");
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30_000);
@@ -174,7 +229,8 @@ export const MacroDashboard: React.FC = () => {
   const events = useMemo(() => {
     if (!rawEvents) return [];
     return rawEvents
-      .filter((ev) => isToday(ev.date, now))
+      .filter((ev) => isWeekday(ev.date))
+      .filter((ev) => (scope === "today" ? isToday(ev.date, now) : isTodayOrLater(ev.date, now)))
       .map((ev) => {
         const eventTime = new Date(ev.date);
         const minutesUntil = Math.round((eventTime.getTime() - now.getTime()) / 60_000);
@@ -187,13 +243,42 @@ export const MacroDashboard: React.FC = () => {
         };
       })
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [rawEvents, now, scope]);
+
+  /**
+   * Prochaine annonce à fort impact — sur TOUTE la semaine du flux (pas
+   * seulement `events`, filtré sur "aujourd'hui" pour la liste juste en
+   * dessous) : un vendredi soir, la prochaine annonce "Fort impact" est
+   * probablement lundi, pas "aucune" faute de correspondance du jour même.
+   */
+  const nextHighImpact = useMemo(() => {
+    if (!rawEvents) return null;
+    return rawEvents
+      .filter((ev) => ev.impact === "High")
+      .filter((ev) => isWeekday(ev.date))
+      .map((ev) => {
+        const eventTime = new Date(ev.date);
+        return { ...ev, eventTime, minutesUntil: Math.round((eventTime.getTime() - now.getTime()) / 60_000) };
+      })
+      .filter((ev) => ev.minutesUntil > 0)
+      .sort((a, b) => a.eventTime.getTime() - b.eventTime.getTime())[0] ?? null;
   }, [rawEvents, now]);
 
   const highImpactCount = events.filter((e) => e.impact === "High").length;
-  // "Holiday" n'est pas un niveau d'impact filtrable : toujours affiché.
-  const filteredEvents = events.filter(
-    (e) => e.impact === "Holiday" || selectedImpact === "All" || e.impact === selectedImpact
-  );
+  const filteredEvents = events.filter((e) => selectedImpacts.has(e.impact as ImpactLevel));
+
+  /** Regroupement par jour — utilisé seulement en vue "Cette semaine" (un seul groupe, inutile, en vue "Aujourd'hui"). */
+  const groupedEvents = useMemo(() => {
+    const groups: { label: string; items: typeof filteredEvents }[] = [];
+    for (const item of filteredEvents) {
+      const label = dayLabel(item.date, now);
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup && lastGroup.label === label) lastGroup.items.push(item);
+      else groups.push({ label, items: [item] });
+    }
+    return groups;
+  }, [filteredEvents, now]);
+
   const riskScore = quotes ? computeRiskSentiment(quotes) : 50;
   const riskLabel = riskScore >= 60 ? "Risk-On" : riskScore <= 40 ? "Risk-Off" : "Neutre";
 
@@ -218,6 +303,31 @@ export const MacroDashboard: React.FC = () => {
         <h1 className="text-2xl font-bold text-white">Macro</h1>
         <p className="text-xs text-slate-400">Marché en direct et calendrier économique</p>
       </div>
+
+      {/* Prochaine annonce à fort impact */}
+      {nextHighImpact && (
+        <div className="bg-gradient-to-r from-rose-500/10 to-transparent border border-rose-500/20 rounded-xl px-4 py-3 flex items-center gap-3">
+          <Zap className="w-5 h-5 text-amber-400 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+              Prochaine annonce à fort impact
+            </div>
+            <div className="text-sm text-white font-semibold truncate flex items-center gap-1.5">
+              <span>{CURRENCY_FLAGS[nextHighImpact.country] ?? FALLBACK_FLAG}</span>
+              {nextHighImpact.title}
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <div className="text-lg font-black text-white">
+              {formatCountdown(nextHighImpact.minutesUntil)}
+            </div>
+            <div className="text-[11px] text-slate-500">{formatClock(nextHighImpact.eventTime)}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Carte des marchés */}
+      <MarketMapWidget now={now} vix={quotes?.find((q) => q.symbol === "^VIX")} nextHighImpact={nextHighImpact} />
 
       {/* Sentiment de risque */}
       <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-3">
@@ -280,52 +390,67 @@ export const MacroDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Annonces à venir aujourd'hui */}
+      {/* Annonces à venir */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <h4 className="text-sm font-bold text-white flex items-center gap-2">
             <span className="w-1 h-4 rounded-full bg-violet-500" />
-            Annonces à venir aujourd'hui
+            Annonces à venir {scope === "today" ? "aujourd'hui" : "cette semaine"}
           </h4>
           {rawEvents !== null && (
             <span className="text-[11px] text-slate-500 font-mono">
-              {events.length} annonce{events.length > 1 ? "s" : ""} aujourd'hui
+              {events.length} annonce{events.length > 1 ? "s" : ""} {scope === "today" ? "aujourd'hui" : "cette semaine"}
               {highImpactCount > 0 && ` · ${highImpactCount} à fort impact`}
             </span>
           )}
         </div>
 
+        {/* Portée : Aujourd'hui / Cette semaine — exclusif, les deux vues n'ont pas de sens combinées. */}
+        <div className="flex items-center gap-2 text-xs font-medium">
+          {(
+            [
+              { id: "today", label: "Aujourd'hui" },
+              { id: "week", label: "Cette semaine" },
+            ] as const
+          ).map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              aria-pressed={scope === opt.id}
+              onClick={() => setScope(opt.id)}
+              className={`px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
+                scope === opt.id
+                  ? "bg-[#00E676]/15 border-[#00E676]/60 text-[#00E676] font-bold"
+                  : "bg-[#0D1110] border-[#1B2320] text-slate-500 hover:text-white"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
         {rawEvents && events.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap text-xs font-medium">
-            <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mr-1">Impact</span>
+            <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mr-1">Impact :</span>
             {IMPACT_FILTER_OPTIONS.map((opt) => {
-              const isActive = selectedImpact === opt.id;
+              const isActive = selectedImpacts.has(opt.id);
               return (
                 <button
                   key={opt.id}
                   type="button"
-                  onClick={() => setSelectedImpact(opt.id)}
-                  className={`px-3 py-1.5 rounded-xl border transition-all whitespace-nowrap ${
+                  aria-pressed={isActive}
+                  onClick={() => toggleImpact(opt.id)}
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
                     isActive
                       ? `${opt.activeClasses} font-bold`
                       : "bg-[#0D1110] border-[#1B2320] text-slate-500 hover:text-white"
                   }`}
                 >
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? opt.dotClass : "bg-slate-600"}`} />
                   {opt.label}
                 </button>
               );
             })}
-            <button
-              type="button"
-              onClick={() => setSelectedImpact("All")}
-              className={`px-3 py-1.5 rounded-xl border transition-all whitespace-nowrap ${
-                selectedImpact === "All"
-                  ? "bg-[#00E676]/15 border-[#00E676]/40 text-[#00E676] font-bold"
-                  : "bg-[#0D1110] border-[#1B2320] text-slate-500 hover:text-white"
-              }`}
-            >
-              Tous
-            </button>
           </div>
         )}
 
@@ -341,7 +466,7 @@ export const MacroDashboard: React.FC = () => {
         )}
         {rawEvents && events.length === 0 && (
           <div className="p-4 text-center text-xs text-slate-500 italic">
-            Aucune annonce prévue aujourd'hui.
+            {scope === "today" ? "Aucune annonce prévue aujourd'hui." : "Aucune annonce prévue cette semaine."}
           </div>
         )}
         {rawEvents && events.length > 0 && filteredEvents.length === 0 && (
@@ -349,40 +474,54 @@ export const MacroDashboard: React.FC = () => {
             Aucune annonce ne correspond aux filtres d'impact sélectionnés.
           </div>
         )}
-        {rawEvents && filteredEvents.length > 0 && (
-          <div className="border border-[#1B2320] rounded-xl divide-y divide-[#1B2320] overflow-hidden">
-            {filteredEvents.map((item) => {
-              const isImminent = item.countdown !== null && item.minutesUntil <= 15;
-              return (
-                <div key={item.id} className="flex items-start gap-4 p-3.5">
-                  <div
-                    className={`w-14 shrink-0 font-mono text-sm font-bold pt-0.5 ${
-                      isImminent ? "text-amber-400" : "text-white"
-                    }`}
-                  >
-                    {item.time}
+        {rawEvents && groupedEvents.length > 0 && (
+          <div className="space-y-4">
+            {groupedEvents.map((group) => (
+              <div key={group.label} className="space-y-2">
+                {/* En-tête de jour : seulement utile quand plusieurs jours sont
+                    mélangés (vue "Cette semaine") — en vue "Aujourd'hui" il n'y a
+                    qu'un seul groupe, l'en-tête serait redondant avec le titre. */}
+                {scope === "week" && (
+                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wide px-1 capitalize">
+                    {group.label}
                   </div>
-                  <div className="w-6 shrink-0 text-center text-lg leading-none pt-0.5">{item.flag}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full shrink-0 ${IMPACT_DOT[item.impact] ?? "bg-slate-500"}`}
-                      />
-                      <span className="font-bold text-white text-sm">{item.title}</span>
-                    </div>
-                    <div className="text-xs text-slate-500 font-mono mt-0.5">
-                      prév. {item.forecast || "-"} · précéd. {item.previous || "-"}
-                      {item.countdown && (
-                        <span className={isImminent ? "text-amber-400 font-semibold" : "text-slate-500"}>
-                          {" "}
-                          · {item.countdown}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                )}
+                <div className="border border-[#1B2320] rounded-xl divide-y divide-[#1B2320] overflow-hidden">
+                  {group.items.map((item) => {
+                    const isImminent = item.countdown !== null && item.minutesUntil <= 15;
+                    return (
+                      <div key={item.id} className="flex items-start gap-4 p-3.5">
+                        <div
+                          className={`w-14 shrink-0 font-mono text-sm font-bold pt-0.5 ${
+                            isImminent ? "text-amber-400" : "text-white"
+                          }`}
+                        >
+                          {item.time}
+                        </div>
+                        <div className="w-6 shrink-0 text-center text-lg leading-none pt-0.5">{item.flag}</div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${IMPACT_DOT[item.impact] ?? "bg-slate-500"}`}
+                            />
+                            <span className="font-bold text-white text-sm">{item.title}</span>
+                          </div>
+                          <div className="text-xs text-slate-500 font-mono mt-0.5">
+                            prév. {item.forecast || "-"} · précéd. {item.previous || "-"}
+                            {item.countdown && (
+                              <span className={isImminent ? "text-amber-400 font-semibold" : "text-slate-500"}>
+                                {" "}
+                                · {item.countdown}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
         )}
       </div>

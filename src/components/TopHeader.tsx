@@ -38,7 +38,7 @@ export function isSessionActive(session: { startUTC: number; endUTC: number }, h
  * 21h UTC (ouverture de Sydney) — un week-end complet sans aucune session
  * active, quelle que soit l'heure.
  */
-function isForexMarketClosed(date: Date): boolean {
+export function isForexMarketClosed(date: Date): boolean {
   const day = date.getUTCDay(); // 0 = dimanche, 5 = vendredi, 6 = samedi
   const hour = date.getUTCHours();
   if (day === 6) return true;
