@@ -13,7 +13,9 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   RefreshCw,
-  Trash2
+  Trash2,
+  Settings,
+  Landmark,
 } from "lucide-react";
 import { TradingAccount, AccountType, Trade } from "../types";
 import { formatCurrency } from "../lib/format";
@@ -49,6 +51,49 @@ const SectionHeader: React.FC<{ children: React.ReactNode; color?: string }> = (
     <h3 className="text-sm font-bold text-white">{children}</h3>
   </div>
 );
+
+const ACCOUNT_STATUS_LABEL: Record<TradingAccount["status"], string> = {
+  ACTIVE: "En cours",
+  PASSED: "Réussi",
+  FAILED: "Échoué",
+  PAID_OUT: "Payé",
+};
+const ACCOUNT_STATUS_CLASS: Record<TradingAccount["status"], string> = {
+  ACTIVE: "text-amber-400",
+  PASSED: "text-[#00E676]",
+  FAILED: "text-rose-400",
+  PAID_OUT: "text-blue-400",
+};
+
+/**
+ * Ligne "actuel / limite" avec barre de progression — une par carte de
+ * portefeuille (objectif de gain, perte du jour, perte totale). `current`
+ * et `limit` portent déjà leur signe (négatif pour une perte) :
+ * `formatCurrency` s'occupe de l'affichage, cette ligne ne fait aucune
+ * hypothèse de signe elle-même.
+ */
+const RiskProgressRow: React.FC<{
+  label: string;
+  current: number;
+  limit: number;
+  barColor: string;
+  valueColor: string;
+}> = ({ label, current, limit, barColor, valueColor }) => {
+  const percent = limit !== 0 ? Math.min(100, (Math.abs(current) / Math.abs(limit)) * 100) : 0;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-slate-400">{label}</span>
+        <span className={`font-mono font-bold ${valueColor}`}>
+          {formatCurrency(current)} / {formatCurrency(limit)}
+        </span>
+      </div>
+      <div className="w-full h-1.5 rounded-full bg-[#0D1110] border border-[#1B2320] overflow-hidden">
+        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${percent}%` }} />
+      </div>
+    </div>
+  );
+};
 
 interface WalletManagementProps {
   accounts: TradingAccount[];
@@ -304,59 +349,85 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
 
           {filteredAccounts.map((acc) => {
             const isSelected = selectedAccount?.id === acc.id;
-            const pnl = acc.equity - acc.initialBalance;
-            const pnlPercent = acc.initialBalance > 0 ? ((pnl / acc.initialBalance) * 100).toFixed(1) : "0.0";
+
+            // Objectifs/limites en $ — dérivés des % configurés à la
+            // création du compte (voir modale "Ajouter un Portefeuille"),
+            // appliqués au capital INITIAL (une prop firm fixe ses règles
+            // sur le capital de départ, jamais sur l'équité courante).
+            const profitTargetAmount = (acc.initialBalance * acc.profitTargetPercent) / 100;
+            const dailyLossLimitAmount = (acc.initialBalance * acc.maxDailyDrawdownPercent) / 100;
+            const totalLossLimitAmount = (acc.initialBalance * acc.maxTotalDrawdownPercent) / 100;
+            const floorEquity = acc.initialBalance - totalLossLimitAmount;
+
+            const gainAmount = Math.max(0, acc.equity - acc.initialBalance);
+            const dailyLossPct = computeDailyLossPercent(trades, acc);
+            const dailyLossAmount = -Math.max(0, (-dailyLossPct / 100) * acc.initialBalance);
+            const totalLossAmount = -Math.max(0, acc.initialBalance - acc.equity);
 
             return (
               <div
                 key={acc.id}
                 onClick={() => setSelectedAccountId(acc.id)}
-                className={`p-4 rounded-xl border transition-all cursor-pointer space-y-3 ${
+                className={`p-4 rounded-xl border transition-all cursor-pointer space-y-3.5 ${
                   isSelected
                     ? "bg-[#111615] border-[#00E676]/40"
                     : "bg-[#0D1110] border-[#1B2320] hover:border-[#00E676]/20"
                 }`}
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#00E676]/10 border border-[#00E676]/20 text-[#00E676]">
-                      {acc.firmOrBroker}
-                    </span>
-                    <h3 className="text-sm font-bold text-white mt-1">{acc.name}</h3>
-                    <p className="text-[11px] text-slate-400 font-mono">{acc.accountNumber || "ACC-LIVE"}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Landmark className="w-4 h-4 text-amber-400 shrink-0" />
+                    <h3 className="text-sm font-bold text-white truncate">
+                      {acc.firmOrBroker} <span className="text-slate-500 font-normal">· {acc.type}</span>
+                    </h3>
                   </div>
-
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                      acc.status === "ACTIVE"
-                        ? "bg-[#00E676]/10 text-[#00E676] border border-[#00E676]/20"
-                        : acc.status === "PAID_OUT"
-                        ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
-                        : "bg-blue-500/10 text-blue-300 border border-blue-500/20"
-                    }`}
-                  >
-                    {acc.status}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs font-bold ${ACCOUNT_STATUS_CLASS[acc.status]}`}>
+                      {ACCOUNT_STATUS_LABEL[acc.status]}
+                    </span>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenBalanceEdit(acc);
+                        }}
+                        title="Ajuster le solde de ce portefeuille"
+                        className="p-1.5 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-400 hover:text-white transition-colors"
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex items-baseline justify-between pt-2 border-t border-[#1B2320]">
-                  <div>
-                    <div className="text-[10px] text-slate-500">Solde Actuel</div>
-                    <div className="text-base font-bold font-mono text-white">
-                      {formatCurrency(acc.equity)}
-                    </div>
-                  </div>
+                <div className="space-y-3 pt-1">
+                  <RiskProgressRow
+                    label="Objectif de gain"
+                    current={gainAmount}
+                    limit={profitTargetAmount}
+                    barColor="bg-[#00E676]"
+                    valueColor="text-[#00E676]"
+                  />
+                  <RiskProgressRow
+                    label="Perte du jour"
+                    current={dailyLossAmount}
+                    limit={-dailyLossLimitAmount}
+                    barColor="bg-amber-500"
+                    valueColor="text-amber-400"
+                  />
+                  <RiskProgressRow
+                    label="Perte totale (limite)"
+                    current={totalLossAmount}
+                    limit={-totalLossLimitAmount}
+                    barColor="bg-rose-500"
+                    valueColor="text-rose-400"
+                  />
+                </div>
 
-                  <div className="text-right">
-                    <div className="text-[10px] text-slate-500">Performance</div>
-                    <div
-                      className={`text-xs font-bold font-mono ${
-                        pnl >= 0 ? "text-[#00E676]" : "text-rose-400"
-                      }`}
-                    >
-                      {pnl >= 0 ? `+${pnlPercent}%` : `${pnlPercent}%`}
-                    </div>
-                  </div>
+                <div className="flex items-center gap-1.5 pt-2 border-t border-[#1B2320] text-[11px] text-slate-500">
+                  Équité <span className="text-white font-bold font-mono">{formatCurrency(acc.equity)}</span>
+                  <span>· plancher {formatCurrency(floorEquity)}</span>
                 </div>
               </div>
             );

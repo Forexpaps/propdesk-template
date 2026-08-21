@@ -41,6 +41,7 @@ import { TabType, SidebarItemKey } from "./Sidebar";
 import { computeDisciplineStreak } from "../lib/badges";
 import { computeWeeklySummary } from "../lib/weeklySummary";
 import { computeJournalSummary } from "../lib/performanceStats";
+import { TradingSessionsWidget } from "./TradingSessionsWidget";
 
 /**
  * En-tête de section — barre verticale colorée + titre, motif repris tel
@@ -222,6 +223,12 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             <p className="text-xs text-slate-400">Gains / Pertes</p>
           </div>
         </div>
+      </div>
+
+      {/* 2bis. Sessions de trading en direct */}
+      <div className="space-y-3">
+        <SectionHeader color="bg-blue-500">Sessions de Trading</SectionHeader>
+        <TradingSessionsWidget />
       </div>
 
       {/* 3. MODULES Section (4 Cards Grid) */}

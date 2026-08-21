@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -72,8 +72,61 @@ const EmptyState: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </div>
 );
 
+/** Jours dans l'ordre d'affichage (semaine française, lundi en premier) — distinct de `Date.getDay()` (0 = dimanche). */
+const HEATMAP_DAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+/** `Date.getDay()` (0 = dimanche) → index dans `HEATMAP_DAYS`. */
+const JS_DAY_TO_HEATMAP_INDEX = [6, 0, 1, 2, 3, 4, 5];
+const HEATMAP_BLOCKS: { label: string; startHour: number; endHour: number }[] = [
+  { label: "0-6h", startHour: 0, endHour: 6 },
+  { label: "6-9h", startHour: 6, endHour: 9 },
+  { label: "9-12h", startHour: 9, endHour: 12 },
+  { label: "12-15h", startHour: 12, endHour: 15 },
+  { label: "15-18h", startHour: 15, endHour: 18 },
+  { label: "18-24h", startHour: 18, endHour: 24 },
+];
+
+interface HeatmapCellStats {
+  tradesCount: number;
+  wins: number;
+  pnl: number;
+}
+
+/**
+ * Grille jour × créneau de 6h — win rate et nombre de trades par case.
+ * Calculée directement depuis `trades` (pas `performanceStats.ts` :
+ * `dayChartData`/`hourChartData` existants agrègent chaque dimension
+ * séparément, jamais croisée). Un trade sans heure (`time` absent, saisie
+ * manuelle ancienne) n'a pas de créneau assignable — exclu de la grille,
+ * jamais compté dans une case au hasard.
+ */
+function computeHeatmap(trades: Trade[]): HeatmapCellStats[][] {
+  const grid: HeatmapCellStats[][] = HEATMAP_DAYS.map(() =>
+    HEATMAP_BLOCKS.map(() => ({ tradesCount: 0, wins: 0, pnl: 0 }))
+  );
+
+  for (const trade of trades) {
+    if (!trade.time) continue;
+    const hour = parseInt(trade.time.split(":")[0], 10);
+    if (Number.isNaN(hour)) continue;
+    const blockIndex = HEATMAP_BLOCKS.findIndex((b) => hour >= b.startHour && hour < b.endHour);
+    if (blockIndex === -1) continue;
+
+    const parsedDate = new Date(`${trade.date}T00:00:00`);
+    if (Number.isNaN(parsedDate.getTime())) continue;
+    const dayIndex = JS_DAY_TO_HEATMAP_INDEX[parsedDate.getDay()];
+
+    const cell = grid[dayIndex][blockIndex];
+    cell.tradesCount += 1;
+    if (trade.result === "WIN") cell.wins += 1;
+    cell.pnl += trade.pnl;
+  }
+
+  return grid;
+}
+
 export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ student, trades }) => {
   const stats = computePerformanceStats(student, trades);
+  const heatmap = useMemo(() => computeHeatmap(trades), [trades]);
   const {
     equityData,
     totalTrades,
@@ -197,6 +250,64 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
                 <Area type="monotone" dataKey="capital" stroke="#00E676" strokeWidth={2} fillOpacity={1} fill="url(#colorCapital)" />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
+        )}
+      </Card>
+
+      {/* Heatmap — où tu gagnes : win rate croisé jour × créneau de 6h. */}
+      <Card className="p-5 space-y-4">
+        <SectionHeader color="bg-violet-500">Heatmap — où tu gagnes</SectionHeader>
+        {trades.length < 3 ? (
+          <EmptyState>Ajoute au moins 3 trades pour révéler ton ADN de trader.</EmptyState>
+        ) : (
+          <div className="overflow-x-auto">
+            <div className="min-w-[560px] grid grid-cols-[48px_repeat(6,1fr)] gap-1.5">
+              <div />
+              {HEATMAP_BLOCKS.map((block) => (
+                <div key={block.label} className="text-center text-[10px] text-slate-500 font-mono pb-1">
+                  {block.label}
+                </div>
+              ))}
+              {HEATMAP_DAYS.map((day, dayIndex) => (
+                <React.Fragment key={day}>
+                  <div className="flex items-center text-xs text-slate-400 font-medium">{day}</div>
+                  {HEATMAP_BLOCKS.map((block, blockIndex) => {
+                    const cell = heatmap[dayIndex][blockIndex];
+                    const winRate = cell.tradesCount > 0 ? Math.round((cell.wins / cell.tradesCount) * 100) : null;
+                    // Intensité proportionnelle au win rate — jamais en dessous de 15%
+                    // d'opacité pour qu'une case avec des trades reste visuellement
+                    // distincte d'une case vraiment vide, même à 0%/100% de réussite.
+                    const backgroundColor =
+                      winRate === null
+                        ? undefined
+                        : winRate >= 50
+                        ? `rgba(0,230,118,${Math.max(0.15, winRate / 100)})`
+                        : `rgba(244,63,94,${Math.max(0.15, (100 - winRate) / 100)})`;
+                    return (
+                      <div
+                        key={block.label}
+                        title={
+                          cell.tradesCount > 0
+                            ? `${day} ${block.label} — ${winRate}% de réussite sur ${cell.tradesCount} trade${cell.tradesCount > 1 ? "s" : ""}`
+                            : `${day} ${block.label} — aucun trade`
+                        }
+                        className="h-11 rounded-lg border border-[#1B2320] bg-[#0D1110] flex flex-col items-center justify-center"
+                        style={backgroundColor ? { backgroundColor } : undefined}
+                      >
+                        {cell.tradesCount > 0 && (
+                          <>
+                            <span className="text-[11px] font-bold text-white leading-none">{winRate}%</span>
+                            <span className="text-[9px] text-slate-300/80 leading-none mt-0.5">
+                              {cell.tradesCount} trade{cell.tradesCount > 1 ? "s" : ""}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
+            </div>
           </div>
         )}
       </Card>
