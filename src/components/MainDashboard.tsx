@@ -40,7 +40,7 @@ import {
 import { TabType, SidebarItemKey } from "./Sidebar";
 import { computeDisciplineStreak } from "../lib/badges";
 import { computeWeeklySummary } from "../lib/weeklySummary";
-import { computeJournalSummary } from "../lib/performanceStats";
+import { computeJournalSummary, computePnlByPeriod } from "../lib/performanceStats";
 import { TradingSessionsWidget } from "./TradingSessionsWidget";
 
 /**
@@ -125,6 +125,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
 
   const disciplineStreak = computeDisciplineStreak(trades);
   const { avgRR, profitFactor } = computeJournalSummary(trades);
+  const pnlByPeriod = computePnlByPeriod(trades);
 
   const firstName = student.name.split(" ")[0] || "Yoann";
 
@@ -223,6 +224,39 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             <p className="text-xs text-slate-400">Gains / Pertes</p>
           </div>
         </div>
+      </div>
+
+      {/* PnL par période — jour / semaine / mois / année en cours */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {(
+          [
+            { key: "day", label: "PnL Jour" },
+            { key: "week", label: "Semaine" },
+            { key: "month", label: "Mois" },
+            { key: "year", label: "Année" },
+          ] as const
+        ).map((period) => {
+          const data = pnlByPeriod[period.key];
+          return (
+            <div
+              key={period.key}
+              className="bg-[#111615] border border-[#1B2320] rounded-xl p-4 space-y-1.5"
+            >
+              <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">{period.label}</div>
+              <div
+                className={`text-xl font-black font-mono ${
+                  data.pnl > 0 ? "text-[#00E676]" : data.pnl < 0 ? "text-rose-400" : "text-white"
+                }`}
+              >
+                {data.pnl > 0 ? "+" : ""}
+                {formatCurrency(data.pnl)}
+              </div>
+              <p className="text-xs text-slate-400">
+                {data.tradesCount} trade{data.tradesCount > 1 ? "s" : ""}
+              </p>
+            </div>
+          );
+        })}
       </div>
 
       {/* 2bis. Sessions de trading en direct */}

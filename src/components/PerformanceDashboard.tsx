@@ -14,7 +14,7 @@ import {
 import { LineChart, AlertTriangle, RotateCcw } from "lucide-react";
 import { Trade, StudentProfile } from "../types";
 import { formatCurrency } from "../lib/format";
-import { computePerformanceStats } from "../lib/performanceStats";
+import { computePerformanceStats, computePnlByPeriod } from "../lib/performanceStats";
 
 interface PerformanceDashboardProps {
   student: StudentProfile;
@@ -127,6 +127,7 @@ function computeHeatmap(trades: Trade[]): HeatmapCellStats[][] {
 export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ student, trades }) => {
   const stats = computePerformanceStats(student, trades);
   const heatmap = useMemo(() => computeHeatmap(trades), [trades]);
+  const pnlByPeriod = useMemo(() => computePnlByPeriod(trades), [trades]);
   const {
     equityData,
     totalTrades,
@@ -226,6 +227,29 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
           value={`${formatCurrency(avgWin)} / ${formatCurrency(avgLoss)}`}
           valueClassName="text-white"
         />
+      </div>
+
+      {/* PnL par période — jour / semaine / mois / année en cours */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {(
+          [
+            { key: "day", label: "PnL Jour" },
+            { key: "week", label: "Semaine" },
+            { key: "month", label: "Mois" },
+            { key: "year", label: "Année" },
+          ] as const
+        ).map((period) => {
+          const data = pnlByPeriod[period.key];
+          return (
+            <StatCard
+              key={period.key}
+              label={period.label}
+              value={`${data.pnl > 0 ? "+" : ""}${formatCurrency(data.pnl)}`}
+              valueClassName={data.pnl > 0 ? "text-[#00E676]" : data.pnl < 0 ? "text-rose-400" : "text-white"}
+              secondary={`${data.tradesCount} trade${data.tradesCount > 1 ? "s" : ""}`}
+            />
+          );
+        })}
       </div>
 
       {/* Courbe de capital — pleine largeur */}

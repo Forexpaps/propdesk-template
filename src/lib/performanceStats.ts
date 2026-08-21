@@ -454,3 +454,68 @@ export function computeJournalSummary(trades: Trade[]): JournalSummary {
 
   return { totalTrades, winTrades, lossTrades, winRate, totalPnL, profitFactor, avgRR, disciplineEmoPercent };
 }
+
+export interface PeriodPnl {
+  pnl: number;
+  tradesCount: number;
+}
+
+export interface PnlByPeriod {
+  day: PeriodPnl;
+  week: PeriodPnl;
+  month: PeriodPnl;
+  year: PeriodPnl;
+}
+
+/** Lundi 00:00 de la semaine calendaire contenant `date` (ISO, jamais un décalage glissant de 7 jours). */
+function startOfWeek(date: Date): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay(); // 0 = dimanche
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diffToMonday);
+  return d;
+}
+
+/**
+ * PnL et nombre de trades sur 4 fenêtres calendaires glissantes — jour,
+ * semaine (lundi→dimanche, pas "les 7 derniers jours"), mois, année en
+ * cours, toutes ancrées sur `reference` (le vrai "maintenant" par défaut).
+ * `tradesCount` compte tous les trades de la fenêtre quelle que soit leur
+ * unité de PnL ($ ou %) ; `pnl` ne somme que les trades en $, même
+ * convention que le reste de ce fichier (un trade en % n'est pas une somme
+ * d'argent qu'on peut additionner à des dollars).
+ */
+export function computePnlByPeriod(trades: Trade[], reference: Date = new Date()): PnlByPeriod {
+  const dayStart = new Date(reference.getFullYear(), reference.getMonth(), reference.getDate());
+  const weekStart = startOfWeek(reference);
+  const monthStart = new Date(reference.getFullYear(), reference.getMonth(), 1);
+  const yearStart = new Date(reference.getFullYear(), 0, 1);
+
+  const empty: PeriodPnl = { pnl: 0, tradesCount: 0 };
+  const totals: PnlByPeriod = { day: { ...empty }, week: { ...empty }, month: { ...empty }, year: { ...empty } };
+
+  for (const t of trades) {
+    const tradeDate = new Date(`${t.date}T00:00:00`);
+    if (Number.isNaN(tradeDate.getTime())) continue;
+    const isDollar = (t.pnlUnit ?? "USD") !== "PERCENT";
+
+    if (tradeDate >= yearStart) {
+      totals.year.tradesCount += 1;
+      if (isDollar) totals.year.pnl += t.pnl;
+    }
+    if (tradeDate >= monthStart) {
+      totals.month.tradesCount += 1;
+      if (isDollar) totals.month.pnl += t.pnl;
+    }
+    if (tradeDate >= weekStart) {
+      totals.week.tradesCount += 1;
+      if (isDollar) totals.week.pnl += t.pnl;
+    }
+    if (tradeDate.getTime() === dayStart.getTime()) {
+      totals.day.tradesCount += 1;
+      if (isDollar) totals.day.pnl += t.pnl;
+    }
+  }
+
+  return totals;
+}
