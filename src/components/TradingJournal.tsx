@@ -240,6 +240,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     exitPrice: "1.0910",
     lotSize: "1",
     strategy: "",
+    result: "OPEN" as TradeResult,
     emotion: "Disciplined" as EmotionState,
     mistakes: [] as TradeMistake[],
     notes: "Validation FVG H1 + Chasse de liquidité.",
@@ -264,6 +265,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     exitPrice: "1.091",
     lotSize: "1",
     strategy: "",
+    result: "OPEN" as TradeResult,
     emotion: "Disciplined" as EmotionState,
     mistakes: [] as TradeMistake[],
     notes: "",
@@ -302,6 +304,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       exitPrice: String(trade.exitPrice ?? 0),
       lotSize: String(trade.lotSize),
       strategy: trade.strategy,
+      result: trade.result,
       emotion: trade.emotion,
       mistakes: trade.mistakes ?? [],
       notes: trade.notes ?? "",
@@ -363,6 +366,21 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         : t.accountId === selectedAccount);
     return matchesPair && matchesMarket && matchesResult && matchesEmotion && matchesAccount;
   });
+
+  const getResultLabel = (result: TradeResult): string => {
+    switch (result) {
+      case "WIN":
+        return "🎯 TP · Gagnant";
+      case "LOSS":
+        return "🛑 SL · Perdant";
+      case "BREAKEVEN":
+        return "➖ BE · Breakeven";
+      case "OPEN":
+        return "⏳ Position ouverte";
+      default:
+        return result;
+    }
+  };
 
   const getEmotionBadge = (emotion: EmotionState) => {
     switch (emotion) {
@@ -431,7 +449,16 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     raw: string,
     { allowNegative = false }: { allowNegative?: boolean } = {},
   ) => {
-    const normalized = raw.replace(",", ".");
+    // Les prix (entrée/SL/TP/sortie) sur les indices ou actifs à forte valeur
+    // s'affichent avec un séparateur de milliers sur la plupart des
+    // plateformes (ex: NAS100 à 20,637.50) : la virgule y est donc retirée
+    // plutôt que convertie en point décimal, sous peine de fabriquer un
+    // second point ("20.637.50") rejeté par la validation ci-dessous. Le
+    // PnL et la taille de lot restent en convention française : une seule
+    // virgule tapée y vaut décimale.
+    const isPriceField =
+      field === "entryPrice" || field === "stopLoss" || field === "takeProfit" || field === "exitPrice";
+    const normalized = isPriceField ? raw.replace(/,/g, "") : raw.replace(",", ".");
     const pattern = allowNegative ? /^-?\d*\.?\d*$/ : /^\d*\.?\d*$/;
     if (!pattern.test(normalized)) return;
     setFormData((prev) => ({ ...prev, [field]: normalized }));
@@ -469,20 +496,13 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         ? Number(formData.pnl) || 0
         : Math.round(Number(formData.pnl) || 0);
 
-    let result: TradeResult = "OPEN";
-    if (Number(formData.exitPrice)) {
-      // Même règle stricte pour les deux unités : l'utilisateur tape un
-      // résultat réel dans les deux cas (voir le commentaire au-dessus de
-      // `pnl`, "aucune formule ne propose plus de valeur par défaut"). Une
-      // marge morte de ±50$ existait ici auparavant pour absorber le bruit
-      // d'une proposition *automatique* de PnL — un mécanisme qui n'existe
-      // plus depuis ce changement. Elle classait à tort un trade réellement
-      // gagnant/perdant (ex. +30$) en "BREAKEVEN", exclu du Win Rate
-      // (`t.result === "WIN"`) tout en restant compté dans `totalPnL`/
-      // `avgWin`/`profitFactor` (qui utilisent le signe brut du PnL) — deux
-      // cartes du même tableau de bord se contredisaient sur un même trade.
-      result = pnl > 0 ? "WIN" : pnl < 0 ? "LOSS" : "BREAKEVEN";
-    }
+    // Le résultat est choisi explicitement (boutons TP/SL/BE/Ouvert), jamais
+    // déduit du signe du PnL : un trade sorti au break-even peut afficher un
+    // PnL légèrement positif ou négatif (spread, frais) sans être un vrai
+    // gagnant/perdant, et l'inverse (TP touché puis PnL négatif à cause d'un
+    // slippage) existe aussi. Seul l'utilisateur sait ce qu'il a réellement
+    // vécu sur sa plateforme.
+    const result: TradeResult = formData.result;
 
     const champs = {
       date: formData.date,
@@ -1044,6 +1064,13 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 </div>
               </div>
 
+              {formData.marketCategory === "Indices" && (
+                <p className="text-[10px] text-slate-500 -mt-2 leading-snug">
+                  Sur les indices, la virgule sert de séparateur de milliers : tape par exemple{" "}
+                  <span className="font-mono text-slate-400">20,637.50</span>.
+                </p>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Prix de Sortie (si fermé)</label>
@@ -1115,6 +1142,31 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                       Aucun setup enregistré — ajoutes-en un dans l'onglet « Setups ».
                     </p>
                   )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Résultat du Trade</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: "WIN", label: "🎯 TP · Gagnant" },
+                    { id: "LOSS", label: "🛑 SL · Perdant" },
+                    { id: "BREAKEVEN", label: "➖ BE · Breakeven" },
+                    { id: "OPEN", label: "⏳ Position ouverte" },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, result: item.id as TradeResult })}
+                      className={`p-2 rounded-lg border text-xs font-semibold text-center transition-all ${
+                        formData.result === item.id
+                          ? "bg-[#00E676] text-slate-950 border-[#00E676] font-bold"
+                          : "bg-[#0D1110] border-[#1B2320] text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
@@ -1315,7 +1367,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               </div>
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
                 <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Résultat</div>
-                <div className="text-white font-semibold">{selectedChartTrade.result}</div>
+                <div className="text-white font-semibold">{getResultLabel(selectedChartTrade.result)}</div>
               </div>
 
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
