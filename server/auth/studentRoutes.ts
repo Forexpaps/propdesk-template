@@ -1,5 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
-import { loginSchema, changePasswordSchema, consumeResetTokenSchema, updateAvatarSchema, tradingPlanSchema } from "../schemas";
+import { loginSchema, changePasswordSchema, consumeResetTokenSchema, updateAvatarSchema, tradingPlansSchema } from "../schemas";
 import { createRateLimit } from "../middleware/rateLimit";
 import { getProfile, saveProfile, saveTradingPlan } from "../repositories";
 import { normalizeEmail } from "./credentials";
@@ -299,10 +299,11 @@ studentProtectedRouter.put(
 );
 
 /**
- * Enregistre le plan de trading de l'élève connecté — seul propriétaire
- * autorisé à l'écrire (voir `getTradingPlan` dans la Vue Complète du coach,
- * `server/auth/routes.ts`, qui ne l'expose qu'en lecture, aucune route
- * d'écriture n'étant proposée au staff).
+ * Enregistre TOUS les plans de trading de l'élève connecté (remplace le
+ * tableau complet) — seul propriétaire autorisé à écrire (voir
+ * `getTradingPlan` dans la Vue Complète du coach, `server/auth/routes.ts`,
+ * qui ne l'expose qu'en lecture, aucune route d'écriture n'étant proposée au
+ * staff).
  */
 studentProtectedRouter.put(
   "/trading-plan",
@@ -313,7 +314,7 @@ studentProtectedRouter.put(
     message: "Trop d'écritures. Réessaie dans quelques minutes.",
   }),
   wrap(async (req, res) => {
-    const parsed = tradingPlanSchema.safeParse(req.body);
+    const parsed = tradingPlansSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Plan de trading invalide." });
       return;

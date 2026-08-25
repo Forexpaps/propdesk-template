@@ -58,9 +58,15 @@ const StatCard: React.FC<{
   valueClassName: string;
   secondary?: string;
 }> = ({ label, value, valueClassName, secondary }) => (
-  <Card className="p-3.5 space-y-1">
+  <Card className="p-3.5 space-y-1 min-w-0">
     <MicroLabel>{label}</MicroLabel>
-    <div className={`text-xl font-black font-mono ${valueClassName}`}>{value}</div>
+    {/* `text-lg` (pas `text-xl`) + `truncate` : une valeur qui grossit (le
+        capital augmente avec les trades) ne doit jamais dépasser la carte —
+        `truncate` ne joue ici qu'un rôle de garde-fou ultime, la marge
+        ajoutée par la taille réduite suffit dans l'immense majorité des cas. */}
+    <div className={`text-lg font-black font-mono truncate ${valueClassName}`} title={value}>
+      {value}
+    </div>
     {secondary && <div className="text-[10px] text-slate-500">{secondary}</div>}
   </Card>
 );
@@ -188,8 +194,14 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
         </div>
       </div>
 
-      {/* Rangée de statistiques — huit cartes, une valeur par métrique clé. */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+      {/* Rangée de statistiques — huit cartes, une valeur par métrique clé.
+          4 colonnes max (jamais 8 sur une seule ligne) : les 4 premières
+          (Capital/P&L/Win Rate/Profit Factor) sur une ligne, les 4
+          suivantes (RR Moyen/Drawdown/Espérance/Gain-Perte) sur la
+          suivante — plus de marge par carte qu'à 8 en ligne, une valeur à 6
+          chiffres comme un capital ("$110,000.00") ne risque plus de
+          dépasser sa carte. */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard
           label="Capital"
           value={formatCurrency(student.currentCapital)}

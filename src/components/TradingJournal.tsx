@@ -28,6 +28,7 @@ import {
   PnlUnit,
   TradeMistake,
   Setup,
+  TradingPlan,
 } from "../types";
 import { formatCurrency } from "../lib/format";
 import { resizeChartScreenshot } from "../lib/image";
@@ -36,6 +37,9 @@ import { ThousandsInput } from "./ThousandsInput";
 
 /** Valeur du sélecteur de compte quand aucun n'est choisi. */
 const SANS_COMPTE = "";
+
+/** Valeur du sélecteur de plan quand aucun n'est choisi — trade pris hors plan. */
+const SANS_PLAN = "";
 
 /** Valeur du filtre « tous les comptes », distincte de « non rattaché ». */
 const TOUS_COMPTES = "Tous";
@@ -106,6 +110,14 @@ interface TradingJournalProps {
    * coup ne modifie jamais les trades déjà enregistrés.
    */
   setups?: Setup[];
+  /**
+   * Plans de trading de l'élève (module Plan de trading) — source du
+   * sélecteur « Plan de trading » du formulaire. `Trade.tradingPlanId` reste
+   * un id libre : un plan renommé ou supprimé après coup ne modifie jamais
+   * les trades déjà enregistrés (même motif que `setups`/`strategy`
+   * ci-dessus).
+   */
+  plans?: TradingPlan[];
 }
 
 export const TradingJournal: React.FC<TradingJournalProps> = ({
@@ -121,6 +133,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   hideAiAndCoachActions = false,
   readOnly = false,
   setups = [],
+  plans = [],
 }) => {
   const [searchPair, setSearchPair] = useState("");
   const [selectedMarket, setSelectedMarket] = useState<string>("Tous");
@@ -148,6 +161,12 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   const nomDuCompte = (accountId?: string): string | null => {
     if (!accountId) return null;
     return accounts.find((a) => a.id === accountId)?.name ?? null;
+  };
+
+  /** `null` si le trade n'est rattaché à aucun plan — y compris un plan supprimé depuis. */
+  const nomDuPlan = (tradingPlanId?: string): string | null => {
+    if (!tradingPlanId) return null;
+    return plans.find((p) => p.id === tradingPlanId)?.name ?? null;
   };
 
   /**
@@ -241,6 +260,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     exitPrice: "1.0910",
     lotSize: "1",
     strategy: "",
+    tradingPlanId: SANS_PLAN,
     result: "OPEN" as TradeResult,
     emotion: "Disciplined" as EmotionState,
     mistakes: [] as TradeMistake[],
@@ -266,6 +286,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     exitPrice: "1.091",
     lotSize: "1",
     strategy: "",
+    tradingPlanId: SANS_PLAN,
     result: "OPEN" as TradeResult,
     emotion: "Disciplined" as EmotionState,
     mistakes: [] as TradeMistake[],
@@ -305,6 +326,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       exitPrice: String(trade.exitPrice ?? 0),
       lotSize: String(trade.lotSize),
       strategy: trade.strategy,
+      tradingPlanId: trade.tradingPlanId ?? SANS_PLAN,
       result: trade.result,
       emotion: trade.emotion,
       mistakes: trade.mistakes ?? [],
@@ -508,6 +530,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       // `undefined` et non chaîne vide : le champ est optionnel, une chaîne
       // vide en base se lirait comme un rattachement à un compte sans id.
       accountId: formData.accountId || undefined,
+      // Même raisonnement que `accountId` juste au-dessus : `undefined`, pas
+      // une chaîne vide, sinon un plan supprimé plus tard ne se distingue
+      // plus de « aucun plan choisi ».
+      tradingPlanId: formData.tradingPlanId || undefined,
       pair: formData.pair,
       marketCategory: formData.marketCategory,
       direction: formData.direction,
@@ -1135,6 +1161,31 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               </div>
 
               <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                  Plan de trading <span className="text-slate-600 font-normal">(facultatif)</span>
+                </label>
+                {plans.length > 0 ? (
+                  <select
+                    value={formData.tradingPlanId}
+                    onChange={(e) => setFormData({ ...formData, tradingPlanId: e.target.value })}
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
+                  >
+                    <option value={SANS_PLAN}>— Aucun plan —</option>
+                    {plans.map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-[11px] text-slate-500 bg-[#0D1110] border border-dashed border-[#1B2320] rounded-lg p-2.5">
+                    Aucun plan enregistré — ajoutes-en un dans « Plan de trading ». Un trade sans plan
+                    n'est soumis à aucune vérification de conformité.
+                  </p>
+                )}
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Résultat du Trade</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
@@ -1353,6 +1404,12 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
                 <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Marché</div>
                 <div className="text-white font-semibold">{selectedChartTrade.marketCategory}</div>
+              </div>
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Plan de trading</div>
+                <div className="text-white font-semibold">
+                  {nomDuPlan(selectedChartTrade.tradingPlanId) ?? "Aucun plan"}
+                </div>
               </div>
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
                 <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Résultat</div>

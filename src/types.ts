@@ -94,6 +94,20 @@ export interface Trade {
    * toujours « introuvable » comme « non rattaché », jamais comme une erreur.
    */
   accountId?: string;
+  /**
+   * Plan de trading suivi pour cette position (`TradingPlan.id`), choisi
+   * explicitement à la saisie — jamais déduit de `strategy`. Un élève peut
+   * avoir plusieurs plans (un par setup, voir `TradingPlanData` plus bas) ;
+   * ce champ dit lequel s'appliquait à CE trade précis.
+   *
+   * **Optionnel, et il doit le rester.** Absent = trade pris hors plan,
+   * volontairement ou parce qu'il a été saisi avant l'introduction de ce
+   * champ — dans les deux cas, aucune vérification de conformité ne doit lui
+   * être appliquée (voir `applyPlanCompliance`, `src/App.tsx`). Un plan
+   * supprimé après coup laisse aussi des `tradingPlanId` orphelins : traite
+   * toujours « introuvable » comme « aucun plan », jamais comme une erreur.
+   */
+  tradingPlanId?: string;
   pair: string; // e.g. "EUR/USD", "BTC/USDT"
   marketCategory: MarketCategory;
   direction: TradeDirection;
@@ -155,6 +169,7 @@ export interface TradeDraft {
   takeProfit?: number;
   lotSize?: number;
   strategy?: string;
+  tradingPlanId?: string;
   notes?: string;
 }
 
@@ -190,22 +205,24 @@ export interface CoachMessage {
 }
 
 /**
- * Contenu du module « Plan de trading » (section Pratique).
- *
- * Élève : synchronisé serveur (`PUT /auth/trading-plan`, `getTradingPlan`/
- * `saveTradingPlan` dans `server/repositories.ts`), avec mise en cache locale
- * via `useSyncedState` — voir `src/App.tsx`. Le coach le consulte en lecture
- * seule dans la Vue Complète (`AdminStudentView.tsx`), sans route d'écriture
- * exposée côté staff. L'instance du bureau staff (son propre plan personnel)
- * reste en `localStorage` seul, non synchronisée — hors périmètre demandé.
+ * Un plan de trading (section Pratique, module « Plan de trading »). Un
+ * élève peut en avoir plusieurs — un par setup, typiquement (voir
+ * `TradingPlanData` juste en dessous) — chacun avec ses propres règles de
+ * risque, sessions, actifs et conditions.
  *
  * `authorizedSetups` : chaîne de noms de `Setup` séparés par des virgules,
  * choisis parmi ceux de l'élève (voir `SetupManagement.tsx`) — même format
- * texte que `matchesAny` (`src/lib/planCompliance.ts`) attendait déjà, donc
- * aucun changement de schéma nécessaire pour passer d'un champ libre à une
- * sélection dans une liste.
+ * texte que `matchesAny` (`src/lib/planCompliance.ts`) attendait déjà. Sert
+ * de référence déclarative ("ce plan couvre ces setups") et à la règle "setup
+ * non autorisé" de `checkPlanViolations` ; ne détermine PAS automatiquement
+ * quel plan s'applique à un trade — voir `Trade.tradingPlanId`, choisi
+ * explicitement à la saisie. L'éditeur (`TradingPlanEditorModal.tsx`) impose
+ * qu'un setup ne soit jamais coché dans deux plans à la fois.
  */
-export interface TradingPlanData {
+export interface TradingPlan {
+  id: string;
+  /** Nom affiché dans la liste des plans, ex: "OPR Confluence". */
+  name: string;
   authorizedSessions: string[];
   tradingHours: string;
   trackedAssets: string;
@@ -217,6 +234,23 @@ export interface TradingPlanData {
   stopConditions: string;
   goldenRules: string;
 }
+
+/**
+ * Tous les plans de trading d'un élève.
+ *
+ * Élève : synchronisé serveur (`PUT /auth/trading-plan`, `getTradingPlan`/
+ * `saveTradingPlan` dans `server/repositories.ts`), avec mise en cache locale
+ * via `useSyncedState` — voir `src/App.tsx`. Le coach le consulte en lecture
+ * seule dans la Vue Complète (`AdminStudentView.tsx`), sans route d'écriture
+ * exposée côté staff. L'instance du bureau staff (son propre plan personnel)
+ * reste en `localStorage` seul, non synchronisée — hors périmètre demandé.
+ *
+ * Anciennes valeurs enregistrées avant l'introduction du multi-plan : un
+ * objet `TradingPlan` unique, pas un tableau. Toujours lire une valeur
+ * stockée via `normalizeTradingPlans` (`src/lib/planCompliance.ts`), jamais
+ * directement — voir son commentaire pour la conversion.
+ */
+export type TradingPlanData = TradingPlan[];
 
 /**
  * Une stratégie de trading définie par l'élève — remplace la liste figée de
