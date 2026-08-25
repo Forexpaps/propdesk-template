@@ -29,6 +29,10 @@ import { getEconomicCalendar } from "./economicCalendar";
 import { getMarketData } from "./marketData";
 import { buildStudentProfile, getStudentByEnrolledId } from "./auth/studentCredentials";
 import { DEFAULT_USER_ID, FOUNDER_COACH_ID } from "./db";
+// Catalogue fixe des badges + repli de dernier recours pour les modules —
+// données pures (aucune dépendance React/DOM), voir le commentaire de
+// `backfillStudentDefaultCollections` plus bas pour pourquoi le serveur en a besoin.
+import { initialTraderBadges, initialModules } from "../src/data/mockData";
 
 export const api = Router();
 
@@ -253,18 +257,36 @@ function withResolvedStudentAvatars<T extends { id: string; avatar?: unknown }>(
  * été réellement peuplée une fois (idempotent).
  */
 function backfillStudentDefaultCollections(dataUserId: string): void {
-  for (const name of ["badges", "modules"] as const) {
-    if (listCollection(name, dataUserId).length > 0) continue;
-    const shared = listCollection<{ id: string; [key: string]: unknown }>(name, DEFAULT_USER_ID);
-    if (shared.length === 0) continue;
-    const personalCopy = shared.map((item) => ({
-      ...item,
-      id: `${dataUserId}-${item.id}`,
-      // Une définition de badge copiée ne doit jamais arriver déjà débloquée
-      // — sans objet pour `modules` (pas de champ `unlocked`), ignoré alors.
-      ...(name === "badges" ? { unlocked: false, unlockedAt: undefined } : {}),
+  // Badges : catalogue FIXE du produit (jamais édité via une UI staff) — la
+  // constante partagée `initialTraderBadges` fait foi directement, plutôt
+  // que la collection "badges" du bureau staff (`DEFAULT_USER_ID`), qui n'a
+  // en réalité jamais été écrite côté serveur pour la plupart des
+  // déploiements : le tableau de bord staff affiche `initialTraderBadges`
+  // comme simple repli client (`seed()`, `src/App.tsx`) sans jamais le
+  // persister en base tant que personne n'y réclame de badge. Copier depuis
+  // cette collection revenait donc à copier... rien, laissant l'élève
+  // bloqué à "0/0" malgré le rattrapage. Toujours reposé verrouillé
+  // (`unlocked: false`), jamais un faux badge déjà débloqué.
+  if (listCollection("badges", dataUserId).length === 0) {
+    const personalBadges = initialTraderBadges.map((badge) => ({
+      ...badge,
+      id: `${dataUserId}-${badge.id}`,
+      unlocked: false,
+      unlockedAt: undefined,
     }));
-    replaceCollection(name, personalCopy, dataUserId);
+    replaceCollection("badges", personalBadges, dataUserId);
+  }
+
+  // Modules : contenu réel du programme, personnalisable par le fondateur —
+  // copié depuis SON bureau en priorité (source de vérité éditable), avec un
+  // repli sur le contenu par défaut seulement si même celui-ci est vide.
+  if (listCollection("modules", dataUserId).length === 0) {
+    const sharedModules = listCollection<{ id: string; [key: string]: unknown }>("modules", DEFAULT_USER_ID);
+    const source = sharedModules.length > 0 ? sharedModules : initialModules;
+    if (source.length > 0) {
+      const personalModules = source.map((mod) => ({ ...mod, id: `${dataUserId}-${mod.id}` }));
+      replaceCollection("modules", personalModules, dataUserId);
+    }
   }
 }
 
