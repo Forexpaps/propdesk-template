@@ -576,7 +576,11 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   }, [syncedTrades]);
 
   const handleAddTrade = (newTrade: Omit<Trade, "id">) => {
-    const tradeWithId: Trade = { ...newTrade, id: `trd-${Date.now()}` };
+    // Le suffixe aléatoire n'est pas cosmétique : deux trades ajoutés dans la
+    // même milliseconde (import CSV en boucle synchrone, notamment) auraient
+    // sinon le même id — rejeté par le serveur (`collectionPayloadSchema`
+    // exige des id uniques), silencieusement pour tout le lot en cours.
+    const tradeWithId: Trade = { ...newTrade, id: `trd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` };
     const next = [tradeWithId, ...syncedTradesRef.current];
     syncedTradesRef.current = next;
     setSyncedTrades(next);
@@ -1498,9 +1502,12 @@ function AcademyApp({
   }, [trades]);
 
   const handleAddTrade = (newTrade: Omit<Trade, "id">) => {
+    // Voir le commentaire équivalent côté élève (`StudentAuthenticatedApp`) :
+    // le suffixe aléatoire évite un id dupliqué quand plusieurs trades sont
+    // ajoutés dans la même milliseconde (import CSV en boucle, notamment).
     const tradeWithId: Trade = {
       ...newTrade,
-      id: `trd-${Date.now()}`,
+      id: `trd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     };
     const next = [tradeWithId, ...tradesRef.current];
     tradesRef.current = next;
