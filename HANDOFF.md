@@ -5,26 +5,88 @@ l'a produit, ni à autre chose que ce dépôt. Lis-le en entier avant de
 toucher au code.
 
 > **État à la dernière mise à jour de ce document**
-> Branche **`fix/audit-securite-concurrence-multi-onglets`** (PR #2 ouverte,
-> pas encore mergée), dernier commit **poussé sur cette branche** : `6b60eb4`.
-> Dernier commit poussé sur `main` : `85b08df` (« Ajoute l'alerte sonore des
-> notifications et le module Annonces »).
-> **14 fichiers modifiés, NON commités** au-dessus de `6b60eb4` sur cette
-> branche (voir §0-bis) — `npx tsc --noEmit` et `npm run build` passent sans
-> erreur, vérifié aussi sans erreur console dans le navigateur (onglet neuf).
-> Deux tours d'audit complet ont maintenant été faits. Voir §0-bis pour le
-> second (le plus récent), §0 pour le premier (déjà pour l'essentiel
-> commité dans `6b60eb4`, PR #2).
-> Statut de déploiement Railway du dernier commit poussé sur `main` non
-> re-vérifié dans cette période — à confirmer avec `railway deployment list
-> --service propdesk --json` avant de considérer quoi que ce soit en
-> production.
+> Branche **`main`**, dernier commit poussé : **`8bb98f4`** (merge de la PR
+> #2, « Audit sécurité complet : concurrence multi-onglets, PnL réalisé,
+> durcissements 2FA/sessions/uploads » + son second tour). **Déployé sur
+> Railway avec succès** (`SUCCESS` confirmé via `railway deployment list
+> --service propdesk --json` juste après le déploiement).
+> Les deux tours d'audit complet (§0-bis et §0 ci-dessous) sont donc
+> **entièrement mergés et en production**. Le contenu de §0-bis/§0 est
+> conservé pour le contexte/l'historique des décisions, mais n'est plus
+> "à faire" — voir §0-ter pour ce qui EST en cours actuellement.
+>
+> **En cours, NON commité** : ajout de plusieurs captures d'écran par trade
+> (voir §0-ter — nouvelle demande produit, pas un audit). **3 fichiers
+> modifiés** : `server/schemas.ts`, `src/components/TradingJournal.tsx`,
+> `src/types.ts`. `npx tsc --noEmit` et `npm run build` passent sans erreur ;
+> vérifié aussi sans erreur console (onglet neuf) — **pas encore vérifié en
+> conditions réelles connecté** (aucun identifiant staff/élève disponible
+> dans cette session pour tester le formulaire derrière l'authentification).
 > Application déployée sur **Railway**, domaine
 > `https://propdesk-academie.up.railway.app`.
 
 ---
 
-## 0-bis. Second tour d'audit (le plus récent — lire ceci EN PREMIER)
+## 0-ter. Captures d'écran multiples par trade (EN COURS — lire ceci EN PREMIER)
+
+**Demande utilisateur** : pouvoir joindre au minimum 3 captures d'écran à un
+trade (à la saisie ou à l'édition) — début, pendant, après, plus des
+emplacements supplémentaires au besoin.
+
+**Design choisi** : `Trade.chartUrl` (une seule capture, `string`) devient
+`Trade.chartUrls?: TradeScreenshot[]` (`{ id, label, url }[]`, `src/types.ts`).
+`chartUrl` reste dans le type, marqué `@deprecated`, pour la lecture des
+trades enregistrés avant cette fonctionnalité — plus jamais écrit.
+
+- **`src/components/TradingJournal.tsx`** (le plus gros du changement) :
+  - `toScreenshotSlots(trade)` : garantit toujours 3 emplacements "Début/
+    Pendant/Après" (dans cet ordre) dans le formulaire, même vides ; absorbe
+    l'ancien `chartUrl` d'un trade existant dans l'emplacement "Début" à
+    l'ouverture du formulaire d'édition (seul cas où `chartUrls` est
+    entièrement absent).
+  - `handleAddScreenshotSlot`/`handleRemoveScreenshotSlot` : emplacements
+    SUPPLÉMENTAIRES à libellé libre (éditable), en plus des 3 par défaut
+    (non supprimables, seulement vidables via `handleRemoveScreenshot`).
+    Plafond `MAX_SCREENSHOT_SLOTS = 8` (même borne que côté serveur).
+  - `handleChartUpload(slotId, e)` : upload ciblé sur UN emplacement (au
+    lieu d'un seul champ global) — même traitement qu'avant
+    (`resizeChartScreenshot`, `src/lib/image.ts`), un seul upload à la fois
+    (`resizingSlotId`).
+  - À la soumission (`handleFormSubmit`) : seuls les emplacements avec une
+    image sont persistés (`chartUrls: formData.chartUrls.filter(s => s.url)`)
+    — un emplacement "Après" jamais rempli n'est pas sauvegardé comme
+    capture vide.
+  - Aperçu complet (`selectedChartTrade`, bouton œil) : `getFilledScreenshots(trade)`
+    (distincte de `toScreenshotSlots`, ne force PAS les 3 emplacements —
+    n'affiche que ce qui existe réellement) affiche chaque capture avec son
+    libellé, en grille responsive.
+- **`server/schemas.ts`** : `isSafeChartUrls()` valide `chartUrls` — même
+  garde `isSafeMediaUrl` (https:// ou data:image/... uniquement) que
+  `chartUrl`/`avatar`, appliquée à chaque `.url`, plafonnée à
+  `MAX_CHART_SCREENSHOTS = 8` entrées. Branché dans le `.refine()` de
+  `collectionItem` (donc appliqué à `PUT /collections/trades`).
+
+**Pas touché, volontairement** : `server/db.ts`/`repositories.ts` (aucun
+changement de schéma SQL nécessaire — `trades` est une collection JSON
+générique, `chartUrls` y voyage comme n'importe quel autre champ) ;
+`CoachMessaging.tsx`/l'attachement d'un trade à un message coach (rattache
+par `Trade.id`, ne lit jamais `chartUrl` directement — aucun impact).
+
+**Vérifié** : `npx tsc --noEmit`, `npm run build`, navigateur sans erreur
+console (onglet neuf, non connecté — l'écran de connexion s'affiche
+normalement). **PAS vérifié en conditions réelles connecté** : aucun
+identifiant de test (staff ou élève) disponible dans cette session pour
+ouvrir le formulaire de trade derrière l'authentification. Prochaine
+étape avant de committer : se connecter (staff ou élève) et vérifier
+manuellement — créer un trade avec 2-3 captures aux emplacements par
+défaut + 1 supplémentaire, l'éditer, vérifier que l'aperçu (bouton œil)
+les affiche toutes avec leurs libellés, et qu'un ANCIEN trade (avec
+`chartUrl` mais sans `chartUrls`) affiche toujours correctement sa capture
+unique dans "Début" à l'édition et dans l'aperçu.
+
+---
+
+## 0-bis. Second tour d'audit (déjà mergé en production, PR #2, `8bb98f4`)
 
 Un second audit complet (bugs + failles de sécurité) a été demandé après la
 PR #2. Même méthode : 4 agents parallèles en lecture seule par zone (auth/
