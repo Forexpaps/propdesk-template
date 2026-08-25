@@ -1,6 +1,27 @@
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import { db } from "../db";
-import { generateTotpSecret, verifyTotpCode } from "./totp";
+import { generateTotpSecret, findMatchingTotpStep } from "./totp";
+
+/**
+ * Vérifie un code TOTP contre `staffId` avec suivi anti-rejeu : un code qui
+ * matche un pas déjà consommé (`totp_last_used_step`) — ou un pas antérieur,
+ * par exemple rejoué depuis une requête interceptée — est refusé même s'il
+ * reste dans la fenêtre ±1 de `findMatchingTotpStep`. Le pas est enregistré
+ * dès qu'il est accepté, pour qu'il ne puisse plus jamais être réutilisé.
+ */
+function verifyAndConsumeTotpStep(staffId: string, secretBase32: string, code: string): boolean {
+  const row = db.prepare("SELECT totp_last_used_step FROM staff_accounts WHERE id = ?").get(staffId) as
+    | { totp_last_used_step: number | null }
+    | undefined;
+  const lastUsedStep = row?.totp_last_used_step ?? null;
+
+  const matchedStep = findMatchingTotpStep(secretBase32, code);
+  if (matchedStep === null) return false;
+  if (lastUsedStep !== null && matchedStep <= lastUsedStep) return false;
+
+  db.prepare("UPDATE staff_accounts SET totp_last_used_step = ? WHERE id = ?").run(matchedStep, staffId);
+  return true;
+}
 
 /**
  * Accès bas niveau à la 2FA (TOTP) d'un compte staff — secret, activation,
@@ -49,7 +70,7 @@ export function confirmTotpSetup(staffId: string, code: string): boolean {
   const row = db.prepare("SELECT totp_secret FROM staff_accounts WHERE id = ?").get(staffId) as
     | { totp_secret: string | null }
     | undefined;
-  if (!row?.totp_secret || !verifyTotpCode(row.totp_secret, code)) return false;
+  if (!row?.totp_secret || !verifyAndConsumeTotpStep(staffId, row.totp_secret, code)) return false;
 
   db.prepare("UPDATE staff_accounts SET totp_enabled_at = ? WHERE id = ?").run(
     new Date().toISOString(),
@@ -68,13 +89,13 @@ export function disableTotp(staffId: string): void {
   })();
 }
 
-/** Vérifie un code TOTP contre le secret ACTIF du compte (2FA déjà activée) — `null` si la 2FA n'est pas active. */
+/** Vérifie un code TOTP contre le secret ACTIF du compte (2FA déjà activée) — `false` si la 2FA n'est pas active. */
 export function verifyStaffTotpCode(staffId: string, code: string): boolean {
   const row = db
     .prepare("SELECT totp_secret FROM staff_accounts WHERE id = ? AND totp_enabled_at IS NOT NULL")
     .get(staffId) as { totp_secret: string | null } | undefined;
   if (!row?.totp_secret) return false;
-  return verifyTotpCode(row.totp_secret, code);
+  return verifyAndConsumeTotpStep(staffId, row.totp_secret, code);
 }
 
 const RECOVERY_CODE_COUNT = 8;

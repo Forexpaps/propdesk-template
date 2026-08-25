@@ -46,6 +46,36 @@ const isValidInitialBalance = (value: unknown): boolean =>
   value == null || (typeof value === "number" && value > 0);
 
 /**
+ * Détecte un schéma d'URL dangereux (`javascript:`, `vbscript:`,
+ * `data:text/html`) n'importe où dans un item de collection, quel que soit
+ * le nom du champ ou sa profondeur d'imbrication.
+ *
+ * Motif : contrairement à `chartUrl`/`avatar` (validés par nom de champ via
+ * `isSafeMediaUrl`), les ressources de leçon (`Module.lessons[].videoUrl`,
+ * `Module.lessons[].resources[].url`) sont profondément imbriquées dans un
+ * item `modules` passé en `.passthrough()` — aucune règle par nom de champ ne
+ * les couvrait. Un élève/coach qui écrit dans sa propre copie de la
+ * collection `modules` (ou un appel direct à l'API) pouvait donc y stocker
+ * `javascript:...`, exploitable en auto-XSS au clic si ce champ est un jour
+ * rendu en lien cliquable plutôt qu'en simple `<video src>`. Un scan
+ * générique, plutôt qu'un champ nommé de plus, couvre aussi tout champ
+ * similaire ajouté plus tard sans nouveau verrou à écrire.
+ */
+function containsDangerousUrlScheme(value: unknown, depth = 0): boolean {
+  if (depth > 10) return false;
+  if (typeof value === "string") {
+    return /^\s*(javascript|vbscript):/i.test(value) || /^\s*data:text\/html/i.test(value);
+  }
+  if (Array.isArray(value)) {
+    return value.some((v) => containsDangerousUrlScheme(v, depth + 1));
+  }
+  if (value && typeof value === "object") {
+    return Object.values(value).some((v) => containsDangerousUrlScheme(v, depth + 1));
+  }
+  return false;
+}
+
+/**
  * Tout élément de collection doit porter un id non vide et unique.
  *
  * ⚠️ `.passthrough()` : un élève écrivant dans une collection qui lui est
@@ -70,6 +100,9 @@ const collectionItem = z
   )
   .refine((item) => isValidInitialBalance((item as Record<string, unknown>).initialBalance), {
     message: "Le capital initial doit être un nombre supérieur à 0.",
+  })
+  .refine((item) => !containsDangerousUrlScheme(item), {
+    message: "URL invalide : les schémas javascript:/vbscript:/data:text/html sont interdits.",
   });
 
 export const collectionPayloadSchema = z
@@ -186,8 +219,22 @@ export const announcementSchema = z.object({
   createdAt: z.string().max(100),
 });
 
-/** Toutes les annonces — plafond large mais réel, pas des milliers d'annonces dans une académie. */
-export const announcementsSchema = z.array(announcementSchema).max(200);
+/**
+ * Toutes les annonces — plafond large mais réel, pas des milliers d'annonces
+ * dans une académie. `id` unique imposé : la route `PUT /admin/announcements`
+ * (`server/auth/routes.ts`) détecte une "nouvelle" annonce par un `id`
+ * absent de l'ancienne liste pour décider qui notifier — un doublon d'`id`
+ * casserait silencieusement cette détection (deux entrées fusionnées à tort)
+ * en plus de produire deux notifications identiques (`announce-${a.id}-${student.id}`
+ * collisionnerait).
+ */
+export const announcementsSchema = z
+  .array(announcementSchema)
+  .max(200)
+  .refine(
+    (list) => new Set(list.map((a) => a.id)).size === list.length,
+    { message: "Deux annonces ne peuvent pas avoir le même identifiant." }
+  );
 
 /**
  * Un seul résultat de quiz de module — voir `ModuleQuizResult` dans

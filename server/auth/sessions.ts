@@ -17,7 +17,7 @@ import { db } from "../db";
 /** Nom du cookie porteur du jeton de session. */
 export const SESSION_COOKIE = "pd_session";
 
-/** Durée de vie absolue. Outil personnel d'usage quotidien : 30 jours. */
+/** Durée d'inactivité tolérée avant expiration. Outil personnel d'usage quotidien : 30 jours. */
 const TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
@@ -27,6 +27,17 @@ const TTL_MS = 30 * 24 * 60 * 60 * 1000;
  * plusieurs par seconde.
  */
 const SLIDING_THRESHOLD_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Durée de vie ABSOLUE, depuis `created_at`, jamais prolongée — même si la
+ * session reste active en continu. Sans ce plafond, `TTL_MS` seul décrivait
+ * une fenêtre GLISSANTE (renouvelée à chaque connexion espacée de plus de
+ * `SLIDING_THRESHOLD_MS`) : un jeton créé il y a des années restait valide
+ * indéfiniment tant que l'appareil se reconnectait au moins une fois par
+ * mois — aucune expiration réelle en pratique. Au-delà de ce plafond, une
+ * reconnexion complète (identifiants, ou 2FA le cas échéant) est exigée.
+ */
+const ABSOLUTE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
 export interface SessionRecord {
   id: string;
@@ -116,13 +127,14 @@ export function createSession(userId: string, userAgent?: string): string {
 export function validateSession(token: string): SessionRecord | null {
   const id = fingerprint(token);
   const nowIso = new Date().toISOString();
+  const absoluteCutoffIso = new Date(Date.now() - ABSOLUTE_TTL_MS).toISOString();
 
   const row = db
     .prepare(
       `SELECT id, user_id, last_seen_at FROM sessions
-       WHERE id = ? AND expires_at > ?`
+       WHERE id = ? AND expires_at > ? AND created_at > ?`
     )
-    .get(id, nowIso) as { id: string; user_id: string; last_seen_at: string } | undefined;
+    .get(id, nowIso, absoluteCutoffIso) as { id: string; user_id: string; last_seen_at: string } | undefined;
 
   if (!row) return null;
 
@@ -172,9 +184,11 @@ export function destroyOtherSessions(userId: string, currentToken: string): numb
  * Renvoie le nombre de lignes supprimées.
  */
 export function purgeExpiredSessions(): number {
+  const nowIso = new Date().toISOString();
+  const absoluteCutoffIso = new Date(Date.now() - ABSOLUTE_TTL_MS).toISOString();
   const result = db
-    .prepare("DELETE FROM sessions WHERE expires_at <= ?")
-    .run(new Date().toISOString());
+    .prepare("DELETE FROM sessions WHERE expires_at <= ? OR created_at <= ?")
+    .run(nowIso, absoluteCutoffIso);
   return result.changes;
 }
 

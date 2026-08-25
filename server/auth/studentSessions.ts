@@ -13,6 +13,8 @@ export const STUDENT_SESSION_COOKIE = "pd_student_session";
 
 const TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const SLIDING_THRESHOLD_MS = 24 * 60 * 60 * 1000;
+/** Voir le commentaire de `ABSOLUTE_TTL_MS` dans `sessions.ts` (staff) — même correctif anti-rejeu indéfini côté élève. */
+const ABSOLUTE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
 export interface StudentSessionRecord {
   id: string;
@@ -67,13 +69,14 @@ export function createStudentSession(studentAccountId: string, userAgent?: strin
 export function validateStudentSession(token: string): StudentSessionRecord | null {
   const id = fingerprint(token);
   const nowIso = new Date().toISOString();
+  const absoluteCutoffIso = new Date(Date.now() - ABSOLUTE_TTL_MS).toISOString();
 
   const row = db
     .prepare(
       `SELECT id, user_id, last_seen_at FROM student_sessions
-       WHERE id = ? AND expires_at > ?`
+       WHERE id = ? AND expires_at > ? AND created_at > ?`
     )
-    .get(id, nowIso) as { id: string; user_id: string; last_seen_at: string } | undefined;
+    .get(id, nowIso, absoluteCutoffIso) as { id: string; user_id: string; last_seen_at: string } | undefined;
 
   if (!row) return null;
 
@@ -114,9 +117,11 @@ export function destroyOtherStudentSessions(studentAccountId: string, currentTok
 }
 
 export function purgeExpiredStudentSessions(): number {
+  const nowIso = new Date().toISOString();
+  const absoluteCutoffIso = new Date(Date.now() - ABSOLUTE_TTL_MS).toISOString();
   const result = db
-    .prepare("DELETE FROM student_sessions WHERE expires_at <= ?")
-    .run(new Date().toISOString());
+    .prepare("DELETE FROM student_sessions WHERE expires_at <= ? OR created_at <= ?")
+    .run(nowIso, absoluteCutoffIso);
   return result.changes;
 }
 
