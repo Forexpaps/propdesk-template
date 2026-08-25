@@ -486,13 +486,11 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     //
     // C'est **la** règle à ne pas casser. Aucune formule ne propose plus de
     // valeur par défaut : l'utilisateur tape le chiffre qu'il lit sur sa
-    // propre plateforme, dans l'unité de son choix. Un montant "$" reste un
-    // entier (comme avant) ; un "%" garde ses décimales, ce n'est pas une
-    // somme d'argent à arrondir.
-    const pnl =
-      formData.pnlUnit === "PERCENT"
-        ? Number(formData.pnl) || 0
-        : Math.round(Number(formData.pnl) || 0);
+    // propre plateforme, dans l'unité de son choix — centimes compris pour
+    // un montant "$" (ex: 543.83), décimales conservées pour un "%".
+    // Arrondir les "$" à l'entier (comportement précédent) tronquait
+    // silencieusement les centimes tapés.
+    const pnl = Number(formData.pnl) || 0;
 
     // Le résultat est choisi explicitement (boutons TP/SL/BE/Ouvert), jamais
     // déduit du signe du PnL : un trade sorti au break-even peut afficher un
