@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Coach, CoachMessage, Trade, StudentProfile } from "../types";
 import { formatCurrency } from "../lib/format";
+import { Select } from "./Select";
 
 /**
  * Les messages réels stockent un horodatage ISO 8601 (parsable, indépendant
@@ -320,7 +321,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
             {/* Attachment Selector Row */}
             <div className="flex items-center gap-3 overflow-x-auto text-xs">
               <span className="text-slate-500 text-[11px] font-semibold shrink-0">Rattacher un Trade :</span>
-              <select
+              <Select
                 value={selectedTradeAttachment}
                 onChange={(e) => setSelectedTradeAttachment(e.target.value)}
                 className="bg-[#111615] border border-[#1B2320] rounded-lg px-2.5 py-1 text-slate-300 text-xs focus:outline-none"
@@ -331,7 +332,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
                     {t.date} - {t.pair} ({t.direction}) [{(t.pnlUnit ?? "USD") === "PERCENT" ? `${t.pnl}%` : formatCurrency(t.pnl)}]
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* Input Row */}

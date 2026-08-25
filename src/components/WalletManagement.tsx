@@ -24,6 +24,7 @@ import {
   dailyLossPercent as computeDailyLossPercent,
   totalDrawdownPercent as computeTotalDrawdownPercent,
 } from "../lib/walletStats";
+import { Select } from "./Select";
 
 /**
  * Une prop `onSelectAccountForJournal?: (accountId: string) => void` figurait
@@ -719,7 +720,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
 
                 <div>
                   <label className="block font-medium text-slate-300 mb-1">Type de Compte</label>
-                  <select
+                  <Select
                     value={newAccType}
                     onChange={(e) => setNewAccType(e.target.value as AccountType)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50"
@@ -728,7 +729,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     <option value="Prop Firm Funded">Prop Firm Funded</option>
                     <option value="Broker Réel">Broker Réel</option>
                     <option value="Compte DÉMO">Compte DÉMO</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 

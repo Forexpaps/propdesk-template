@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ShieldAlert, X, KeyRound, LogIn, LogOut, Lock, UserX, UserPlus, UserMinus } from "lucide-react";
 import { api, type SecurityEvent, type SecuritySeverity } from "../lib/api";
+import { Select } from "./Select";
 
 interface SecurityLogModalProps {
   isOpen: boolean;
@@ -166,7 +167,7 @@ export const SecurityLogModal: React.FC<SecurityLogModalProps> = ({ isOpen, onCl
 
         {/* Filtres */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          <select
+          <Select
             value={severityFilter}
             onChange={(e) => {
               setSeverityFilter(e.target.value as SecuritySeverity | "");
@@ -180,9 +181,9 @@ export const SecurityLogModal: React.FC<SecurityLogModalProps> = ({ isOpen, onCl
                 {SEVERITY_LABELS[s]}
               </option>
             ))}
-          </select>
+          </Select>
 
-          <select
+          <Select
             value={eventTypeFilter}
             onChange={(e) => {
               setEventTypeFilter(e.target.value);
@@ -196,7 +197,7 @@ export const SecurityLogModal: React.FC<SecurityLogModalProps> = ({ isOpen, onCl
                 {label}
               </option>
             ))}
-          </select>
+          </Select>
 
           <span className="text-[11px] text-slate-500 sm:ml-auto self-center">
             <span className="font-bold text-slate-300">{events.length}</span> affichés ·{" "}
