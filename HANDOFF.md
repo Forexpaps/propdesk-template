@@ -5,399 +5,89 @@ l'a produit, ni à autre chose que ce dépôt. Lis-le en entier avant de
 toucher au code.
 
 > **État à la dernière mise à jour de ce document**
-> Branche **`main`**, dernier commit poussé : **`8bb98f4`** (merge de la PR
-> #2, « Audit sécurité complet : concurrence multi-onglets, PnL réalisé,
-> durcissements 2FA/sessions/uploads » + son second tour). **Déployé sur
-> Railway avec succès** (`SUCCESS` confirmé via `railway deployment list
-> --service propdesk --json` juste après le déploiement).
-> Les deux tours d'audit complet (§0-bis et §0 ci-dessous) sont donc
-> **entièrement mergés et en production**. Le contenu de §0-bis/§0 est
-> conservé pour le contexte/l'historique des décisions, mais n'est plus
-> "à faire" — voir §0-ter pour ce qui EST en cours actuellement.
+> Branche **`main`**, dernier commit **poussé** : `959ff91` (« Rattrape les
+> badges/modules jamais initialisés chez un élève existant »), **déployé
+> avec succès sur Railway** (`SUCCESS` confirmé via `railway deployment
+> list --service propdesk --json`).
 >
-> **En cours, NON commité** : ajout de plusieurs captures d'écran par trade
-> (voir §0-ter — nouvelle demande produit, pas un audit). **3 fichiers
-> modifiés** : `server/schemas.ts`, `src/components/TradingJournal.tsx`,
-> `src/types.ts`. `npx tsc --noEmit` et `npm run build` passent sans erreur ;
-> vérifié aussi sans erreur console (onglet neuf) — **pas encore vérifié en
-> conditions réelles connecté** (aucun identifiant staff/élève disponible
-> dans cette session pour tester le formulaire derrière l'authentification).
+> **MAIS ce commit `959ff91` a un bug connu, déjà corrigé dans l'arbre de
+> travail, PAS ENCORE COMMITÉ** : voir §0 ci-dessous, c'est la toute
+> première chose à traiter en reprenant. Un seul fichier modifié,
+> non commité : `server/routes.ts`. `npx tsc --noEmit` et `npm run build`
+> passent sans erreur ; corrigé et vérifié directement en base de données
+> (voir §0), mais **jamais vérifié en conditions réelles via le navigateur
+> connecté** (aucun identifiant élève disponible dans la session qui a
+> produit ce correctif).
+>
 > Application déployée sur **Railway**, domaine
 > `https://propdesk-academie.up.railway.app`.
 
 ---
 
-## 0-ter. Captures d'écran multiples par trade (EN COURS — lire ceci EN PREMIER)
+## 0. Où reprendre EXACTEMENT
 
-**Demande utilisateur** : pouvoir joindre au minimum 3 captures d'écran à un
-trade (à la saisie ou à l'édition) — début, pendant, après, plus des
-emplacements supplémentaires au besoin.
+### Le correctif en cours (non commité) : badges/modules jamais initialisés chez un élève
 
-**Design choisi** : `Trade.chartUrl` (une seule capture, `string`) devient
-`Trade.chartUrls?: TradeScreenshot[]` (`{ id, label, url }[]`, `src/types.ts`).
-`chartUrl` reste dans le type, marqué `@deprecated`, pour la lecture des
-trades enregistrés avant cette fonctionnalité — plus jamais écrit.
+**Symptôme rapporté par l'utilisateur** : un élève voit "Badges & Succès
+0/0" dans son profil — aucun badge affiché, alors qu'il devrait voir le
+catalogue complet (verrouillé) et pouvoir en débloquer en utilisant l'app.
 
-- **`src/components/TradingJournal.tsx`** (le plus gros du changement) :
-  - `toScreenshotSlots(trade)` : garantit toujours 3 emplacements "Début/
-    Pendant/Après" (dans cet ordre) dans le formulaire, même vides ; absorbe
-    l'ancien `chartUrl` d'un trade existant dans l'emplacement "Début" à
-    l'ouverture du formulaire d'édition (seul cas où `chartUrls` est
-    entièrement absent).
-  - `handleAddScreenshotSlot`/`handleRemoveScreenshotSlot` : emplacements
-    SUPPLÉMENTAIRES à libellé libre (éditable), en plus des 3 par défaut
-    (non supprimables, seulement vidables via `handleRemoveScreenshot`).
-    Plafond `MAX_SCREENSHOT_SLOTS = 8` (même borne que côté serveur).
-  - `handleChartUpload(slotId, e)` : upload ciblé sur UN emplacement (au
-    lieu d'un seul champ global) — même traitement qu'avant
-    (`resizeChartScreenshot`, `src/lib/image.ts`), un seul upload à la fois
-    (`resizingSlotId`).
-  - À la soumission (`handleFormSubmit`) : seuls les emplacements avec une
-    image sont persistés (`chartUrls: formData.chartUrls.filter(s => s.url)`)
-    — un emplacement "Après" jamais rempli n'est pas sauvegardé comme
-    capture vide.
-  - Aperçu complet (`selectedChartTrade`, bouton œil) : `getFilledScreenshots(trade)`
-    (distincte de `toScreenshotSlots`, ne force PAS les 3 emplacements —
-    n'affiche que ce qui existe réellement) affiche chaque capture avec son
-    libellé, en grille responsive.
-- **`server/schemas.ts`** : `isSafeChartUrls()` valide `chartUrls` — même
-  garde `isSafeMediaUrl` (https:// ou data:image/... uniquement) que
-  `chartUrl`/`avatar`, appliquée à chaque `.url`, plafonnée à
-  `MAX_CHART_SCREENSHOTS = 8` entrées. Branché dans le `.refine()` de
-  `collectionItem` (donc appliqué à `PUT /collections/trades`).
+**Cause racine** : les badges (et modules vidéo) d'un élève sont copiés
+depuis le bureau staff partagé au moment de son **invitation**
+(`server/auth/routes.ts`, recherche `sharedBadges`) — mais cette copie ne
+se produit qu'**une seule fois**, sans mécanisme de rattrapage. Un élève
+invité avant l'existence de cette copie, ou à un moment où le bureau staff
+n'avait lui-même **encore rien à copier**, reste bloqué à vie avec une
+collection vide.
 
-**Pas touché, volontairement** : `server/db.ts`/`repositories.ts` (aucun
-changement de schéma SQL nécessaire — `trades` est une collection JSON
-générique, `chartUrls` y voyage comme n'importe quel autre champ) ;
-`CoachMessaging.tsx`/l'attachement d'un trade à un message coach (rattache
-par `Trade.id`, ne lit jamais `chartUrl` directement — aucun impact).
+**Premier correctif tenté (commit `959ff91`, DÉPLOYÉ mais INSUFFISANT)** :
+une fonction `backfillStudentDefaultCollections()` dans `server/routes.ts`,
+appelée à chaque `GET /api/state` d'une session élève, qui copie
+badges/modules depuis la collection du bureau staff (`DEFAULT_USER_ID`) si
+la collection de l'élève est vide. **Le bug** : sur ce déploiement, la
+collection "badges" du bureau staff **n'a jamais été réellement écrite
+côté serveur** — le tableau de bord staff affiche les 9 badges uniquement
+via un repli d'affichage côté client (`seed()` dans `AcademyApp`,
+`src/App.tsx`, retombe sur `initialTraderBadges` de `mockData.ts` sans
+jamais le persister tant que personne ne réclame un badge). Copier depuis
+cette collection revient donc à copier une liste vide : le rattrapage ne
+rattrapait rien.
 
-**Vérifié** : `npx tsc --noEmit`, `npm run build`, navigateur sans erreur
-console (onglet neuf, non connecté — l'écran de connexion s'affiche
-normalement). **PAS vérifié en conditions réelles connecté** : aucun
-identifiant de test (staff ou élève) disponible dans cette session pour
-ouvrir le formulaire de trade derrière l'authentification. Prochaine
-étape avant de committer : se connecter (staff ou élève) et vérifier
-manuellement — créer un trade avec 2-3 captures aux emplacements par
-défaut + 1 supplémentaire, l'éditer, vérifier que l'aperçu (bouton œil)
-les affiche toutes avec leurs libellés, et qu'un ANCIEN trade (avec
-`chartUrl` mais sans `chartUrls`) affiche toujours correctement sa capture
-unique dans "Début" à l'édition et dans l'aperçu.
+**Correctif actuel (dans l'arbre de travail, NON COMMITÉ)** : la partie
+"badges" de `backfillStudentDefaultCollections()` utilise maintenant
+**directement** la constante `initialTraderBadges` importée depuis
+`src/data/mockData.ts` (import cross-répertoire `../src/data/mockData`
+depuis `server/routes.ts` — fonctionne car ce fichier est de la donnée pure,
+sans dépendance React/DOM, et esbuild le bundle sans problème dans
+`dist/server.cjs`, vérifié : `grep` dans le bundle retrouve bien les
+titres de badges, juste échappés en unicode `\xEE` pour les accents). Les
+badges copiés sont toujours reposés `unlocked: false` (jamais un faux badge
+déjà débloqué). La partie "modules" garde sa logique d'origine (copie
+depuis le bureau staff en priorité — c'est du vrai contenu personnalisable
+par le fondateur, pas un catalogue fixe — avec repli sur `initialModules`,
+qui est vide dans ce projet, donc sans effet réel aujourd'hui).
 
----
+**Vérifié** : reproduit exactement les conditions de production en local
+(bureau staff ET élève vidés de leurs badges dans `data/horizon.db`),
+exécuté la même logique via un script `tsx` autonome, confirmé les 9
+badges recréés côté élève, tous verrouillés. **PAS vérifié dans le
+navigateur** (session élève réelle) faute d'identifiants disponibles dans
+la session qui a produit ce correctif — c'est la prochaine étape avant de
+committer.
 
-## 0-bis. Second tour d'audit (déjà mergé en production, PR #2, `8bb98f4`)
-
-Un second audit complet (bugs + failles de sécurité) a été demandé après la
-PR #2. Même méthode : 4 agents parallèles en lecture seule par zone (auth/
-sessions serveur, reste du serveur, logique client App.tsx/hooks/lib,
-composants UI), résultats compilés et priorisés, une seule vraie question de
-permission posée à l'utilisateur, tout le reste corrigé directement.
-
-`git status --short` doit renvoyer ces 14 fichiers modifiés, NON commités,
-au-dessus de `6b60eb4` sur la branche `fix/audit-securite-concurrence-multi-onglets` :
-
-```
-server/auth/exportData.ts
-server/auth/middleware.ts
-server/auth/routes.ts
-server/auth/studentCredentials.ts
-server/schemas.ts
-src/App.tsx
-src/components/CoachMessaging.tsx
-src/components/MindsetJournalModal.tsx
-src/components/PositionCalculatorModal.tsx
-src/components/WalletManagement.tsx
-src/hooks/usePersistentState.ts
-src/lib/pendingChanges.ts
-src/lib/performanceStats.ts
-src/lib/planCompliance.ts
-```
-
-`npx tsc --noEmit` ET `npm run build` passent sans erreur. Vérifié aussi en
-navigateur (onglet neuf, aucune erreur console) — un onglet resté ouvert
-depuis une session de test antérieure peut afficher une fausse alerte React
-"hooks order changed" au rechargement : c'est un artefact HMR/Vite d'un
-ancien module, pas un vrai bug (confirmé en ouvrant un onglet neuf).
-
-### Corrigé dans ce second tour
-
-1. **Critique — Setups et Plan de trading absents du registre
-   `pendingChanges`** (`src/lib/pendingChanges.ts`) : `markPending()`
-   ignorait silencieusement toute modification hors ligne (ou après échec
-   réseau) de ces deux collections — jamais signalée dans
-   `PendingChangesBanner`, jamais protégée par `resolveStudentValue`
-   (`src/App.tsx`), donc écrasée sans avertissement au rechargement
-   suivant. Ajout de `horizon_setups`/`horizon_student_setups` dans
-   `LABELS`/`COLLECTION_BY_KEY`, et reconnaissance par préfixe des clés de
-   plan namespacées par email (`isTradingPlanKey`, `BASE_STORAGE_KEY`
-   maintenant exporté depuis `src/lib/planCompliance.ts`).
-2. **Élevée — `POST /api/auth/staff` sans `requireOwner`** (permission
-   validée explicitement par l'utilisateur : réserver au fondateur).
-   `server/auth/routes.ts:467`. Cohérent maintenant avec `DELETE
-   /staff/:id`, déjà verrouillé. Avant ce correctif, n'importe quel coach
-   invité pouvait créer un nombre illimité de comptes staff à pleins droits.
-3. **Élevée — Règle "perte quotidienne max" du plan de trading basée sur un
-   capital figé côté staff** (`src/App.tsx`, `AcademyApp.applyPlanCompliance`) :
-   utilisait `student.startingCapital` (jamais mis à jour depuis que le
-   capital vient des comptes réels) au lieu de `displayStudent.startingCapital`
-   (dérivé). La règle était silencieusement cassée pour tout trade saisi
-   depuis le bureau staff.
-4. **Élevée — Incohérence de fuseau horaire entre Rentabilité et l'alerte
-   de plan** (`src/lib/performanceStats.ts`, `getSessionLabel`) : traitait
-   l'heure saisie comme déjà en UTC, alors que `checkPlanViolations`
-   (`planCompliance.ts`) convertit correctement via l'heure locale du
-   navigateur puis `getUTCHours()`. Un même trade pouvait être classé dans
-   deux sessions différentes selon l'écran, pour tout utilisateur hors UTC.
-   `getSessionLabel` suit maintenant la même conversion.
-5. **Moyenne — `usePersistentState` écrasait la valeur namespacée existante
-   au premier changement de clé** (`src/hooks/usePersistentState.ts`) :
-   `readBadgeNotificationIds` (`src/App.tsx`) se monte avec une clé
-   générique avant que `student.email` soit connu (chargement async), puis
-   change de clé — sans détection de ce changement, la valeur en mémoire
-   (périmée) était réécrite sous la NOUVELLE clé, écrasant les vraies
-   données déjà namespacées d'un élève sur un poste partagé. Corrigé via un
-   `keyRef` qui relit explicitement au changement de clé.
-6. **Moyenne — `setState` imbriqué dans `handleClaimBadge` (staff)** :
-   `setNotifications` appelé depuis l'intérieur de l'updater de `setBadges`
-   — impureté détectée par le double-invoke StrictMode (deux notifications
-   en dev, sans impact en prod). Notification calculée avant `setBadges`,
-   comme le fait déjà l'équivalent élève.
-7. **Moyenne — Échec d'envoi de message coach silencieux**
-   (`src/components/CoachMessaging.tsx`) : `catch` ne faisait que
-   `console.error`, aucun retour visible à l'élève. Ajout d'un état
-   `sendError` affiché sous le composeur.
-8. **Faible — `containsDangerousUrlScheme` fail-open au-delà de la
-   profondeur max** (`server/schemas.ts`) : retournait `false`
-   (sûr/accepté) au lieu de `true` (dangereux/rejeté) passé 10 niveaux
-   d'imbrication — un faux négatif silencieux. Inversé en fail-CLOSED.
-9. **Faible — Jetons de reset de mot de passe élève non invalidés à la
-   régénération** (`server/auth/studentCredentials.ts`,
-   `createPasswordResetToken`) : un ancien lien restait utilisable même
-   après l'émission d'un nouveau. Les jetons encore valides du compte sont
-   maintenant supprimés avant d'en émettre un nouveau.
-10. **Faible — `/auth/login/2fa` absent de `PUBLIC_PATHS`**
-    (`server/auth/middleware.ts`) : ne fonctionnait que grâce à l'ordre de
-    montage des routeurs, sans le filet de sécurité prévu pour ce cas.
-    Ajouté à la liste blanche.
-11. **Faible — `GET /auth/export` sans rate-limit dédié**
-    (`server/auth/exportData.ts`) : seule route protégée du module auth
-    sans limite propre. Ajouté (20/15min), cohérent avec le reste du
-    projet.
-12. **Faible — Champs de risque (`%`) du formulaire de compte sans
-    contrainte positive** (`src/components/WalletManagement.tsx`) :
-    `parseFloat(...) || défaut` ne bloque pas une valeur négative (`-5 ||
-    10` reste `-5`), faussant silencieusement les barres de progression de
-    risque. `min="0.1"` ajouté aux 3 champs + validation stricte
-    (`positiveOrDefault`) à la création.
-13. **Faible — Bouton "Appliquer au Journal" actif même à division nulle**
-    (`src/components/PositionCalculatorModal.tsx`) : entrée = stop poussait
-    silencieusement des zéros (lot, R:R) dans le Journal. Bouton désactivé
-    dans ce cas, avec message explicatif.
-14. **Faible — Fuite d'`AudioContext` + échec silencieux de sauvegarde**
-    (`src/components/MindsetJournalModal.tsx`) : chaque son joué laissait
-    son `AudioContext` ouvert indéfiniment (limite navigateur ~6, son
-    silencieusement cassé au-delà) ; un échec `localStorage.setItem` fermait
-    quand même la modale sans avertir l'élève que son check-in n'était pas
-    enregistré. Les deux corrigés.
-
-### PAS traité, décisions/limitations assumées (documentées, pas des oublis)
-
-- **DoS de verrouillage de compte par email connu**
-  (`server/auth/loginLockout.ts`) : le verrouillage est indexé sur
-  `(kind, email_lower)`, pas sur l'IP — c'est un choix **délibéré et déjà
-  documenté dans le code** pour empêcher un attaquant réparti sur plusieurs
-  IP de contourner la protection anti-credential-stuffing en ciblant un
-  seul compte. La contrepartie inhérente (quelqu'un qui connaît un email
-  peut verrouiller ce compte 15 min à la fois, indéfiniment) n'a pas de
-  correctif "gratuit" sans ajouter de l'infrastructure (CAPTCHA,
-  déverrouillage admin, notification par email) — à discuter comme un vrai
-  arbitrage produit si ça devient un problème concret, pas une simple
-  correction de bug.
-- **Score du quiz rapide de leçon (VideoAcademy) jamais persisté** — à la
-  différence du Quiz de Module (noté, seuil 70%, sauvegardé via
-  `onSaveModuleQuizResult`, contribue à la progression), le petit quiz par
-  leçon (`activeLessonQuizModal`) n'a aucun callback de sauvegarde : il
-  semble être un outil de vérification rapide à faible enjeu, pas une
-  évaluation formelle. Le corriger proprement demanderait un nouveau champ
-  sur `Lesson`, un schéma serveur, une route, et un branchement dans les
-  deux shells — une vraie extension de fonctionnalité, pas une simple
-  correction. À clarifier avec l'utilisateur si un suivi de ce quiz est
-  réellement voulu avant de construire cette infrastructure.
-- **Coût scrypt et threadpool partagé** (`server/auth/password.ts`) —
-  trade-off déjà assumé et documenté dans une période antérieure.
-- Plusieurs constats "Faible" jugés non actionnables ou hors scope :
-  `UserProfileModal`/`Announcements` — l'URL d'avatar/image est **déjà**
-  validée côté serveur (`isSafeMediaUrl` sur `profileSchema`/
-  `announcementSchema`), l'absence de validation client immédiate est une
-  UX à améliorer, pas une faille ; `TwoFactorSetupModal` — l'URI
-  `otpauth://` est construite serveur à partir du propre email du compte,
-  risque quasi nul ; `updateCollectionItem` (`server/repositories.ts`) —
-  n'échoue pas silencieusement en pratique (les 3 appelants actuels
-  vérifient déjà l'existence de la ligne en amont), fragile pour un futur
-  appelant seulement ; `WalletManagement.accountNumber` via `Math.random()`
-  — cosmétique, pas un identifiant de sécurité ; `AdminStudentView` sans
-  garde anti-concurrence — théorique, non exploitable tant que le composant
-  démonte à chaque changement d'élève ; `TradingJournal.handleFormSubmit`/
-  `SetupManagement` "fire-and-forget" — **pas un bug** : conforme au design
-  optimiste de l'app (état local mis à jour immédiatement, échec de sync
-  serveur signalé séparément et de façon asynchrone par
-  `SyncErrorBanner`/`markPending`) ; CSP `img-src https:` large — marge de
-  durcissement, aucun vecteur actif identifié aujourd'hui ; lien "mot de
-  passe oublié" de `LoginScreen` pointant vers le README — UX, pas un bug.
-
-**Prochaine étape immédiate concrète** : committer ces 14 fichiers (un ou
-plusieurs commits par thème, à l'appréciation de qui reprend), sur la
-branche `fix/audit-securite-concurrence-multi-onglets` (PR #2 déjà ouverte)
-— seulement sur demande explicite de l'utilisateur, comme toujours. Puis,
-si l'utilisateur veut aller plus loin : décider du sort du DoS de
-verrouillage de compte et du quiz de leçon non persisté (les deux points
-ci-dessus qui restent de vrais arbitrages produit, pas des bugs oubliés).
-
----
-
-## 0. Premier tour d'audit (déjà commité dans `6b60eb4`, PR #2)
-
-**Chantier quasi terminé, répertoire NON propre.** Un audit complet du
-projet (bugs + failles de sécurité, demandé explicitement par l'utilisateur,
-qui a aussi validé de corriger tout — y compris le problème de concurrence
-multi-onglets ET, après question explicite, la durée de vie des sessions)
-a été mené. `git status --short` doit renvoyer ces 19 fichiers modifiés :
-
-```
-server.ts
-server/auth/routes.ts
-server/auth/sessions.ts
-server/auth/studentSessions.ts
-server/auth/totp.ts
-server/auth/twoFactor.ts
-server/db.ts
-server/repositories.ts
-server/routes.ts
-server/schemas.ts
-src/App.tsx
-src/components/Announcements.tsx
-src/components/MainDashboard.tsx
-src/components/PerformanceDashboard.tsx
-src/hooks/useServerSync.ts
-src/lib/api.ts
-src/lib/performanceStats.ts
-src/lib/planCompliance.ts
-src/lib/walletStats.ts
-```
-
-`npx tsc --noEmit` ET `npm run build` passent sans erreur sur cet état.
-**Rien n'a été commité, rien n'a été poussé.**
-
-### TERMINÉ dans cette session :
-
-1. **Convention "PnL réalisé"** — un trade `result === "OPEN"` n'entre plus
-   dans aucun total $ agrégé (`isRealizedDollarTrade`, voir §8). Corrigé dans
-   `performanceStats.ts`, `MainDashboard.tsx`, `PerformanceDashboard.tsx`
-   (heatmap), `walletStats.ts` (**le bug le plus grave** : un trade OPEN
-   pouvait fausser le solde recalculé d'un compte prop firm et déclencher un
-   faux badge "Compte Invalidé"), `planCompliance.ts`.
-2. **Logout élève incohérent** — `StudentAuthenticatedApp.handleLogout`
-   suit maintenant exactement le motif du logout staff.
-3. **Concurrence multi-onglets (contrôle de concurrence optimiste)** —
-   compteur de version par `(userId, collection)`, table
-   `collection_versions`, rejet HTTP 409 sur un push à version périmée.
-   **Le câblage `markLoaded` dans `src/App.tsx` (qui manquait à la mise à
-   jour précédente de ce document) est maintenant fait** : les ~9
-   `useSyncedState<...>` du shell élève récupèrent et utilisent leur 3ᵉ
-   élément `markLoaded` (variables `markTradesLoaded`, `markAccountsLoaded`,
-   etc.) dans l'effet `[status]` qui hydrate depuis `resolveStudentValue`.
-   Le shell staff (`AcademyApp`) n'en avait pas besoin : il résout sa valeur
-   de départ de façon synchrone via `seed()` et ne monte qu'après la fin du
-   bootstrap (`AuthenticatedApp`, `status === "loading"` → écran de
-   chargement), donc pas de phase "resolve après montage" à couvrir.
-4. **#6 (Élevée) `normalizeTradingPlans` sans validation de type par
-   champ** — `sanitizePlanEntry()` (`src/lib/planCompliance.ts`) ne retient
-   un champ de l'entrée brute que s'il a le bon type (tableau de strings
-   pour `authorizedSessions`, string pour tout le reste), sinon garde le
-   default de `createEmptyPlan()`. Corrige un crash potentiel sur
-   `authorizedSessions: null` ou toute valeur corrompue similaire.
-5. **#8 (Moyenne) codes TOTP rejouables** — nouvelle colonne
-   `totp_last_used_step` sur `staff_accounts` (migration idempotente comme
-   les autres colonnes 2FA). `findMatchingTotpStep()` (`server/auth/totp.ts`)
-   renvoie maintenant le pas de temps apparié (pas juste un booléen) ;
-   `verifyAndConsumeTotpStep()` (`server/auth/twoFactor.ts`) rejette un pas
-   déjà utilisé ou antérieur, et enregistre le nouveau pas dès qu'il est
-   accepté. Câblé dans `confirmTotpSetup` et `verifyStaffTotpCode`.
-6. **#10 (Moyenne) limite 16kb sur `/api/auth` bloquant les uploads
-   d'image** — deux parseurs `express.json({ limit: "2mb" })` scopés
-   ajoutés dans `server.ts`, AVANT le parseur global à 16kb, pour
-   `/api/auth/profile/avatar` et `/api/auth/announcements` (les deux seules
-   routes sous `/api/auth` qui transportent une image en base64). En plus :
-   `apiErrorHandler` (`server/routes.ts`) respecte maintenant `err.status`/
-   `err.statusCode` quand il est dans la plage 4xx (ex. `PayloadTooLargeError`
-   de body-parser) au lieu de toujours renvoyer 500 "Erreur serveur." — un
-   413 réel remonte maintenant un 413 avec un message clair.
-7. **#11 (Moyenne) URL de ressource de leçon non validée côté serveur** —
-   nouveau scanner récursif générique `containsDangerousUrlScheme()`
-   (`server/schemas.ts`) qui rejette `javascript:`/`vbscript:`/
-   `data:text/html` n'importe où dans un item de collection, quelle que soit
-   la profondeur d'imbrication (couvre `Module.lessons[].videoUrl` et
-   `.resources[].url`, jamais validés par nom de champ jusqu'ici) — branché
-   dans le `.refine()` de `collectionItem`.
-8. **#13 (Moyenne) collection `notifications` élève jamais purgée** —
-   plafond `MAX_STUDENT_NOTIFICATIONS = 300` dans `upsertPlanAlert()`
-   (`src/lib/planCompliance.ts`) et plafond équivalent (`.slice(0, 300)`)
-   dans le fan-out de notifications d'annonce (`server/auth/routes.ts`).
-9. **#14 (Moyenne) `announcementsSchema` n'imposait pas l'unicité des
-   `id`** — `.refine()` ajouté (`server/schemas.ts`), même motif que
-   `collectionPayloadSchema`.
-10. **#16 (Moyenne) `applyPlanCompliance` sous-compte par stale closure** —
-    les deux shells (`StudentAuthenticatedApp`/`AcademyApp`, `src/App.tsx`)
-    ont maintenant un ref (`syncedTradesRef`/`tradesRef`) tenu à jour de
-    façon strictement synchrone à chaque ajout/modif/suppression de trade
-    (pas via un `useEffect`, qui ne se déclenche qu'au rendu suivant) —
-    deux `handleAddTrade` rapprochés (avant re-rendu) voient maintenant
-    chacun le trade ajouté par l'autre dans `allTrades`.
-11. **#17 (Moyenne) clé localStorage des badges lus non namespacée par
-    élève** — `readBadgeNotificationIds` (`src/App.tsx`) utilise maintenant
-    `horizon_student_read_badge_notifications_${student.email}`.
-12. **Faible — `Announcements.onSave` non gardé par `isOwner` côté
-    client** — `handleSubmit`/`handleDelete`/`togglePin`
-    (`src/components/Announcements.tsx`) vérifient maintenant `isOwner`
-    eux-mêmes, en plus de la garde `{isOwner && (...)}` déjà présente autour
-    du rendu (le serveur, `requireOwner`, restait de toute façon la seule
-    vraie barrière — défense en profondeur seulement).
-
-13. **#9 (Moyenne) session sans durée de vie absolue réelle** — corrigé,
-    après validation explicite de l'utilisateur (ajouter une vraie limite,
-    recommandation choisie). Nouvelle constante `ABSOLUTE_TTL_MS = 90 jours`
-    dans `server/auth/sessions.ts` ET `server/auth/studentSessions.ts`
-    (mondes staff et élève, code dupliqué par design — voir §8), calculée
-    depuis `created_at` et JAMAIS prolongée, contrairement à `expires_at`
-    (glissant, prolongé de `TTL_MS` à chaque connexion espacée de plus de
-    `SLIDING_THRESHOLD_MS`). `validateSession`/`validateStudentSession`
-    rejettent maintenant aussi une session dont `created_at` dépasse ce
-    plafond, même si `expires_at` reste dans le futur ; `purgeExpiredSessions`/
-    `purgeExpiredStudentSessions` la suppriment en base au lieu de la
-    laisser traîner. Au-delà de 90 jours, même un compte utilisé
-    quotidiennement doit se reconnecter.
-
-### PAS traité, jugé hors scope pour l'instant (échelle actuelle du projet) :
-
-- **#12 (Moyenne) fan-out de notifications d'annonce synchrone/bloquant** —
-  la boucle sur tous les élèves actifs dans `PUT /admin/announcements`
-  (`server/auth/routes.ts`) est synchrone dans une transaction SQLite
-  unique. Pour la taille actuelle d'une académie (dizaines/centaines
-  d'élèves), better-sqlite3 (synchrone, très rapide) absorbe ça sans
-  problème perceptible. À revisiter si le nombre d'élèves actifs devient
-  très grand (des milliers).
-- Faible — UX de collage avec espace insécable dans `ThousandsInput`.
-- Faible — pas de purge périodique dédiée des défis 2FA expirés (purgés
-  opportunistement au fil des requêtes de connexion via
-  `purgeExpiredTwoFactorChallenges()`, déjà en place, jugé suffisant).
-
-**Prochaine étape immédiate concrète** : décider avec l'utilisateur du sort
-de #9 (voir ci-dessus et §11), puis committer le travail de cette session —
-probablement plusieurs commits par thème (concurrence multi-onglets / PnL
-réalisé / durcissements sécurité 2FA-uploads-notifications / logout
-élève) — **seulement sur demande explicite** ("commite", "commite et
-pousse"), jamais spontanément.
+**Prochaine étape immédiate** :
+1. Committer ce correctif (`server/routes.ts` — un seul fichier).
+2. Pousser et déployer sur Railway **seulement si l'utilisateur le demande
+   explicitement** (voir §10 — jamais spontanément).
+3. Une fois déployé, demander à l'utilisateur de confirmer avec son élève
+   que les badges apparaissent bien (0/9, pas 0/0).
+4. Si le bug persiste malgré tout après ce déploiement, le diagnostic
+   suivant à creuser : vérifier que le compte élève concerné a bien un
+   `student_account_id` actif (un élève sans accès actif n'appelle jamais
+   `GET /api/state` en tant qu'élève) et que la route appelle bien
+   `backfillStudentDefaultCollections(dataUserId)` avec le bon
+   `dataUserId` (voir la ligne juste avant `res.json(...)` dans la branche
+   `kind === "student"`).
 
 ---
 
@@ -408,44 +98,43 @@ Concepts*) destinée à un coach (le fondateur, compte admin) et à ses
 élèves. Interface **entièrement en français**, ton direct, tutoiement.
 Devise unique : **`$`**, jamais `€` (exception assumée : le module
 Calculateurs, qui affiche `€/$` sur certains champs pour coller à une
-maquette externe — ne pas généraliser). **Aucune IA n'est utilisée nulle
-part** — décision produit explicite et répétée plusieurs fois, **ne jamais
-la réintroduire sans nouvelle demande explicite**.
+maquette externe). **Aucune IA n'est utilisée nulle part** — décision
+produit explicite et répétée plusieurs fois, ne jamais la réintroduire
+sans nouvelle demande explicite.
 
 C'est un **vrai projet full-stack** : React 19 + TypeScript + Vite côté
 client, Express + `better-sqlite3` (SQLite, mode WAL) côté serveur, un
 seul process Node sert les deux.
 
-**Identité visuelle** : design system unifié sur tout l'écosystème autour
-du langage visuel de Macro/Rentabilité — cartes plates à bordure fine
-(`#111615`/`#1B2320`), micro-labels `[9px]`/`[10px]` en majuscules
-espacées, en-têtes de section à barre verticale colorée (`SectionHeader`,
-un composant local à chaque fichier, jamais partagé — voir §9). Palette
-PropDesk (vert `#00E676`, fonds `#0D1110`/`#111615`), enrichie de couleurs
-de statut ponctuelles (ambre, violet, indigo, rose) pour les widgets
-Macro/Portefeuille.
+**Deux mondes d'identité strictement séparés**, jamais mélangés :
+- **Staff** (`AcademyApp`, `src/App.tsx`) : un bureau **partagé** entre
+  tous les comptes coach (`DEFAULT_USER_ID`), toutes les données du
+  fondateur et des élèves y transitent en lecture. Tout compte staff a
+  `isAdmin: true` — "tous les comptes staff ont les mêmes droits" est le
+  principe actuel du projet (documenté et assumé, pas un oubli).
+- **Élève** (`StudentAuthenticatedApp`, `src/App.tsx`) : chaque élève a son
+  propre bureau isolé (`student-<id>`), ses propres trades, comptes, plan,
+  badges, modules.
 
-Format des nombres **français** partout dans les champs de saisie
-(virgule = décimale, espace/point = milliers) via le composant partagé
-`src/components/ThousandsInput.tsx` — utilisé dans le calculateur de
-position, le Journal de trading, le Plan de trading. Convention "PnL
-réalisé" (`isRealizedDollarTrade`, voir §0 et §8) : un trade `OPEN` n'entre
-dans AUCUN total $ agrégé nulle part dans l'app.
+Format des nombres **totalement libre** dans les champs de prix du Journal
+de trading et du Calculateur (voir §6, §8) : point ou virgule, avec ou sans
+séparateur de milliers, à l'emplacement choisi par qui tape —
+`parsePriceInput` (`src/lib/format.ts`) retrouve le bon nombre quelle que
+soit la convention utilisée. Convention "PnL réalisé"
+(`isRealizedDollarTrade`, `src/lib/performanceStats.ts`) : un trade
+`OPEN` n'entre dans AUCUN total $ agrégé nulle part dans l'app.
 
-Le projet possède : une page publique de mentions légales et de CGU, un
-lien vers la politique de confidentialité, un système complet de gestion
-d'accès/mot de passe élève (invitation, changement forcé, changement
-volontaire, lien de réinitialisation à jeton), une **authentification à
-deux facteurs (TOTP) optionnelle pour les comptes staff** (maison, sans
-lib externe, `node:crypto`), un journal de sécurité réservé au fondateur,
-une photo de profil personnalisable par élève, un **export RGPD Article
-20** côté élève, un **effacement en cascade conforme à l'Article 17**, un
-système de niveau/XP dynamique, un module **Setups** (stratégies
-définies par l'élève), un **système de Plans de trading multiples**
-(voir §6 — remplace l'ancien plan unique), un module **Annonces**
-(diffusion du fondateur vers tous les élèves, avec notification + son),
-une alerte sonore de notification (Web Audio API, aucun fichier audio
-externe).
+Le projet possède : mentions légales/CGU, gestion d'accès/mot de passe
+élève complète, **2FA (TOTP) maison** pour les comptes staff, journal de
+sécurité, photo de profil élève, **export RGPD Article 20**, **effacement
+en cascade Article 17**, système de niveau/XP dynamique, module **Setups**,
+**Plans de trading multiples** (avec **Aperçu en lecture seule** + onglet
+Édition, voir §6), module **Annonces** (diffusion fondateur → élèves, avec
+son), **captures d'écran multiples par trade** (Début/Pendant/Après +
+emplacements supplémentaires, voir §6), **import/export CSV** du Journal,
+un onglet **Suivi de performance** dédié dans les fiches élèves (séparé de
+l'édition), et des **menus déroulants à l'apparence identique sur tous les
+navigateurs** (composant partagé `Select.tsx`, voir §6/§8).
 
 ---
 
@@ -455,354 +144,354 @@ externe).
 |---|---|
 | `npm install` | installe les dépendances (client + serveur, même `package.json`) |
 | `npm run dev` | lance le serveur Express + Vite en mode dev (HMR) |
-| `npx tsc --noEmit` | vérifie le typage sur tout le projet, AUCUNE émission — c'est le "lint" de ce projet |
-| `npm run build` | build de production (client + serveur) |
-| `git push` puis `railway redeploy --from-source -y` | déploiement Railway — **JAMAIS `railway up`**, qui échoue car le `.gitignore` du dépôt a un motif `data/` qui matche aussi `src/data/` |
+| `npx tsc --noEmit` | vérifie le typage sur tout le projet — c'est le "lint" de ce projet |
+| `npm run build` | build de production (`vite build` + `esbuild server.ts` → `dist/`) |
+| `git push` puis `railway redeploy --from-source -y` | déploiement Railway — **JAMAIS `railway up`** (le `.gitignore` a un motif `data/` qui matche aussi `src/data/`, faisant échouer l'upload) |
+| `railway deployment list --service propdesk --json` | vérifie le statut du dernier déploiement (`SUCCESS`/`FAILED`/`BUILDING`) |
 
 **Piège serveur** : après une modification côté `server/`, le serveur de
-dev doit être redémarré manuellement (pas de hot-reload serveur) — un
-onglet navigateur ouvert avant le redémarrage peut afficher un état HMR
-périmé côté client, recharger la page en cas de doute.
+dev doit être redémarré manuellement (pas de hot-reload serveur) — tuer le
+process sur le port 3000 (`lsof -ti:3000 | xargs kill`) puis relancer.
+
+**Piège SQL** : jamais de backtick littéral dans un commentaire SQL `-- ...`
+à l'intérieur d'un template `db.exec(\`...\`)` dans `server/db.ts` — casse
+la compilation TS avec une erreur obscure (TS1005). Texte brut uniquement
+dans ces commentaires.
 
 **Tester une fonctionnalité élève sans casser une session coach en
-cours** : ne jamais se déconnecter du compte staff pour tester côté élève.
-Méthodes sûres : (a) un second navigateur/profil ou une fenêtre de
-navigation privée pour la session élève, en parallèle de la session staff ;
-(b) vérification directe via l'API (`curl`/fetch) sans passer par l'UI
-quand seul l'état serveur doit être inspecté ; (c) le compte élève de test
-existant "Sensei" (si présent en base) peut être réutilisé pour ne pas
-polluer les données d'élèves réels. Ne jamais déconnecter l'utilisateur
-réel pour un test.
+cours** : ne jamais se déconnecter du compte staff. Un second navigateur/
+profil privé, l'API directe, ou le compte élève de test existant "Sensei"
+(présent dans la base de dev locale) sont les méthodes sûres.
 
-**Inspection SQLite directe** (utile pour vérifier un état sans passer par
-l'API) : `sqlite3 data/app.db` (ou le chemin configuré), puis `.tables`,
-`.schema <table>`, `SELECT * FROM ... ;`.
+**Inspection SQLite directe** : `sqlite3 data/horizon.db`, puis `.tables`,
+`.schema <table>`, `SELECT * FROM ... ;`. Table `student_accounts` pour
+retrouver le `user_id` d'un élève à partir de son email.
 
-**Accès production Railway** : les logs et le déploiement se pilotent via
-la CLI `railway` (`railway logs`, `railway deployment list --service
-propdesk --json`, `railway redeploy --from-source -y`) — pas d'accès direct
-à la base de production depuis cet environnement de dev.
+**Vérifier un correctif serveur sans navigateur** : un script `tsx` autonome
+à la racine du projet (`npx tsx mon-script.ts`) peut importer directement
+`server/repositories.ts`/`server/db.ts` et exécuter la même logique qu'une
+route contre la vraie base de dev — utile pour vérifier une migration/un
+rattrapage de données sans avoir besoin d'une session authentifiée. Toujours
+sauvegarder `data/horizon.db` avant (`cp data/horizon.db /tmp/backup.db`) et
+le supprimer après usage (jamais commité).
 
-**Compte admin** : le compte fondateur est le seul avec `isOwner` — les
-routes de publication (Annonces, gestion staff, etc.) sont gardées côté
-serveur par `requireOwner`, pas seulement par une garde UI.
+**Accès production Railway** : logs et déploiement se pilotent via la CLI
+`railway` (`railway logs`, `railway deployment list --service propdesk
+--json`, `railway redeploy --from-source -y`) — pas d'accès direct à la
+base de production depuis l'environnement de dev.
 
 ---
 
 ## 3. Architecture
 
 ```
-server.ts                     point d'entrée : Express + Vite/statique
-                               + helmet + trust proxy (prod) + tâches de
-                               nettoyage périodiques.
+server.ts                     Point d'entrée : Express + Vite (dev) ou
+                               statique (prod) + helmet + trust proxy +
+                               tâches de nettoyage périodiques. Parseurs
+                               JSON à taille bornée : 16kb par défaut sur
+                               /api/auth, 2mb sur /api/auth/profile/avatar
+                               et /api/auth/announcements (uploads
+                               d'image), 8mb ailleurs.
+
 server/
-  db.ts                       SQLite (better-sqlite3, WAL, foreign_keys
-                               ON). MODIFIÉ (non commité) : + table
-                               `collection_versions` (contrôle de
-                               concurrence optimiste, voir §0/§8). Piège
-                               syntaxique connu : jamais de backtick
-                               littéral dans un commentaire SQL `-- ...` à
-                               l'intérieur du template `db.exec(\`...\`)`.
-  repositories.ts              MODIFIÉ (non commité) : `CollectionVersionConflictError`,
-                               `getCollectionVersion()`, `replaceCollection()`
-                               accepte un `expectedVersion?` et retourne la
-                               nouvelle version ; `updateCollectionItem()`
-                               incrémente aussi le compteur de version.
-                               Gère aussi le stockage type "objet unique par
-                               utilisateur" (`trading_plans`, `announcements`,
-                               `profile`) via le même motif `user_id TEXT
-                               PRIMARY KEY`.
-  routes.ts                    MODIFIÉ (non commité) : `writeCollectionForAuth()`
-                               version-aware, catch `CollectionVersionConflictError`
-                               → 409, `PUT /collections/:name` attend
-                               `{ items, version }`, `GET /api/state`
-                               retourne `versions: Record<CollectionName,
-                               number>` (branches élève ET staff).
-  schemas.ts                   `announcementSchema`/`announcementsSchema`,
-                               `tradingPlanSchema` (adapté au système multi-plans,
-                               voir §6), `totpCodeSchema`, `twoFactorLoginSchema`,
-                               `disableTotpSchema`.
-  middleware/rateLimit.ts      inchangé.
+  db.ts                        SQLite (better-sqlite3, WAL, foreign_keys
+                               ON). Toutes les migrations sont idempotentes
+                               (CREATE TABLE IF NOT EXISTS / PRAGMA
+                               table_info avant ALTER TABLE). DEFAULT_USER_ID
+                               = "user-local" (bureau staff partagé).
+  repositories.ts               Accès aux données : `listCollection`,
+                               `replaceCollection` (avec contrôle de
+                               concurrence optimiste par version, voir §8),
+                               `updateCollectionItem`, singletons
+                               (profil, plan de trading, annonces).
+  routes.ts                     Routes générales (`/api/state`,
+                               `/collections/:name`, `/profile`,
+                               `/quiz-results`, calendrier économique,
+                               données de marché). Contient
+                               `backfillStudentDefaultCollections()` (voir
+                               §0) — appelée à chaque `GET /state` élève.
+  schemas.ts                    Validation Zod de tout ce qui entre par
+                               l'API. `containsDangerousUrlScheme` (scan
+                               récursif anti-XSS générique),
+                               `isSafeChartUrls` (validation de
+                               `Trade.chartUrls[]`).
+  middleware/rateLimit.ts       Limiteur de débit générique.
   auth/
-    routes.ts                  `staffRouter` : routes 2FA (`/2fa/status`,
-                               `/2fa/setup`, `/2fa/enable`, `/2fa/disable`,
-                               `/2fa/recovery-codes/regenerate`, toutes
-                               `requireStaffKind`) ; route publique `POST
-                               /login/2fa` (étape 2 de connexion) ; `POST
-                               /login` répond `{state: "2fa-required",
-                               pendingToken}` si le compte a la 2FA active ;
-                               `PUT /admin/announcements` (`requireStaffKind`
-                               + `requireOwner`) diffuse une notification à
-                               chaque élève actif pour toute nouvelle
-                               annonce (id inconnu de l'ancienne liste).
-    studentRoutes.ts            `PUT /trading-plan` (élève écrit son plan,
-                               maintenant un tableau de plans — voir §6) ;
-                               `GET /export` (export RGPD Article 20,
-                               délègue à `exportData.ts`).
-    exportData.ts                Collecte profil + plans de trading +
-                               progression modules + badges pour l'élève
-                               connecté — n'exporte QUE des données réelles
-                               du schéma de ce projet.
-    totp.ts                      TOTP (RFC 6238) maison sans dépendance
-                               externe : secret base32, HMAC-SHA1 +
-                               troncature dynamique (RFC 4226), tolérance
-                               ±1 pas de temps (30s), URI `otpauth://`. Pas
-                               de QR code (décision explicite, voir §8).
-    twoFactor.ts                  Accès bas niveau à la 2FA d'un compte
-                               staff (secret, activation, codes de
-                               récupération à usage unique, défi de
-                               connexion temporaire).
-    studentCredentials.ts        `buildStudentProfile()` fusionne l'avatar
-                               personnalisé de l'élève ; `listActiveStudentAccounts()`
-                               (utilisé par le fan-out de notifications
-                               Annonces).
-    securityEvents.ts             types d'événements 2FA + `login_2fa_required`
-                               (champ `eventType` reste `string` libre,
-                               aucune migration nécessaire pour en ajouter).
-  economicCalendar.ts           flux public ForexFactory, cache 10 min,
-                               "this week" seulement (comportement normal,
-                               pas un bug : un vendredi soir, la semaine du
-                               flux peut ne plus contenir d'annonce à
-                               venir).
-  marketData.ts / seed.ts       inchangés.
+    routes.ts                    `authRouter` (login, 2FA, logout) +
+                               `staffRouter` (gestion comptes staff —
+                               création réservée `requireOwner`, 2FA,
+                               journal de sécurité, annonces, invitation
+                               élève avec copie badges/modules).
+    studentRoutes.ts             Auth élève + `PUT /trading-plan` + export
+                               RGPD.
+    exportData.ts                 Export Article 20 (rate-limité).
+    totp.ts                       TOTP maison (RFC 6238/4226), anti-rejeu
+                               via `totp_last_used_step`.
+    twoFactor.ts                  Accès bas niveau 2FA staff.
+    sessions.ts / studentSessions.ts   Sessions serveur, durée de vie
+                               ABSOLUE de 90 jours (`ABSOLUTE_TTL_MS`) en
+                               plus du renouvellement glissant de 30 jours.
+    loginLockout.ts                Verrouillage de compte après échecs
+                               (indexé par email, pas IP — trade-off
+                               assumé, voir §8).
+    studentCredentials.ts          Profil élève, jetons de reset (invalidés
+                               à la régénération).
+    password.ts / credentials.ts   Hachage scrypt, comparaison anti-timing.
+    securityEvents.ts               Journal de sécurité (purge RGPD 90j).
+  economicCalendar.ts / marketData.ts   Flux externes, cache, timeout.
+  seed.ts                        Amorçage initial (démo).
+
 src/
-  App.tsx                      MODIFIÉ (non commité, wiring incomplet —
-                               voir §0). Deux shells quasi-dupliqués :
-                               `StudentAuthenticatedApp` (élève, `userId`
-                               isolé par compte) et `AcademyApp` (staff,
-                               bureau unique partagé `DEFAULT_USER_ID`).
-                               `handleLogout` élève réécrit pour suivre le
-                               motif staff (terminé). Modules Annonces et
-                               plans multiples déjà branchés (chercher
-                               `announcements`/`tradingPlans` dans le
-                               fichier).
-  types.ts                     `TradingPlan[]` (remplace l'ancien objet
-                               `TradingPlanData` unique — voir §6),
-                               `Announcement`/`AnnouncementCategory`,
-                               `Setup`.
+  App.tsx                      Fichier central : les deux shells
+                               `StudentAuthenticatedApp` et `AcademyApp`,
+                               quasi-dupliqués (même feature, deux mondes
+                               d'identité — voir §8 pour pourquoi ce n'est
+                               pas factorisé). Tous les handlers de haut
+                               niveau (`handleAddTrade`, `handleClaimBadge`,
+                               `applyPlanCompliance`...).
+  types.ts                     Tous les types métier. `TradeScreenshot`
+                               (captures multiples), `Trade.chartUrls`
+                               (remplace l'ancien `chartUrl`, gardé
+                               `@deprecated` pour lecture rétro-compatible).
+  data/mockData.ts               Données de démo + catalogue FIXE des 9
+                               badges (`initialTraderBadges`) — importé
+                               aussi côté SERVEUR maintenant (voir §0),
+                               fichier de donnée pure sans dépendance
+                               React/DOM.
   hooks/
-    useAuth.ts                  état `"2fa-required"` dans `AuthStatus` ;
-                               `pendingTwoFactorToken`, `verifyTwoFactor`,
-                               `verifyTwoFactorRecovery`, `cancelTwoFactor`.
-    useServerSync.ts             MODIFIÉ (non commité) : `useSyncedState<T>`
-                               retourne un triplet `[value, setValue,
-                               markLoaded]` (voir §0) ; flush automatique au
-                               démontage ; `tradingPlans`/`announcements`
-                               dans les bootstraps.
-    useNotificationSound.ts      Web Audio API — joue un son quand une
-                               notification avec un `id` inédit apparaît
-                               dans la collection `notifications`.
+    useAuth.ts                   État d'authentification, 2FA.
+    useServerSync.ts               `useSyncedState` (sync optimiste avec
+                               contrôle de version), `useBootstrap`
+                               (staff), `useStudentBootstrap` (élève).
+    useNotificationSound.ts        Son d'alerte (Web Audio API).
+    usePersistentState.ts          `useState` + localStorage, tolère un
+                               changement de clé en cours de vie (relit au
+                               lieu d'écraser).
   lib/
-    performanceStats.ts          MODIFIÉ (non commité) : + `isRealizedDollarTrade`
-                               (helper partagé, voir §0/§8), + `losses`
-                               dans `CategoryStats`, + `winRateOf()`.
-    walletStats.ts                MODIFIÉ (non commité) : `dailyLossPercent`
-                               et `syncAccountsWithTrades` utilisent
-                               `isRealizedDollarTrade`.
-    planCompliance.ts             MODIFIÉ (non commité) : règle de perte
-                               quotidienne max utilise `isRealizedDollarTrade`.
-    api.ts                        MODIFIÉ (non commité) : `ServerState.versions`,
-                               cache `collectionVersions`, `fetchState`/
-                               `saveCollection` version-aware ;
-                               `getAnnouncements`/`saveAnnouncements`
-                               (routes dédiées, pas `saveCollection`
-                               générique — `saveAnnouncements` n'a pas la
-                               restriction `requireOwner` côté client, elle
-                               vient du serveur).
-    links.ts                      `PRIVACY_POLICY_URL`.
-    image.ts                      `resizeChartScreenshot` — réutilisé pour
-                               les pièces jointes image des Annonces.
+    format.ts                     `formatCurrency` + `parsePriceInput`
+                               (saisie libre des prix, voir §6/§8).
+    image.ts                      `resizeChartScreenshot`/`resizeAvatar` —
+                               décodage en cascade (`createImageBitmap` →
+                               `<img>` → fichier brut en dernier recours,
+                               voir §6) pour accepter tous les formats
+                               d'image sans jamais bloquer l'upload.
+    pendingChanges.ts               Registre des modifications hors ligne
+                               non synchronisées (couvre trades, comptes,
+                               setups, plan de trading namespacé par email).
+    badges.ts                     `computeBadgeProgress` — recalcule la
+                               progression en direct depuis trades/modules,
+                               ne touche jamais `unlocked`/`unlockedAt`.
+    planCompliance.ts               `checkPlanViolations`,
+                               `normalizeTradingPlans` (validation de type
+                               par champ), `parsePriceInput`-compatible.
+    walletStats.ts / performanceStats.ts   Calculs partagés, tous
+                               "PnL réalisé"-aware.
   components/
-    MainDashboard.tsx             MODIFIÉ (non commité) : `isCapitalUp` en
-                               `>=`, courbe d'équité et `totalPnL` via
-                               `isRealizedDollarTrade`.
-    PerformanceDashboard.tsx      MODIFIÉ (non commité) : heatmap `winRate`
-                               recalculé sur `wins/(wins+losses)`, garde
-                               `winRate !== null`.
-    Announcements.tsx             NOUVEAU (déjà commité dans `85b08df`).
-                               Vue staff (fondateur uniquement, formulaire +
-                               liste avec édition/suppression/épinglage) et
-                               vue lecture seule (élève, coach non-fondateur) —
-                               badges de catégorie colorés, épinglées en
-                               premier.
-    TradingPlanEditorModal.tsx    Gère désormais une LISTE de plans
-                               (`TradingPlan[]`), pas un objet unique — voir
-                               §6.
-    ThousandsInput.tsx             Champ de saisie numérique au format
-                               français (virgule décimale), utilisé dans
-                               calculateur de position + Journal + Plan de
-                               trading.
-    Sidebar.tsx                    entrée "Annonces" (icône Megaphone).
+    Select.tsx                    NOUVEAU — `<select>` personnalisé
+                               partagé par tout le projet (chevron
+                               identique sur tous les navigateurs, voir
+                               §6/§8). Remplace l'ancien `ThousandsInput.tsx`
+                               (supprimé) et la définition locale qui
+                               vivait dans `TradingJournal.tsx`.
+    TradingJournal.tsx             Le plus gros fichier de composant.
+                               Captures d'écran multiples, import/export
+                               CSV, prix en saisie libre, tous les
+                               `<select>` uniformisés.
+    TradingPlanEditorModal.tsx      Onglets "Aperçu" (lecture seule, en un
+                               coup d'œil) / "Modifier" (formulaire
+                               complet) — voir §6.
+    StudentTracking.tsx             Fiches élèves (staff) — onglets
+                               "Infos" / "Suivi de performance" (graphique
+                               d'évolution + notes de session), dans la
+                               fiche d'édition ET la fiche complète en
+                               lecture seule.
+    WalletManagement.tsx             Formulaire de portefeuille — champs
+                               numériques `step="any"` (pas juste `min`,
+                               voir bug §7 déjà corrigé).
+    Announcements.tsx / CoachMessaging.tsx / PositionCalculatorModal.tsx /
+    SecurityLogModal.tsx             Tous mis à jour pour utiliser `Select`.
 ```
 
 ---
 
-## 4. Le module Calculateurs (référence design "MacroPulse")
+## 4. Le module Calculateurs
 
-Composant `PositionCalculatorModal.tsx`. Affiche `€/$` sur certains champs
-pour coller à une maquette externe fournie par l'utilisateur — exception
-volontaire à la règle "devise unique `$`" du reste de l'app, ne pas
-généraliser à d'autres modules. La saisie des prix (y compris les indices)
-suit le format français via `ThousandsInput`.
+`PositionCalculatorModal.tsx`. Affiche `€/$` sur certains champs pour
+coller à une maquette externe — exception volontaire à la règle "devise
+unique `$`" du reste de l'app. Champs de prix en saisie libre
+(`parsePriceInput`, comme le Journal). Menus déroulants uniformisés
+(`Select`).
 
 ---
 
 ## 5. Fonctionnalités terminées (les plus récentes en premier)
 
-- **Module Annonces** (`85b08df`) — diffusion fondateur → tous les élèves,
-  catégories à badges colorés, épinglage, pièce jointe image, notification
-  + son automatiques à la création (pas à l'édition). Droits : publication
-  réservée `requireOwner`, lecture ouverte à toute session authentifiée.
-- **Alerte sonore de notification** (`85b08df`) — `useNotificationSound.ts`,
-  Web Audio API, aucun fichier audio externe.
-- **Taux de réussite tenant compte des Breakeven** (`37bcf84`, affiné en
-  `295e144`) — le détail TP/SL/BE est maintenant affiché explicitement, et
-  Paris a été retiré de la liste des sessions de trading.
-- **Plans de trading multiples** (`44edb39`) — remplace l'ancien objet
-  unique `TradingPlanData` par `TradingPlan[]`. Voir §6 pour le détail du
-  design (exclusivité setup↔plan, sélection manuelle explicite du plan par
-  trade). Corrige aussi la mise en page de l'onglet Rentabilité.
-- **PnL en $ non arrondi à l'enregistrement** (`5cd8f1c`) — le Journal
-  conserve désormais les décimales exactes saisies par l'utilisateur au
-  lieu d'arrondir à l'entier.
-- **Choix manuel du résultat (TP/SL/BE) et saisie des prix au format
-  français** (`67ae89b`, `348b9dd`, `1f942d7`, `1eaeea7`) — le résultat
-  d'un trade n'est plus uniquement déduit automatiquement du calcul
-  prix/stop, l'utilisateur peut le choisir explicitement ; tous les champs
-  de prix (y compris indices) utilisent `ThousandsInput`.
-- Fonctionnalités antérieures (RGPD complet — 2FA TOTP maison, export
-  Article 20, effacement Article 17, CGU, registre des traitements —,
-  système de niveau/XP, module Setups, photo de profil élève répercutée
-  côté coach) : terminées lors de périodes précédentes, stables, non
-  retouchées cette période sauf mention contraire ci-dessus.
-
-**Non commité cette période (voir §0 pour le détail complet)** :
-- Correction de la convention "PnL réalisé" dans 5 fichiers (`performanceStats.ts`,
-  `MainDashboard.tsx`, `PerformanceDashboard.tsx`, `walletStats.ts`,
-  `planCompliance.ts`) — **terminé, prêt à committer**.
-- Logout élève aligné sur le motif staff (`App.tsx`) — **terminé, prêt à
-  committer**.
-- Contrôle de concurrence optimiste multi-onglets (`db.ts`, `repositories.ts`,
-  `routes.ts`, `api.ts`, `useServerSync.ts`) — **serveur et lib client
-  terminés, wiring dans `App.tsx` PAS FAIT** (voir §0, prochaine tâche).
+- **Rattrapage badges/modules jamais initialisés** (en cours, voir §0) —
+  self-heal côté serveur à chaque chargement d'état élève.
+- **Menus déroulants uniformisés sur tout le projet** — composant partagé
+  `Select.tsx` (chevron personnalisé, `appearance-none`) : sans lui, Safari
+  affichait une double flèche "spinner" alors que Chrome affiche un simple
+  chevron, un coach et son élève ne voyaient pas le même formulaire pour un
+  code identique. Appliqué à Portefeuille, Messagerie Coach, Calculateur,
+  Journal de sécurité, Annonces, Suivi des Élèves, Journal de trading.
+- **Saisie libre des prix (point/virgule au choix)** — `parsePriceInput`
+  (`src/lib/format.ts`) remplace l'ancien `ThousandsInput` qui forçait un
+  regroupement par milliers pendant la frappe (faux sur un actif comme
+  XAU/USD). Fonctionne dans le Journal ET le Calculateur.
+- **Import CSV du Journal de trading** — bouton à côté d'"Exporter CSV",
+  colonnes retrouvées par nom (tolère un fichier réordonné), lignes
+  invalides ignorées et comptées à part.
+- **Aperçu du Plan de trading** — onglet "Aperçu" en lecture seule (par
+  défaut à l'ouverture) + onglet "Modifier" pour le formulaire complet.
+- **Onglet "Suivi de performance" dans les fiches élèves** — le graphique
+  d'évolution + notes de session ne sont plus mélangés aux champs d'édition
+  de la fiche, dans un onglet séparé (fiche d'édition ET fiche complète).
+- **Acceptation de tous les formats d'image** — `resizeChartScreenshot`
+  (`src/lib/image.ts`) ne bloque plus jamais un upload : décodage en
+  cascade (`createImageBitmap` → `<img>` → fichier brut si les deux
+  échouent). Limite connue : un format qu'AUCUN navigateur ne sait afficher
+  (HEIC réel sur Chrome/Android) sera enregistré mais peut ne pas
+  s'afficher en aperçu — limitation de la plateforme, pas de l'app.
+- **Captures d'écran multiples par trade** — `Trade.chartUrls`
+  (`TradeScreenshot[]`) remplace `chartUrl` (gardé `@deprecated` pour la
+  lecture rétro-compatible). 3 emplacements par défaut (Début/Pendant/
+  Après) toujours proposés + emplacements supplémentaires à libellé libre
+  (jusqu'à 8). Validé côté serveur (`isSafeChartUrls`, `schemas.ts`).
+- **Correction de la validation des champs numériques du Portefeuille** —
+  `step="any"` ajouté (un `min="0.1"` sans `step` limitait les valeurs
+  acceptées à 0,1/1,1/2,1... rejetant "10").
+- Fonctionnalités antérieures (déjà en production, stables) : audit
+  sécurité complet (concurrence multi-onglets, convention PnL réalisé,
+  durcissements 2FA/sessions/uploads/XSS — voir historique git pour le
+  détail, `6b60eb4` et `acfd951`), RGPD complet, module Annonces, alerte
+  sonore, plans de trading multiples, niveau/XP, module Setups.
 
 ---
 
 ## 6. Flux détaillés
 
-### 6.1 Plans de trading multiples
+### 6.1 Rattrapage badges/modules (voir §0 pour l'état exact et le bug résiduel)
 
-Le Plan de trading est passé d'un objet unique (`TradingPlanData`) à une
-**liste** (`TradingPlan[]`), chaque plan ayant son propre nom, ses règles,
-et sa liste de setups autorisés. Un trade référence désormais
-explicitement un `tradingPlanId` — **pas de déduction automatique** du
-plan depuis le setup utilisé, le choix est manuel et explicite dans le
-Journal. Un setup ne peut être rattaché qu'à un seul plan à la fois
-(exclusivité). Stocké côté serveur via `PUT /trading-plan` (élève),
-`getTradingPlan`/`saveTradingPlan` dans `repositories.ts` (même motif
-"une ligne JSON par utilisateur" que `profile`).
+`backfillStudentDefaultCollections(dataUserId)` (`server/routes.ts`),
+appelée à chaque `GET /api/state` élève : si `badges` est vide, copie
+`initialTraderBadges` (catalogue fixe, `src/data/mockData.ts`) avec des id
+préfixés `${dataUserId}-` et `unlocked: false` forcé ; si `modules` est
+vide, copie en priorité le contenu réel du bureau staff, avec repli sur
+`initialModules` (vide dans ce projet, donc sans effet pratique).
 
-### 6.2 Module Annonces
+### 6.2 Captures d'écran multiples par trade
 
-Stockage : une liste JSON complète réécrite à chaque publication (`announcements`
-table, `user_id TEXT PRIMARY KEY` = toujours `DEFAULT_USER_ID`, un seul
-bureau partagé — pas de `CollectionName` générique car pas besoin d'id/position
-par ligne SQL). `GET /api/announcements` : lecture ouverte à toute session
-authentifiée (élève ou staff). `PUT /api/auth/admin/announcements` :
-réservé `requireOwner`, diffuse une notification (`type: "academy"`) à
-chaque élève actif pour toute entrée dont l'`id` n'existait pas dans
-l'ancienne liste (une édition ne renotifie pas). Le son se déclenche déjà
-côté client via `useNotificationSound` dès qu'un `id` inédit apparaît dans
-`notifications`.
+`toScreenshotSlots(trade)` (`TradingJournal.tsx`) garantit toujours 3
+emplacements "Début/Pendant/Après" dans le formulaire (même vides),
+absorbe l'ancien `chartUrl` d'un trade existant dans "Début" à l'édition.
+`handleAddScreenshotSlot`/`handleRemoveScreenshotSlot` gèrent les
+emplacements supplémentaires (libellé libre, jusqu'à 8 au total). À la
+soumission, seuls les emplacements avec une image sont persistés.
+`getFilledScreenshots(trade)` (distincte, ne force pas les 3 emplacements)
+sert à l'aperçu en lecture seule.
 
-### 6.3 Contrôle de concurrence optimiste (EN COURS — voir §0)
+### 6.3 Décodage d'image en cascade (accepte tous les formats)
 
-Un compteur de version par `(userId, collection)` dans la table
-`collection_versions`. Chaque `PUT /collections/:name` envoie la version
-qu'il pensait être la dernière connue (`{ items, version }`) ; le serveur
-vérifie-puis-incrémente atomiquement dans la même transaction que
-l'écriture, et rejette (409, `CollectionVersionConflictError`) si la
-version envoyée est périmée — signe qu'un autre onglet/appareil a écrit
-entre-temps. Scope délibérément limité aux 8 collections `CollectionName`
-partagées à plus haut risque (trades, comptes, modules, messages, badges,
-setups, notifications, enrolledStudents) — pas étendu aux endpoints
-singleton (plan de trading, profil, annonces, résultats de quiz) qui ont
-un risque de collision beaucoup plus faible en pratique.
+`decode()` (`src/lib/image.ts`) tente `createImageBitmap` (rapide, corrige
+l'orientation EXIF), puis `<img>` classique si ça échoue (plus permissif —
+corrige le cas réel signalé : un PNG valide rejeté par
+`createImageBitmap` sur Safari). Si les deux échouent,
+`resizeChartScreenshot` retombe sur `readAsDataUrl(file)` : le fichier
+original, non compressé, plutôt que de bloquer l'upload.
+
+### 6.4 Saisie libre des prix
+
+`parsePriceInput(raw)` (`src/lib/format.ts`) : un seul séparateur présent
+(point OU virgule) est toujours la décimale ; les deux présents (ex.
+"4.655,66" ou "4,655.66"), celui qui apparaît EN DERNIER est la décimale,
+l'autre n'est que du regroupement à retirer. Les champs eux-mêmes
+n'appliquent plus aucun formatage/reformatage pendant la frappe — texte
+totalement libre, filtré uniquement sur `[\d.,]`.
+
+### 6.5 Import CSV du Journal
+
+`handleImportCSV` (`TradingJournal.tsx`) : `parseCsv()` maison (RFC 4180
+basique, miroir de `csvCell` côté export), colonnes retrouvées par NOM
+(`CSV_IMPORT_COLUMNS`) pas par position. Chaque ligne valide devient un
+NOUVEAU trade (`onAddTrade`) — la colonne "ID" de l'export est ignorée,
+réimporter son propre export crée donc des doublons plutôt que de
+fusionner. Une ligne avec marché/direction/résultat inconnu est ignorée et
+comptée à part.
+
+### 6.6 Menus déroulants uniformisés
+
+`Select` (`src/components/Select.tsx`) : `appearance-none` + un chevron
+`ChevronDown` constant, quel que soit le navigateur. Le padding droit est
+fixé en `style` inline (pas en classe Tailwind — une classe `pr-*`
+perdrait face à un `p-2.5`/`px-3` du même niveau de spécificité selon
+l'ordre interne des utilitaires Tailwind).
 
 ---
 
 ## 7. Bugs connus / limitations
 
-**Corrigés cette période (non commités, voir §0/§5) :**
-- ~~PnL non réalisé (trades OPEN) inclus dans des totaux agrégés à
-  plusieurs endroits~~ — corrigé via `isRealizedDollarTrade`.
-- ~~Écrasement silencieux multi-onglets~~ — corrigé serveur ET client
-  (wiring `markLoaded` fait, voir §0).
-- ~~Logout élève incohérent avec le motif staff~~ — corrigé.
-- ~~#6 Élevée : `normalizeTradingPlans` sans validation de type~~ — corrigé
-  (`sanitizePlanEntry`, voir §0).
-- ~~#8 Moyenne : codes TOTP rejouables~~ — corrigé (`totp_last_used_step` +
-  `verifyAndConsumeTotpStep`, voir §0).
-- ~~#10 Moyenne : limite 16kb bloquant les uploads d'image~~ — corrigé
-  (parseurs scopés à 2mb + `apiErrorHandler` respecte le vrai code HTTP,
-  voir §0).
-- ~~#11 Moyenne : URL de ressource de leçon non validée~~ — corrigé
-  (`containsDangerousUrlScheme`, voir §0).
-- ~~#13 Moyenne : collection `notifications` élève jamais purgée~~ — corrigé
-  (plafond 300, voir §0).
-- ~~#14 Moyenne : `announcementsSchema` sans unicité des `id`~~ — corrigé.
-- ~~#16 Moyenne : `applyPlanCompliance` stale closure~~ — corrigé (ref
-  synchrone dans les deux shells, voir §0).
-- ~~#17 Moyenne : clé localStorage badges non namespacée~~ — corrigé.
-- ~~Faible : `Announcements.onSave` non gardé par `isOwner` côté client~~ —
-  corrigé (défense en profondeur).
+**En cours de correction, voir §0** :
+- Rattrapage badges/modules — correctif dans l'arbre de travail, pas
+  encore vérifié en conditions réelles connecté.
 
-**Encore ouverts :**
+**Limite de plateforme assumée (pas un bug applicatif)** :
+- Un format d'image qu'AUCUN navigateur ne sait afficher (HEIC réel sur
+  Chrome/Android, sans support natif) sera enregistré via le repli "fichier
+  brut" mais peut ne jamais s'afficher en aperçu sur ce navigateur — vrai
+  seulement pour des formats exotiques, PNG/JPEG/WebP fonctionnent partout.
 
-| # | Sévérité | Constat |
-|---|---|---|
-| 9 | Moyenne | La session n'a pas de durée de vie absolue réelle — c'est une fenêtre glissante. **Décision produit nécessaire avant correctif**, voir §0. |
-| 12 | Moyenne | La boucle de fan-out de notifications à la publication d'une annonce est synchrone et bloquante. Jugé hors scope à l'échelle actuelle du projet, voir §0. |
-| — | Faible | UX de collage avec espace insécable dans `ThousandsInput` ; pas de purge périodique dédiée des défis 2FA expirés (purge opportuniste déjà en place, jugée suffisante). |
+**Non traités, restent de vrais arbitrages produit (pas des oublis)** :
+- Verrouillage de compte par email (pas par IP) — `server/auth/loginLockout.ts` :
+  protection anti-credential-stuffing délibérée, dont la contrepartie
+  (quelqu'un qui connaît un email peut verrouiller ce compte en boucle)
+  n'a pas de correctif gratuit sans ajouter de l'infrastructure (CAPTCHA,
+  déverrouillage admin). Documenté dans le code, pas un bug oublié.
+- Fan-out de notifications à la publication d'une annonce, synchrone —
+  jugé hors scope à l'échelle actuelle du projet (dizaines/centaines
+  d'élèves), à revisiter si le nombre d'élèves actifs devient très grand.
+- Score du quiz rapide de leçon (VideoAcademy, `activeLessonQuizModal`)
+  jamais persisté — semble être un outil de vérification à faible enjeu,
+  pas une évaluation formelle. Nécessiterait un nouveau champ/schéma/route
+  si un suivi réel est voulu — pas fait faute de demande explicite.
 
-**Limitations connues, non des bugs :**
+**Limitations connues, non des bugs** :
 - Le calendrier économique ne montre que "cette semaine" (flux
-  ForexFactory) — un vendredi soir, la liste peut être vide, comportement
-  normal.
-- Pas de QR code pour la 2FA — décision explicite (voir §8).
+  ForexFactory) — peut être vide un vendredi soir, comportement normal.
+- Pas de QR code pour la 2FA — secret + lien `otpauth://` cliquable,
+  décision explicite pour éviter une dépendance externe.
 
 ---
 
 ## 8. Décisions techniques importantes
 
+- **Import cross-répertoire serveur ← client pour les données pures**
+  (`server/routes.ts` importe `src/data/mockData.ts`) — accepté
+  spécifiquement parce que ce fichier n'a aucune dépendance React/DOM,
+  esbuild le bundle sans problème. Ne PAS généraliser ce pattern à des
+  fichiers qui ont de vraies dépendances client (composants, hooks).
 - **`isRealizedDollarTrade`** comme seule source de vérité pour "ce trade
   compte-t-il dans un total $ agrégé ?" — un trade `OPEN` n'y entre jamais.
-  Motif : avant cette période, 5 fichiers différents avaient chacun leur
-  propre logique, souvent incohérente (BE parfois inclus, parfois exclu ;
-  OPEN parfois inclus par erreur). Toute nouvelle fonctionnalité qui somme
-  du PnL en $ DOIT utiliser cet helper plutôt que ré-implémenter un filtre.
+- **`parsePriceInput`** comme seule source de vérité pour convertir un prix
+  saisi librement en nombre — ne jamais réintroduire `Number(x)` direct ni
+  un formatage forcé (`ThousandsInput`, supprimé) sur un champ de prix.
+- **`Select` partagé** pour tout nouveau `<select>` du projet — ne jamais
+  revenir à un `<select>` brut, le rendu natif diverge entre navigateurs.
 - **Contrôle de concurrence optimiste scopé aux seules collections
-  `CollectionName`** (pas aux endpoints singleton) — compromis coût/bénéfice
-  assumé : ce sont les seules données où deux onglets peuvent raisonnablement
-  écrire des éléments indépendants en parallèle (ajouter deux trades
-  différents en même temps, par ex.) ; les singletons (plan, profil,
-  annonces) sont réécrits en bloc et déjà à faible risque de collision réelle.
+  `CollectionName`** (pas aux endpoints singleton comme le plan de trading
+  ou les annonces) — compromis coût/bénéfice assumé.
+- **Catalogue de badges FIXE, jamais édité via une UI** — `initialTraderBadges`
+  fait foi directement pour le rattrapage, indépendamment de ce que
+  contient (ou pas) la collection "badges" du bureau staff.
 - **Plans de trading multiples avec sélection manuelle explicite** — le
-  `tradingPlanId` d'un trade n'est jamais déduit automatiquement du setup
-  utilisé, même si un setup n'appartient qu'à un seul plan. Motif : éviter
-  toute ambiguïté silencieuse si un setup change de plan après coup.
-- **Pas de QR code pour la 2FA** — secret affiché en texte à recopier +
-  lien `otpauth://` cliquable sur mobile, décision explicite pour éviter
-  une dépendance externe de génération de QR code pour un gain UX marginal
-  (l'app cible des coachs/élèves, pas le grand public).
+  `tradingPlanId` d'un trade n'est jamais déduit automatiquement du setup.
+- **Aperçu en lecture seule par défaut** (Plan de trading, et pattern
+  "Infos"/"Suivi de performance" des fiches élèves) — un module qui mélange
+  consultation et édition dans le même écran gagne à séparer les deux dès
+  qu'il devient consulté plus souvent qu'édité.
 - **Aucune dépendance externe pour le TOTP** — implémentation maison
   (RFC 6238/4226) sur `node:crypto` uniquement.
-- **Annonces : stockage JSON complet plutôt que `CollectionName` générique**
-  — pas besoin d'id/position par ligne SQL pour une liste réécrite en bloc
-  à chaque publication (peu fréquente), motif identique à `trading_plans`.
-- **Aucune IA nulle part dans le produit** — répété plusieurs fois par
-  l'utilisateur comme décision produit ferme, ne pas réintroduire sans
-  demande explicite.
+- **Aucune IA nulle part dans le produit** — décision produit ferme,
+  répétée plusieurs fois, ne jamais réintroduire sans demande explicite.
 
 ---
 
@@ -810,12 +499,16 @@ un risque de collision beaucoup plus faible en pratique.
 
 `SectionHeader` est réimplémenté localement dans chaque fichier qui en a
 besoin plutôt que factorisé en composant partagé — décision historique
-assumée (chaque section a des variations mineures de style/props qui
-rendaient une factorisation prématurée plus coûteuse que répétitive).
+assumée (variations mineures de style/props par section).
 
 Le module "Annonces" a été nommé ainsi plutôt que "Académie" pour éviter
-une collision de nom avec le module vidéo existant `VideoAcademy.tsx`
-(`TabType: "academy"`), qui aurait été confusante.
+une collision avec le module vidéo existant `VideoAcademy.tsx`
+(`TabType: "academy"`).
+
+`ThousandsInput.tsx` a existé puis a été **supprimé** une fois tous ses
+appelants migrés vers la saisie libre (`parsePriceInput`) — si tu tombes
+sur une référence à ce nom dans un vieux commentaire, c'est de l'histoire,
+pas un fichier manquant.
 
 ---
 
@@ -823,58 +516,76 @@ une collision de nom avec le module vidéo existant `VideoAcademy.tsx`
 
 Forexpaps est le fondateur de PropDesk, **non-technique**, délègue
 largement l'exécution du code. Il valide des décisions produit (nommage,
-droits d'accès, priorités) mais pas des détails d'implémentation. Workflow
-attendu pour un audit complet : agents parallèles par zone → compiler les
-résultats → prioriser → ne demander l'arbitrage de l'utilisateur QUE pour
-de vraies décisions produit/permission (pas pour des choix techniques) →
-corriger tout le reste directement → vérifier (`tsc`/build/navigateur) →
-UN commit bien documenté par initiative (ne pas fragmenter à l'excès) →
-ne committer/pousser que sur demande explicite ("commite et pousse", pas
-avant).
+droits d'accès, priorités) mais pas des détails d'implémentation.
 
-Pour tester une fonctionnalité élève : ne jamais déconnecter une session
-coach en cours pour le faire — utiliser un second navigateur/profil privé,
-l'API directe, ou un compte élève de test dédié.
+**Workflow observé sur de nombreux échanges, à reproduire** :
+1. L'utilisateur signale un bug (souvent via une ou deux captures d'écran
+   comparant "chez moi" vs "chez mon élève") ou demande une fonctionnalité
+   en une phrase.
+2. Diagnostiquer en profondeur AVANT de proposer un correctif — plusieurs
+   bugs de cette session avaient une cause différente de l'hypothèse
+   initiale la plus évidente (voir §0 : le rattrapage badges a été corrigé
+   UNE FOIS, déployé, et s'est révélé insuffisant à l'usage réel — la
+   bonne pratique est de vérifier l'hypothèse aussi près que possible des
+   conditions réelles avant de conclure qu'un correctif est fini).
+3. Corriger directement, vérifier (`tsc` + `build` + test en navigateur ou
+   en base de données), puis résumer clairement CE QUI A CHANGÉ et
+   pourquoi, en français simple, sans jargon inutile.
+4. **Ne JAMAIS committer, pousser, ni déployer sans demande explicite** —
+   "commite et pousse" / "publie sur Railway" sont des phrases qui
+   reviennent systématiquement, une par une, après chaque correctif validé.
+5. Un déploiement Railway prend ~1-2 minutes ; vérifier le statut via
+   `railway deployment list` après un délai raisonnable plutôt que de
+   sonder en boucle serrée.
+
+**Test d'une fonctionnalité élève** : ne jamais déconnecter une session
+coach en cours. Utiliser un second navigateur/profil privé, l'API directe,
+ou le compte élève de test "Sensei" existant.
+
+**Sur la vérification** : plusieurs bugs de cette session (menus
+déroulants, formats d'image, badges) étaient invisibles en local pour le
+développeur (macOS/Chrome) mais visibles uniquement dans l'environnement
+réel de l'élève (souvent Safari/iOS, ou un compte créé avant une
+fonctionnalité). Toujours envisager que "ça marche chez moi" et "ça marche
+en production pour un compte existant" sont deux affirmations différentes
+— tester avec des données/navigateurs représentatifs de la vraie
+population d'utilisateurs quand c'est possible (onglet neuf, simulation en
+base de données des conditions réelles), pas seulement le cas le plus
+simple.
 
 ---
 
 ## 11. Prochaines tâches, dans l'ordre
 
-1. **Décider du sort de #9** (session sans vraie durée de vie absolue,
-   voir §0/§7) avec l'utilisateur — imposer une expiration absolue changerait
-   un comportement produit existant (reconnexion forcée périodique), ce
-   n'est pas un choix purement technique. Implémenter seulement après
-   validation.
-2. Tester manuellement le scénario deux-onglets décrit dans la version
-   précédente de ce document (§0) : modifier une donnée dans l'onglet A,
-   dans l'onglet B modifier la même collection avant que A n'ait rechargé →
-   B doit voir un rejet 409 propre (`SyncErrorBanner`) plutôt qu'un
-   écrasement silencieux. Vérifier aussi la 2FA (anti-rejeu #8) et un upload
-   d'avatar/annonce avec une image de quelques centaines de ko (#10).
-3. Committer les 19 fichiers modifiés — plusieurs commits par thème
-   (probable : concurrence multi-onglets / convention PnL réalisé /
-   durcissements sécurité 2FA-uploads-notifications-XSS / logout élève —
-   à discuter avec l'utilisateur si ambigu), **seulement sur demande
-   explicite** ("commite", "commite et pousse").
-4. Si l'utilisateur valide un correctif pour #9, l'implémenter, vérifier,
-   committer séparément.
-5. #12 (fan-out d'annonces synchrone) : à revisiter seulement si le nombre
-   d'élèves actifs devient très grand — pas d'action requise pour l'instant.
-6. Ne pousser/déployer sur Railway que sur demande explicite de
-   l'utilisateur.
+1. **Committer le correctif badges/modules en cours** (`server/routes.ts`,
+   voir §0) — un seul fichier, prêt.
+2. Sur demande explicite de l'utilisateur seulement : pousser et déployer
+   sur Railway.
+3. Une fois déployé, s'assurer que l'utilisateur confirme avec son élève
+   que les badges apparaissent (0/9 au lieu de 0/0). Si ce n'est toujours
+   pas le cas, suivre le diagnostic de repli donné en §0 (point 4).
+4. Aucune autre tâche explicitement demandée n'est en attente à la date de
+   cette mise à jour — le reste de ce document (§7) liste des arbitrages
+   produit non tranchés (verrouillage par email, fan-out d'annonces, quiz
+   de leçon non persisté) : ne les traiter QUE si l'utilisateur les
+   soulève, ce sont des choix, pas des bugs oubliés.
+5. En l'absence de demande précise, un audit de sécurité/bugs complet
+   (méthode : agents parallèles en lecture seule par zone, résultats
+   compilés et priorisés, une seule vraie question de permission posée à
+   l'utilisateur si besoin, tout le reste corrigé directement) a déjà été
+   fait deux fois dans l'historique de ce projet et est une action que
+   l'utilisateur redemande périodiquement — un bon réflexe si aucune tâche
+   spécifique n'est donnée et qu'un moment semble propice à une passe de
+   qualité.
 
 ---
 
 ## 12. État à la reprise
 
-- Branche `main`, dernier commit **poussé** : `85b08df`.
-- **19 fichiers modifiés, non commités** (liste exacte en §0) — `npx tsc
-  --noEmit` ET `npm run build` passent sans erreur sur cet état.
-- Statut de déploiement Railway de `85b08df` **non re-vérifié** dans cette
-  période — à confirmer avant de supposer quoi que ce soit sur la prod.
-- Audit complet (bugs + failles de sécurité) **quasiment terminé** : 12 des
-  14 constats traités (voir §0/§7 pour le détail exact), tous vérifiés par
-  `tsc`/`build`. Il reste #9 (bloqué sur une décision produit) et #12 (jugé
-  hors scope à l'échelle actuelle).
-- Aucun blocage technique connu — juste la décision #9 à prendre avec
-  l'utilisateur, puis committer sur demande explicite.
+- Branche `main`, dernier commit **poussé et déployé** : `959ff91`.
+- **1 fichier modifié, non commité** : `server/routes.ts` (correctif
+  badges/modules, voir §0) — `npx tsc --noEmit` et `npm run build` passent
+  sans erreur, vérifié en base de données mais pas en navigateur connecté.
+- Aucun autre chantier ouvert. Le reste du projet est stable et déployé.
+- Aucun blocage technique connu — juste la vérification finale en
+  conditions réelles à obtenir de l'utilisateur après déploiement (§0/§11).
