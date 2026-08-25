@@ -15,7 +15,8 @@ import {
   Pencil,
   X,
   ImagePlus,
-  Loader2
+  Loader2,
+  ChevronDown
 } from "lucide-react";
 import {
   Trade,
@@ -114,6 +115,34 @@ function getFilledScreenshots(trade: Pick<Trade, "chartUrls" | "chartUrl">): Tra
   if (fromNewField.length > 0) return fromNewField;
   return trade.chartUrl ? [{ id: "legacy", label: "Capture", url: trade.chartUrl }] : [];
 }
+
+/**
+ * `<select>` personnalisé.
+ *
+ * Sans ça, chaque navigateur affiche son propre widget natif pour un
+ * `<select>` non stylé : un simple chevron sur Chrome/Firefox, mais une
+ * double flèche façon "spinner" sur Safari (macOS/iOS). Un élève sur Safari
+ * et son coach sur Chrome ne voyaient donc pas le même formulaire — aucune
+ * différence de code entre les deux, juste le rendu natif du navigateur.
+ * `appearance-none` masque ce widget natif partout ; le chevron `ChevronDown`
+ * ci-dessous, toujours identique, le remplace. Le padding droit est fixé en
+ * `style` (pas en classe Tailwind) : une classe `pr-*` perdrait face à un
+ * `p-2.5` du même niveau de spécificité selon l'ordre interne des utilitaires
+ * Tailwind, un style inline gagne toujours.
+ */
+const Select: React.FC<React.SelectHTMLAttributes<HTMLSelectElement>> = ({
+  className = "",
+  style,
+  children,
+  ...props
+}) => (
+  <div className="relative">
+    <select {...props} className={`appearance-none ${className}`} style={{ paddingRight: "1.75rem", ...style }}>
+      {children}
+    </select>
+    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+  </div>
+);
 
 /** Erreurs proposées au tag sur un trade — voir `TradeMistake` dans types.ts. */
 const MISTAKE_OPTIONS: TradeMistake[] = [
@@ -783,7 +812,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto scrollbar-none pb-1 md:pb-0">
-          <select
+          <Select
             value={selectedMarket}
             onChange={(e) => setSelectedMarket(e.target.value)}
             className="bg-[#0D1110] border border-[#1B2320] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none"
@@ -793,12 +822,12 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             <option value="Crypto">Crypto</option>
             <option value="Indices">Indices</option>
             <option value="Matières Premières">Matières Premières</option>
-          </select>
+          </Select>
 
           {/* Le filtre par compte n'apparaît que s'il y a des portefeuilles :
               sur une base neuve, un sélecteur vide n'apprendrait rien. */}
           {accounts.length > 0 && (
-            <select
+            <Select
               value={selectedAccount}
               onChange={(e) => setSelectedAccount(e.target.value)}
               className="bg-[#0D1110] border border-[#1B2320] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none"
@@ -810,10 +839,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 </option>
               ))}
               <option value={NON_RATTACHES}>Non rattachés</option>
-            </select>
+            </Select>
           )}
 
-          <select
+          <Select
             value={selectedResult}
             onChange={(e) => setSelectedResult(e.target.value)}
             className="bg-[#0D1110] border border-[#1B2320] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none"
@@ -822,9 +851,9 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             <option value="WIN">Gagnants (WIN)</option>
             <option value="LOSS">Perdants (LOSS)</option>
             <option value="BREAKEVEN">Breakeven</option>
-          </select>
+          </Select>
 
-          <select
+          <Select
             value={selectedEmotion}
             onChange={(e) => setSelectedEmotion(e.target.value)}
             className="bg-[#0D1110] border border-[#1B2320] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none"
@@ -835,7 +864,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             <option value="Impulsive">Impulsif</option>
             <option value="Anxious">Anxieux</option>
             <option value="Calm">Calme</option>
-          </select>
+          </Select>
         </div>
       </div>
 
@@ -1111,7 +1140,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <label className="block text-xs font-semibold text-slate-400 mb-1">
                     Compte <span className="text-slate-600 font-normal">(facultatif)</span>
                   </label>
-                  <select
+                  <Select
                     value={formData.accountId}
                     onChange={(e) => setFormData({ ...formData, accountId: e.target.value })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
@@ -1122,7 +1151,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                         {acc.name} · {acc.firmOrBroker}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               )}
 
@@ -1141,7 +1170,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Marché</label>
-                  <select
+                  <Select
                     value={formData.marketCategory}
                     onChange={(e) => setFormData({ ...formData, marketCategory: e.target.value as MarketCategory })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
@@ -1150,21 +1179,21 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     <option value="Crypto">Crypto</option>
                     <option value="Indices">Indices</option>
                     <option value="Matières Premières">Matières Premières</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Sens</label>
-                  <select
+                  <Select
                     value={formData.direction}
                     onChange={(e) => setFormData({ ...formData, direction: e.target.value as TradeDirection })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-bold"
                   >
                     <option value="LONG">LONG (Achat)</option>
                     <option value="SHORT">SHORT (Vente)</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
@@ -1241,14 +1270,14 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                       onChange={(e) => handleDecimalChange("pnl", e.target.value, { allowNegative: true })}
                       className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     />
-                    <select
+                    <Select
                       value={formData.pnlUnit}
                       onChange={(e) => setFormData({ ...formData, pnlUnit: e.target.value as PnlUnit })}
                       className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-bold"
                     >
                       <option value="USD">$</option>
                       <option value="PERCENT">%</option>
-                    </select>
+                    </Select>
                   </div>
                   <p className="text-[10px] text-slate-500 mt-1 leading-snug">
                     Le chiffre que tu lis sur ta plateforme — aucun calcul de notre part.
@@ -1258,7 +1287,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Stratégie / Setup</label>
                   {setups.length > 0 ? (
-                    <select
+                    <Select
                       value={formData.strategy}
                       onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
                       className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
@@ -1269,7 +1298,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                           {setup.name}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   ) : (
                     <p className="text-[11px] text-slate-500 bg-[#0D1110] border border-dashed border-[#1B2320] rounded-lg p-2.5">
                       Aucun setup enregistré — ajoutes-en un dans l'onglet « Setups ».
@@ -1283,7 +1312,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   Plan de trading <span className="text-slate-600 font-normal">(facultatif)</span>
                 </label>
                 {plans.length > 0 ? (
-                  <select
+                  <Select
                     value={formData.tradingPlanId}
                     onChange={(e) => setFormData({ ...formData, tradingPlanId: e.target.value })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
@@ -1294,7 +1323,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                         {plan.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 ) : (
                   <p className="text-[11px] text-slate-500 bg-[#0D1110] border border-dashed border-[#1B2320] rounded-lg p-2.5">
                     Aucun plan enregistré — ajoutes-en un dans « Plan de trading ». Un trade sans plan
