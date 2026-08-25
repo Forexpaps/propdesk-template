@@ -38,18 +38,8 @@ function pickFormat(): "image/webp" | "image/jpeg" {
     : "image/jpeg";
 }
 
-/**
- * Décode le fichier en une source dessinable.
- *
- * `createImageBitmap` est préféré quand il existe : il redresse l'image selon
- * son orientation EXIF, ce que les photos prises au téléphone exigent, et
- * décode hors du fil principal.
- */
-async function decode(file: File): Promise<CanvasImageSource & { width: number; height: number }> {
-  if (typeof createImageBitmap === "function") {
-    return createImageBitmap(file, { imageOrientation: "from-image" });
-  }
-
+/** Décode via une balise `<img>` — repli universel, voir `decode()`. */
+async function decodeViaImageElement(file: File): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(file);
   try {
     return await new Promise((resolve, reject) => {
@@ -61,6 +51,36 @@ async function decode(file: File): Promise<CanvasImageSource & { width: number; 
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+/**
+ * Décode le fichier en une source dessinable.
+ *
+ * `createImageBitmap` est préféré quand il existe : il redresse l'image selon
+ * son orientation EXIF, ce que les photos prises au téléphone exigent, et
+ * décode hors du fil principal. Mais certains navigateurs (Safari/iOS en
+ * particulier, sur certains PNG pourtant valides — profil colorimétrique
+ * embarqué, capture d'écran haute résolution) le font échouer alors qu'une
+ * balise `<img>` classique décode le même fichier sans problème. Un élève
+ * dont le PNG était rejeté avec « Cette image n'a pas pu être lue » alors que
+ * le fichier était valide a signalé exactement ce cas — `createImageBitmap`
+ * échouait silencieusement sans jamais retomber sur ce second décodeur, plus
+ * permissif. On tente donc `createImageBitmap` d'abord, et on retombe sur
+ * `<img>` s'il rejette, plutôt que d'abandonner immédiatement.
+ */
+async function decode(file: File): Promise<CanvasImageSource & { width: number; height: number }> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      return await createImageBitmap(file, { imageOrientation: "from-image" });
+    } catch (err) {
+      console.warn(
+        "[propdesk] createImageBitmap a rejeté ce fichier, repli sur <img>.",
+        err
+      );
+    }
+  }
+
+  return decodeViaImageElement(file);
 }
 
 /**
