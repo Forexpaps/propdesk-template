@@ -54,6 +54,25 @@ async function decodeViaImageElement(file: File): Promise<HTMLImageElement> {
 }
 
 /**
+ * Lit le fichier tel quel, en data URL — dernier repli quand ni
+ * `createImageBitmap` ni `<img>` n'arrivent à décoder le fichier (format que
+ * ce navigateur ne sait tout simplement pas rendre sur un canvas — HEIC/HEIF
+ * d'iPhone sur Chrome/Android par exemple, qu'aucun des deux décodeurs
+ * canvas ne supporte alors que le fichier est parfaitement valide). Contient
+ * le fichier ORIGINAL, non compressé ni redimensionné : mieux vaut une
+ * capture plus lourde que stockée qu'un upload qui échoue purement et
+ * simplement pour un format que ce navigateur ne sait pas retravailler.
+ */
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error("Fichier illisible."));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
  * Décode le fichier en une source dessinable.
  *
  * `createImageBitmap` est préféré quand il existe : il redresse l'image selon
@@ -151,38 +170,49 @@ const CHART_SCREENSHOT_QUALITY = 0.82;
  * `localStorage`. Une capture d'écran brute (souvent plusieurs Mo) y pèserait
  * son poids trois fois.
  *
- * @throws si le fichier n'est pas une image décodable.
+ * N'échoue quasiment jamais : si le décodage canvas échoue pour un format
+ * que ce navigateur ne sait pas retravailler (voir `readAsDataUrl`), le
+ * fichier original est utilisé tel quel plutôt que de bloquer l'upload —
+ * demande explicite d'accepter tous les formats d'image, après qu'un PNG
+ * pourtant valide s'est vu rejeté chez un élève.
  */
 export async function resizeChartScreenshot(
   file: File,
   maxDimension = CHART_SCREENSHOT_MAX_DIMENSION
 ): Promise<string> {
-  const source = await decode(file);
-
   try {
-    const scale = Math.min(1, maxDimension / Math.max(source.width, source.height));
-    const width = Math.round(source.width * scale);
-    const height = Math.round(source.height * scale);
+    const source = await decode(file);
+    try {
+      const scale = Math.min(1, maxDimension / Math.max(source.width, source.height));
+      const width = Math.round(source.width * scale);
+      const height = Math.round(source.height * scale);
 
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Contexte de rendu indisponible.");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Contexte de rendu indisponible.");
 
-    ctx.imageSmoothingQuality = "high";
+      ctx.imageSmoothingQuality = "high";
 
-    const format = pickFormat();
-    if (format === "image/jpeg") {
-      ctx.fillStyle = SURFACE_COLOR;
-      ctx.fillRect(0, 0, width, height);
+      const format = pickFormat();
+      if (format === "image/jpeg") {
+        ctx.fillStyle = SURFACE_COLOR;
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      ctx.drawImage(source, 0, 0, width, height);
+
+      return canvas.toDataURL(format, CHART_SCREENSHOT_QUALITY);
+    } finally {
+      if ("close" in source && typeof source.close === "function") source.close();
     }
-
-    ctx.drawImage(source, 0, 0, width, height);
-
-    return canvas.toDataURL(format, CHART_SCREENSHOT_QUALITY);
-  } finally {
-    if ("close" in source && typeof source.close === "function") source.close();
+  } catch (err) {
+    console.warn(
+      "[propdesk] Décodage/redimensionnement impossible pour ce fichier, conservé tel quel.",
+      err
+    );
+    return readAsDataUrl(file);
   }
 }

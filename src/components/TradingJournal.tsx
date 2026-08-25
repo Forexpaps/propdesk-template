@@ -1480,7 +1480,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                                 Remplacer
                                 <input
                                   type="file"
-                                  accept="image/*"
+                                  accept="image/*,.heic,.heif"
                                   onChange={(e) => handleChartUpload(slot.id, e)}
                                   className="hidden"
                                 />
@@ -1513,7 +1513,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                             )}
                             <input
                               type="file"
-                              accept="image/*"
+                              accept="image/*,.heic,.heif"
                               onChange={(e) => handleChartUpload(slot.id, e)}
                               disabled={resizingSlotId !== null}
                               className="hidden"
