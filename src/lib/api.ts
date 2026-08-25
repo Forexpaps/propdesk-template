@@ -11,6 +11,7 @@ import {
   Coach,
   TradingPlanData,
   Setup,
+  Announcement,
 } from "../types";
 
 /** Collections synchronisées avec le serveur, dans les formes de src/types.ts. */
@@ -65,6 +66,12 @@ export interface ServerState {
    * enregistré de plan. Voir `getTradingPlan`, `server/repositories.ts`.
    */
   tradingPlan?: TradingPlanData | null;
+  /**
+   * Annonces du fondateur — jamais scopées par élève (voir `getAnnouncements`,
+   * `server/repositories.ts`), présentes dans les deux branches (élève et
+   * staff) de `GET /api/state`.
+   */
+  announcements?: Announcement[];
 }
 
 /** État d'authentification renvoyé par `/api/auth/me`. */
@@ -215,6 +222,18 @@ export const api = {
     request<void>("/api/auth/trading-plan", {
       method: "PUT",
       body: JSON.stringify(plan),
+    }),
+
+  /**
+   * Publie la liste complète des annonces — réservé au fondateur côté
+   * serveur (`requireOwner`), jamais `saveCollection` générique qui n'a pas
+   * cette restriction. Voir `PUT /auth/announcements`,
+   * `server/auth/routes.ts`.
+   */
+  saveAnnouncements: (announcements: Announcement[]) =>
+    request<{ success: true; count: number }>("/api/auth/announcements", {
+      method: "PUT",
+      body: JSON.stringify(announcements),
     }),
 
   saveQuizResults: (results: Record<string, ModuleQuizResult>) =>

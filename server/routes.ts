@@ -7,6 +7,7 @@ import {
   getQuizResults,
   replaceQuizResults,
   getTradingPlan,
+  getAnnouncements,
   COLLECTION_NAMES,
   CollectionOwnershipConflictError,
   type CollectionName,
@@ -255,6 +256,10 @@ api.get("/state", (req, res) => {
       student: buildStudentProfile(req.auth!.userId),
       quizResults: getQuizResults(dataUserId),
       tradingPlan: getTradingPlan(dataUserId),
+      // Annonces du fondateur : jamais scopées par élève (voir
+      // `getAnnouncements`, `server/repositories.ts`) — la même liste part
+      // dans les deux branches de cette route (élève et staff).
+      announcements: getAnnouncements() ?? [],
       coaches: buildCoachesForStudent(),
       collections: Object.fromEntries(
         [...STUDENT_ALLOWED_COLLECTIONS].map((name) => [name, listCollection(name, dataUserId)])
@@ -284,6 +289,7 @@ api.get("/state", (req, res) => {
     bootstrapped: isBootstrapped(),
     student: buildStaffProfile(dataUserId),
     quizResults: getQuizResults(dataUserId),
+    announcements: getAnnouncements() ?? [],
     collections,
   });
 });

@@ -27,6 +27,7 @@ import {
   LogOut,
   ClipboardList,
   Target,
+  Megaphone,
 } from "lucide-react";
 import { StudentProfile } from "../types";
 
@@ -49,6 +50,7 @@ export const ALL_TABS = [
   "students",
   "wallets",
   "academy",
+  "announcements",
   "journal",
   "messaging",
   "analytics",
@@ -82,6 +84,7 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
   "analytics",
   "students",
   "academy",
+  "announcements",
   "messaging",
   "mindset",
   "calendar",
@@ -105,6 +108,7 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   analytics: "analytics",
   students: "students",
   academy: "academy",
+  announcements: "announcements",
   messaging: "messaging",
   mindset: null,
   calendar: "macro",
@@ -213,6 +217,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
    * confondre les deux.
    */
   const suiviItems: SidebarEntry[] = [
+    { key: "announcements", id: "announcements", label: "Annonces", icon: Megaphone },
     { key: "journal", id: "journal", label: "Journal de trading", icon: BookMarked },
     { key: "wallets", id: "wallets", label: "Portefeuille", icon: Wallet },
     { key: "analytics", id: "analytics", label: "Rentabilité", icon: LineChart },

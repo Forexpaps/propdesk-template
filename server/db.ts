@@ -58,6 +58,15 @@ db.exec(`
     payload TEXT NOT NULL
   );
 
+  -- Une seule ligne dans toute l'app (celle du fondateur, DEFAULT_USER_ID) :
+  -- les annonces sont le seul contenu partagé par tous les élèves plutôt que
+  -- scopé par élève, voir le commentaire de saveAnnouncements
+  -- (server/repositories.ts).
+  CREATE TABLE IF NOT EXISTS announcements (
+    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    payload TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS setups (
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

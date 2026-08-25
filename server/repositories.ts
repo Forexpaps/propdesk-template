@@ -260,6 +260,27 @@ export function saveTradingPlan(plan: unknown, userId: string = DEFAULT_USER_ID)
   ).run(userId, JSON.stringify(plan));
 }
 
+/**
+ * Annonces du fondateur — toujours `DEFAULT_USER_ID`, jamais un paramètre :
+ * contrairement à tout le reste de cette app (scopé par élève), il n'existe
+ * qu'UNE seule liste d'annonces, partagée par tout le monde. Même
+ * passthrough générique que `getTradingPlan`/`saveTradingPlan`.
+ */
+export function getAnnouncements<T>(): T | null {
+  const row = db.prepare("SELECT payload FROM announcements WHERE user_id = ?").get(DEFAULT_USER_ID) as
+    | { payload: string }
+    | undefined;
+  if (!row) return null;
+  return safeParsePayload<T>(row.payload, `announcements#${DEFAULT_USER_ID}`);
+}
+
+export function saveAnnouncements(list: unknown): void {
+  db.prepare(
+    `INSERT INTO announcements (user_id, payload) VALUES (?, ?)
+     ON CONFLICT(user_id) DO UPDATE SET payload = excluded.payload`
+  ).run(DEFAULT_USER_ID, JSON.stringify(list));
+}
+
 export function getQuizResults<T>(
   userId: string = DEFAULT_USER_ID
 ): Record<string, T> {

@@ -475,4 +475,23 @@ export interface AppNotification {
   targetTab?: string;
 }
 
+/**
+ * Une annonce publiée par le fondateur, visible par tous les élèves — le
+ * seul contenu de toute l'app qui n'est pas scopé par élève, voir le
+ * commentaire de `saveAnnouncements` (`server/repositories.ts`).
+ */
+export type AnnouncementCategory = "Général" | "Alerte marché" | "Pédagogie" | "Événement";
+
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  category: AnnouncementCategory;
+  pinned: boolean;
+  /** Optionnel : capture d'écran/illustration jointe, même traitement que `Trade.chartUrl`. */
+  imageUrl?: string;
+  /** ISO — pour le tri chronologique (plus récent en premier). */
+  createdAt: string;
+}
+
 // (Module Forum retiré — voir HANDOFF.md pour l'historique.)
