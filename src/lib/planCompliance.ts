@@ -1,20 +1,27 @@
-import { AppNotification, Trade, TradingPlanData } from "../types";
+import { AppNotification, Trade, TradingPlan, TradingPlanData } from "../types";
 import { FOREX_SESSIONS, isSessionActive } from "../components/TopHeader";
 
 const BASE_STORAGE_KEY = "horizon_trading_plan";
 
-export const EMPTY_TRADING_PLAN: TradingPlanData = {
-  authorizedSessions: [],
-  tradingHours: "",
-  trackedAssets: "",
-  authorizedSetups: "",
-  riskPerTradePercent: "",
-  maxTradesPerDay: "",
-  maxDailyLossPercent: "",
-  entryConditions: "",
-  stopConditions: "",
-  goldenRules: "",
-};
+/** Un plan vierge, prêt pour le formulaire — `id` généré, jamais réutilisé. */
+export function createEmptyPlan(name = "Nouveau plan"): TradingPlan {
+  return {
+    id: `plan-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name,
+    authorizedSessions: [],
+    tradingHours: "",
+    trackedAssets: "",
+    authorizedSetups: "",
+    riskPerTradePercent: "",
+    maxTradesPerDay: "",
+    maxDailyLossPercent: "",
+    entryConditions: "",
+    stopConditions: "",
+    goldenRules: "",
+  };
+}
+
+export const EMPTY_TRADING_PLANS: TradingPlanData = [];
 
 /**
  * Même motif que `MindsetJournalModal.tsx` (`storageKey` prop) : côté
@@ -26,13 +33,38 @@ export function getTradingPlanStorageKey(storageKey?: string): string {
   return storageKey ? `${BASE_STORAGE_KEY}_${storageKey}` : BASE_STORAGE_KEY;
 }
 
-/** `null` si l'utilisateur n'a jamais enregistré de plan — ne jamais vérifier contre un plan vide par défaut. */
-export function loadTradingPlan(storageKey?: string): TradingPlanData | null {
+/**
+ * Convertit une valeur de plan brute (venue de `localStorage` ou du serveur)
+ * en tableau de `TradingPlan` — quelle que soit sa forme d'origine :
+ * - déjà un tableau : renvoyé tel quel, avec des defaults défensifs par
+ *   entrée au cas où un champ manquerait (donnée partiellement corrompue) ;
+ * - ancien objet unique (forme d'avant le multi-plan, sans `id`/`name`) :
+ *   enveloppé dans un tableau à une entrée, pour ne perdre aucune donnée déjà
+ *   enregistrée ;
+ * - absent/invalide : tableau vide.
+ *
+ * À utiliser partout où une valeur de plan stockée est lue avant usage —
+ * jamais directement `JSON.parse` ni la valeur brute du serveur.
+ */
+export function normalizeTradingPlans(raw: unknown): TradingPlan[] {
+  if (Array.isArray(raw)) {
+    return raw
+      .filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null)
+      .map((entry) => ({ ...createEmptyPlan(), ...entry }) as TradingPlan);
+  }
+  if (typeof raw === "object" && raw !== null) {
+    return [{ ...createEmptyPlan("Mon plan"), ...(raw as Record<string, unknown>), id: "legacy" } as TradingPlan];
+  }
+  return [];
+}
+
+/** Tableau vide si l'utilisateur n'a jamais enregistré de plan. */
+export function loadTradingPlan(storageKey?: string): TradingPlanData {
   try {
     const saved = localStorage.getItem(getTradingPlanStorageKey(storageKey));
-    return saved ? (JSON.parse(saved) as TradingPlanData) : null;
+    return saved ? normalizeTradingPlans(JSON.parse(saved)) : [];
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -64,7 +96,7 @@ function matchesAny(haystack: string, needle: string): boolean {
 export function checkPlanViolations(
   trade: Trade,
   sameDayTrades: Trade[],
-  plan: TradingPlanData,
+  plan: TradingPlan,
   startingCapital: number
 ): string[] {
   const reasons: string[] = [];

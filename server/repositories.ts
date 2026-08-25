@@ -235,10 +235,15 @@ export function saveProfile(profile: unknown, userId: string = DEFAULT_USER_ID):
 }
 
 /**
- * Plan de trading d'un élève — objet unique, pas une collection : même
- * modèle « une ligne par utilisateur » que `getProfile`/`saveProfile`, sur
- * sa propre table plutôt que forcé dans le moule `CollectionName` (voir
- * `TradingPlanData`, `src/types.ts` : pas de tableau `id`/position).
+ * Plans de trading d'un élève — payload JSON opaque (un tableau de
+ * `TradingPlan`, voir `TradingPlanData` dans `src/types.ts`) sur une ligne
+ * par utilisateur, même modèle que `getProfile`/`saveProfile`, sur sa propre
+ * table plutôt que forcé dans le moule `CollectionName`. Passthrough
+ * générique : le passage d'un objet unique (avant l'introduction du
+ * multi-plan) à un tableau ne demande aucun changement ici, ni de migration
+ * SQL — seule la validation applicative (`tradingPlansSchema`,
+ * `server/schemas.ts`) et la normalisation à la lecture
+ * (`normalizeTradingPlans`, `src/lib/planCompliance.ts`) en tiennent compte.
  */
 export function getTradingPlan<T>(userId: string = DEFAULT_USER_ID): T | null {
   const row = db.prepare("SELECT payload FROM trading_plans WHERE user_id = ?").get(userId) as

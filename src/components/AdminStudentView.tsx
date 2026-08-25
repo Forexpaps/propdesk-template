@@ -11,7 +11,7 @@ import { Sidebar, SidebarItemKey, TabType } from "./Sidebar";
 import { TopHeader } from "./TopHeader";
 import { TradingPlanEditorModal } from "./TradingPlanEditorModal";
 import { SetupManagement } from "./SetupManagement";
-import { EMPTY_TRADING_PLAN } from "../lib/planCompliance";
+import { normalizeTradingPlans } from "../lib/planCompliance";
 
 interface AdminStudentViewProps {
   enrolledStudentId: string;
@@ -327,7 +327,7 @@ export const AdminStudentView: React.FC<AdminStudentViewProps> = ({
       <TradingPlanEditorModal
         isOpen={isTradingPlanOpen}
         onClose={() => setIsTradingPlanOpen(false)}
-        plan={studentData.tradingPlan ?? EMPTY_TRADING_PLAN}
+        plans={normalizeTradingPlans(studentData.tradingPlan)}
         setups={studentData.setups}
         readOnly
       />

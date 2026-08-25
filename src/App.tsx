@@ -21,7 +21,7 @@ import { CGUModal } from "./components/CGUModal";
 import { PRIVACY_POLICY_URL } from "./lib/links";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
 import { ConfirmDialogHost, confirmDialog } from "./lib/confirmDialog";
-import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, getTradingPlanStorageKey, EMPTY_TRADING_PLAN } from "./lib/planCompliance";
+import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, getTradingPlanStorageKey, EMPTY_TRADING_PLANS, normalizeTradingPlans } from "./lib/planCompliance";
 import { computeBadgeProgress } from "./lib/badges";
 import { listPending } from "./lib/pendingChanges";
 
@@ -412,12 +412,14 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
    * `planCompliance.ts` (namespacée par email, voir `getTradingPlanStorageKey`)
    * pour que `applyPlanCompliance` (qui relit ce cache directement, plus bas)
    * voie toujours la même valeur que celle réellement synchronisée au
-   * serveur. `EMPTY_TRADING_PLAN` en solde par défaut : un élève qui n'a
-   * jamais enregistré son plan édite un formulaire vide, pas une erreur.
+   * serveur. `EMPTY_TRADING_PLANS` en solde par défaut : un élève qui n'a
+   * jamais enregistré de plan démarre avec une liste vide, pas une erreur.
+   * `normalizeTradingPlans` absorbe les anciennes valeurs enregistrées avant
+   * le multi-plan (objet unique plutôt que tableau) — voir son commentaire.
    */
   const [syncedTradingPlan, setSyncedTradingPlan] = useSyncedState<TradingPlanData>(
     getTradingPlanStorageKey(student?.email),
-    tradingPlan ?? EMPTY_TRADING_PLAN,
+    normalizeTradingPlans(tradingPlan) ?? EMPTY_TRADING_PLANS,
     (v) => api.saveTradingPlan(v),
     syncEnabled,
     reportSyncError
@@ -437,7 +439,9 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     setSyncedQuizResults(resolveStudentValue(quizResults, "horizon_student_quiz_results"));
     setSyncedSetups(resolveStudentValue(setups, "horizon_student_setups"));
     setSyncedTradingPlan(
-      resolveStudentValue(tradingPlan ?? EMPTY_TRADING_PLAN, getTradingPlanStorageKey(student?.email))
+      normalizeTradingPlans(
+        resolveStudentValue(tradingPlan ?? EMPTY_TRADING_PLANS, getTradingPlanStorageKey(student?.email))
+      )
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
@@ -556,13 +560,20 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
 
   /**
    * Vérifie le respect du plan de trading pour un trade donné et upsert/
-   * retire l'alerte correspondante — voir `src/lib/planCompliance.ts`.
+   * retire l'alerte correspondante — voir `src/lib/planCompliance.ts`. Le
+   * plan vérifié est celui choisi explicitement sur CE trade
+   * (`trade.tradingPlanId`), jamais déduit de son setup/stratégie. Sans plan
+   * choisi (ou plan depuis supprimé), aucune vérification n'est faite — un
+   * trade pris hors plan n'a pas de règle à respecter.
+   *
    * Plan namespacé par email élève (`storageKey`, même motif que
    * `MindsetJournalModal`) : nécessaire, l'ancien plan côté élève était
    * partagé sans distinction entre comptes sur un même poste.
    */
   const applyPlanCompliance = (trade: Trade, allTrades: Trade[]) => {
-    const plan = loadTradingPlan(studentProfile.email);
+    if (!trade.tradingPlanId) return;
+    const plans = loadTradingPlan(studentProfile.email);
+    const plan = plans.find((p) => p.id === trade.tradingPlanId);
     if (!plan) return;
     const sameDayTrades = allTrades.filter((t) => t.date === trade.date);
     const reasons = checkPlanViolations(trade, sameDayTrades, plan, studentProfile.startingCapital);
@@ -762,6 +773,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
                 onSendTradeToCoach={() => undefined}
                 hideAiAndCoachActions
                 setups={syncedSetups}
+                plans={syncedTradingPlan}
               />
             )}
 
@@ -851,7 +863,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
         isOpen={isTradingPlanOpen}
         onClose={() => setIsTradingPlanOpen(false)}
         storageKey={studentProfile.email}
-        plan={syncedTradingPlan}
+        plans={syncedTradingPlan}
         onChange={setSyncedTradingPlan}
         setups={syncedSetups}
       />
@@ -978,6 +990,23 @@ function AcademyApp({
   const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
+
+  /**
+   * Plans de trading personnels du bureau staff — `localStorage` seul,
+   * jamais synchronisé au serveur (hors périmètre, voir le commentaire de
+   * `TradingPlanData` dans `src/types.ts`). Levé ici (plutôt que géré en
+   * interne par `TradingPlanEditorModal`) pour que `TradingJournal` puisse
+   * aussi lire la liste, son sélecteur "Plan de trading" en ayant besoin.
+   */
+  const [staffTradingPlan, setStaffTradingPlanState] = useState<TradingPlanData>(() => loadTradingPlan());
+  const setStaffTradingPlan = (next: TradingPlanData) => {
+    setStaffTradingPlanState(next);
+    try {
+      localStorage.setItem(getTradingPlanStorageKey(), JSON.stringify(next));
+    } catch {
+      // Quota dépassé ou navigation privée : rien à faire de plus ici.
+    }
+  };
   const [isLegalNoticeOpen, setIsLegalNoticeOpen] = useState(false);
   const [isCguOpen, setIsCguOpen] = useState(false);
   const [isStaffAccountsOpen, setIsStaffAccountsOpen] = useState(false);
@@ -1374,11 +1403,15 @@ function AcademyApp({
   /**
    * Vérifie le respect du plan de trading pour un trade donné (ajout ou
    * modification) et upsert/retire l'alerte correspondante — voir
-   * `src/lib/planCompliance.ts`. Clé de plan partagée (bureau staff), pas de
+   * `src/lib/planCompliance.ts`. Le plan vérifié est celui choisi
+   * explicitement sur CE trade (`trade.tradingPlanId`), jamais déduit de son
+   * setup/stratégie. Clé de plan partagée (bureau staff), pas de
    * `storageKey`.
    */
   const applyPlanCompliance = (trade: Trade, allTrades: Trade[]) => {
-    const plan = loadTradingPlan();
+    if (!trade.tradingPlanId) return;
+    const plans = loadTradingPlan();
+    const plan = plans.find((p) => p.id === trade.tradingPlanId);
     if (!plan) return;
     const sameDayTrades = allTrades.filter((t) => t.date === trade.date);
     const reasons = checkPlanViolations(trade, sameDayTrades, plan, student.startingCapital);
@@ -1601,6 +1634,7 @@ function AcademyApp({
               prefillDraft={journalDraft}
               onPrefillConsumed={() => setJournalDraft(null)}
               setups={setups}
+              plans={staffTradingPlan}
             />
           )}
 
@@ -1731,6 +1765,8 @@ function AcademyApp({
       <TradingPlanEditorModal
         isOpen={isTradingPlanOpen}
         onClose={() => setIsTradingPlanOpen(false)}
+        plans={staffTradingPlan}
+        onChange={setStaffTradingPlan}
         setups={setups}
       />
 
