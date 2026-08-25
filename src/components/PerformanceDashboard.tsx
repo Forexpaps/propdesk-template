@@ -14,7 +14,7 @@ import {
 import { LineChart, AlertTriangle, RotateCcw } from "lucide-react";
 import { Trade, StudentProfile } from "../types";
 import { formatCurrency } from "../lib/format";
-import { computePerformanceStats, computePnlByPeriod } from "../lib/performanceStats";
+import { computePerformanceStats, computePnlByPeriod, isRealizedDollarTrade } from "../lib/performanceStats";
 
 interface PerformanceDashboardProps {
   student: StudentProfile;
@@ -94,6 +94,7 @@ const HEATMAP_BLOCKS: { label: string; startHour: number; endHour: number }[] = 
 interface HeatmapCellStats {
   tradesCount: number;
   wins: number;
+  losses: number;
   pnl: number;
 }
 
@@ -107,7 +108,7 @@ interface HeatmapCellStats {
  */
 function computeHeatmap(trades: Trade[]): HeatmapCellStats[][] {
   const grid: HeatmapCellStats[][] = HEATMAP_DAYS.map(() =>
-    HEATMAP_BLOCKS.map(() => ({ tradesCount: 0, wins: 0, pnl: 0 }))
+    HEATMAP_BLOCKS.map(() => ({ tradesCount: 0, wins: 0, losses: 0, pnl: 0 }))
   );
 
   for (const trade of trades) {
@@ -124,7 +125,8 @@ function computeHeatmap(trades: Trade[]): HeatmapCellStats[][] {
     const cell = grid[dayIndex][blockIndex];
     cell.tradesCount += 1;
     if (trade.result === "WIN") cell.wins += 1;
-    cell.pnl += trade.pnl;
+    if (trade.result === "LOSS") cell.losses += 1;
+    if (isRealizedDollarTrade(trade)) cell.pnl += trade.pnl;
   }
 
   return grid;
@@ -309,7 +311,12 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
                   <div className="flex items-center text-xs text-slate-400 font-medium">{day}</div>
                   {HEATMAP_BLOCKS.map((block, blockIndex) => {
                     const cell = heatmap[dayIndex][blockIndex];
-                    const winRate = cell.tradesCount > 0 ? Math.round((cell.wins / cell.tradesCount) * 100) : null;
+                    // `wins/(wins+losses)`, pas `wins/tradesCount` : un BE ou un
+                    // OPEN dans la case ne doit ni compter comme gagnant ni
+                    // diluer le taux — même règle que partout ailleurs, voir
+                    // `isRealizedDollarTrade` (src/lib/performanceStats.ts).
+                    const decided = cell.wins + cell.losses;
+                    const winRate = decided > 0 ? Math.round((cell.wins / decided) * 100) : null;
                     // Intensité proportionnelle au win rate — jamais en dessous de 15%
                     // d'opacité pour qu'une case avec des trades reste visuellement
                     // distincte d'une case vraiment vide, même à 0%/100% de réussite.
@@ -324,7 +331,9 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
                         key={block.label}
                         title={
                           cell.tradesCount > 0
-                            ? `${day} ${block.label} — ${winRate}% de réussite sur ${cell.tradesCount} trade${cell.tradesCount > 1 ? "s" : ""}`
+                            ? winRate !== null
+                              ? `${day} ${block.label} — ${winRate}% de réussite sur ${cell.tradesCount} trade${cell.tradesCount > 1 ? "s" : ""}`
+                              : `${day} ${block.label} — ${cell.tradesCount} trade${cell.tradesCount > 1 ? "s" : ""} sans résultat décidé (BE/ouvert)`
                             : `${day} ${block.label} — aucun trade`
                         }
                         className="h-11 rounded-lg border border-[#1B2320] bg-[#0D1110] flex flex-col items-center justify-center"
@@ -332,7 +341,12 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
                       >
                         {cell.tradesCount > 0 && (
                           <>
-                            <span className="text-[11px] font-bold text-white leading-none">{winRate}%</span>
+                            {/* `null` seulement si aucun trade WIN/LOSS dans la
+                                case (uniquement des BE/OPEN) : pas de taux à
+                                afficher plutôt qu'un "null%" littéral. */}
+                            <span className="text-[11px] font-bold text-white leading-none">
+                              {winRate !== null ? `${winRate}%` : "—"}
+                            </span>
                             <span className="text-[9px] text-slate-300/80 leading-none mt-0.5">
                               {cell.tradesCount} trade{cell.tradesCount > 1 ? "s" : ""}
                             </span>

@@ -346,42 +346,42 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     []
   );
 
-  const [syncedTrades, setSyncedTrades] = useSyncedState<Trade[]>(
+  const [syncedTrades, setSyncedTrades, markTradesLoaded] = useSyncedState<Trade[]>(
     "horizon_student_trades",
     trades,
     (v) => api.saveCollection("trades", v),
     syncEnabled,
     reportSyncError
   );
-  const [syncedAccounts, setSyncedAccounts] = useSyncedState<TradingAccount[]>(
+  const [syncedAccounts, setSyncedAccounts, markAccountsLoaded] = useSyncedState<TradingAccount[]>(
     "horizon_student_accounts",
     accounts,
     (v) => api.saveCollection("accounts", v),
     syncEnabled,
     reportSyncError
   );
-  const [syncedModules, setSyncedModules] = useSyncedState<Module[]>(
+  const [syncedModules, setSyncedModules, markModulesLoaded] = useSyncedState<Module[]>(
     "horizon_student_modules",
     modules,
     (v) => api.saveCollection("modules", v),
     syncEnabled,
     reportSyncError
   );
-  const [syncedMessages, setSyncedMessages] = useSyncedState<CoachMessage[]>(
+  const [syncedMessages, setSyncedMessages, markMessagesLoaded] = useSyncedState<CoachMessage[]>(
     "horizon_student_messages",
     messages,
     (v) => api.saveCollection("messages", v),
     syncEnabled,
     reportSyncError
   );
-  const [syncedBadges, setSyncedBadges] = useSyncedState<TraderBadge[]>(
+  const [syncedBadges, setSyncedBadges, markBadgesLoaded] = useSyncedState<TraderBadge[]>(
     "horizon_student_badges",
     badges,
     (v) => api.saveCollection("badges", v),
     syncEnabled,
     reportSyncError
   );
-  const [syncedQuizResults, setSyncedQuizResults] = useSyncedState<Record<string, ModuleQuizResult>>(
+  const [syncedQuizResults, setSyncedQuizResults, markQuizResultsLoaded] = useSyncedState<Record<string, ModuleQuizResult>>(
     "horizon_student_quiz_results",
     quizResults,
     (v) => api.saveQuizResults(v),
@@ -389,7 +389,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     reportSyncError
   );
   /** Stratégies de trading définies par l'élève (module Setups) — voir `Setup` dans `src/types.ts`. */
-  const [syncedSetups, setSyncedSetups] = useSyncedState<Setup[]>(
+  const [syncedSetups, setSyncedSetups, markSetupsLoaded] = useSyncedState<Setup[]>(
     "horizon_student_setups",
     setups,
     (v) => api.saveCollection("setups", v),
@@ -405,7 +405,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
    * arbitraire. `"notifications"` a été ajoutée à
    * `STUDENT_ALLOWED_COLLECTIONS` côté serveur pour permettre ceci.
    */
-  const [syncedNotifications, setSyncedNotifications] = useSyncedState<AppNotification[]>(
+  const [syncedNotifications, setSyncedNotifications, markNotificationsLoaded] = useSyncedState<AppNotification[]>(
     "horizon_student_notifications",
     notifications,
     (v) => api.saveCollection("notifications", v),
@@ -428,7 +428,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
    * `normalizeTradingPlans` absorbe les anciennes valeurs enregistrées avant
    * le multi-plan (objet unique plutôt que tableau) — voir son commentaire.
    */
-  const [syncedTradingPlan, setSyncedTradingPlan] = useSyncedState<TradingPlanData>(
+  const [syncedTradingPlan, setSyncedTradingPlan, markTradingPlanLoaded] = useSyncedState<TradingPlanData>(
     getTradingPlanStorageKey(student?.email),
     normalizeTradingPlans(tradingPlan) ?? EMPTY_TRADING_PLANS,
     (v) => api.saveTradingPlan(v),
@@ -441,15 +441,15 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   // que la valeur par défaut figée avant que les données ne soient connues.
   useEffect(() => {
     if (status !== "online") return;
-    setSyncedTrades(resolveStudentValue(trades, "horizon_student_trades"));
-    setSyncedAccounts(resolveStudentValue(accounts, "horizon_student_accounts"));
-    setSyncedModules(resolveStudentValue(modules, "horizon_student_modules"));
-    setSyncedMessages(resolveStudentValue(messages, "horizon_student_messages"));
-    setSyncedBadges(resolveStudentValue(badges, "horizon_student_badges"));
-    setSyncedNotifications(resolveStudentValue(notifications, "horizon_student_notifications"));
-    setSyncedQuizResults(resolveStudentValue(quizResults, "horizon_student_quiz_results"));
-    setSyncedSetups(resolveStudentValue(setups, "horizon_student_setups"));
-    setSyncedTradingPlan(
+    markTradesLoaded(resolveStudentValue(trades, "horizon_student_trades"));
+    markAccountsLoaded(resolveStudentValue(accounts, "horizon_student_accounts"));
+    markModulesLoaded(resolveStudentValue(modules, "horizon_student_modules"));
+    markMessagesLoaded(resolveStudentValue(messages, "horizon_student_messages"));
+    markBadgesLoaded(resolveStudentValue(badges, "horizon_student_badges"));
+    markNotificationsLoaded(resolveStudentValue(notifications, "horizon_student_notifications"));
+    markQuizResultsLoaded(resolveStudentValue(quizResults, "horizon_student_quiz_results"));
+    markSetupsLoaded(resolveStudentValue(setups, "horizon_student_setups"));
+    markTradingPlanLoaded(
       normalizeTradingPlans(
         resolveStudentValue(tradingPlan ?? EMPTY_TRADING_PLANS, getTradingPlanStorageKey(student?.email))
       )
@@ -481,8 +481,13 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   // Badges déjà signalés dans le panneau de notifications — un débloquage ne
   // doit apparaître "non lu" qu'une fois, pas à chaque rendu. Purement local
   // (pas de collection dédiée côté serveur pour cette seule marque de lecture).
+  // Clé namespacée par email, même motif que `getTradingPlanStorageKey` :
+  // sans ça, sur un poste partagé par plusieurs élèves, l'état "lu" du
+  // premier élève à s'être connecté s'appliquait à tort à tous les suivants.
   const [readBadgeNotificationIds, setReadBadgeNotificationIds] = usePersistentState<string[]>(
-    "horizon_student_read_badge_notifications",
+    student?.email
+      ? `horizon_student_read_badge_notifications_${student.email}`
+      : "horizon_student_read_badge_notifications",
     []
   );
 
@@ -558,15 +563,31 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   const [profileModalTab, setProfileModalTab] = useState<"profile" | "badges">("profile");
   const [prefilledLessonTitle, setPrefilledLessonTitle] = useState<string | undefined>();
 
+  // Miroir synchrone de `syncedTrades`, mis à jour immédiatement à chaque
+  // ajout/modif — jamais via un effet `[syncedTrades]`, qui ne se déclenche
+  // qu'au rendu suivant. Sans ce miroir, deux appels rapprochés de
+  // `handleAddTrade` (avant que React n'ait re-rendu entre les deux) lisaient
+  // tous les deux la même valeur figée de `syncedTrades` : le second trade du
+  // jour ne voyait pas le premier dans `allTrades`, sous-comptant
+  // `sameDayTrades` pour la règle "max trades/jour" de `checkPlanViolations`.
+  const syncedTradesRef = React.useRef(syncedTrades);
+  React.useEffect(() => {
+    syncedTradesRef.current = syncedTrades;
+  }, [syncedTrades]);
+
   const handleAddTrade = (newTrade: Omit<Trade, "id">) => {
     const tradeWithId: Trade = { ...newTrade, id: `trd-${Date.now()}` };
-    setSyncedTrades((prev) => [tradeWithId, ...prev]);
-    applyPlanCompliance(tradeWithId, [tradeWithId, ...syncedTrades]);
+    const next = [tradeWithId, ...syncedTradesRef.current];
+    syncedTradesRef.current = next;
+    setSyncedTrades(next);
+    applyPlanCompliance(tradeWithId, next);
   };
 
   const handleUpdateTrade = (updated: Trade) => {
-    setSyncedTrades((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-    applyPlanCompliance(updated, syncedTrades.map((t) => (t.id === updated.id ? updated : t)));
+    const next = syncedTradesRef.current.map((t) => (t.id === updated.id ? updated : t));
+    syncedTradesRef.current = next;
+    setSyncedTrades(next);
+    applyPlanCompliance(updated, next);
   };
 
   /**
@@ -592,7 +613,9 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   };
 
   const handleDeleteTrade = (id: string) => {
-    setSyncedTrades((prev) => prev.filter((t) => t.id !== id));
+    const next = syncedTradesRef.current.filter((t) => t.id !== id);
+    syncedTradesRef.current = next;
+    setSyncedTrades(next);
   };
 
   const handleAddSetup = (setup: Setup) => {
@@ -691,18 +714,47 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
    * (`markPending`), le compte suivant à se connecter se la verrait réinjectée
    * par `resolveStudentValue` puis repoussée sur LE SERVEUR sous sa propre
    * session, écrasant ses propres données. Bug réel corrigé ici.
+   *
+   * Mêmes garde-fous que côté staff (trouvés absents ici en audit) : refus
+   * hors ligne (le cache local serait alors la SEULE copie d'une
+   * modification en attente, la vider serait une perte sèche) et
+   * confirmation explicite avant d'effacer quoi que ce soit — un simple clic
+   * sur "Déconnexion" ne doit jamais suffire à perdre une saisie en cours.
    */
   const handleLogout = async () => {
+    if (status !== "online") {
+      alert(
+        "Déconnexion impossible hors ligne : les modifications de cette session ne sont pas encore enregistrées sur le serveur. Reconnecte-toi au serveur avant de te déconnecter."
+      );
+      return;
+    }
+
+    let confirmed: boolean;
     try {
-      await api.studentLogout();
+      confirmed = await confirmDialog(
+        "Se déconnecter ? Tes données restent enregistrées sur le serveur. Le cache de cet appareil sera effacé.",
+        { title: "Déconnexion", confirmLabel: "Se déconnecter" }
+      );
     } catch (err) {
-      console.warn("[propdesk] Déconnexion serveur échouée.", err);
-    } finally {
+      console.error("[propdesk] confirmDialog() a levé une exception.", err);
+      alert("La déconnexion n'a pas pu être confirmée. Réessaie, ou recharge la page.");
+      return;
+    }
+    if (!confirmed) return;
+
+    try {
+      try {
+        await api.studentLogout();
+      } catch (err) {
+        console.warn("[propdesk] Déconnexion serveur échouée.", err);
+      }
+
       try {
         localStorage.clear();
       } catch {
         // Stockage indisponible : il n'y avait alors rien à oublier.
       }
+    } finally {
       onLoggedOut();
     }
   };
@@ -1354,36 +1406,42 @@ function AcademyApp({
     setSetups((prev) => prev.filter((s) => s.id !== id));
   };
 
+  // La notification est calculée AVANT `setBadges`, jamais depuis l'intérieur
+  // de son updater : StrictMode double-invoque les updaters en développement
+  // pour détecter les impuretés, et un `setNotifications` imbriqué produisait
+  // deux notifications "Badge débloqué" au lieu d'une (sans impact en
+  // production, mais une vraie impureté — l'équivalent élève,
+  // `StudentAuthenticatedApp.handleClaimBadge`, ne l'avait pas).
   const handleClaimBadge = (badgeId: string) => {
+    const badge = badges.find((b) => b.id === badgeId);
+    if (!badge) return;
+
     setBadges((prevBadges) =>
-      prevBadges.map((b) => {
-        if (b.id === badgeId) {
-          const unlockedBadge = {
-            ...b,
-            unlocked: true,
-            progressPercentage: 100,
-            unlockedAt: new Date().toLocaleDateString("fr-FR", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            }),
-          };
-
-          const newNotif: AppNotification = {
-            id: `notif-badge-${Date.now()}`,
-            title: "🏆 Nouveau Badge Débloqué !",
-            message: `Félicitations ! Tu as débloqué le badge "${b.title}" et gagné +${b.rewardXP || 200} XP !`,
-            time: "À l'instant",
-            type: "system",
-            read: false,
-          };
-          setNotifications((prev) => [newNotif, ...prev]);
-
-          return unlockedBadge;
-        }
-        return b;
-      })
+      prevBadges.map((b) =>
+        b.id === badgeId
+          ? {
+              ...b,
+              unlocked: true,
+              progressPercentage: 100,
+              unlockedAt: new Date().toLocaleDateString("fr-FR", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              }),
+            }
+          : b
+      )
     );
+
+    const newNotif: AppNotification = {
+      id: `notif-badge-${Date.now()}`,
+      title: "🏆 Nouveau Badge Débloqué !",
+      message: `Félicitations ! Tu as débloqué le badge "${badge.title}" et gagné +${badge.rewardXP || 200} XP !`,
+      time: "À l'instant",
+      type: "system",
+      read: false,
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
   };
 
   // Accounts Handlers
@@ -1430,18 +1488,31 @@ function AcademyApp({
     }));
   };
 
+  // Voir le commentaire équivalent dans `StudentAuthenticatedApp` : sans ce
+  // miroir synchrone, deux ajouts de trade rapprochés se basaient tous les
+  // deux sur la même valeur figée de `trades`, sous-comptant `sameDayTrades`
+  // dans `checkPlanViolations`.
+  const tradesRef = React.useRef(trades);
+  React.useEffect(() => {
+    tradesRef.current = trades;
+  }, [trades]);
+
   const handleAddTrade = (newTrade: Omit<Trade, "id">) => {
     const tradeWithId: Trade = {
       ...newTrade,
       id: `trd-${Date.now()}`,
     };
-    setTrades((prev) => [tradeWithId, ...prev]);
-    applyPlanCompliance(tradeWithId, [tradeWithId, ...trades]);
+    const next = [tradeWithId, ...tradesRef.current];
+    tradesRef.current = next;
+    setTrades(next);
+    applyPlanCompliance(tradeWithId, next);
   };
 
   const handleUpdateTrade = (updated: Trade) => {
-    setTrades((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-    applyPlanCompliance(updated, trades.map((t) => (t.id === updated.id ? updated : t)));
+    const next = tradesRef.current.map((t) => (t.id === updated.id ? updated : t));
+    tradesRef.current = next;
+    setTrades(next);
+    applyPlanCompliance(updated, next);
   };
 
   /**
@@ -1458,12 +1529,19 @@ function AcademyApp({
     const plan = plans.find((p) => p.id === trade.tradingPlanId);
     if (!plan) return;
     const sameDayTrades = allTrades.filter((t) => t.date === trade.date);
-    const reasons = checkPlanViolations(trade, sameDayTrades, plan, student.startingCapital);
+    // `displayStudent.startingCapital`, pas `student.startingCapital` : ce
+    // dernier n'est plus jamais tenu à jour depuis que le capital affiché
+    // vient des comptes réels (voir le commentaire de `displayStudent`
+    // plus haut) — l'utiliser ici désactivait silencieusement la règle de
+    // perte quotidienne max pour tout trade saisi depuis le bureau staff.
+    const reasons = checkPlanViolations(trade, sameDayTrades, plan, displayStudent.startingCapital);
     setNotifications((prev) => upsertPlanAlert(prev, trade, reasons));
   };
 
   const handleDeleteTrade = (id: string) => {
-    setTrades((prev) => prev.filter((t) => t.id !== id));
+    const next = tradesRef.current.filter((t) => t.id !== id);
+    tradesRef.current = next;
+    setTrades(next);
   };
 
   const handleAskCoachAboutLesson = (lessonTitle: string) => {

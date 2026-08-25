@@ -92,15 +92,25 @@ export function generateTotpCode(secretBase32: string, forEpochMs?: number): str
  * l'attaque par mesure de temps qui justifierait `timingSafeEqual` ailleurs
  * dans ce projet (mots de passe, jetons) n'a pas de prise pratique sur une
  * fenêtre aussi courte.
+ *
+ * Renvoie le pas de temps effectivement apparié (pas juste `true`/`false`) —
+ * nécessaire pour que l'appelant (`twoFactor.ts`) puisse rejeter un code déjà
+ * consommé (anti-rejeu, voir `totp_last_used_step`) : sans connaître QUEL pas
+ * a matché dans la fenêtre ±1, impossible de comparer au dernier pas utilisé.
  */
-export function verifyTotpCode(secretBase32: string, code: string, forEpochMs?: number): boolean {
-  if (!/^\d{6}$/.test(code)) return false;
+export function findMatchingTotpStep(secretBase32: string, code: string, forEpochMs?: number): number | null {
+  if (!/^\d{6}$/.test(code)) return null;
 
   const step = currentTimeStep(forEpochMs);
   for (let delta = -WINDOW_STEPS; delta <= WINDOW_STEPS; delta++) {
-    if (hotp(secretBase32, step + delta) === code) return true;
+    if (hotp(secretBase32, step + delta) === code) return step + delta;
   }
-  return false;
+  return null;
+}
+
+/** Vérification simple, sans suivi anti-rejeu — utilisée seulement là où consommer le pas ne s'applique pas. */
+export function verifyTotpCode(secretBase32: string, code: string, forEpochMs?: number): boolean {
+  return findMatchingTotpStep(secretBase32, code, forEpochMs) !== null;
 }
 
 /**

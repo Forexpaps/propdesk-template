@@ -25,8 +25,22 @@ const ALL_EMOTIONS: { id: EmotionState; label: string }[] = [
 
 interface CategoryStats {
   wins: number;
+  losses: number;
   total: number;
   pnl: number;
+}
+
+/**
+ * Un trade compte dans un total monétaire réalisé (PnL cumulé, courbe
+ * d'équité, ventilations...) seulement s'il est en $ (pas en %, pas une
+ * somme d'argent comparable) ET clôturé (`result !== "OPEN"`). Une position
+ * encore ouverte n'a qu'un PnL indicatif tapé à la main par l'utilisateur —
+ * le compter comme réalisé polluait le PnL cumulé, la courbe d'équité, le
+ * solde recalculé du compte prop firm (`walletStats.ts`) et les alertes de
+ * plan (`planCompliance.ts`) avec un montant qui n'est pas encore acquis.
+ */
+export function isRealizedDollarTrade(t: Trade): boolean {
+  return (t.pnlUnit ?? "USD") !== "PERCENT" && t.result !== "OPEN";
 }
 
 export interface PerformanceStats {
@@ -78,9 +92,10 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   const equityData = [
     { date: `Début (${student.joinedDate})`, capital: student.startingCapital, pnl: 0 },
     ...sortedTrades.map((t) => {
-      // Un trade en % n'est pas une somme d'argent : il reste dans la courbe
-      // temporelle mais n'ajoute rien au capital cumulé.
-      if ((t.pnlUnit ?? "USD") !== "PERCENT") runningCapital += t.pnl;
+      // Un trade en % n'est pas une somme d'argent, une position encore
+      // ouverte n'a rien de réalisé : ni l'un ni l'autre n'ajoute au capital
+      // cumulé — voir `isRealizedDollarTrade`.
+      if (isRealizedDollarTrade(t)) runningCapital += t.pnl;
       return {
         date: t.date,
         capital: runningCapital,
@@ -89,23 +104,28 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
     }),
   ];
 
-  // Trades en $ uniquement : seuls ceux-ci entrent dans les totaux monétaires.
-  const tradesEnDollars = trades.filter((t) => (t.pnlUnit ?? "USD") !== "PERCENT");
+  // Trades en $ ET clôturés uniquement : seuls ceux-ci entrent dans les totaux monétaires.
+  const tradesEnDollars = trades.filter(isRealizedDollarTrade);
+
+  /** `wins/(wins+losses)` — BREAKEVEN/OPEN au dénominateur diluerait le taux, voir `isRealizedDollarTrade`. */
+  const winRateOf = (s: CategoryStats): number =>
+    s.wins + s.losses > 0 ? Math.round((s.wins / (s.wins + s.losses)) * 100) : 0;
 
   // 2. Performance par Stratégie
   const strategyStats: Record<string, CategoryStats> = {};
   trades.forEach((t) => {
     if (!strategyStats[t.strategy]) {
-      strategyStats[t.strategy] = { wins: 0, total: 0, pnl: 0 };
+      strategyStats[t.strategy] = { wins: 0, losses: 0, total: 0, pnl: 0 };
     }
     strategyStats[t.strategy].total += 1;
     if (t.result === "WIN") strategyStats[t.strategy].wins += 1;
-    if ((t.pnlUnit ?? "USD") !== "PERCENT") strategyStats[t.strategy].pnl += t.pnl;
+    if (t.result === "LOSS") strategyStats[t.strategy].losses += 1;
+    if (isRealizedDollarTrade(t)) strategyStats[t.strategy].pnl += t.pnl;
   });
 
   const strategyChartData = Object.keys(strategyStats).map((strat) => ({
     strategy: strat,
-    winRate: Math.round((strategyStats[strat].wins / strategyStats[strat].total) * 100),
+    winRate: winRateOf(strategyStats[strat]),
     pnl: strategyStats[strat].pnl,
     tradesCount: strategyStats[strat].total,
   }));
@@ -117,25 +137,23 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   // trade "Anxieux" ne verrait jamais cette barre, alors que c'est justement
   // l'information utile (« je n'ai jamais (encore) tradé anxieux »).
   const emotionStats: Record<EmotionState, CategoryStats> = {
-    Disciplined: { wins: 0, total: 0, pnl: 0 },
-    FOMO: { wins: 0, total: 0, pnl: 0 },
-    Impulsive: { wins: 0, total: 0, pnl: 0 },
-    Anxious: { wins: 0, total: 0, pnl: 0 },
-    Calm: { wins: 0, total: 0, pnl: 0 },
-    Greedy: { wins: 0, total: 0, pnl: 0 },
+    Disciplined: { wins: 0, losses: 0, total: 0, pnl: 0 },
+    FOMO: { wins: 0, losses: 0, total: 0, pnl: 0 },
+    Impulsive: { wins: 0, losses: 0, total: 0, pnl: 0 },
+    Anxious: { wins: 0, losses: 0, total: 0, pnl: 0 },
+    Calm: { wins: 0, losses: 0, total: 0, pnl: 0 },
+    Greedy: { wins: 0, losses: 0, total: 0, pnl: 0 },
   };
   trades.forEach((t) => {
     emotionStats[t.emotion].total += 1;
     if (t.result === "WIN") emotionStats[t.emotion].wins += 1;
-    if ((t.pnlUnit ?? "USD") !== "PERCENT") emotionStats[t.emotion].pnl += t.pnl;
+    if (t.result === "LOSS") emotionStats[t.emotion].losses += 1;
+    if (isRealizedDollarTrade(t)) emotionStats[t.emotion].pnl += t.pnl;
   });
 
   const emotionChartData = ALL_EMOTIONS.map(({ id, label }) => ({
     emotion: label,
-    winRate:
-      emotionStats[id].total > 0
-        ? Math.round((emotionStats[id].wins / emotionStats[id].total) * 100)
-        : 0,
+    winRate: winRateOf(emotionStats[id]),
     pnl: emotionStats[id].pnl,
     tradesCount: emotionStats[id].total,
   }));
@@ -164,10 +182,11 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   // 4. Performance par Actif (paire)
   const pairStats: Record<string, CategoryStats> = {};
   trades.forEach((t) => {
-    if (!pairStats[t.pair]) pairStats[t.pair] = { wins: 0, total: 0, pnl: 0 };
+    if (!pairStats[t.pair]) pairStats[t.pair] = { wins: 0, losses: 0, total: 0, pnl: 0 };
     pairStats[t.pair].total += 1;
     if (t.result === "WIN") pairStats[t.pair].wins += 1;
-    if ((t.pnlUnit ?? "USD") !== "PERCENT") pairStats[t.pair].pnl += t.pnl;
+    if (t.result === "LOSS") pairStats[t.pair].losses += 1;
+    if (isRealizedDollarTrade(t)) pairStats[t.pair].pnl += t.pnl;
   });
   const pairChartData = Object.keys(pairStats)
     .map((pair) => ({ pair, pnl: pairStats[pair].pnl, tradesCount: pairStats[pair].total }))
@@ -177,10 +196,11 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   // 5. Performance par Direction (Long / Short)
   const directionStats: Record<string, CategoryStats> = {};
   trades.forEach((t) => {
-    if (!directionStats[t.direction]) directionStats[t.direction] = { wins: 0, total: 0, pnl: 0 };
+    if (!directionStats[t.direction]) directionStats[t.direction] = { wins: 0, losses: 0, total: 0, pnl: 0 };
     directionStats[t.direction].total += 1;
     if (t.result === "WIN") directionStats[t.direction].wins += 1;
-    if ((t.pnlUnit ?? "USD") !== "PERCENT") directionStats[t.direction].pnl += t.pnl;
+    if (t.result === "LOSS") directionStats[t.direction].losses += 1;
+    if (isRealizedDollarTrade(t)) directionStats[t.direction].pnl += t.pnl;
   });
   const directionChartData = (["LONG", "SHORT"] as const)
     .filter((d) => directionStats[d])
@@ -202,10 +222,11 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   const dayStats: Record<string, CategoryStats> = {};
   trades.forEach((t) => {
     const day = getDayLabel(t.date);
-    if (!dayStats[day]) dayStats[day] = { wins: 0, total: 0, pnl: 0 };
+    if (!dayStats[day]) dayStats[day] = { wins: 0, losses: 0, total: 0, pnl: 0 };
     dayStats[day].total += 1;
     if (t.result === "WIN") dayStats[day].wins += 1;
-    if ((t.pnlUnit ?? "USD") !== "PERCENT") dayStats[day].pnl += t.pnl;
+    if (t.result === "LOSS") dayStats[day].losses += 1;
+    if (isRealizedDollarTrade(t)) dayStats[day].pnl += t.pnl;
   });
   const dayChartData = DAY_ORDER.filter((d) => dayStats[d]).map((d) => ({
     day: d.slice(0, 3),
@@ -215,15 +236,25 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
 
   // 7. Performance par Session de Marché
   //
-  // Approximation assumée : `Trade.time` est une chaîne "HH:MM" libre, sans
-  // fuseau horaire garanti — l'heure saisie est utilisée telle quelle.
+  // Convertie en heure UTC avant classification — même convention que
+  // `checkPlanViolations` (`src/lib/planCompliance.ts`, règle "session
+  // autorisée") et `FOREX_SESSIONS`/`isSessionActive` (`TopHeader.tsx`) : un
+  // `new Date(\`${date}T${time}\`)` sans suffixe de fuseau est interprété par
+  // JS dans le fuseau LOCAL du navigateur, puis `getUTCHours()` en tire
+  // l'heure UTC réelle. Avant ce correctif, cette fonction traitait
+  // directement le chiffre d'heure saisi comme s'il était déjà en UTC : un
+  // même trade pouvait tomber dans une session ici et dans une autre pour
+  // `checkPlanViolations`, pour tout utilisateur hors UTC (ex. France,
+  // UTC+1/+2) — Rentabilité et l'alerte de non-respect du plan racontaient
+  // alors deux histoires différentes sur la même donnée.
   // Découpage sans chevauchement (contrairement à la pastille live de
   // TopHeader.tsx, qui peut cumuler plusieurs sessions actives) pour ne
   // compter chaque trade qu'une seule fois dans ces statistiques.
-  const getSessionLabel = (time?: string): string | null => {
-    if (!time) return null;
-    const hour = parseInt(time.split(":")[0], 10);
-    if (Number.isNaN(hour)) return null;
+  const getSessionLabel = (date?: string, time?: string): string | null => {
+    if (!time || !date) return null;
+    const instant = new Date(`${date}T${time}`);
+    if (Number.isNaN(instant.getTime())) return null;
+    const hour = instant.getUTCHours();
     if (hour >= 21) return "Sydney";
     if (hour < 7) return "Tokyo";
     if (hour < 12) return "Londres";
@@ -234,15 +265,16 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   const sessionStats: Record<string, CategoryStats> = {};
   let tradesSansHeure = 0;
   trades.forEach((t) => {
-    const session = getSessionLabel(t.time);
+    const session = getSessionLabel(t.date, t.time);
     if (!session) {
       tradesSansHeure += 1;
       return;
     }
-    if (!sessionStats[session]) sessionStats[session] = { wins: 0, total: 0, pnl: 0 };
+    if (!sessionStats[session]) sessionStats[session] = { wins: 0, losses: 0, total: 0, pnl: 0 };
     sessionStats[session].total += 1;
     if (t.result === "WIN") sessionStats[session].wins += 1;
-    if ((t.pnlUnit ?? "USD") !== "PERCENT") sessionStats[session].pnl += t.pnl;
+    if (t.result === "LOSS") sessionStats[session].losses += 1;
+    if (isRealizedDollarTrade(t)) sessionStats[session].pnl += t.pnl;
   });
   const sessionChartData = SESSION_ORDER.filter((s) => sessionStats[s]).map((s) => ({
     session: s,
@@ -328,9 +360,10 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
     const hour = parseInt(t.time.split(":")[0], 10);
     if (Number.isNaN(hour)) return;
     const key = `${String(hour).padStart(2, "0")}h`;
-    if (!hourStats[key]) hourStats[key] = { wins: 0, total: 0, pnl: 0 };
+    if (!hourStats[key]) hourStats[key] = { wins: 0, losses: 0, total: 0, pnl: 0 };
     hourStats[key].total += 1;
     if (t.result === "WIN") hourStats[key].wins += 1;
+    if (t.result === "LOSS") hourStats[key].losses += 1;
     hourStats[key].pnl += t.pnl;
   });
   const hourChartData = Object.keys(hourStats)
@@ -341,10 +374,11 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   // obligatoire à la saisie), donc pas de catégorie "non renseigné" à gérer.
   const marketStats: Record<string, CategoryStats> = {};
   trades.forEach((t) => {
-    if (!marketStats[t.marketCategory]) marketStats[t.marketCategory] = { wins: 0, total: 0, pnl: 0 };
+    if (!marketStats[t.marketCategory]) marketStats[t.marketCategory] = { wins: 0, losses: 0, total: 0, pnl: 0 };
     marketStats[t.marketCategory].total += 1;
     if (t.result === "WIN") marketStats[t.marketCategory].wins += 1;
-    if ((t.pnlUnit ?? "USD") !== "PERCENT") marketStats[t.marketCategory].pnl += t.pnl;
+    if (t.result === "LOSS") marketStats[t.marketCategory].losses += 1;
+    if (isRealizedDollarTrade(t)) marketStats[t.marketCategory].pnl += t.pnl;
   });
   const marketChartData = Object.keys(marketStats).map((market) => ({
     market,
@@ -359,10 +393,7 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
     .map((asset) => ({
       asset,
       tradesCount: pairStats[asset].total,
-      winRate:
-        pairStats[asset].total > 0
-          ? Math.round((pairStats[asset].wins / pairStats[asset].total) * 100)
-          : 0,
+      winRate: winRateOf(pairStats[asset]),
       pnl: pairStats[asset].pnl,
     }))
     .sort((a, b) => b.pnl - a.pnl);
@@ -447,7 +478,7 @@ export function computeJournalSummary(trades: Trade[]): JournalSummary {
   const decidedTrades = winTrades + lossTrades;
   const winRate = decidedTrades > 0 ? Math.round((winTrades / decidedTrades) * 100) : 0;
 
-  const tradesEnDollars = trades.filter((t) => (t.pnlUnit ?? "USD") !== "PERCENT");
+  const tradesEnDollars = trades.filter(isRealizedDollarTrade);
   const totalPnL = tradesEnDollars.reduce((acc, t) => acc + t.pnl, 0);
   const totalGains = tradesEnDollars.filter((t) => t.pnl > 0).reduce((acc, t) => acc + t.pnl, 0);
   const totalLosses = Math.abs(tradesEnDollars.filter((t) => t.pnl < 0).reduce((acc, t) => acc + t.pnl, 0));
@@ -520,7 +551,7 @@ export function computePnlByPeriod(trades: Trade[], reference: Date = new Date()
   for (const t of trades) {
     const tradeDate = new Date(`${t.date}T00:00:00`);
     if (Number.isNaN(tradeDate.getTime())) continue;
-    const isDollar = (t.pnlUnit ?? "USD") !== "PERCENT";
+    const isDollar = isRealizedDollarTrade(t);
 
     if (tradeDate >= yearStart) {
       totals.year.tradesCount += 1;
