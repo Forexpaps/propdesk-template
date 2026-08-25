@@ -1,6 +1,16 @@
 import { api } from "./api";
 import type { CollectionName, ServerCollections } from "./api";
-import type { ModuleQuizResult, StudentProfile } from "../types";
+import type { ModuleQuizResult, StudentProfile, TradingPlanData } from "../types";
+import { BASE_STORAGE_KEY as TRADING_PLAN_BASE_KEY } from "./planCompliance";
+
+/**
+ * Une clé de plan de trading élève est namespacée par email
+ * (`getTradingPlanStorageKey`, `planCompliance.ts`) — dynamique, donc jamais
+ * listée telle quelle dans `LABELS`/`COLLECTION_BY_KEY`. Reconnue par préfixe.
+ */
+function isTradingPlanKey(key: string): boolean {
+  return key === TRADING_PLAN_BASE_KEY || key.startsWith(`${TRADING_PLAN_BASE_KEY}_`);
+}
 
 /**
  * Suivi des modifications faites **sans serveur**, en attente d'être envoyées.
@@ -38,6 +48,13 @@ const LABELS: Record<string, string> = {
   horizon_badges: "Badges",
   horizon_modules: "Modules vidéo",
   horizon_quiz_results: "Résultats de quiz",
+  // Ajoutées après coup (module Setups, plan de trading synchronisé) :
+  // sans elles, `markPending` ignorait silencieusement toute modification
+  // hors ligne (ou après échec réseau) de ces deux collections, qui
+  // repartaient donc écrasées par l'état serveur périmé au rechargement
+  // suivant, sans jamais passer par `PendingChangesBanner`.
+  horizon_setups: "Setups",
+  [TRADING_PLAN_BASE_KEY]: "Plan de trading",
   // Bureau élève — mêmes collections, clés locales préfixées (voir
   // `StudentAuthenticatedApp` dans src/App.tsx). Sans ces entrées, une
   // sauvegarde échouée côté élève n'était jamais protégée : `markPending`
@@ -49,6 +66,9 @@ const LABELS: Record<string, string> = {
   horizon_student_badges: "Badges",
   horizon_student_notifications: "Notifications",
   horizon_student_quiz_results: "Résultats de quiz",
+  horizon_student_setups: "Setups",
+  // Les clés de plan namespacées par email (`horizon_trading_plan_<email>`)
+  // ne peuvent pas être listées ici (dynamiques) — voir `isTradingPlanKey`.
 };
 
 /** Clé `localStorage` → collection serveur. Absent pour profil et quiz. */
@@ -66,6 +86,8 @@ const COLLECTION_BY_KEY: Record<string, CollectionName> = {
   horizon_student_messages: "messages",
   horizon_student_badges: "badges",
   horizon_student_notifications: "notifications",
+  horizon_setups: "setups",
+  horizon_student_setups: "setups",
 };
 
 function read(): string[] {
@@ -75,7 +97,7 @@ function read(): string[] {
     const parsed: unknown = JSON.parse(raw);
     // On filtre sur la liste blanche : une clé inconnue ne doit rien déclencher.
     return Array.isArray(parsed)
-      ? parsed.filter((k): k is string => typeof k === "string" && k in LABELS)
+      ? parsed.filter((k): k is string => typeof k === "string" && (k in LABELS || isTradingPlanKey(k)))
       : [];
   } catch {
     return [];
@@ -94,7 +116,7 @@ function write(keys: string[]): void {
 
 /** Note qu'une collection a été modifiée hors ligne. Idempotent. */
 export function markPending(localKey: string): void {
-  if (!(localKey in LABELS)) return;
+  if (!(localKey in LABELS) && !isTradingPlanKey(localKey)) return;
   const current = read();
   if (current.includes(localKey)) return;
   write([...current, localKey]);
@@ -107,7 +129,7 @@ export function listPending(): string[] {
 
 /** Libellés lisibles correspondants, pour l'affichage. */
 export function describePending(keys: string[]): string[] {
-  return keys.map((k) => LABELS[k] ?? k);
+  return keys.map((k) => LABELS[k] ?? (isTradingPlanKey(k) ? "Plan de trading" : k));
 }
 
 export function clearPending(): void {
@@ -135,6 +157,11 @@ async function pushOne(localKey: string): Promise<void> {
 
   if (localKey === "horizon_quiz_results" || localKey === "horizon_student_quiz_results") {
     await api.saveQuizResults(value as Record<string, ModuleQuizResult>);
+    return;
+  }
+
+  if (isTradingPlanKey(localKey)) {
+    await api.saveTradingPlan(value as TradingPlanData);
     return;
   }
 

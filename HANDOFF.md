@@ -5,23 +5,196 @@ l'a produit, ni à autre chose que ce dépôt. Lis-le en entier avant de
 toucher au code.
 
 > **État à la dernière mise à jour de ce document**
-> Branche `main`, dernier commit poussé : **`85b08df`** (« Ajoute l'alerte
-> sonore des notifications et le module Annonces »).
-> **19 fichiers modifiés, NON commités** au moment de cette mise à jour
-> (voir §0 et §3) — `npx tsc --noEmit` et `npm run build` passent sans
-> erreur. L'audit complet (bugs + failles de sécurité) demandé par
-> l'utilisateur est **terminé** à une exception près : seul #12 (fan-out
-> d'annonces synchrone, jugé hors scope à l'échelle actuelle) reste ouvert —
-> voir §0 pour le détail exact de chaque correctif.
-> Statut de déploiement Railway du dernier commit poussé non re-vérifié
-> dans cette période — à confirmer avec `railway deployment list --service
-> propdesk --json` avant de considérer `85b08df` en production.
+> Branche **`fix/audit-securite-concurrence-multi-onglets`** (PR #2 ouverte,
+> pas encore mergée), dernier commit **poussé sur cette branche** : `6b60eb4`.
+> Dernier commit poussé sur `main` : `85b08df` (« Ajoute l'alerte sonore des
+> notifications et le module Annonces »).
+> **14 fichiers modifiés, NON commités** au-dessus de `6b60eb4` sur cette
+> branche (voir §0-bis) — `npx tsc --noEmit` et `npm run build` passent sans
+> erreur, vérifié aussi sans erreur console dans le navigateur (onglet neuf).
+> Deux tours d'audit complet ont maintenant été faits. Voir §0-bis pour le
+> second (le plus récent), §0 pour le premier (déjà pour l'essentiel
+> commité dans `6b60eb4`, PR #2).
+> Statut de déploiement Railway du dernier commit poussé sur `main` non
+> re-vérifié dans cette période — à confirmer avec `railway deployment list
+> --service propdesk --json` avant de considérer quoi que ce soit en
+> production.
 > Application déployée sur **Railway**, domaine
 > `https://propdesk-academie.up.railway.app`.
 
 ---
 
-## 0. Où reprendre EXACTEMENT
+## 0-bis. Second tour d'audit (le plus récent — lire ceci EN PREMIER)
+
+Un second audit complet (bugs + failles de sécurité) a été demandé après la
+PR #2. Même méthode : 4 agents parallèles en lecture seule par zone (auth/
+sessions serveur, reste du serveur, logique client App.tsx/hooks/lib,
+composants UI), résultats compilés et priorisés, une seule vraie question de
+permission posée à l'utilisateur, tout le reste corrigé directement.
+
+`git status --short` doit renvoyer ces 14 fichiers modifiés, NON commités,
+au-dessus de `6b60eb4` sur la branche `fix/audit-securite-concurrence-multi-onglets` :
+
+```
+server/auth/exportData.ts
+server/auth/middleware.ts
+server/auth/routes.ts
+server/auth/studentCredentials.ts
+server/schemas.ts
+src/App.tsx
+src/components/CoachMessaging.tsx
+src/components/MindsetJournalModal.tsx
+src/components/PositionCalculatorModal.tsx
+src/components/WalletManagement.tsx
+src/hooks/usePersistentState.ts
+src/lib/pendingChanges.ts
+src/lib/performanceStats.ts
+src/lib/planCompliance.ts
+```
+
+`npx tsc --noEmit` ET `npm run build` passent sans erreur. Vérifié aussi en
+navigateur (onglet neuf, aucune erreur console) — un onglet resté ouvert
+depuis une session de test antérieure peut afficher une fausse alerte React
+"hooks order changed" au rechargement : c'est un artefact HMR/Vite d'un
+ancien module, pas un vrai bug (confirmé en ouvrant un onglet neuf).
+
+### Corrigé dans ce second tour
+
+1. **Critique — Setups et Plan de trading absents du registre
+   `pendingChanges`** (`src/lib/pendingChanges.ts`) : `markPending()`
+   ignorait silencieusement toute modification hors ligne (ou après échec
+   réseau) de ces deux collections — jamais signalée dans
+   `PendingChangesBanner`, jamais protégée par `resolveStudentValue`
+   (`src/App.tsx`), donc écrasée sans avertissement au rechargement
+   suivant. Ajout de `horizon_setups`/`horizon_student_setups` dans
+   `LABELS`/`COLLECTION_BY_KEY`, et reconnaissance par préfixe des clés de
+   plan namespacées par email (`isTradingPlanKey`, `BASE_STORAGE_KEY`
+   maintenant exporté depuis `src/lib/planCompliance.ts`).
+2. **Élevée — `POST /api/auth/staff` sans `requireOwner`** (permission
+   validée explicitement par l'utilisateur : réserver au fondateur).
+   `server/auth/routes.ts:467`. Cohérent maintenant avec `DELETE
+   /staff/:id`, déjà verrouillé. Avant ce correctif, n'importe quel coach
+   invité pouvait créer un nombre illimité de comptes staff à pleins droits.
+3. **Élevée — Règle "perte quotidienne max" du plan de trading basée sur un
+   capital figé côté staff** (`src/App.tsx`, `AcademyApp.applyPlanCompliance`) :
+   utilisait `student.startingCapital` (jamais mis à jour depuis que le
+   capital vient des comptes réels) au lieu de `displayStudent.startingCapital`
+   (dérivé). La règle était silencieusement cassée pour tout trade saisi
+   depuis le bureau staff.
+4. **Élevée — Incohérence de fuseau horaire entre Rentabilité et l'alerte
+   de plan** (`src/lib/performanceStats.ts`, `getSessionLabel`) : traitait
+   l'heure saisie comme déjà en UTC, alors que `checkPlanViolations`
+   (`planCompliance.ts`) convertit correctement via l'heure locale du
+   navigateur puis `getUTCHours()`. Un même trade pouvait être classé dans
+   deux sessions différentes selon l'écran, pour tout utilisateur hors UTC.
+   `getSessionLabel` suit maintenant la même conversion.
+5. **Moyenne — `usePersistentState` écrasait la valeur namespacée existante
+   au premier changement de clé** (`src/hooks/usePersistentState.ts`) :
+   `readBadgeNotificationIds` (`src/App.tsx`) se monte avec une clé
+   générique avant que `student.email` soit connu (chargement async), puis
+   change de clé — sans détection de ce changement, la valeur en mémoire
+   (périmée) était réécrite sous la NOUVELLE clé, écrasant les vraies
+   données déjà namespacées d'un élève sur un poste partagé. Corrigé via un
+   `keyRef` qui relit explicitement au changement de clé.
+6. **Moyenne — `setState` imbriqué dans `handleClaimBadge` (staff)** :
+   `setNotifications` appelé depuis l'intérieur de l'updater de `setBadges`
+   — impureté détectée par le double-invoke StrictMode (deux notifications
+   en dev, sans impact en prod). Notification calculée avant `setBadges`,
+   comme le fait déjà l'équivalent élève.
+7. **Moyenne — Échec d'envoi de message coach silencieux**
+   (`src/components/CoachMessaging.tsx`) : `catch` ne faisait que
+   `console.error`, aucun retour visible à l'élève. Ajout d'un état
+   `sendError` affiché sous le composeur.
+8. **Faible — `containsDangerousUrlScheme` fail-open au-delà de la
+   profondeur max** (`server/schemas.ts`) : retournait `false`
+   (sûr/accepté) au lieu de `true` (dangereux/rejeté) passé 10 niveaux
+   d'imbrication — un faux négatif silencieux. Inversé en fail-CLOSED.
+9. **Faible — Jetons de reset de mot de passe élève non invalidés à la
+   régénération** (`server/auth/studentCredentials.ts`,
+   `createPasswordResetToken`) : un ancien lien restait utilisable même
+   après l'émission d'un nouveau. Les jetons encore valides du compte sont
+   maintenant supprimés avant d'en émettre un nouveau.
+10. **Faible — `/auth/login/2fa` absent de `PUBLIC_PATHS`**
+    (`server/auth/middleware.ts`) : ne fonctionnait que grâce à l'ordre de
+    montage des routeurs, sans le filet de sécurité prévu pour ce cas.
+    Ajouté à la liste blanche.
+11. **Faible — `GET /auth/export` sans rate-limit dédié**
+    (`server/auth/exportData.ts`) : seule route protégée du module auth
+    sans limite propre. Ajouté (20/15min), cohérent avec le reste du
+    projet.
+12. **Faible — Champs de risque (`%`) du formulaire de compte sans
+    contrainte positive** (`src/components/WalletManagement.tsx`) :
+    `parseFloat(...) || défaut` ne bloque pas une valeur négative (`-5 ||
+    10` reste `-5`), faussant silencieusement les barres de progression de
+    risque. `min="0.1"` ajouté aux 3 champs + validation stricte
+    (`positiveOrDefault`) à la création.
+13. **Faible — Bouton "Appliquer au Journal" actif même à division nulle**
+    (`src/components/PositionCalculatorModal.tsx`) : entrée = stop poussait
+    silencieusement des zéros (lot, R:R) dans le Journal. Bouton désactivé
+    dans ce cas, avec message explicatif.
+14. **Faible — Fuite d'`AudioContext` + échec silencieux de sauvegarde**
+    (`src/components/MindsetJournalModal.tsx`) : chaque son joué laissait
+    son `AudioContext` ouvert indéfiniment (limite navigateur ~6, son
+    silencieusement cassé au-delà) ; un échec `localStorage.setItem` fermait
+    quand même la modale sans avertir l'élève que son check-in n'était pas
+    enregistré. Les deux corrigés.
+
+### PAS traité, décisions/limitations assumées (documentées, pas des oublis)
+
+- **DoS de verrouillage de compte par email connu**
+  (`server/auth/loginLockout.ts`) : le verrouillage est indexé sur
+  `(kind, email_lower)`, pas sur l'IP — c'est un choix **délibéré et déjà
+  documenté dans le code** pour empêcher un attaquant réparti sur plusieurs
+  IP de contourner la protection anti-credential-stuffing en ciblant un
+  seul compte. La contrepartie inhérente (quelqu'un qui connaît un email
+  peut verrouiller ce compte 15 min à la fois, indéfiniment) n'a pas de
+  correctif "gratuit" sans ajouter de l'infrastructure (CAPTCHA,
+  déverrouillage admin, notification par email) — à discuter comme un vrai
+  arbitrage produit si ça devient un problème concret, pas une simple
+  correction de bug.
+- **Score du quiz rapide de leçon (VideoAcademy) jamais persisté** — à la
+  différence du Quiz de Module (noté, seuil 70%, sauvegardé via
+  `onSaveModuleQuizResult`, contribue à la progression), le petit quiz par
+  leçon (`activeLessonQuizModal`) n'a aucun callback de sauvegarde : il
+  semble être un outil de vérification rapide à faible enjeu, pas une
+  évaluation formelle. Le corriger proprement demanderait un nouveau champ
+  sur `Lesson`, un schéma serveur, une route, et un branchement dans les
+  deux shells — une vraie extension de fonctionnalité, pas une simple
+  correction. À clarifier avec l'utilisateur si un suivi de ce quiz est
+  réellement voulu avant de construire cette infrastructure.
+- **Coût scrypt et threadpool partagé** (`server/auth/password.ts`) —
+  trade-off déjà assumé et documenté dans une période antérieure.
+- Plusieurs constats "Faible" jugés non actionnables ou hors scope :
+  `UserProfileModal`/`Announcements` — l'URL d'avatar/image est **déjà**
+  validée côté serveur (`isSafeMediaUrl` sur `profileSchema`/
+  `announcementSchema`), l'absence de validation client immédiate est une
+  UX à améliorer, pas une faille ; `TwoFactorSetupModal` — l'URI
+  `otpauth://` est construite serveur à partir du propre email du compte,
+  risque quasi nul ; `updateCollectionItem` (`server/repositories.ts`) —
+  n'échoue pas silencieusement en pratique (les 3 appelants actuels
+  vérifient déjà l'existence de la ligne en amont), fragile pour un futur
+  appelant seulement ; `WalletManagement.accountNumber` via `Math.random()`
+  — cosmétique, pas un identifiant de sécurité ; `AdminStudentView` sans
+  garde anti-concurrence — théorique, non exploitable tant que le composant
+  démonte à chaque changement d'élève ; `TradingJournal.handleFormSubmit`/
+  `SetupManagement` "fire-and-forget" — **pas un bug** : conforme au design
+  optimiste de l'app (état local mis à jour immédiatement, échec de sync
+  serveur signalé séparément et de façon asynchrone par
+  `SyncErrorBanner`/`markPending`) ; CSP `img-src https:` large — marge de
+  durcissement, aucun vecteur actif identifié aujourd'hui ; lien "mot de
+  passe oublié" de `LoginScreen` pointant vers le README — UX, pas un bug.
+
+**Prochaine étape immédiate concrète** : committer ces 14 fichiers (un ou
+plusieurs commits par thème, à l'appréciation de qui reprend), sur la
+branche `fix/audit-securite-concurrence-multi-onglets` (PR #2 déjà ouverte)
+— seulement sur demande explicite de l'utilisateur, comme toujours. Puis,
+si l'utilisateur veut aller plus loin : décider du sort du DoS de
+verrouillage de compte et du quiz de leçon non persisté (les deux points
+ci-dessus qui restent de vrais arbitrages produit, pas des bugs oubliés).
+
+---
+
+## 0. Premier tour d'audit (déjà commité dans `6b60eb4`, PR #2)
 
 **Chantier quasi terminé, répertoire NON propre.** Un audit complet du
 projet (bugs + failles de sécurité, demandé explicitement par l'utilisateur,

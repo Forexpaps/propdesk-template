@@ -1406,36 +1406,42 @@ function AcademyApp({
     setSetups((prev) => prev.filter((s) => s.id !== id));
   };
 
+  // La notification est calculée AVANT `setBadges`, jamais depuis l'intérieur
+  // de son updater : StrictMode double-invoque les updaters en développement
+  // pour détecter les impuretés, et un `setNotifications` imbriqué produisait
+  // deux notifications "Badge débloqué" au lieu d'une (sans impact en
+  // production, mais une vraie impureté — l'équivalent élève,
+  // `StudentAuthenticatedApp.handleClaimBadge`, ne l'avait pas).
   const handleClaimBadge = (badgeId: string) => {
+    const badge = badges.find((b) => b.id === badgeId);
+    if (!badge) return;
+
     setBadges((prevBadges) =>
-      prevBadges.map((b) => {
-        if (b.id === badgeId) {
-          const unlockedBadge = {
-            ...b,
-            unlocked: true,
-            progressPercentage: 100,
-            unlockedAt: new Date().toLocaleDateString("fr-FR", {
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            }),
-          };
-
-          const newNotif: AppNotification = {
-            id: `notif-badge-${Date.now()}`,
-            title: "🏆 Nouveau Badge Débloqué !",
-            message: `Félicitations ! Tu as débloqué le badge "${b.title}" et gagné +${b.rewardXP || 200} XP !`,
-            time: "À l'instant",
-            type: "system",
-            read: false,
-          };
-          setNotifications((prev) => [newNotif, ...prev]);
-
-          return unlockedBadge;
-        }
-        return b;
-      })
+      prevBadges.map((b) =>
+        b.id === badgeId
+          ? {
+              ...b,
+              unlocked: true,
+              progressPercentage: 100,
+              unlockedAt: new Date().toLocaleDateString("fr-FR", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              }),
+            }
+          : b
+      )
     );
+
+    const newNotif: AppNotification = {
+      id: `notif-badge-${Date.now()}`,
+      title: "🏆 Nouveau Badge Débloqué !",
+      message: `Félicitations ! Tu as débloqué le badge "${badge.title}" et gagné +${badge.rewardXP || 200} XP !`,
+      time: "À l'instant",
+      type: "system",
+      read: false,
+    };
+    setNotifications((prev) => [newNotif, ...prev]);
   };
 
   // Accounts Handlers
@@ -1523,7 +1529,12 @@ function AcademyApp({
     const plan = plans.find((p) => p.id === trade.tradingPlanId);
     if (!plan) return;
     const sameDayTrades = allTrades.filter((t) => t.date === trade.date);
-    const reasons = checkPlanViolations(trade, sameDayTrades, plan, student.startingCapital);
+    // `displayStudent.startingCapital`, pas `student.startingCapital` : ce
+    // dernier n'est plus jamais tenu à jour depuis que le capital affiché
+    // vient des comptes réels (voir le commentaire de `displayStudent`
+    // plus haut) — l'utiliser ici désactivait silencieusement la règle de
+    // perte quotidienne max pour tout trade saisi depuis le bureau staff.
+    const reasons = checkPlanViolations(trade, sameDayTrades, plan, displayStudent.startingCapital);
     setNotifications((prev) => upsertPlanAlert(prev, trade, reasons));
   };
 

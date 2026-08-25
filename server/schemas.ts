@@ -62,7 +62,11 @@ const isValidInitialBalance = (value: unknown): boolean =>
  * similaire ajouté plus tard sans nouveau verrou à écrire.
  */
 function containsDangerousUrlScheme(value: unknown, depth = 0): boolean {
-  if (depth > 10) return false;
+  // Fail-CLOSED : au-delà de la profondeur maximale, on considère l'item
+  // dangereux (rejeté) plutôt que de laisser passer un faux négatif
+  // silencieux — le pire des deux comportements pour une limite de
+  // profondeur défensive.
+  if (depth > 10) return true;
   if (typeof value === "string") {
     return /^\s*(javascript|vbscript):/i.test(value) || /^\s*data:text\/html/i.test(value);
   }

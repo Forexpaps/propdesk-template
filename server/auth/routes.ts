@@ -467,6 +467,7 @@ staffRouter.get("/staff", requireStaffKind, (_req, res) => {
 staffRouter.post(
   "/staff",
   requireStaffKind,
+  requireOwner,
   createRateLimit({
     windowMs: 15 * 60_000,
     max: 10,

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { listCollection, getQuizResults, getTradingPlan } from "../repositories";
 import { buildStudentProfile, getStudentById } from "./studentCredentials";
 import { requireStudentKind } from "./middleware";
+import { createRateLimit } from "../middleware/rateLimit";
 
 /** Formes minimales lues depuis les collections — seuls les champs exportés nous intéressent ici. */
 interface LessonLike {
@@ -93,18 +94,32 @@ function collectStudentExport(studentAccountId: string): Record<string, unknown>
  * ces données appartiennent à l'élève, lui seul peut les exporter.
  */
 export function addStudentExportRoute(router: Router): void {
-  router.get("/export", requireStudentKind, (req, res) => {
-    const data = collectStudentExport(req.auth!.userId);
-    if (!data) {
-      res.status(404).json({ error: "Compte introuvable." });
-      return;
-    }
+  router.get(
+    "/export",
+    requireStudentKind,
+    // Seule route protégée du module auth sans rate-limit dédié jusqu'ici —
+    // même en lecture seule sur ses propres données, chaque appel fait
+    // plusieurs lectures SQLite (modules, quizResults, badges, plan) ; par
+    // cohérence avec le reste du projet (même les routes en lecture seule
+    // comme /students/:id/trades en ont une).
+    createRateLimit({
+      windowMs: 15 * 60_000,
+      max: 20,
+      message: "Trop de demandes d'export. Réessaie dans quelques minutes.",
+    }),
+    (req, res) => {
+      const data = collectStudentExport(req.auth!.userId);
+      if (!data) {
+        res.status(404).json({ error: "Compte introuvable." });
+        return;
+      }
 
-    res.setHeader("Content-Type", "application/json");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="propdesk-export-${new Date().toISOString().split("T")[0]}.json"`
-    );
-    res.json(data);
-  });
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="propdesk-export-${new Date().toISOString().split("T")[0]}.json"`
+      );
+      res.json(data);
+    }
+  );
 }

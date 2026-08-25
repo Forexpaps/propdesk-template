@@ -179,6 +179,16 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
       alert("Le capital initial doit être un nombre supérieur à 0.");
       return;
     }
+    // `parseFloat(...) || défaut` seul ne protège pas contre une valeur
+    // négative (`-5 || 10` reste `-5`, seul `0`/NaN retombe sur le défaut) —
+    // une valeur négative fausserait silencieusement les barres de
+    // progression de risque (`RiskProgressRow`) qui supposent un pourcentage
+    // positif. Une fonction dédiée referme ce trou en plus du cas NaN.
+    const positiveOrDefault = (raw: string, fallback: number): number => {
+      const parsed = parseFloat(raw);
+      return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+    };
+
     const initialBal = parsedBalance;
     const newAcc: TradingAccount = {
       id: `acc-${Date.now()}`,
@@ -188,9 +198,9 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
       initialBalance: initialBal,
       currentBalance: initialBal,
       equity: initialBal,
-      maxTotalDrawdownPercent: parseFloat(newAccMaxTotalDrawdown) || 10,
-      maxDailyDrawdownPercent: parseFloat(newAccMaxDailyDrawdown) || 5,
-      profitTargetPercent: parseFloat(newAccProfitTarget) || 10,
+      maxTotalDrawdownPercent: positiveOrDefault(newAccMaxTotalDrawdown, 10),
+      maxDailyDrawdownPercent: positiveOrDefault(newAccMaxDailyDrawdown, 5),
+      profitTargetPercent: positiveOrDefault(newAccProfitTarget, 10),
       startDate: new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" }),
       status: "ACTIVE",
       tradingDays: 1,
@@ -739,6 +749,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <label className="block font-medium text-slate-300 mb-1">Profit Target (%)</label>
                   <input
                     type="number"
+                    min="0.1"
                     value={newAccProfitTarget}
                     onChange={(e) => setNewAccProfitTarget(e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50 font-mono"
@@ -751,6 +762,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <label className="block font-medium text-slate-300 mb-1">Max Daily Loss (%)</label>
                   <input
                     type="number"
+                    min="0.1"
                     value={newAccMaxDailyDrawdown}
                     onChange={(e) => setNewAccMaxDailyDrawdown(e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50 font-mono"
@@ -761,6 +773,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <label className="block font-medium text-slate-300 mb-1">Max Total Drawdown (%)</label>
                   <input
                     type="number"
+                    min="0.1"
                     value={newAccMaxTotalDrawdown}
                     onChange={(e) => setNewAccMaxTotalDrawdown(e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50 font-mono"

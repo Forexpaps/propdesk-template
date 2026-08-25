@@ -236,15 +236,25 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
 
   // 7. Performance par Session de Marché
   //
-  // Approximation assumée : `Trade.time` est une chaîne "HH:MM" libre, sans
-  // fuseau horaire garanti — l'heure saisie est utilisée telle quelle.
+  // Convertie en heure UTC avant classification — même convention que
+  // `checkPlanViolations` (`src/lib/planCompliance.ts`, règle "session
+  // autorisée") et `FOREX_SESSIONS`/`isSessionActive` (`TopHeader.tsx`) : un
+  // `new Date(\`${date}T${time}\`)` sans suffixe de fuseau est interprété par
+  // JS dans le fuseau LOCAL du navigateur, puis `getUTCHours()` en tire
+  // l'heure UTC réelle. Avant ce correctif, cette fonction traitait
+  // directement le chiffre d'heure saisi comme s'il était déjà en UTC : un
+  // même trade pouvait tomber dans une session ici et dans une autre pour
+  // `checkPlanViolations`, pour tout utilisateur hors UTC (ex. France,
+  // UTC+1/+2) — Rentabilité et l'alerte de non-respect du plan racontaient
+  // alors deux histoires différentes sur la même donnée.
   // Découpage sans chevauchement (contrairement à la pastille live de
   // TopHeader.tsx, qui peut cumuler plusieurs sessions actives) pour ne
   // compter chaque trade qu'une seule fois dans ces statistiques.
-  const getSessionLabel = (time?: string): string | null => {
-    if (!time) return null;
-    const hour = parseInt(time.split(":")[0], 10);
-    if (Number.isNaN(hour)) return null;
+  const getSessionLabel = (date?: string, time?: string): string | null => {
+    if (!time || !date) return null;
+    const instant = new Date(`${date}T${time}`);
+    if (Number.isNaN(instant.getTime())) return null;
+    const hour = instant.getUTCHours();
     if (hour >= 21) return "Sydney";
     if (hour < 7) return "Tokyo";
     if (hour < 12) return "Londres";
@@ -255,7 +265,7 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   const sessionStats: Record<string, CategoryStats> = {};
   let tradesSansHeure = 0;
   trades.forEach((t) => {
-    const session = getSessionLabel(t.time);
+    const session = getSessionLabel(t.date, t.time);
     if (!session) {
       tradesSansHeure += 1;
       return;
