@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Calculator, X, Check } from "lucide-react";
 import { formatCurrency } from "../lib/format";
+import { ThousandsInput } from "./ThousandsInput";
 
 interface PositionCalculatorModalProps {
   isOpen: boolean;
@@ -47,13 +48,10 @@ const CalcCard: React.FC<{ title: string; subtitle: string; children: React.Reac
 );
 
 /**
- * Champ numérique en texte libre, jamais `type="number"` — voir le
- * commentaire de `handleDecimalChange` dans TradingJournal.tsx : un input
- * number bloque net la virgule (séparateur de milliers sur un indice comme
- * NAS100 à 20,637.50), faussant silencieusement le prix appliqué au
- * calculateur puis au Ratio R:R. La virgule est donc retirée (séparateur de
- * milliers) plutôt que convertie en décimale ; le point reste la seule
- * décimale valide, comme sur une plateforme de trading.
+ * Champ numérique avec regroupement par milliers affiché en direct — jamais
+ * `type="number"` : voir `ThousandsInput.tsx`. Un input number bloque net la
+ * virgule décimale sur un indice comme NAS100 à 20.637,50, faussant
+ * silencieusement le prix appliqué au calculateur puis au Ratio R:R.
  */
 const FieldInput: React.FC<{
   label: string;
@@ -62,15 +60,9 @@ const FieldInput: React.FC<{
 }> = ({ label, value, onChange }) => (
   <div>
     <label className="block text-[10px] text-slate-500 mb-1 font-sans">{label}</label>
-    <input
-      type="text"
-      inputMode="decimal"
+    <ThousandsInput
       value={value}
-      onChange={(e) => {
-        const normalized = e.target.value.replace(/,/g, "");
-        if (!/^\d*\.?\d*$/.test(normalized)) return;
-        onChange(normalized);
-      }}
+      onChange={onChange}
       className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white text-sm font-mono font-bold focus:outline-none focus:border-[#00E676]"
     />
   </div>

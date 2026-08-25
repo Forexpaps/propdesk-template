@@ -32,6 +32,7 @@ import {
 import { formatCurrency } from "../lib/format";
 import { resizeChartScreenshot } from "../lib/image";
 import { computeJournalSummary } from "../lib/performanceStats";
+import { ThousandsInput } from "./ThousandsInput";
 
 /** Valeur du sélecteur de compte quand aucun n'est choisi. */
 const SANS_COMPTE = "";
@@ -436,29 +437,26 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   };
 
   /**
-   * Champs prix/PnL saisis en texte libre, jamais en `type="number"` : un
-   * input number renvoie une `value` DOM vide dès que son contenu n'est pas
-   * un nombre valide pour le *locale* du navigateur (virgule au lieu du
+   * PnL et taille de lot saisis en texte libre, jamais en `type="number"` :
+   * un input number renvoie une `value` DOM vide dès que son contenu n'est
+   * pas un nombre valide pour le *locale* du navigateur (virgule au lieu du
    * point, point superflu, "0" qu'on essaie d'effacer pour retaper devant).
    * Le champ contrôlé réaffichait alors aussitôt "0", effaçant la saisie en
    * cours. Ici, la valeur reste une chaîne pendant toute la frappe (virgule
    * convertie en point) et n'est convertie en nombre qu'à la soumission.
+   *
+   * Les 4 champs de prix (entrée/SL/TP/sortie) n'utilisent plus cette
+   * fonction — voir `ThousandsInput.tsx` : sur les indices, le point de
+   * milliers s'affiche automatiquement pendant la frappe, la virgule
+   * décimale devant rester visible telle quelle, pas juste convertie en
+   * point puis affichée comme tel.
    */
   const handleDecimalChange = (
-    field: "entryPrice" | "stopLoss" | "takeProfit" | "exitPrice" | "lotSize" | "pnl",
+    field: "lotSize" | "pnl",
     raw: string,
     { allowNegative = false }: { allowNegative?: boolean } = {},
   ) => {
-    // Les prix (entrée/SL/TP/sortie) sur les indices ou actifs à forte valeur
-    // s'affichent avec un séparateur de milliers sur la plupart des
-    // plateformes (ex: NAS100 à 20,637.50) : la virgule y est donc retirée
-    // plutôt que convertie en point décimal, sous peine de fabriquer un
-    // second point ("20.637.50") rejeté par la validation ci-dessous. Le
-    // PnL et la taille de lot restent en convention française : une seule
-    // virgule tapée y vaut décimale.
-    const isPriceField =
-      field === "entryPrice" || field === "stopLoss" || field === "takeProfit" || field === "exitPrice";
-    const normalized = isPriceField ? raw.replace(/,/g, "") : raw.replace(",", ".");
+    const normalized = raw.replace(",", ".");
     const pattern = allowNegative ? /^-?\d*\.?\d*$/ : /^\d*\.?\d*$/;
     if (!pattern.test(normalized)) return;
     setFormData((prev) => ({ ...prev, [field]: normalized }));
@@ -1029,11 +1027,9 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Prix d'Entrée</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
+                  <ThousandsInput
                     value={formData.entryPrice}
-                    onChange={(e) => handleDecimalChange("entryPrice", e.target.value)}
+                    onChange={(v) => setFormData((prev) => ({ ...prev, entryPrice: v }))}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
@@ -1041,11 +1037,9 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Stop Loss</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
+                  <ThousandsInput
                     value={formData.stopLoss}
-                    onChange={(e) => handleDecimalChange("stopLoss", e.target.value)}
+                    onChange={(v) => setFormData((prev) => ({ ...prev, stopLoss: v }))}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
@@ -1053,11 +1047,9 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Take Profit</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
+                  <ThousandsInput
                     value={formData.takeProfit}
-                    onChange={(e) => handleDecimalChange("takeProfit", e.target.value)}
+                    onChange={(v) => setFormData((prev) => ({ ...prev, takeProfit: v }))}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
@@ -1066,19 +1058,18 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
               {formData.marketCategory === "Indices" && (
                 <p className="text-[10px] text-slate-500 -mt-2 leading-snug">
-                  Sur les indices, la virgule sert de séparateur de milliers : tape par exemple{" "}
-                  <span className="font-mono text-slate-400">20,637.50</span>.
+                  Sur les indices, tape directement les chiffres — le point de milliers s'affiche
+                  tout seul, la virgule reste la décimale : ça donne{" "}
+                  <span className="font-mono text-slate-400">20.637,50</span>.
                 </p>
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Prix de Sortie (si fermé)</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
+                  <ThousandsInput
                     value={formData.exitPrice}
-                    onChange={(e) => handleDecimalChange("exitPrice", e.target.value)}
+                    onChange={(v) => setFormData((prev) => ({ ...prev, exitPrice: v }))}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                   />
                 </div>
