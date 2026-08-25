@@ -1,4 +1,5 @@
 import { Trade, TradingAccount } from "../types";
+import { isRealizedDollarTrade } from "./performanceStats";
 
 /**
  * Calculs purs de portefeuille, extraits de `WalletManagement.tsx` où ils
@@ -45,9 +46,7 @@ export function dailyLossPercent(trades: Trade[], account: TradingAccount): numb
   if (account.initialBalance <= 0) return 0;
   const today = todayLocalISODate();
   const pnlToday = trades
-    .filter(
-      (t) => t.accountId === account.id && t.date === today && (t.pnlUnit ?? "USD") !== "PERCENT"
-    )
+    .filter((t) => t.accountId === account.id && t.date === today && isRealizedDollarTrade(t))
     .reduce((sum, t) => sum + t.pnl, 0);
   return (pnlToday / account.initialBalance) * 100;
 }
@@ -61,7 +60,9 @@ export function totalDrawdownPercent(account: TradingAccount): number {
 /**
  * Recalcule le solde de chaque compte à partir des trades qui lui sont
  * rattachés : `equity = capital initial + somme des PnL des trades liés`
- * (en dollars uniquement — un trade en % n'est pas une somme d'argent).
+ * (en dollars et clôturés uniquement — voir `isRealizedDollarTrade` : un
+ * trade en % n'est pas une somme d'argent, une position encore ouverte n'a
+ * rien de réalisé à ajouter au solde du compte).
  *
  * Un compte sans trade rattaché garde son solde tel quel — retirer le
  * dernier trade lié à un compte ne doit pas silencieusement remettre son
@@ -81,9 +82,7 @@ export function syncAccountsWithTrades(
     const linkedTrades = trades.filter((t) => t.accountId === acc.id);
     if (linkedTrades.length === 0) return acc;
 
-    const pnl = linkedTrades
-      .filter((t) => (t.pnlUnit ?? "USD") !== "PERCENT")
-      .reduce((sum, t) => sum + t.pnl, 0);
+    const pnl = linkedTrades.filter(isRealizedDollarTrade).reduce((sum, t) => sum + t.pnl, 0);
     const newBalance = acc.initialBalance + pnl;
 
     if (acc.equity === newBalance && acc.currentBalance === newBalance) return acc;

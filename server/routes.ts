@@ -8,8 +8,10 @@ import {
   replaceQuizResults,
   getTradingPlan,
   getAnnouncements,
+  getCollectionVersion,
   COLLECTION_NAMES,
   CollectionOwnershipConflictError,
+  CollectionVersionConflictError,
   type CollectionName,
 } from "./repositories";
 import { isBootstrapped, writeFullState, seedDemoData } from "./seed";
@@ -264,6 +266,13 @@ api.get("/state", (req, res) => {
       collections: Object.fromEntries(
         [...STUDENT_ALLOWED_COLLECTIONS].map((name) => [name, listCollection(name, dataUserId)])
       ),
+      // Version actuelle de chaque collection modifiable par l'élève —
+      // renvoyée avec la collection elle-même pour que `PUT
+      // /collections/:name` puisse détecter qu'un autre onglet l'a modifiée
+      // entre-temps (voir `CollectionVersionConflictError`).
+      versions: Object.fromEntries(
+        [...STUDENT_ALLOWED_COLLECTIONS].map((name) => [name, getCollectionVersion(name, dataUserId)])
+      ),
     });
     return;
   }
@@ -291,6 +300,9 @@ api.get("/state", (req, res) => {
     quizResults: getQuizResults(dataUserId),
     announcements: getAnnouncements() ?? [],
     collections,
+    versions: Object.fromEntries(
+      COLLECTION_NAMES.map((name) => [name, getCollectionVersion(name, dataUserId)])
+    ),
   });
 });
 
@@ -314,8 +326,17 @@ const collectionsRateLimit = createRateLimit({
 function writeCollectionForAuth(
   auth: AuthContext,
   name: CollectionName,
-  rawPayload: unknown
-): { ok: true; count: number } | { ok: false; status: number; error: string } {
+  rawPayload: unknown,
+  /**
+   * Version lue par l'appelant à son dernier chargement — `undefined`
+   * désactive la vérification (restauration de sauvegarde : toujours
+   * autoritaire, jamais un client concurrent). Fournie par
+   * `PUT /collections/:name`, chemin normal d'un client vivant qui peut
+   * avoir un autre onglet ouvert sur le même bureau — voir
+   * `CollectionVersionConflictError`, `server/repositories.ts`.
+   */
+  expectedVersion?: number
+): { ok: true; count: number; version: number } | { ok: false; status: number; error: string } {
   // Une session élève ne touche jamais qu'à son propre Journal — ni les
   // collections du bureau staff, ni celles d'un autre élève.
   if (auth.kind === "student" && !STUDENT_ALLOWED_COLLECTIONS.has(name)) {
@@ -386,8 +407,9 @@ function writeCollectionForAuth(
     ) as typeof parsed.data;
   }
 
+  let newVersion: number;
   try {
-    replaceCollection(name, dataToWrite, auth.dataUserId);
+    newVersion = replaceCollection(name, dataToWrite, auth.dataUserId, expectedVersion);
   } catch (err) {
     if (err instanceof CollectionOwnershipConflictError) {
       // Un ou plusieurs `id` soumis appartiennent déjà à un autre bureau
@@ -400,9 +422,21 @@ function writeCollectionForAuth(
         error: "Conflit de synchronisation : recharge la page et réessaie.",
       };
     }
+    if (err instanceof CollectionVersionConflictError) {
+      // Un autre onglet (ou un autre coach sur le même bureau partagé) a
+      // écrit cette collection entre le chargement de CETTE session et
+      // maintenant — rien n'a été écrit, pour ne pas écraser cette autre
+      // modification. Même message que le conflit d'id ci-dessus : dans les
+      // deux cas, la seule action correcte est de recharger.
+      return {
+        ok: false,
+        status: 409,
+        error: "Conflit de synchronisation : recharge la page et réessaie.",
+      };
+    }
     throw err;
   }
-  return { ok: true, count: dataToWrite.length };
+  return { ok: true, count: dataToWrite.length, version: newVersion };
 }
 
 api.put("/collections/:name", collectionsRateLimit, (req, res) => {
@@ -412,12 +446,22 @@ api.put("/collections/:name", collectionsRateLimit, (req, res) => {
     return;
   }
 
-  const result = writeCollectionForAuth(req.auth!, name, req.body);
+  // Corps `{ items, version }` — `version` est la valeur renvoyée par le
+  // dernier `GET /state` ou la dernière écriture réussie pour cette
+  // collection (voir `versions` dans la réponse de bootstrap plus bas, et
+  // `useSyncedState`/`api.ts` côté client). Absente ou non numérique :
+  // traitée comme "pas de vérification demandée" plutôt que rejetée, pour
+  // ne pas casser un appel direct à l'API qui ignorerait ce détail.
+  const body = req.body as { items?: unknown; version?: unknown };
+  const items = body && typeof body === "object" && "items" in body ? body.items : req.body;
+  const version = typeof body?.version === "number" ? body.version : undefined;
+
+  const result = writeCollectionForAuth(req.auth!, name, items, version);
   if (!result.ok) {
     res.status(result.status).json({ error: result.error });
     return;
   }
-  res.json({ success: true, count: result.count });
+  res.json({ success: true, count: result.count, version: result.version });
 });
 
 const profileRateLimit = createRateLimit({
@@ -649,12 +693,22 @@ api.post("/state/restore", stateRestoreRateLimit, (req, res) => {
  * contraintes SQLite, chemins de fichiers, paramètres cryptographiques.
  */
 export const apiErrorHandler = (
-  err: Error,
+  err: Error & { status?: number; statusCode?: number },
   _req: Request,
   res: Response,
   _next: NextFunction
 ) => {
   console.error("Erreur API:", err);
+
+  // body-parser (corps JSON trop volumineux ou malformé) attache un vrai
+  // code HTTP à l'erreur — sans ce cas, un simple dépassement de taille (ex.
+  // upload d'image trop grosse) remontait en 500 "Erreur serveur.", un
+  // message trompeur pour un problème purement côté requête.
+  const status = err.status ?? err.statusCode;
+  if (status && status >= 400 && status < 500) {
+    res.status(status).json({ error: status === 413 ? "Fichier trop volumineux." : "Requête invalide." });
+    return;
+  }
 
   const body: { error: string; details?: string } = { error: "Erreur serveur." };
   if (process.env.NODE_ENV !== "production") body.details = err.message;

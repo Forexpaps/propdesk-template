@@ -72,6 +72,12 @@ export interface ServerState {
    * staff) de `GET /api/state`.
    */
   announcements?: Announcement[];
+  /**
+   * Version actuelle de chaque collection modifiable, pour détecter qu'un
+   * autre onglet (ou un autre coach sur le même bureau partagé) l'a modifiée
+   * entre-temps — voir le commentaire au-dessus de `saveCollection`.
+   */
+  versions?: Partial<Record<CollectionName, number>>;
 }
 
 /** État d'authentification renvoyé par `/api/auth/me`. */
@@ -202,14 +208,34 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export const api = {
-  fetchState: () => request<ServerState>("/api/state"),
+/**
+ * Dernière version connue de chaque collection, tenue à jour par
+ * `fetchState` et par chaque `saveCollection` réussi — jamais exposée en
+ * dehors de ce module. Sert de verrouillage optimiste transparent : les
+ * appelants (`useSyncedState`, `App.tsx`) n'ont rien à savoir des versions,
+ * seul `saveCollection` en a besoin pour que le serveur puisse détecter
+ * qu'un AUTRE onglet (ou un autre coach sur le même bureau partagé) a écrit
+ * cette collection entre-temps, et refuser plutôt qu'écraser en silence —
+ * voir le commentaire de `collection_versions` (server/db.ts).
+ */
+const collectionVersions: Partial<Record<CollectionName, number>> = {};
 
-  saveCollection: <K extends CollectionName>(name: K, items: ServerCollections[K]) =>
-    request<{ success: true }>(`/api/collections/${name}`, {
+export const api = {
+  fetchState: async () => {
+    const state = await request<ServerState>("/api/state");
+    if (state.versions) Object.assign(collectionVersions, state.versions);
+    return state;
+  },
+
+  saveCollection: async <K extends CollectionName>(name: K, items: ServerCollections[K]) => {
+    const version = collectionVersions[name];
+    const result = await request<{ success: true; version?: number }>(`/api/collections/${name}`, {
       method: "PUT",
-      body: JSON.stringify(items),
-    }),
+      body: JSON.stringify({ items, version }),
+    });
+    if (typeof result.version === "number") collectionVersions[name] = result.version;
+    return result;
+  },
 
   saveProfile: (student: StudentProfile) =>
     request<{ success: true }>("/api/profile", {

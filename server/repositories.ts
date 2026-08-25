@@ -40,6 +40,27 @@ export class CollectionOwnershipConflictError extends Error {
   }
 }
 
+/**
+ * Levée par `replaceCollection` quand `expectedVersion` ne correspond plus à
+ * la version en base — quelqu'un d'autre (un autre onglet, un autre coach
+ * sur le même bureau partagé) a écrit cette collection entre-temps. Voir le
+ * commentaire de `collection_versions` (server/db.ts).
+ */
+export class CollectionVersionConflictError extends Error {
+  constructor(public readonly currentVersion: number) {
+    super("La collection a été modifiée entre-temps par quelqu'un d'autre.");
+    this.name = "CollectionVersionConflictError";
+  }
+}
+
+/** Version actuelle d'une collection pour un utilisateur — `0` si jamais écrite. */
+export function getCollectionVersion(name: CollectionName, userId: string = DEFAULT_USER_ID): number {
+  const row = db
+    .prepare("SELECT version FROM collection_versions WHERE user_id = ? AND name = ?")
+    .get(userId, name) as { version: number } | undefined;
+  return row?.version ?? 0;
+}
+
 /** Colonnes promues hors du payload, par collection. */
 const PROMOTED: Partial<Record<CollectionName, string[]>> = {
   trades: ["date", "pair", "direction", "result", "pnl"],
@@ -97,8 +118,17 @@ export function listCollection<T extends WithId>(
 export function replaceCollection<T extends WithId>(
   name: CollectionName,
   items: T[],
-  userId: string = DEFAULT_USER_ID
-): void {
+  userId: string = DEFAULT_USER_ID,
+  /**
+   * Version lue par l'appelant au dernier chargement — `undefined` désactive
+   * la vérification (chemins internes non exposés à un client concurrent :
+   * seed, import, restore). Fournie, l'écriture est refusée
+   * (`CollectionVersionConflictError`) si elle ne correspond plus à la
+   * version actuelle en base, plutôt que d'écraser une modification faite
+   * entre-temps par un autre onglet/coach.
+   */
+  expectedVersion?: number
+): number {
   const table = TABLES[name];
   const promoted = PROMOTED[name] ?? [];
   const columns = ["id", "user_id", "position", ...promoted, "payload"];
@@ -110,7 +140,27 @@ export function replaceCollection<T extends WithId>(
      ON CONFLICT(id) DO UPDATE SET position = excluded.position, ${updateSet}`
   );
 
+  const versionRow = db.prepare(
+    `INSERT INTO collection_versions (user_id, name, version) VALUES (?, ?, 1)
+     ON CONFLICT(user_id, name) DO UPDATE SET version = version + 1
+     RETURNING version`
+  );
+
   const run = db.transaction((rows: T[]) => {
+    // Vérifiée EN PREMIER, dans la même transaction que l'écriture : sans
+    // cette atomicité, deux requêtes pourraient toutes les deux lire la même
+    // version périmée avant qu'aucune n'ait eu la chance d'écrire, et
+    // écraser quand même l'une l'autre malgré le contrôle.
+    if (expectedVersion !== undefined) {
+      const current = db
+        .prepare("SELECT version FROM collection_versions WHERE user_id = ? AND name = ?")
+        .get(userId, name) as { version: number } | undefined;
+      const currentVersion = current?.version ?? 0;
+      if (currentVersion !== expectedVersion) {
+        throw new CollectionVersionConflictError(currentVersion);
+      }
+    }
+
     const existingIds = db
       .prepare(`SELECT id FROM ${table} WHERE user_id = ?`)
       .all(userId) as { id: string }[];
@@ -182,9 +232,12 @@ export function replaceCollection<T extends WithId>(
 
       upsert.run(...values, JSON.stringify(item));
     });
+
+    const { version: newVersion } = versionRow.get(userId, name) as { version: number };
+    return newVersion;
   });
 
-  run(items);
+  return run(items);
 }
 
 /**
@@ -217,6 +270,18 @@ export function updateCollectionItem<T extends WithId>(
     id,
     userId
   );
+
+  // Incrémente aussi la version de la collection (voir `replaceCollection`) :
+  // sans ça, un onglet qui a chargé cette collection AVANT cette écriture
+  // ciblée pousserait plus tard sa copie périmée en croyant la version
+  // toujours valide (le contrôle ne détecterait rien), effaçant cette
+  // modification faite en coulisses par une route staff (invitation, révocation,
+  // changement d'email). L'incrément force ce type de push à échouer en
+  // conflit plutôt qu'à écraser en silence.
+  db.prepare(
+    `INSERT INTO collection_versions (user_id, name, version) VALUES (?, ?, 1)
+     ON CONFLICT(user_id, name) DO UPDATE SET version = version + 1`
+  ).run(userId, name);
 }
 
 export function getProfile<T>(userId: string = DEFAULT_USER_ID): T | null {

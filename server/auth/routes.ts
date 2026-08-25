@@ -1226,7 +1226,12 @@ staffRouter.put(
           read: false,
           targetTab: "announcements",
         }));
-        replaceCollection("notifications", [...notifications, ...existing], student.userId);
+        // Plafonnée : sans ça, la collection `notifications` d'un élève actif
+        // grossirait indéfiniment au fil des annonces + alertes de plan
+        // accumulées sur des mois, jamais purgée par ailleurs (voir
+        // `MAX_STUDENT_NOTIFICATIONS` côté client, `planCompliance.ts`, pour
+        // le même plafond appliqué aux alertes de plan).
+        replaceCollection("notifications", [...notifications, ...existing].slice(0, 300), student.userId);
       }
     })();
 
