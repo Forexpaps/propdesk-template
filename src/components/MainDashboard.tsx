@@ -159,8 +159,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
               {winRate}%
             </div>
             <p className="text-xs text-slate-400">
-              {winningTrades} gagnants · {losingTrades} perdants
-              {breakevenTrades > 0 ? ` · ${breakevenTrades} BE` : ""}
+              {winningTrades} TP · {losingTrades} SL · {breakevenTrades} BE
             </p>
           </div>
         </div>

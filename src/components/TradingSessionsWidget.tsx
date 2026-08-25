@@ -8,14 +8,11 @@ import { FOREX_SESSIONS, isSessionActive, isForexMarketClosed } from "./TopHeade
  *
  * `session` référence une entrée de `FOREX_SESSIONS` (`TopHeader.tsx`,
  * horaires UTC, source unique déjà utilisée par le badge de session du
- * header et par `planCompliance.ts`) : Paris n'a pas sa propre session Forex
- * — elle partage celle de Londres, les deux places ouvrant/fermant les
- * marchés européens ensemble.
+ * header et par `planCompliance.ts`).
  */
 const CITIES: { name: string; timeZone: string; session: string }[] = [
   { name: "Sydney", timeZone: "Australia/Sydney", session: "Sydney" },
   { name: "Tokyo", timeZone: "Asia/Tokyo", session: "Tokyo" },
-  { name: "Paris", timeZone: "Europe/Paris", session: "Londres" },
   { name: "Londres", timeZone: "Europe/London", session: "Londres" },
   { name: "New York", timeZone: "America/New_York", session: "New York" },
 ];
@@ -33,7 +30,7 @@ function formatCityTime(date: Date, timeZone: string): string {
 /**
  * Horloges des grandes places de trading, avec statut ouvert/fermé en
  * direct — même logique de session que le badge "SESSION" du header
- * (`TopHeader.tsx`), affichée ici pour les 5 places plutôt qu'un seul badge
+ * (`TopHeader.tsx`), affichée ici pour les 4 places plutôt qu'un seul badge
  * texte.
  *
  * Tick chaque seconde (l'affichage inclut les secondes) : `setInterval`
@@ -52,7 +49,7 @@ export const TradingSessionsWidget: React.FC = () => {
   const hourUTC = now.getUTCHours();
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {CITIES.map((city) => {
         const sessionDef = FOREX_SESSIONS.find((s) => s.name === city.session);
         const isOpen = !marketClosed && !!sessionDef && isSessionActive(sessionDef, hourUTC);
