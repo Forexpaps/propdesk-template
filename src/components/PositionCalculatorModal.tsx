@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Calculator, X, Check } from "lucide-react";
-import { formatCurrency } from "../lib/format";
-import { ThousandsInput } from "./ThousandsInput";
+import { formatCurrency, parsePriceInput } from "../lib/format";
+import { Select } from "./Select";
 
 interface PositionCalculatorModalProps {
   isOpen: boolean;
@@ -48,10 +48,13 @@ const CalcCard: React.FC<{ title: string; subtitle: string; children: React.Reac
 );
 
 /**
- * Champ numérique avec regroupement par milliers affiché en direct — jamais
- * `type="number"` : voir `ThousandsInput.tsx`. Un input number bloque net la
- * virgule décimale sur un indice comme NAS100 à 20.637,50, faussant
- * silencieusement le prix appliqué au calculateur puis au Ratio R:R.
+ * Champ numérique en texte totalement libre — jamais `type="number"` (bloque
+ * net la virgule décimale sur un indice comme NAS100 à 20.637,50), et plus
+ * de regroupement par milliers imposé pendant la frappe non plus : un coach
+ * ou un élève doit pouvoir taper le point et la virgule où il veut, la
+ * cotation n'ayant pas la même forme d'un actif à l'autre (`parsePriceInput`,
+ * `src/lib/format.ts`, s'occupe de retrouver le bon nombre au moment du
+ * calcul, quelle que soit la convention utilisée).
  */
 const FieldInput: React.FC<{
   label: string;
@@ -60,9 +63,13 @@ const FieldInput: React.FC<{
 }> = ({ label, value, onChange }) => (
   <div>
     <label className="block text-[10px] text-slate-500 mb-1 font-sans">{label}</label>
-    <ThousandsInput
+    <input
+      type="text"
+      inputMode="decimal"
       value={value}
-      onChange={onChange}
+      onChange={(e) => {
+        if (/^[\d.,]*$/.test(e.target.value)) onChange(e.target.value);
+      }}
       className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white text-sm font-mono font-bold focus:outline-none focus:border-[#00E676]"
     />
   </div>
@@ -115,18 +122,19 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
 
   // Champs texte convertis en nombre au moment du calcul seulement — voir
   // le commentaire de `FieldInput`, la valeur reste une chaîne pendant la
-  // frappe.
-  const capitalNum = Number(capital) || 0;
-  const riskPercentNum = Number(riskPercent) || 0;
-  const entry1Num = Number(entry1) || 0;
-  const stop1Num = Number(stop1) || 0;
-  const target1Num = Number(target1) || 0;
-  const entry2Num = Number(entry2) || 0;
-  const stop2Num = Number(stop2) || 0;
-  const target2Num = Number(target2) || 0;
-  const entry4Num = Number(entry4) || 0;
-  const exit4Num = Number(exit4) || 0;
-  const units4Num = Number(units4) || 0;
+  // frappe. `parsePriceInput` (pas `Number` direct) : point et virgule sont
+  // acceptés dans n'importe quel ordre, voir son commentaire.
+  const capitalNum = parsePriceInput(capital) || 0;
+  const riskPercentNum = parsePriceInput(riskPercent) || 0;
+  const entry1Num = parsePriceInput(entry1) || 0;
+  const stop1Num = parsePriceInput(stop1) || 0;
+  const target1Num = parsePriceInput(target1) || 0;
+  const entry2Num = parsePriceInput(entry2) || 0;
+  const stop2Num = parsePriceInput(stop2) || 0;
+  const target2Num = parsePriceInput(target2) || 0;
+  const entry4Num = parsePriceInput(entry4) || 0;
+  const exit4Num = parsePriceInput(exit4) || 0;
+  const units4Num = parsePriceInput(units4) || 0;
 
   // --- Panneau 1 : Taille de position & risque ---
   // Taille de contrat dérivée de la classe d'actif (plus de champ éditable —
@@ -281,14 +289,14 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
                 <FieldInput label="Taille (unités)" value={units4} onChange={setUnits4} />
                 <div>
                   <label className="block text-[10px] text-slate-500 mb-1 font-sans">Sens</label>
-                  <select
+                  <Select
                     value={direction4}
                     onChange={(e) => setDirection4(e.target.value as "LONG" | "SHORT")}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white text-sm font-mono font-bold focus:outline-none focus:border-[#00E676]"
                   >
                     <option value="LONG">Achat (long)</option>
                     <option value="SHORT">Vente (short)</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
               <div className="space-y-0">

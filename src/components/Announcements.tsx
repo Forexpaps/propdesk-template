@@ -3,6 +3,7 @@ import { Megaphone, Plus, Pin, PinOff, Trash2, Pencil, ImagePlus, Loader2, X } f
 import { Announcement, AnnouncementCategory } from "../types";
 import { resizeChartScreenshot } from "../lib/image";
 import { confirmDialog } from "../lib/confirmDialog";
+import { Select } from "./Select";
 
 interface AnnouncementsProps {
   announcements: Announcement[];
@@ -309,7 +310,7 @@ export const Announcements: React.FC<AnnouncementsProps> = ({ announcements, isO
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Catégorie</label>
-                  <select
+                  <Select
                     value={formData.category}
                     onChange={(e) =>
                       setFormData((prev) => ({ ...prev, category: e.target.value as AnnouncementCategory }))
@@ -321,7 +322,7 @@ export const Announcements: React.FC<AnnouncementsProps> = ({ announcements, isO
                         {CATEGORY_EMOJI[cat]} {cat}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
