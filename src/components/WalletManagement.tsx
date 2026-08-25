@@ -732,6 +732,14 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 </div>
               </div>
 
+              {/* `step="any"` sur les 4 champs numériques ci-dessous : sans lui,
+                  un `<input type="number">` applique un pas par défaut de 1 à
+                  partir de `min` — avec `min="0.1"`, seules 0,1 / 1,1 / 2,1…
+                  sont valides, donc une valeur aussi normale que "10" était
+                  rejetée par le navigateur ("valeur non valable"). Bug
+                  introduit en ajoutant `min` sans `step` lors d'un audit
+                  précédent, signalé par un élève qui ne pouvait plus saisir
+                  10% de Profit Target. */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-medium text-slate-300 mb-1">Capital Initial ($)</label>
@@ -739,6 +747,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     type="number"
                     required
                     min="1"
+                    step="any"
                     value={newAccBalance}
                     onChange={(e) => setNewAccBalance(e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50 font-mono"
@@ -750,6 +759,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <input
                     type="number"
                     min="0.1"
+                    step="any"
                     value={newAccProfitTarget}
                     onChange={(e) => setNewAccProfitTarget(e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50 font-mono"
@@ -763,6 +773,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <input
                     type="number"
                     min="0.1"
+                    step="any"
                     value={newAccMaxDailyDrawdown}
                     onChange={(e) => setNewAccMaxDailyDrawdown(e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50 font-mono"
@@ -774,6 +785,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   <input
                     type="number"
                     min="0.1"
+                    step="any"
                     value={newAccMaxTotalDrawdown}
                     onChange={(e) => setNewAccMaxTotalDrawdown(e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50 font-mono"
