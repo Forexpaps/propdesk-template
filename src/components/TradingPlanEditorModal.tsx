@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { ClipboardList, X, Check, Plus, Trash2 } from "lucide-react";
+import { ClipboardList, X, Check, Plus, Trash2, Eye, Pencil, Clock, Target, ShieldAlert, Gauge, Repeat, TrendingDown, Sparkles } from "lucide-react";
 import { TradingPlan, TradingPlanData, Setup } from "../types";
 import { getTradingPlanStorageKey, normalizeTradingPlans, createEmptyPlan } from "../lib/planCompliance";
 import { confirmDialog } from "../lib/confirmDialog";
@@ -58,6 +58,145 @@ const inputClass =
 
 const SESSIONS = ["Asie", "Londres", "New York"];
 
+/** Petite carte chiffrée (risque, nb de trades, perte max) — "—" si le champ n'a jamais été renseigné, jamais "0" qui laisserait croire à une vraie règle à 0. */
+const StatTile: React.FC<{ icon: React.ReactNode; label: string; value: string; suffix?: string }> = ({
+  icon,
+  label,
+  value,
+  suffix,
+}) => (
+  <div className="bg-[#0D1110] border border-[#1B2320] rounded-xl p-4 space-y-1">
+    <div className="flex items-center gap-1.5 text-slate-500">
+      {icon}
+      <span className="text-[10px] uppercase tracking-wide font-bold">{label}</span>
+    </div>
+    <div className="text-xl font-mono font-black text-white">
+      {value || "—"}
+      {value && suffix ? <span className="text-xs text-slate-500 font-sans font-normal ml-1">{suffix}</span> : null}
+    </div>
+  </div>
+);
+
+/** Bloc de texte libre (conditions d'entrée/arrêt, règles d'or) — placeholder discret si jamais renseigné. */
+const TextBlock: React.FC<{ icon: React.ReactNode; label: string; value: string; accent?: string }> = ({
+  icon,
+  label,
+  value,
+  accent = "text-slate-300",
+}) => (
+  <div className="bg-[#0D1110] border border-[#1B2320] rounded-xl p-4 space-y-1.5">
+    <div className={`flex items-center gap-1.5 ${accent}`}>
+      {icon}
+      <span className="text-[10px] uppercase tracking-wide font-bold">{label}</span>
+    </div>
+    {value ? (
+      <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">{value}</p>
+    ) : (
+      <p className="text-sm text-slate-600 italic">Non renseigné.</p>
+    )}
+  </div>
+);
+
+/**
+ * Aperçu en lecture seule d'un plan, en un coup d'œil — demande explicite :
+ * pouvoir consulter son plan sans passer par le formulaire d'édition à
+ * chaque fois. Reprend les mêmes données que le formulaire juste en dessous
+ * dans le fichier, mais mises en page pour la lecture (cartes, badges),
+ * jamais des champs désactivés qui resteraient visuellement un formulaire.
+ */
+const PlanApercu: React.FC<{ plan: TradingPlan; authorizedSetupNames: string[] }> = ({
+  plan,
+  authorizedSetupNames,
+}) => (
+  <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 text-sm">
+    <div>
+      <span className="text-[10px] uppercase tracking-wide font-bold text-slate-500">Plan</span>
+      <h4 className="text-lg font-black text-white">{plan.name || "Sans nom"}</h4>
+    </div>
+
+    <div>
+      <span className="block text-[10px] uppercase tracking-wide font-bold text-slate-500 mb-2">
+        Sessions autorisées
+      </span>
+      {plan.authorizedSessions.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {plan.authorizedSessions.map((session) => (
+            <span
+              key={session}
+              className="px-3.5 py-1.5 rounded-lg border border-[#00E676] bg-[#00E676]/15 text-[#00E676] text-xs font-bold"
+            >
+              {session}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-slate-600 italic">Aucune session restreinte — toutes autorisées.</p>
+      )}
+    </div>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <TextBlock icon={<Clock className="w-3.5 h-3.5" />} label="Horaires de trading" value={plan.tradingHours} />
+      <TextBlock icon={<Target className="w-3.5 h-3.5" />} label="Actifs suivis" value={plan.trackedAssets} />
+    </div>
+
+    <div>
+      <span className="block text-[10px] uppercase tracking-wide font-bold text-slate-500 mb-2">
+        Setups autorisés
+      </span>
+      {authorizedSetupNames.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {authorizedSetupNames.map((name) => (
+            <span
+              key={name}
+              className="px-3.5 py-1.5 rounded-lg border border-[#00E676] bg-[#00E676]/15 text-[#00E676] text-xs font-bold"
+            >
+              {name}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-slate-600 italic">Aucun setup rattaché à ce plan.</p>
+      )}
+    </div>
+
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <StatTile
+        icon={<Gauge className="w-3.5 h-3.5" />}
+        label="Risque / trade"
+        value={plan.riskPerTradePercent}
+        suffix="%"
+      />
+      <StatTile
+        icon={<Repeat className="w-3.5 h-3.5" />}
+        label="Trades / jour max"
+        value={plan.maxTradesPerDay}
+      />
+      <StatTile
+        icon={<TrendingDown className="w-3.5 h-3.5" />}
+        label="Perte / jour max"
+        value={plan.maxDailyLossPercent}
+        suffix="%"
+      />
+    </div>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <TextBlock icon={<Target className="w-3.5 h-3.5" />} label="Conditions d'entrée" value={plan.entryConditions} />
+      <TextBlock
+        icon={<ShieldAlert className="w-3.5 h-3.5" />}
+        label="Conditions d'arrêt"
+        value={plan.stopConditions}
+      />
+    </div>
+
+    <TextBlock
+      icon={<Sparkles className="w-3.5 h-3.5" />}
+      label="Règles d'or / rappels"
+      value={plan.goldenRules}
+      accent="text-[#00E676]"
+    />
+  </div>
+);
+
 export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
   isOpen,
   onClose,
@@ -74,6 +213,21 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
   const [localPlans, setLocalPlans] = useState<TradingPlanData>(() => loadPlans(storageKey));
   const [showSaved, setShowSaved] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  /**
+   * "Aperçu" (lecture, mise en page en un coup d'œil) ou "Édition" (le
+   * formulaire complet) — demande explicite : pouvoir consulter son plan
+   * sans être plongé dans le formulaire d'édition à chaque ouverture. Sans
+   * objet en `readOnly` (Vue Complète du coach) : toujours un aperçu, il n'y
+   * a de toute façon rien à éditer côté staff.
+   */
+  const [mode, setMode] = useState<"apercu" | "edition">("apercu");
+
+  // Toujours "Aperçu" à l'ouverture, y compris si la précédente session dans
+  // cette modale s'était terminée en édition — évite de rouvrir en pleine
+  // saisie sur un plan qu'on voulait juste consulter.
+  useEffect(() => {
+    if (isOpen) setMode("apercu");
+  }, [isOpen]);
 
   const plans = isControlled ? (controlledPlans as TradingPlanData) : localPlans;
   const setPlans = (update: TradingPlanData | ((prev: TradingPlanData) => TradingPlanData)) => {
@@ -260,6 +414,34 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
           </button>
         </div>
 
+        {/* Aperçu / Édition — sans objet en lecture seule (Vue Complète du coach). */}
+        {!readOnly && plans.length > 0 && (
+          <div className="shrink-0 flex items-center gap-1 px-5 sm:px-6 pt-3 border-b border-[#1B2320] bg-[#111615]">
+            <button
+              type="button"
+              onClick={() => setMode("apercu")}
+              className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold border-b-2 -mb-px transition-colors ${
+                mode === "apercu"
+                  ? "border-[#00E676] text-[#00E676]"
+                  : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Eye className="w-3.5 h-3.5" /> Aperçu
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("edition")}
+              className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold border-b-2 -mb-px transition-colors ${
+                mode === "edition"
+                  ? "border-[#00E676] text-[#00E676]"
+                  : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Pencil className="w-3.5 h-3.5" /> Modifier
+            </button>
+          </div>
+        )}
+
         {plans.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 p-10 text-center">
             <p className="text-sm text-slate-400 max-w-sm">
@@ -293,7 +475,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
                   >
                     {p.name || "Sans nom"}
                   </button>
-                  {!readOnly && (
+                  {!readOnly && mode === "edition" && (
                     <button
                       onClick={() => handleDeletePlan(p.id)}
                       className="p-1.5 rounded-lg text-slate-600 hover:text-rose-400 hover:bg-[#1B2320] opacity-0 group-hover:opacity-100 transition-all shrink-0"
@@ -304,7 +486,7 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
                   )}
                 </div>
               ))}
-              {!readOnly && (
+              {!readOnly && mode === "edition" && (
                 <button
                   onClick={handleAddPlan}
                   className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-[#1B2320] text-slate-400 hover:text-[#00E676] hover:border-[#00E676]/40 text-xs font-bold shrink-0"
@@ -314,8 +496,13 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
               )}
             </div>
 
+            {/* Aperçu en lecture seule — toujours en `readOnly` (coach), sinon tant que le mode "Aperçu" est actif. */}
+            {activePlan && (readOnly || mode === "apercu") && (
+              <PlanApercu plan={activePlan} authorizedSetupNames={authorizedSetupNames} />
+            )}
+
             {/* Formulaire du plan sélectionné */}
-            {activePlan && (
+            {activePlan && !readOnly && mode === "edition" && (
               <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 text-sm">
                 <div>
                   <label className="block text-xs font-bold text-slate-300 mb-1.5">Nom du plan</label>
@@ -508,7 +695,15 @@ export const TradingPlanEditorModal: React.FC<TradingPlanEditorModalProps> = ({
           >
             Fermer
           </button>
-          {!readOnly && plans.length > 0 && (
+          {!readOnly && plans.length > 0 && mode === "apercu" && activePlan && (
+            <button
+              onClick={() => setMode("edition")}
+              className="px-5 py-2.5 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-xs shadow-lg shadow-[#00E676]/20 flex items-center gap-1.5"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Modifier ce plan
+            </button>
+          )}
+          {!readOnly && plans.length > 0 && mode === "edition" && (
             <button
               onClick={handleSaveNow}
               className="px-5 py-2.5 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-xs shadow-lg shadow-[#00E676]/20 flex items-center gap-1.5"

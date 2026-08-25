@@ -31,6 +31,7 @@ import { api, type StaffAccountSummary } from "../lib/api";
 import { confirmDialog } from "../lib/confirmDialog";
 import { AdminStudentView } from "./AdminStudentView";
 import { StudentEvolutionSection } from "./StudentEvolutionSection";
+import { Select } from "./Select";
 
 /**
  * En-tête de section — barre verticale colorée + titre, motif repris tel
@@ -105,6 +106,15 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
   const [selectedStudent, setSelectedStudent] = useState<EnrolledStudent | null>(null);
   const [isEditingFile, setIsEditingFile] = useState(false);
   const [isReadOnlyPreview, setIsReadOnlyPreview] = useState(false);
+  /**
+   * Onglet actif dans la fiche élève (édition ET lecture seule) : "Infos"
+   * (les champs de la fiche) ou "Suivi de performance" (graphique
+   * d'évolution + notes de session, `StudentEvolutionSection`) — séparés en
+   * deux onglets sur demande explicite, ce contenu vivait auparavant mélangé
+   * au reste des champs dans le même formulaire sans fil conducteur.
+   * Partagé entre les deux modales : une seule fiche ouverte à la fois.
+   */
+  const [ficheTab, setFicheTab] = useState<"infos" | "performance">("infos");
   const [isFullViewOpen, setIsFullViewOpen] = useState(false);
   const [isCreatingStudent, setIsCreatingStudent] = useState(false);
 
@@ -254,6 +264,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
 
   const handleOpenEdit = (student: EnrolledStudent) => {
     setSelectedStudent(student);
+    setFicheTab("infos");
     // Une fiche antérieure au champ n'a pas de style : on aligne l'état du
     // formulaire sur ce que le menu affiche, sinon enregistrer sans y toucher
     // laisserait la valeur vide.
@@ -301,6 +312,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
 
   const handleOpenReadOnly = (student: EnrolledStudent) => {
     setSelectedStudent(student);
+    setFicheTab("infos");
     setIsReadOnlyPreview(true);
     setRealTrades(null);
     setRealAccounts(null);
@@ -635,8 +647,35 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               </button>
             </div>
 
+            {/* Onglets : "Infos" (champs de la fiche) et "Suivi de performance"
+                (StudentEvolutionSection) — auparavant mélangés dans le même
+                formulaire sans séparation, demande explicite du fondateur. */}
+            <div className="shrink-0 flex items-center gap-1 px-6 pt-3 border-b border-[#1B2320] bg-[#111615]">
+              {(
+                [
+                  { key: "infos", label: "Infos" },
+                  { key: "performance", label: "Suivi de performance" },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setFicheTab(tab.key)}
+                  className={`px-3.5 py-2 text-xs font-bold border-b-2 -mb-px transition-colors ${
+                    ficheTab === tab.key
+                      ? "border-[#00E676] text-[#00E676]"
+                      : "border-transparent text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
             <div className="flex-1 overflow-y-auto px-6 py-5">
             <form onSubmit={handleSaveStudentFile} className="space-y-4 text-xs">
+              {ficheTab === "infos" && (
+              <>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-medium text-slate-300 mb-1">Nom Élève</label>
@@ -686,7 +725,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
 
                 <div>
                   <label className="block font-medium text-slate-300 mb-1">Coach Attribué</label>
-                  <select
+                  <Select
                     value={editForm.assignedCoach || ""}
                     onChange={(e) => setEditForm({ ...editForm, assignedCoach: e.target.value || undefined })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
@@ -697,12 +736,12 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                         {coach.name}{coach.isOwner ? " (Fondateur)" : ""}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block font-medium text-slate-300 mb-1">Statut Élève (Badge)</label>
-                  <select
+                  <Select
                     value={editForm.statusTag || "Évaluation Étape 1"}
                     onChange={(e) => setEditForm({ ...editForm, statusTag: e.target.value as StudentStatusTag })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white font-bold"
@@ -710,12 +749,12 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     {STATUS_TAGS.map((tag) => (
                       <option key={tag} value={tag}>{tag}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block font-medium text-slate-300 mb-1">Style de Trading</label>
-                  <select
+                  <Select
                     value={editForm.tradingStyle || "Intraday"}
                     onChange={(e) => setEditForm({ ...editForm, tradingStyle: e.target.value as TradingStyle })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
@@ -723,12 +762,12 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     <option value="Scalping">Scalping</option>
                     <option value="Intraday">Intraday</option>
                     <option value="Swing Trading">Swing Trading</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block font-medium text-slate-300 mb-1">Évaluation du Risque</label>
-                  <select
+                  <Select
                     value={editForm.riskStatus || "🟢 Risque Maîtrisé"}
                     onChange={(e) => setEditForm({ ...editForm, riskStatus: e.target.value as any })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
@@ -737,7 +776,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     <option value="⚠️ Attention Risk">⚠️ Attention Risk</option>
                     <option value="🔴 Sur-Risque">🔴 Sur-Risque / Danger</option>
                     <option value="🏆 Challenge Validé">🏆 Challenge Validé</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
@@ -854,7 +893,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   </div>
                   <div>
                     <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Type de Compte</label>
-                    <select
+                    <Select
                       value={editForm.initialDiagnostic?.accountType ?? ""}
                       onChange={(e) => setEditForm({
                         ...editForm,
@@ -866,7 +905,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                       {ACCOUNT_TYPES.map((t) => (
                         <option key={t} value={t}>{t}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -918,12 +957,6 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl p-3 text-white"
                 />
               </div>
-
-              {/* Suivi d'évolution : graphique + notes de session */}
-              <StudentEvolutionSection
-                sessions={editForm.coachingSessions ?? []}
-                onChange={(sessions) => setEditForm({ ...editForm, coachingSessions: sessions })}
-              />
 
               {/* Accès & connexion */}
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-xl p-4 space-y-3">
@@ -1036,6 +1069,15 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   <p className="text-[11px] text-rose-400">{accessActionError}</p>
                 )}
               </div>
+              </>
+              )}
+
+              {ficheTab === "performance" && (
+                <StudentEvolutionSection
+                  sessions={editForm.coachingSessions ?? []}
+                  onChange={(sessions) => setEditForm({ ...editForm, coachingSessions: sessions })}
+                />
+              )}
 
               <div className="flex items-center justify-between pt-4 border-t border-[#1B2320]">
                 <button
@@ -1128,7 +1170,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                 </div>
                 <div>
                   <label className="block text-slate-300 font-medium mb-1">Coach Attribué</label>
-                  <select
+                  <Select
                     value={editForm.assignedCoach || ""}
                     onChange={(e) => setEditForm({ ...editForm, assignedCoach: e.target.value || undefined })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white"
@@ -1139,11 +1181,11 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                         {coach.name}{coach.isOwner ? " (Fondateur)" : ""}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-slate-300 font-medium mb-1">Statut Élève</label>
-                  <select
+                  <Select
                     value={editForm.statusTag || "Évaluation Étape 1"}
                     onChange={(e) => setEditForm({ ...editForm, statusTag: e.target.value as StudentStatusTag })}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3 py-2 text-white font-bold"
@@ -1151,7 +1193,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                     {STATUS_TAGS.map((tag) => (
                       <option key={tag} value={tag}>{tag}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               </div>
 
@@ -1227,7 +1269,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                   </div>
                   <div>
                     <label className="block text-[10px] uppercase tracking-wide text-slate-500 mb-1">Type de Compte</label>
-                    <select
+                    <Select
                       value={editForm.initialDiagnostic?.accountType ?? ""}
                       onChange={(e) => setEditForm({
                         ...editForm,
@@ -1239,7 +1281,7 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                       {ACCOUNT_TYPES.map((t) => (
                         <option key={t} value={t}>{t}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -1380,7 +1422,33 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
             </div>
             </div>
 
+            {/* Mêmes onglets que la fiche édition ("Infos"/"Suivi de
+                performance") — voir le commentaire de `ficheTab`. */}
+            <div className="shrink-0 flex items-center gap-1 px-6 pt-3 border-b border-[#1B2320] bg-[#111615]">
+              {(
+                [
+                  { key: "infos", label: "Infos" },
+                  { key: "performance", label: "Suivi de performance" },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setFicheTab(tab.key)}
+                  className={`px-3.5 py-2 text-xs font-bold border-b-2 -mb-px transition-colors ${
+                    ficheTab === tab.key
+                      ? "border-[#00E676] text-[#00E676]"
+                      : "border-transparent text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+            {ficheTab === "infos" && (
+            <>
             {/* Accounts Section in Read-Only */}
             <div className="space-y-3">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -1516,15 +1584,6 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               )}
             </div>
 
-            {/* Suivi d'évolution : graphique + notes de session (lecture seule) */}
-            <div className="space-y-3">
-              <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                <SectionHeader />
-                Suivi d'évolution
-              </h4>
-              <StudentEvolutionSection sessions={selectedStudent.coachingSessions ?? []} />
-            </div>
-
             {/* Accès & connexion (lecture seule, aucune action sensible ici) */}
             <div className="space-y-2">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -1556,6 +1615,12 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               </span>
               <p className="text-slate-300 italic">{selectedStudent.privateCoachNotes}</p>
             </div>
+            </>
+            )}
+
+            {ficheTab === "performance" && (
+              <StudentEvolutionSection sessions={selectedStudent.coachingSessions ?? []} />
+            )}
             </div>
           </div>
         </div>
