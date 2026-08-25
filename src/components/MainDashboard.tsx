@@ -81,8 +81,14 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
 
   const totalTrades = trades.length;
   const winningTrades = trades.filter((t) => t.result === "WIN").length;
-  const losingTrades = totalTrades - winningTrades;
-  const winRate = totalTrades > 0 ? Math.round((winningTrades / totalTrades) * 100) : 0;
+  // Jamais `totalTrades - winningTrades` : ça comptait les trades encore
+  // ouverts et ceux clôturés au break-even comme "perdants", alors qu'ils ne
+  // sont ni l'un ni l'autre — voir `computeJournalSummary`,
+  // `src/lib/performanceStats.ts`, même règle appliquée là-bas.
+  const losingTrades = trades.filter((t) => t.result === "LOSS").length;
+  const breakevenTrades = trades.filter((t) => t.result === "BREAKEVEN").length;
+  const decidedTrades = winningTrades + losingTrades;
+  const winRate = decidedTrades > 0 ? Math.round((winningTrades / decidedTrades) * 100) : 0;
 
   // Equity Curve Data
   const sortedTrades = [...trades].sort(
@@ -154,6 +160,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             </div>
             <p className="text-xs text-slate-400">
               {winningTrades} gagnants · {losingTrades} perdants
+              {breakevenTrades > 0 ? ` · ${breakevenTrades} BE` : ""}
             </p>
           </div>
         </div>
