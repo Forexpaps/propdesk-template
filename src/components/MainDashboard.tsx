@@ -40,7 +40,7 @@ import {
 import { TabType, SidebarItemKey } from "./Sidebar";
 import { computeDisciplineStreak } from "../lib/badges";
 import { computeWeeklySummary } from "../lib/weeklySummary";
-import { computeJournalSummary, computePnlByPeriod } from "../lib/performanceStats";
+import { computeJournalSummary, computePnlByPeriod, isRealizedDollarTrade } from "../lib/performanceStats";
 import { TradingSessionsWidget } from "./TradingSessionsWidget";
 
 /**
@@ -77,7 +77,10 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   // Calculate Metrics
   const capitalDiff = student.currentCapital - student.startingCapital;
   const capitalDiffPercent = student.startingCapital > 0 ? ((capitalDiff / student.startingCapital) * 100).toFixed(1) : "0.0";
-  const isCapitalUp = capitalDiff > 0;
+  // `>=`, pas `>` : un capital exactement inchangé doit être traité de la
+  // même façon ici et dans `computePerformanceStats` (`src/lib/performanceStats.ts`),
+  // sinon un même compte apparaît "en hausse" sur un écran et "stable" sur l'autre.
+  const isCapitalUp = capitalDiff >= 0;
 
   const totalTrades = trades.length;
   const winningTrades = trades.filter((t) => t.result === "WIN").length;
@@ -99,17 +102,16 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   const equityData = [
     { label: "Départ", capital: student.startingCapital },
     ...sortedTrades.map((trade) => {
-      // Un trade en % n'est pas une somme d'argent : l'ajouter tel quel au
-      // capital cumulé (ex. "2.5" pour +2.5%) faussait la forme de la courbe
-      // comme s'il s'agissait de +2.5$. Même règle que `totalPnL` plus bas et
-      // que la seule autre courbe d'équité de l'app (`computePerformanceStats`,
-      // `src/lib/performanceStats.ts`) — ce fichier reste néanmoins une
-      // implémentation séparée, dupliquée pour la tuile compacte du tableau
-      // de bord. Les deux affichent désormais la vraie date du trade en
-      // abscisse (demande explicite), plus de libellés "T1"/"T2" générés.
-      const pnl = (trade.pnlUnit ?? "USD") !== "PERCENT" ? parseFloat(String(trade.pnl)) || 0 : 0;
-      if (trade.result === "WIN" || trade.result === "LOSS") {
-        tempCapital += pnl;
+      // `isRealizedDollarTrade` (partagée avec `computePerformanceStats`,
+      // `src/lib/performanceStats.ts`) : un trade en % n'est pas une somme
+      // d'argent, une position encore ouverte n'a rien de réalisé. Un trade
+      // BREAKEVEN, lui, COMPTE ici (spread/frais non nuls) — cette courbe
+      // divergeait de celle de Rentabilité tant qu'elle se limitait à
+      // WIN/LOSS. Ce fichier reste une implémentation séparée, dupliquée
+      // pour la tuile compacte du tableau de bord, mais doit rester
+      // équivalente à l'autre pour le même compte.
+      if (isRealizedDollarTrade(trade)) {
+        tempCapital += parseFloat(String(trade.pnl)) || 0;
       }
       return {
         label: trade.date,
@@ -122,11 +124,9 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
     ...(sortedTrades.length > 0 ? [{ label: "Actuel", capital: student.currentCapital }] : []),
   ];
 
-  // Trades en $ uniquement : un trade en % n'est pas une somme d'argent,
+  // Trades en $ et clôturés uniquement — voir `isRealizedDollarTrade`,
   // même principe que dans PerformanceDashboard.tsx.
-  const totalPnL = trades
-    .filter((t) => (t.pnlUnit ?? "USD") !== "PERCENT")
-    .reduce((acc, t) => acc + t.pnl, 0);
+  const totalPnL = trades.filter(isRealizedDollarTrade).reduce((acc, t) => acc + t.pnl, 0);
   const isPnLPositive = totalPnL >= 0;
 
   const disciplineStreak = computeDisciplineStreak(trades);

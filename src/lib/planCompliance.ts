@@ -1,7 +1,9 @@
 import { AppNotification, Trade, TradingPlan, TradingPlanData } from "../types";
 import { FOREX_SESSIONS, isSessionActive } from "../components/TopHeader";
+import { isRealizedDollarTrade } from "./performanceStats";
 
-const BASE_STORAGE_KEY = "horizon_trading_plan";
+/** Exportée pour `src/lib/pendingChanges.ts`, qui doit reconnaître une clé de plan namespacée par email sans connaître ce préfixe en dur. */
+export const BASE_STORAGE_KEY = "horizon_trading_plan";
 
 /** Un plan vierge, prêt pour le formulaire — `id` généré, jamais réutilisé. */
 export function createEmptyPlan(name = "Nouveau plan"): TradingPlan {
@@ -34,10 +36,38 @@ export function getTradingPlanStorageKey(storageKey?: string): string {
 }
 
 /**
+ * Ne retient un champ de `entry` que s'il a le bon type ; sinon le default de
+ * `createEmptyPlan()` est conservé. Sans ça, une entrée partiellement
+ * corrompue (ex. `authorizedSessions: null` écrit par une session antérieure
+ * en bug, ou une valeur bricolée dans `localStorage`) écraserait le default
+ * via le spread et ferait planter tout code qui suppose le type déclaré —
+ * `plan.authorizedSessions.length`, `plan.trackedAssets.trim()`, etc. — au
+ * lieu d'un simple champ vide.
+ */
+function sanitizePlanEntry(entry: Record<string, unknown>, empty: TradingPlan): TradingPlan {
+  const result = { ...empty };
+  for (const key of Object.keys(empty) as (keyof TradingPlan)[]) {
+    const value = entry[key];
+    const expected = empty[key];
+    if (Array.isArray(expected)) {
+      if (Array.isArray(value) && value.every((v) => typeof v === "string")) {
+        (result as Record<string, unknown>)[key] = value;
+      }
+    } else if (typeof expected === "string") {
+      if (typeof value === "string") {
+        (result as Record<string, unknown>)[key] = value;
+      }
+    }
+  }
+  return result;
+}
+
+/**
  * Convertit une valeur de plan brute (venue de `localStorage` ou du serveur)
  * en tableau de `TradingPlan` — quelle que soit sa forme d'origine :
  * - déjà un tableau : renvoyé tel quel, avec des defaults défensifs par
- *   entrée au cas où un champ manquerait (donnée partiellement corrompue) ;
+ *   entrée au cas où un champ manquerait ou aurait un type inattendu (donnée
+ *   partiellement corrompue, voir `sanitizePlanEntry`) ;
  * - ancien objet unique (forme d'avant le multi-plan, sans `id`/`name`) :
  *   enveloppé dans un tableau à une entrée, pour ne perdre aucune donnée déjà
  *   enregistrée ;
@@ -50,10 +80,16 @@ export function normalizeTradingPlans(raw: unknown): TradingPlan[] {
   if (Array.isArray(raw)) {
     return raw
       .filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null)
-      .map((entry) => ({ ...createEmptyPlan(), ...entry }) as TradingPlan);
+      .map((entry) => {
+        const empty = createEmptyPlan();
+        const sanitized = sanitizePlanEntry(entry, empty);
+        const id = typeof entry.id === "string" && entry.id ? entry.id : empty.id;
+        return { ...sanitized, id };
+      });
   }
   if (typeof raw === "object" && raw !== null) {
-    return [{ ...createEmptyPlan("Mon plan"), ...(raw as Record<string, unknown>), id: "legacy" } as TradingPlan];
+    const empty = createEmptyPlan("Mon plan");
+    return [{ ...sanitizePlanEntry(raw as Record<string, unknown>, empty), id: "legacy" }];
   }
   return [];
 }
@@ -134,7 +170,7 @@ export function checkPlanViolations(
   const maxDailyLossPercent = Number(plan.maxDailyLossPercent);
   if (plan.maxDailyLossPercent.trim() && Number.isFinite(maxDailyLossPercent) && maxDailyLossPercent > 0 && startingCapital > 0) {
     const dailyLoss = sameDayTrades
-      .filter((t) => (t.pnlUnit ?? "USD") !== "PERCENT" && t.pnl < 0)
+      .filter((t) => isRealizedDollarTrade(t) && t.pnl < 0)
       .reduce((acc, t) => acc + t.pnl, 0);
     const dailyLossPercent = (Math.abs(dailyLoss) / startingCapital) * 100;
     if (dailyLossPercent > maxDailyLossPercent) {
@@ -176,6 +212,15 @@ export function buildPlanAlertNotification(trade: Trade, reasons: string[]): App
 }
 
 /**
+ * Plafond de la collection `notifications` d'un élève — sans lui, un élève
+ * actif qui accumule des alertes de non-respect du plan pendant des mois
+ * verrait cette collection grossir indéfiniment (jamais purgée par ailleurs).
+ * Les entrées excédentaires (les plus anciennes, en fin de liste — les plus
+ * récentes sont toujours insérées en tête) sont abandonnées silencieusement.
+ */
+const MAX_STUDENT_NOTIFICATIONS = 300;
+
+/**
  * Upsert idempotent : ajoute/remplace la notification déterministe de ce
  * trade si `reasons` est non vide, la retire sinon (un trade corrigé après
  * coup ne doit pas laisser une alerte périmée traîner, même "lue").
@@ -187,5 +232,5 @@ export function upsertPlanAlert(
 ): AppNotification[] {
   const withoutExisting = notifications.filter((n) => n.id !== planAlertId(trade.id));
   if (reasons.length === 0) return withoutExisting;
-  return [buildPlanAlertNotification(trade, reasons), ...withoutExisting];
+  return [buildPlanAlertNotification(trade, reasons), ...withoutExisting].slice(0, MAX_STUDENT_NOTIFICATIONS);
 }

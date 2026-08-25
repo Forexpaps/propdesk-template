@@ -253,7 +253,7 @@ export function useSyncedState<T>(
   push: (value: T) => Promise<unknown>,
   enabled: boolean,
   onSyncError?: (message?: string) => void
-): [T, React.Dispatch<React.SetStateAction<T>>] {
+): [T, React.Dispatch<React.SetStateAction<T>>, (value: T) => void] {
   const [value, setValue] = useState<T>(initialValue);
 
   // Référence de la valeur chargée au démarrage. Comparer les identités plutôt
@@ -264,8 +264,23 @@ export function useSyncedState<T>(
   const stablePush = useCallback(push, []); // eslint-disable-line react-hooks/exhaustive-deps
   const stableOnError = useCallback(onSyncError ?? (() => undefined), []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Dernière valeur en attente d'envoi (avant le débounce de 400 ms) et
+  // indicateur qu'un envoi est planifié — lus par l'effet de démontage
+  // ci-dessous, jamais par le rendu.
+  const pendingValue = useRef<T | null>(null);
+  const hasPending = useRef(false);
+
   useEffect(() => {
-    // Ne pas réécrire ce qu'on vient tout juste de charger.
+    // Ne pas réécrire ce qu'on vient tout juste de charger — que ce soit la
+    // valeur initiale, OU une valeur reposée après coup par `markLoaded`
+    // (résolution post-bootstrap, `resolveStudentValue` dans App.tsx) : sans
+    // cette seconde voie, `value` restait perpétuellement différent de
+    // `loadedValue.current` (figé à sa toute première valeur) et CHAQUE
+    // rechargement de page repoussait inutilement vers le serveur une
+    // collection qu'il venait tout juste d'envoyer — un aller-retour réseau
+    // superflu à chaque connexion, et depuis le verrouillage optimiste des
+    // collections, un faux conflit de version à chaque fois qu'un autre
+    // onglet avait entre-temps écrit la même collection.
     if (value === loadedValue.current) return;
 
     try {
@@ -282,7 +297,11 @@ export function useSyncedState<T>(
       return;
     }
 
+    pendingValue.current = value;
+    hasPending.current = true;
+
     const timer = setTimeout(() => {
+      hasPending.current = false;
       stablePush(value).catch((err) => {
         console.warn(`[horizon] Synchronisation de "${localKey}" échouée.`, err);
         // Échec ponctuel (réseau, conflit 409) alors que l'app se croit en
@@ -298,5 +317,33 @@ export function useSyncedState<T>(
     return () => clearTimeout(timer);
   }, [value, localKey, enabled, stablePush, stableOnError]);
 
-  return [value, setValue];
+  // Filet de secours pour le vrai démontage (déconnexion, fermeture d'onglet
+  // — pas un simple ré-rendu, cet effet n'a aucune dépendance) : si une
+  // frappe/modification est encore dans les 400 ms de débounce au moment où
+  // le composant disparaît, on la pousse quand même plutôt que de la laisser
+  // s'annuler silencieusement avec `clearTimeout`. `handleLogout`
+  // (`App.tsx`) confirme déjà explicitement avant de démonter, donc ce
+  // filet ne se déclenche qu'en dernier recours (l'utilisateur a été rapide
+  // au clavier juste avant de confirmer).
+  useEffect(() => {
+    return () => {
+      if (hasPending.current && pendingValue.current !== null) {
+        stablePush(pendingValue.current).catch(() => markPending(localKey));
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Repose la valeur sans déclencher d'envoi ni de marque "en attente" — à
+   * utiliser quand la nouvelle valeur vient d'être confirmée par le serveur
+   * lui-même (ex: `resolveStudentValue` juste après le retour du bootstrap),
+   * jamais pour une vraie modification locale.
+   */
+  const markLoaded = useCallback((v: T) => {
+    loadedValue.current = v;
+    setValue(v);
+  }, []);
+
+  return [value, setValue, markLoaded];
 }

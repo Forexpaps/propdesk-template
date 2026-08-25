@@ -90,6 +90,12 @@ const PUBLIC_PATHS = new Set([
   "/health",
   "/auth/me",
   "/auth/login",
+  // 2ᵉ étape de la connexion staff (2FA) : aucune session n'existe encore à
+  // ce stade (voir `createTwoFactorChallenge`), oubliée ici jusqu'ici — ne
+  // fonctionnait que grâce à l'ordre de montage des routeurs dans
+  // `server/routes.ts` (authRouter avant la barrière requireAuth), sans le
+  // filet de sécurité que cette liste est censée fournir.
+  "/auth/login/2fa",
   "/auth/logout",
   "/auth/setup",
   "/auth/student-me",

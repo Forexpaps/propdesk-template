@@ -67,6 +67,23 @@ db.exec(`
     payload TEXT NOT NULL
   );
 
+  -- Verrouillage optimiste sur les collections CollectionName (trades,
+  -- accounts, modules, messages, badges, setups, notifications,
+  -- enrolledStudents) : un compteur par (utilisateur, collection),
+  -- incrémenté à chaque écriture réussie. PUT /api/collections/:name
+  -- exige la version lue au dernier chargement et refuse (409) si elle ne
+  -- correspond plus — sans ça, deux onglets ouverts sur le même bureau
+  -- staff partagé pouvaient s'écraser silencieusement l'un l'autre (l'un
+  -- ajoute un trade, l'autre pousse sa propre version 10s plus tard sans
+  -- jamais l'avoir vu, le premier trade disparaît sans erreur ni pour
+  -- personne).
+  CREATE TABLE IF NOT EXISTS collection_versions (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name    TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, name)
+  );
+
   CREATE TABLE IF NOT EXISTS setups (
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -151,6 +168,11 @@ db.exec(`
     -- existante.
     totp_secret           TEXT,
     totp_enabled_at        TEXT,
+    -- Anti-rejeu : dernier pas de temps TOTP (30s) accepte pour ce compte.
+    -- Un code deja utilise pour ce pas (ou un pas anterieur) est refuse meme
+    -- s'il correspond encore dans la fenetre de tolerance de findMatchingTotpStep,
+    -- voir server/auth/twoFactor.ts.
+    totp_last_used_step   INTEGER,
     created_at           TEXT NOT NULL,
     updated_at           TEXT NOT NULL
   );
@@ -502,6 +524,9 @@ function migrateAddTotpColumns(): void {
     }
     if (!hasColumn("totp_enabled_at")) {
       db.exec("ALTER TABLE staff_accounts ADD COLUMN totp_enabled_at TEXT;");
+    }
+    if (!hasColumn("totp_last_used_step")) {
+      db.exec("ALTER TABLE staff_accounts ADD COLUMN totp_last_used_step INTEGER;");
     }
   })();
 }

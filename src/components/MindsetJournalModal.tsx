@@ -55,6 +55,13 @@ const playZenSound = (freq = 432, duration = 1.2) => {
     gain.connect(ctx.destination);
     osc.start();
     osc.stop(ctx.currentTime + duration);
+    // Sans ça, chaque appel laissait son AudioContext ouvert indéfiniment —
+    // sur une session de respiration prolongée (plusieurs check-ins), les
+    // contextes s'accumulent jusqu'à la limite du navigateur (~6), après
+    // quoi le son échoue silencieusement pour le reste de la session.
+    osc.onended = () => {
+      ctx.close().catch(() => undefined);
+    };
   } catch (e) {
     // Ignore audio autoplay restrictions
   }
@@ -152,7 +159,14 @@ export const MindsetJournalModal: React.FC<MindsetJournalModalProps> = ({
     try {
       localStorage.setItem(localStorageKey, JSON.stringify(updated));
     } catch {
-      // ignore
+      // Avant ce correctif, un quota dépassé ou un stockage désactivé
+      // (navigation privée) laissait la modale se fermer normalement — rien
+      // ne signalait à l'utilisateur que son check-in n'avait PAS été
+      // persisté (`logs` retombe à sa valeur d'avant au prochain montage).
+      alert(
+        "Ton check-in n'a pas pu être enregistré (stockage local indisponible ou plein). Réessaie, ou vide un peu d'espace de stockage sur cet appareil."
+      );
+      return;
     }
     onClose();
   };

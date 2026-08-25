@@ -76,6 +76,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
     prefilledTradeId || ""
   );
   const [isSending, setIsSending] = useState<boolean>(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   if (!coaches || coaches.length === 0) {
     return (
@@ -97,6 +98,7 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
     if (!inputText.trim() && !selectedTradeAttachment) return;
 
     setIsSending(true);
+    setSendError(null);
     try {
       await onSendMessage(
         selectedCoach.id,
@@ -107,7 +109,12 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
       setInputText("");
       setSelectedTradeAttachment("");
     } catch (err) {
+      // Avant ce correctif, un échec d'envoi ne partait qu'en console —
+      // l'élève croyait son message envoyé (le champ restait rempli mais
+      // rien ne signalait l'échec), sans aucun moyen de savoir qu'il fallait
+      // réessayer.
       console.error(err);
+      setSendError((err as Error)?.message || "Le message n'a pas pu être envoyé. Réessaie.");
     } finally {
       setIsSending(false);
     }
@@ -299,6 +306,11 @@ export const CoachMessaging: React.FC<CoachMessagingProps> = ({
               <div className="flex items-center gap-2 text-xs text-[#00E676] animate-pulse py-2">
                 <Clock className="w-4 h-4" />
                 <span>Envoi en cours...</span>
+              </div>
+            )}
+            {sendError && (
+              <div className="flex items-center gap-2 text-xs text-rose-400 py-2">
+                <span>{sendError}</span>
               </div>
             )}
           </div>

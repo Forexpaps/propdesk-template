@@ -118,6 +118,11 @@ export const Announcements: React.FC<AnnouncementsProps> = ({ announcements, isO
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Défense en profondeur : le serveur (`requireOwner`) refuse déjà toute
+    // écriture d'un non-fondateur, ce garde n'est qu'une seconde ligne pour
+    // qu'un futur bug d'affichage (formulaire monté sans le contrôle
+    // `{isOwner && (...)}` autour) ne déclenche même pas l'appel réseau.
+    if (!isOwner) return;
     if (!formData.title.trim() || !formData.body.trim()) return;
 
     const previous = editingId ? announcements.find((a) => a.id === editingId) : undefined;
@@ -142,6 +147,7 @@ export const Announcements: React.FC<AnnouncementsProps> = ({ announcements, isO
   };
 
   const handleDelete = async (a: Announcement) => {
+    if (!isOwner) return;
     const ok = await confirmDialog(`Supprimer l'annonce « ${a.title} » ? Cette action est irréversible.`, {
       title: "Supprimer cette annonce",
       confirmLabel: "Supprimer",
@@ -152,6 +158,7 @@ export const Announcements: React.FC<AnnouncementsProps> = ({ announcements, isO
   };
 
   const togglePin = (a: Announcement) => {
+    if (!isOwner) return;
     onSave?.(announcements.map((x) => (x.id === a.id ? { ...x, pinned: !x.pinned } : x)));
   };
 

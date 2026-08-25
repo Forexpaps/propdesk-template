@@ -88,10 +88,18 @@ app.use(
   })
 );
 
-// Les routes d'authentification n'échangent que quelques centaines d'octets. Ce
-// parseur borné est déclaré AVANT le parseur global : body-parser marque la
-// requête comme déjà lue, donc celui de 8 Mo passe la main. Sans cela, un corps
-// de 8 Mo atteindrait le hachage du mot de passe.
+// Deux routes sous /api/auth transportent une image (avatar élève, pièce
+// jointe d'annonce) en base64 dans le corps JSON — bien au-delà de 16kb.
+// Déclarées AVANT le parseur borné ci-dessous pour la même raison que lui :
+// le premier `express.json()` à matcher marque la requête comme déjà lue, les
+// suivants passent la main sans y toucher.
+app.use("/api/auth/profile/avatar", express.json({ limit: "2mb" }));
+app.use("/api/auth/announcements", express.json({ limit: "2mb" }));
+
+// Les autres routes d'authentification n'échangent que quelques centaines
+// d'octets. Ce parseur borné est déclaré AVANT le parseur global : body-parser
+// marque la requête comme déjà lue, donc celui de 8 Mo passe la main. Sans
+// cela, un corps de 8 Mo atteindrait le hachage du mot de passe.
 app.use("/api/auth", express.json({ limit: "16kb" }));
 
 // Les collections complètes peuvent dépasser la limite par défaut de 100 ko.
