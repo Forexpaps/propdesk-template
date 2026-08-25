@@ -51,6 +51,7 @@ import {
   FOUNDER_COACH_ID,
   TradingPlanData,
   Setup,
+  Announcement,
 } from "./types";
 import { isTabType, type TabType as SidebarTabType } from "./components/Sidebar";
 
@@ -76,6 +77,9 @@ import { isTabType, type TabType as SidebarTabType } from "./components/Sidebar"
  */
 const VideoAcademy = React.lazy(() =>
   import("./components/VideoAcademy").then((m) => ({ default: m.VideoAcademy }))
+);
+const Announcements = React.lazy(() =>
+  import("./components/Announcements").then((m) => ({ default: m.Announcements }))
 );
 const TradingJournal = React.lazy(() =>
   import("./components/TradingJournal").then((m) => ({ default: m.TradingJournal }))
@@ -116,6 +120,7 @@ import { formatCurrency } from "./lib/format";
 import { syncAccountsWithTrades } from "./lib/walletStats";
 import { usePersistentState } from "./hooks/usePersistentState";
 import { useBootstrap, useSyncedState, useStudentBootstrap } from "./hooks/useServerSync";
+import { useNotificationSound } from "./hooks/useNotificationSound";
 import { useAuth } from "./hooks/useAuth";
 import { LoginScreen } from "./components/auth/LoginScreen";
 import { TwoFactorVerifyScreen } from "./components/auth/TwoFactorVerifyScreen";
@@ -328,7 +333,7 @@ function resolveStudentValue<T>(serverValue: T, localKey: string): T {
  * périmètre de l'accès élève.
  */
 function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
-  const { status, trades, accounts, modules, messages, badges, setups, notifications, quizResults, student, setStudent, coaches, tradingPlan } = useStudentBootstrap();
+  const { status, trades, accounts, modules, messages, badges, setups, notifications, quizResults, student, setStudent, coaches, tradingPlan, announcements } = useStudentBootstrap();
   const syncEnabled = status === "online";
 
   // Bandeau d'avertissement immédiat quand une sauvegarde échoue en
@@ -407,6 +412,12 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     syncEnabled,
     reportSyncError
   );
+  // `ready` seulement une fois `status === "online"` : avant ça,
+  // `syncedNotifications` porte encore sa valeur de départ, remplacée par
+  // les vraies données serveur juste après (voir l'effet `[status]` plus
+  // bas) — sans ce garde-fou, ce remplacement se lirait comme un déluge de
+  // "nouvelles" notifications à l'ouverture et ferait sonner l'alerte.
+  useNotificationSound(syncedNotifications, status === "online");
   /**
    * Plan de trading — même clé de cache que `TradingPlanEditorModal`/
    * `planCompliance.ts` (namespacée par email, voir `getTradingPlanStorageKey`)
@@ -815,6 +826,10 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
               />
             )}
 
+            {activeTab === "announcements" && (
+              <Announcements announcements={announcements} isOwner={false} />
+            )}
+
             {activeTab === "messaging" && (
               <CoachMessaging
                 coaches={coaches}
@@ -1007,6 +1022,30 @@ function AcademyApp({
       // Quota dépassé ou navigation privée : rien à faire de plus ici.
     }
   };
+  /**
+   * Annonces du fondateur — synchronisées au serveur (`PUT /auth/announcements`,
+   * réservé au fondateur), mais sans la mécanique `useSyncedState`/debounce :
+   * publication peu fréquente, sauvegarde immédiate à chaque action plutôt
+   * qu'un état intermédiaire à réconcilier. `setAnnouncements` échoue de
+   * façon visible (alert) plutôt que silencieusement : contrairement à un
+   * trade, une annonce non publiée n'a aucune trace locale à rattraper au
+   * prochain chargement.
+   */
+  const [announcements, setAnnouncementsState] = useState<Announcement[]>(() =>
+    seed(initialState?.announcements, "horizon_announcements", [])
+  );
+  const setAnnouncements = async (next: Announcement[]) => {
+    const previous = announcements;
+    setAnnouncementsState(next);
+    try {
+      await api.saveAnnouncements(next);
+      localStorage.setItem("horizon_announcements", JSON.stringify(next));
+    } catch (err) {
+      console.warn("[propdesk] Publication de l'annonce échouée.", err);
+      setAnnouncementsState(previous);
+      alert("La publication a échoué. Vérifie ta connexion et réessaie.");
+    }
+  };
   const [isLegalNoticeOpen, setIsLegalNoticeOpen] = useState(false);
   const [isCguOpen, setIsCguOpen] = useState(false);
   const [isStaffAccountsOpen, setIsStaffAccountsOpen] = useState(false);
@@ -1043,6 +1082,11 @@ function AcademyApp({
     syncEnabled,
     reportSyncError
   );
+  // `ready` d'emblée : contrairement à l'instance élève, `seed()` résout déjà
+  // la vraie valeur de départ de façon synchrone au montage (serveur, sinon
+  // cache local, sinon `initialNotifications`) — pas de remplacement différé
+  // à ignorer.
+  useNotificationSound(notifications, true);
 
   const [student, setStudent] = useSyncedState<StudentProfile>(
     "horizon_student",
@@ -1620,6 +1664,10 @@ function AcademyApp({
               onAskCoachAboutLesson={handleAskCoachAboutLesson}
               onSaveModuleQuizResult={handleSaveModuleQuizResult}
             />
+          )}
+
+          {activeTab === "announcements" && (
+            <Announcements announcements={announcements} isOwner={isOwner} onSave={setAnnouncements} />
           )}
 
           {activeTab === "journal" && (

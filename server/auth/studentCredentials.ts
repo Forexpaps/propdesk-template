@@ -84,6 +84,25 @@ export function getStudentByEnrolledId(enrolledStudentId: string): StudentAccoun
 }
 
 /**
+ * Tous les comptes élève avec un accès actif — utilisé pour diffuser une
+ * notification à tout le monde à la fois (annonces du fondateur, voir
+ * `PUT /auth/announcements`, `server/auth/routes.ts`). Un élève inscrit
+ * (`EnrolledStudent`) sans compte actif n'a pas de ligne ici et n'est donc
+ * jamais notifié — cohérent avec `getStudentByEnrolledId`, qui renvoie `null`
+ * dans le même cas.
+ */
+export function listAllStudentAccounts(): StudentAccount[] {
+  const rows = db
+    .prepare(
+      `SELECT id, enrolled_student_id, user_id, email, email_lower, password_hash, must_change_password
+       FROM student_accounts`
+    )
+    .all() as StudentAccountRow[];
+
+  return rows.map(toStudentAccount);
+}
+
+/**
  * Crée un compte élève, avec un mot de passe temporaire déjà haché, et la
  * ligne `users` dédiée qui portera son bureau.
  *

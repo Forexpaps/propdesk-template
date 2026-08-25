@@ -167,6 +167,29 @@ export const tradingPlanSchema = z.object({
 export const tradingPlansSchema = z.array(tradingPlanSchema).max(20);
 
 /**
+ * Une annonce (`Announcement`, `src/types.ts`) — corps attendu par
+ * `PUT /auth/announcements` (`server/auth/routes.ts`, réservée au
+ * fondateur). `imageUrl` suit la même garde `isSafeMediaUrl` que l'avatar
+ * ci-dessus : seules `https://` et `data:image/...` sont acceptées.
+ */
+export const announcementSchema = z.object({
+  id: z.string().min(1).max(100),
+  title: z.string().min(1).max(200),
+  body: z.string().max(5000),
+  category: z.enum(["Général", "Alerte marché", "Pédagogie", "Événement"]),
+  pinned: z.boolean(),
+  imageUrl: z
+    .string()
+    .max(400_000)
+    .refine(isSafeMediaUrl, { message: "URL d'image invalide : seules https:// et data:image/... sont acceptées." })
+    .optional(),
+  createdAt: z.string().max(100),
+});
+
+/** Toutes les annonces — plafond large mais réel, pas des milliers d'annonces dans une académie. */
+export const announcementsSchema = z.array(announcementSchema).max(200);
+
+/**
  * Un seul résultat de quiz de module — voir `ModuleQuizResult` dans
  * `src/types.ts`. Bornée (au lieu de `z.unknown()`) : la seule protection
  * précédente était la limite globale de 8 Mo sur le corps de la requête,

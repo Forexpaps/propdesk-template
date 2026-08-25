@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { randomBytes } from "node:crypto";
 import { db, DEFAULT_USER_ID, FOUNDER_COACH_ID } from "../db";
-import { getProfile, saveProfile, listCollection, updateCollectionItem, replaceCollection, getTradingPlan } from "../repositories";
+import { getProfile, saveProfile, listCollection, updateCollectionItem, replaceCollection, getTradingPlan, getAnnouncements, saveAnnouncements } from "../repositories";
 import {
   setupSchema,
   loginSchema,
@@ -13,6 +13,7 @@ import {
   totpCodeSchema,
   twoFactorLoginSchema,
   disableTotpSchema,
+  announcementsSchema,
 } from "../schemas";
 import { createRateLimit } from "../middleware/rateLimit";
 import { hashPassword, verifyPassword, needsRehash, verifyAgainstDecoy } from "./password";
@@ -48,6 +49,7 @@ import {
   deleteStudentAccount,
   getStudentByEmail as getStudentAccountByEmail,
   getStudentByEnrolledId,
+  listAllStudentAccounts,
   setStudentPassword,
   updateStudentEmail,
 } from "./studentCredentials";
@@ -1118,6 +1120,7 @@ staffRouter.get(
       // le plan de trading, seule `PUT /auth/trading-plan` (élève, sur sa
       // propre session) peut l'écrire — voir `studentRoutes.ts`.
       tradingPlan: getTradingPlan(account.userId),
+      announcements: getAnnouncements() ?? [],
     });
   }
 );
@@ -1176,6 +1179,58 @@ staffRouter.post(
     })();
 
     res.status(201).json({ message });
+  }
+);
+
+/**
+ * Publie la liste complète des annonces — réservée au fondateur
+ * (`requireOwner`, en plus de `requireStaffKind` : un coach invité ne peut
+ * que consulter). Diffuse une notification (type "academy", avec le son
+ * d'alerte côté client — voir `useNotificationSound`,
+ * `src/hooks/useNotificationSound.ts`) dans le fil de CHAQUE élève actif,
+ * mais seulement pour les entrées dont l'`id` n'existait pas dans l'ancienne
+ * liste : une simple édition (même id) ne renotifie personne.
+ */
+staffRouter.put(
+  "/announcements",
+  requireStaffKind,
+  requireOwner,
+  createRateLimit({
+    windowMs: 15 * 60_000,
+    max: 30,
+    message: "Trop d'écritures. Réessaie dans quelques minutes.",
+  }),
+  (req, res) => {
+    const parsed = announcementsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Annonces invalides." });
+      return;
+    }
+
+    const previousIds = new Set((getAnnouncements<{ id: string }[]>() ?? []).map((a) => a.id));
+    const newAnnouncements = parsed.data.filter((a) => !previousIds.has(a.id));
+
+    db.transaction(() => {
+      saveAnnouncements(parsed.data);
+
+      if (newAnnouncements.length === 0) return;
+      const students = listAllStudentAccounts();
+      for (const student of students) {
+        const existing = listCollection("notifications", student.userId);
+        const notifications = newAnnouncements.map((a) => ({
+          id: `announce-${a.id}-${student.id}`,
+          title: `📣 ${a.title}`,
+          message: a.body.slice(0, 200),
+          time: "À l'instant",
+          type: "academy" as const,
+          read: false,
+          targetTab: "announcements",
+        }));
+        replaceCollection("notifications", [...notifications, ...existing], student.userId);
+      }
+    })();
+
+    res.json({ success: true, count: parsed.data.length });
   }
 );
 
