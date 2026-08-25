@@ -46,19 +46,31 @@ const CalcCard: React.FC<{ title: string; subtitle: string; children: React.Reac
   </div>
 );
 
+/**
+ * Champ numérique en texte libre, jamais `type="number"` — voir le
+ * commentaire de `handleDecimalChange` dans TradingJournal.tsx : un input
+ * number bloque net la virgule (séparateur de milliers sur un indice comme
+ * NAS100 à 20,637.50), faussant silencieusement le prix appliqué au
+ * calculateur puis au Ratio R:R. La virgule est donc retirée (séparateur de
+ * milliers) plutôt que convertie en décimale ; le point reste la seule
+ * décimale valide, comme sur une plateforme de trading.
+ */
 const FieldInput: React.FC<{
   label: string;
-  value: number;
-  onChange: (v: number) => void;
-  step?: string;
-}> = ({ label, value, onChange, step = "0.0001" }) => (
+  value: string;
+  onChange: (v: string) => void;
+}> = ({ label, value, onChange }) => (
   <div>
     <label className="block text-[10px] text-slate-500 mb-1 font-sans">{label}</label>
     <input
-      type="number"
-      step={step}
+      type="text"
+      inputMode="decimal"
       value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
+      onChange={(e) => {
+        const normalized = e.target.value.replace(/,/g, "");
+        if (!/^\d*\.?\d*$/.test(normalized)) return;
+        onChange(normalized);
+      }}
       className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg px-2.5 py-2 text-white text-sm font-mono font-bold focus:outline-none focus:border-[#00E676]"
     />
   </div>
@@ -86,21 +98,21 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
   const [copied, setCopied] = useState(false);
 
   // Panneau 1 — Taille de position & risque
-  const [capital, setCapital] = useState<number>(defaultCapital || 10000);
-  const [riskPercent, setRiskPercent] = useState<number>(1);
-  const [entry1, setEntry1] = useState<number>(1.085);
-  const [stop1, setStop1] = useState<number>(1.082);
-  const [target1, setTarget1] = useState<number>(1.092);
+  const [capital, setCapital] = useState<string>(String(defaultCapital || 10000));
+  const [riskPercent, setRiskPercent] = useState<string>("1");
+  const [entry1, setEntry1] = useState<string>("1.085");
+  const [stop1, setStop1] = useState<string>("1.082");
+  const [target1, setTarget1] = useState<string>("1.092");
 
   // Panneau 2 — Risque / Rendement
-  const [entry2, setEntry2] = useState<number>(1.085);
-  const [stop2, setStop2] = useState<number>(1.082);
-  const [target2, setTarget2] = useState<number>(1.092);
+  const [entry2, setEntry2] = useState<string>("1.085");
+  const [stop2, setStop2] = useState<string>("1.082");
+  const [target2, setTarget2] = useState<string>("1.092");
 
   // Panneau 3 — Profit / Perte
-  const [entry4, setEntry4] = useState<number>(1.085);
-  const [exit4, setExit4] = useState<number>(1.09);
-  const [units4, setUnits4] = useState<number>(100000);
+  const [entry4, setEntry4] = useState<string>("1.085");
+  const [exit4, setExit4] = useState<string>("1.09");
+  const [units4, setUnits4] = useState<string>("100000");
   const [direction4, setDirection4] = useState<"LONG" | "SHORT">("LONG");
 
   if (!isOpen) return null;
@@ -109,40 +121,55 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
     setAssetClass(ac);
   };
 
+  // Champs texte convertis en nombre au moment du calcul seulement — voir
+  // le commentaire de `FieldInput`, la valeur reste une chaîne pendant la
+  // frappe.
+  const capitalNum = Number(capital) || 0;
+  const riskPercentNum = Number(riskPercent) || 0;
+  const entry1Num = Number(entry1) || 0;
+  const stop1Num = Number(stop1) || 0;
+  const target1Num = Number(target1) || 0;
+  const entry2Num = Number(entry2) || 0;
+  const stop2Num = Number(stop2) || 0;
+  const target2Num = Number(target2) || 0;
+  const entry4Num = Number(entry4) || 0;
+  const exit4Num = Number(exit4) || 0;
+  const units4Num = Number(units4) || 0;
+
   // --- Panneau 1 : Taille de position & risque ---
   // Taille de contrat dérivée de la classe d'actif (plus de champ éditable —
   // simplifié sur demande explicite de l'utilisateur).
   const contract1 = DEFAULT_CONTRACT[assetClass];
-  const riskAmount1 = (capital * riskPercent) / 100;
-  const isLong1 = target1 >= entry1;
-  const riskDiff1 = Math.abs(entry1 - stop1);
-  const rewardDiff1 = Math.abs(target1 - entry1);
+  const riskAmount1 = (capitalNum * riskPercentNum) / 100;
+  const isLong1 = target1Num >= entry1Num;
+  const riskDiff1 = Math.abs(entry1Num - stop1Num);
+  const rewardDiff1 = Math.abs(target1Num - entry1Num);
   const units1 = riskDiff1 > 0 ? riskAmount1 / riskDiff1 : 0;
   const lots1 = contract1 > 0 ? units1 / contract1 : 0;
   const potentialProfit1 = units1 * rewardDiff1;
   const rr1 = riskDiff1 > 0 ? rewardDiff1 / riskDiff1 : 0;
 
   // --- Panneau 2 : Risque / Rendement ---
-  const isLong2 = target2 >= entry2;
-  const riskDiff2 = Math.abs(entry2 - stop2);
-  const rewardDiff2 = Math.abs(target2 - entry2);
-  const riskPct2 = entry2 > 0 ? (riskDiff2 / entry2) * 100 : 0;
-  const gainPct2 = entry2 > 0 ? (rewardDiff2 / entry2) * 100 : 0;
+  const isLong2 = target2Num >= entry2Num;
+  const riskDiff2 = Math.abs(entry2Num - stop2Num);
+  const rewardDiff2 = Math.abs(target2Num - entry2Num);
+  const riskPct2 = entry2Num > 0 ? (riskDiff2 / entry2Num) * 100 : 0;
+  const gainPct2 = entry2Num > 0 ? (rewardDiff2 / entry2Num) * 100 : 0;
   const rr2 = riskDiff2 > 0 ? rewardDiff2 / riskDiff2 : 0;
   const breakevenWinRate2 = rr2 > 0 ? (1 / (1 + rr2)) * 100 : 0;
 
   // --- Panneau 3 : Profit / Perte ---
-  const movement4 = exit4 - entry4;
-  const movementPct4 = entry4 > 0 ? (Math.abs(movement4) / entry4) * 100 : 0;
-  const pnl4 = (direction4 === "LONG" ? movement4 : -movement4) * units4;
+  const movement4 = exit4Num - entry4Num;
+  const movementPct4 = entry4Num > 0 ? (Math.abs(movement4) / entry4Num) * 100 : 0;
+  const pnl4 = (direction4 === "LONG" ? movement4 : -movement4) * units4Num;
 
   const handleApply = () => {
     if (onApplyToJournal) {
       onApplyToJournal({
         pair,
-        entryPrice: entry1,
-        stopLoss: stop1,
-        takeProfit: target1,
+        entryPrice: entry1Num,
+        stopLoss: stop1Num,
+        takeProfit: target1Num,
         lotSize: parseFloat(lots1.toFixed(3)),
         riskAmount: riskAmount1,
         riskRewardRatio: parseFloat(rr1.toFixed(2)),
@@ -206,8 +233,8 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
             {/* Panneau 1 : Taille de position & risque */}
             <CalcCard title="Taille de position & risque" subtitle="Taille pour ne risquer qu'un % du capital + profit potentiel et perte max.">
               <div className="grid grid-cols-2 gap-2.5">
-                <FieldInput label="Capital (€/$)" value={capital} onChange={setCapital} step="100" />
-                <FieldInput label="Risque (%)" value={riskPercent} onChange={setRiskPercent} step="0.1" />
+                <FieldInput label="Capital (€/$)" value={capital} onChange={setCapital} />
+                <FieldInput label="Risque (%)" value={riskPercent} onChange={setRiskPercent} />
               </div>
               <div className="grid grid-cols-3 gap-2.5">
                 <FieldInput label="Entrée" value={entry1} onChange={setEntry1} />
@@ -252,7 +279,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
                 <FieldInput label="Sortie" value={exit4} onChange={setExit4} />
               </div>
               <div className="grid grid-cols-2 gap-2.5">
-                <FieldInput label="Taille (unités)" value={units4} onChange={setUnits4} step="1" />
+                <FieldInput label="Taille (unités)" value={units4} onChange={setUnits4} />
                 <div>
                   <label className="block text-[10px] text-slate-500 mb-1 font-sans">Sens</label>
                   <select
