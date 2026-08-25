@@ -33,6 +33,35 @@ const isSafeMediaUrl = (value: unknown): boolean =>
     (value === "" || /^https:\/\//.test(value) || /^data:image\//.test(value)));
 
 /**
+ * `Trade.chartUrls` (plusieurs captures d'écran labellisées — voir
+ * `src/types.ts`, `TradeScreenshot`). Même garde `isSafeMediaUrl` que
+ * `chartUrl`/`avatar` appliquée à chaque `.url`, plus une borne sur le
+ * nombre d'entrées : un trade ne devrait jamais porter des dizaines de
+ * captures, et chacune pèse potentiellement plusieurs centaines de ko en
+ * base64 dans un payload de collection déjà limité à 8 Mo.
+ */
+const MAX_CHART_SCREENSHOTS = 8;
+const isSafeChartUrls = (value: unknown): boolean => {
+  if (value == null) return true;
+  if (!Array.isArray(value)) return false;
+  if (value.length > MAX_CHART_SCREENSHOTS) return false;
+  return value.every((entry) => {
+    if (typeof entry !== "object" || entry === null) return false;
+    const e = entry as Record<string, unknown>;
+    return (
+      typeof e.id === "string" &&
+      e.id.length > 0 &&
+      e.id.length <= 100 &&
+      typeof e.label === "string" &&
+      e.label.length <= 60 &&
+      typeof e.url === "string" &&
+      e.url.length > 0 &&
+      isSafeMediaUrl(e.url)
+    );
+  });
+};
+
+/**
  * `initialBalance` (comptes `TradingAccount`) sert de diviseur dans plusieurs
  * calculs de pourcentage côté client (progression vers l'objectif de profit,
  * drawdown) — un compte créé avec un capital nul ou négatif produirait un
@@ -104,6 +133,9 @@ const collectionItem = z
   )
   .refine((item) => isValidInitialBalance((item as Record<string, unknown>).initialBalance), {
     message: "Le capital initial doit être un nombre supérieur à 0.",
+  })
+  .refine((item) => isSafeChartUrls((item as Record<string, unknown>).chartUrls), {
+    message: "Captures d'écran invalides : au maximum 8, chacune avec une URL https:// ou data:image/...",
   })
   .refine((item) => !containsDangerousUrlScheme(item), {
     message: "URL invalide : les schémas javascript:/vbscript:/data:text/html sont interdits.",

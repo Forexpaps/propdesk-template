@@ -29,6 +29,7 @@ import {
   TradeMistake,
   Setup,
   TradingPlan,
+  TradeScreenshot,
 } from "../types";
 import { formatCurrency } from "../lib/format";
 import { resizeChartScreenshot } from "../lib/image";
@@ -46,6 +47,73 @@ const TOUS_COMPTES = "Tous";
 
 /** Valeur du filtre isolant les trades sans compte. */
 const NON_RATTACHES = "__aucun__";
+
+/**
+ * Les 3 emplacements de capture d'écran toujours proposés, dans cet ordre —
+ * demande explicite : pouvoir illustrer un trade au minimum au début,
+ * pendant, et après. Au-delà, `handleAddScreenshotSlot` permet d'ajouter des
+ * emplacements supplémentaires à libellé libre.
+ */
+const DEFAULT_SCREENSHOT_LABELS = ["Début", "Pendant", "Après"] as const;
+
+/** Nombre max d'emplacements (3 par défaut + supplémentaires) — même borne que `MAX_CHART_SCREENSHOTS` côté serveur (`server/schemas.ts`). */
+const MAX_SCREENSHOT_SLOTS = 8;
+
+function makeScreenshotId(): string {
+  return `shot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Garantit la présence des 3 emplacements par défaut (Début/Pendant/Après),
+ * dans cet ordre, sans dupliquer ceux déjà présents ; les captures
+ * supplémentaires à libellé libre sont conservées à la suite, dans leur
+ * ordre d'origine.
+ *
+ * Absorbe aussi l'ancien champ `Trade.chartUrl` (une seule capture, avant
+ * cette fonctionnalité) en la plaçant dans l'emplacement "Début" — seul cas
+ * où `chartUrls` est totalement absent d'un trade existant.
+ */
+function toScreenshotSlots(trade?: Pick<Trade, "chartUrls" | "chartUrl"> | null): TradeScreenshot[] {
+  const existing = trade?.chartUrls ? [...trade.chartUrls] : [];
+  if (existing.length === 0 && trade?.chartUrl) {
+    existing.push({ id: makeScreenshotId(), label: DEFAULT_SCREENSHOT_LABELS[0], url: trade.chartUrl });
+  }
+
+  const usedLabels = new Set(existing.map((s) => s.label));
+  const slots = [...existing];
+  DEFAULT_SCREENSHOT_LABELS.forEach((label) => {
+    if (!usedLabels.has(label)) {
+      slots.push({ id: makeScreenshotId(), label, url: "" });
+    }
+  });
+
+  return slots.sort((a, b) => {
+    const ai = DEFAULT_SCREENSHOT_LABELS.indexOf(a.label as (typeof DEFAULT_SCREENSHOT_LABELS)[number]);
+    const bi = DEFAULT_SCREENSHOT_LABELS.indexOf(b.label as (typeof DEFAULT_SCREENSHOT_LABELS)[number]);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+}
+
+/** Un emplacement par défaut ne peut pas être supprimé, seulement vidé de son image — seuls les emplacements supplémentaires (libellé libre) le peuvent. */
+function isDefaultScreenshotLabel(label: string): boolean {
+  return (DEFAULT_SCREENSHOT_LABELS as readonly string[]).includes(label);
+}
+
+/**
+ * Captures réellement présentes d'un trade, pour l'affichage en lecture
+ * seule (aperçu complet) — contrairement à `toScreenshotSlots`, ne force PAS
+ * les 3 emplacements par défaut : un emplacement jamais rempli ne doit rien
+ * afficher. Absorbe le même repli sur l'ancien `chartUrl` que
+ * `toScreenshotSlots`, pour les trades enregistrés avant cette fonctionnalité.
+ */
+function getFilledScreenshots(trade: Pick<Trade, "chartUrls" | "chartUrl">): TradeScreenshot[] {
+  const fromNewField = trade.chartUrls?.filter((s) => s.url.trim() !== "") ?? [];
+  if (fromNewField.length > 0) return fromNewField;
+  return trade.chartUrl ? [{ id: "legacy", label: "Capture", url: trade.chartUrl }] : [];
+}
 
 /** Erreurs proposées au tag sur un trade — voir `TradeMistake` dans types.ts. */
 const MISTAKE_OPTIONS: TradeMistake[] = [
@@ -152,7 +220,8 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
 
   const [selectedChartTrade, setSelectedChartTrade] = useState<Trade | null>(null);
-  const [isResizingChart, setIsResizingChart] = useState(false);
+  /** Id de l'emplacement dont l'image est en cours de redimensionnement, ou `null` — un seul upload à la fois. */
+  const [resizingSlotId, setResizingSlotId] = useState<string | null>(null);
 
   /**
    * Nom affichable d'un compte, ou `null` si le trade n'est rattaché à rien —
@@ -265,7 +334,9 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     emotion: "Disciplined" as EmotionState,
     mistakes: [] as TradeMistake[],
     notes: "Validation FVG H1 + Chasse de liquidité.",
-    chartUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=800",
+    chartUrls: toScreenshotSlots({
+      chartUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=800",
+    }),
   });
 
   /** Valeurs par défaut d'une création. Recalculées à chaque ouverture. */
@@ -291,7 +362,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     emotion: "Disciplined" as EmotionState,
     mistakes: [] as TradeMistake[],
     notes: "",
-    chartUrl: "",
+    chartUrls: toScreenshotSlots(null),
   });
 
   const ouvrirCreation = () => {
@@ -331,7 +402,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       emotion: trade.emotion,
       mistakes: trade.mistakes ?? [],
       notes: trade.notes ?? "",
-      chartUrl: trade.chartUrl ?? "",
+      chartUrls: toScreenshotSlots(trade),
     });
     setIsAddModalOpen(true);
   };
@@ -425,14 +496,15 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   };
 
   /**
-   * Capture d'écran du trade, réduite avant d'entrer dans l'état applicatif.
+   * Capture d'écran d'un EMPLACEMENT du trade (`slotId`), réduite avant
+   * d'entrer dans l'état applicatif.
    *
-   * `Trade.chartUrl` est sérialisé en JSON — dans la base, dans chaque
+   * `Trade.chartUrls` est sérialisé en JSON — dans la base, dans chaque
    * réponse de `/api/state` et dans le cache `localStorage` — une image brute
-   * y pèserait donc son poids réel à trois endroits à la fois. Voir
-   * `src/lib/image.ts`.
+   * y pèserait donc son poids réel à trois endroits à la fois, multiplié par
+   * le nombre de captures. Voir `src/lib/image.ts`.
    */
-  const handleChartUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChartUpload = async (slotId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     // Sans réinitialiser la valeur, re-choisir le même fichier après une
     // erreur n'émettrait aucun évènement.
@@ -446,16 +518,57 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       return;
     }
 
-    setIsResizingChart(true);
+    setResizingSlotId(slotId);
     try {
-      const chartUrl = await resizeChartScreenshot(file);
-      setFormData((prev) => ({ ...prev, chartUrl }));
+      const url = await resizeChartScreenshot(file);
+      setFormData((prev) => ({
+        ...prev,
+        chartUrls: prev.chartUrls.map((s) => (s.id === slotId ? { ...s, url } : s)),
+      }));
     } catch (err) {
       console.error("[propdesk] Redimensionnement de la capture d'écran échoué.", err);
       alert("Cette image n'a pas pu être lue. Essaie un autre fichier (JPEG, PNG ou WebP).");
     } finally {
-      setIsResizingChart(false);
+      setResizingSlotId(null);
     }
+  };
+
+  /** Vide l'image d'un emplacement (garde le libellé) — c'est ainsi qu'on "retire" une capture des 3 emplacements par défaut, toujours présents. */
+  const handleRemoveScreenshot = (slotId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      chartUrls: prev.chartUrls.map((s) => (s.id === slotId ? { ...s, url: "" } : s)),
+    }));
+  };
+
+  /** Ajoute un emplacement supplémentaire à libellé libre, en plus des 3 par défaut. */
+  const handleAddScreenshotSlot = () => {
+    setFormData((prev) => {
+      if (prev.chartUrls.length >= MAX_SCREENSHOT_SLOTS) return prev;
+      const numeroSupplementaire = prev.chartUrls.filter((s) => !isDefaultScreenshotLabel(s.label)).length + 1;
+      return {
+        ...prev,
+        chartUrls: [
+          ...prev.chartUrls,
+          { id: makeScreenshotId(), label: `Supplémentaire ${numeroSupplementaire}`, url: "" },
+        ],
+      };
+    });
+  };
+
+  /** Supprime entièrement un emplacement supplémentaire (libellé + image) — pas possible sur les 3 par défaut, toujours présents. */
+  const handleRemoveScreenshotSlot = (slotId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      chartUrls: prev.chartUrls.filter((s) => s.id !== slotId),
+    }));
+  };
+
+  const handleScreenshotLabelChange = (slotId: string, label: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      chartUrls: prev.chartUrls.map((s) => (s.id === slotId ? { ...s, label } : s)),
+    }));
   };
 
   /**
@@ -550,7 +663,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       emotion: formData.emotion,
       mistakes: formData.mistakes,
       notes: formData.notes,
-      chartUrl: formData.chartUrl,
+      // Emplacements vides (aucune image choisie) filtrés — un emplacement
+      // "Après" jamais rempli ne doit pas être persisté comme s'il portait
+      // une vraie capture.
+      chartUrls: formData.chartUrls.filter((s) => s.url.trim() !== ""),
     };
 
     if (editingTrade) {
@@ -1284,60 +1400,120 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">
-                  Capture d'écran du trade
+                  Captures d'écran du trade
                 </label>
-                {formData.chartUrl ? (
-                  <div className="relative rounded-lg overflow-hidden border border-[#1B2320] group">
-                    <img
-                      src={formData.chartUrl}
-                      alt="Capture d'écran du trade"
-                      className="w-full max-h-56 object-contain bg-[#0D1110]"
-                    />
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <label className="px-3 py-1.5 rounded-lg bg-[#1B2320] text-white text-xs font-semibold cursor-pointer hover:bg-[#232D29]">
-                        Remplacer
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleChartUpload}
-                          className="hidden"
-                        />
-                      </label>
+                <p className="text-[11px] text-slate-500 mb-2">
+                  Illustre au minimum le début, le pendant et l'après de ta position — ajoute des emplacements supplémentaires si besoin.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {formData.chartUrls.map((slot) => {
+                    const isDefault = isDefaultScreenshotLabel(slot.label);
+                    const isResizingThisSlot = resizingSlotId === slot.id;
+                    return (
+                      <div key={slot.id} className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          {isDefault ? (
+                            <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wide">
+                              {slot.label}
+                            </span>
+                          ) : (
+                            <input
+                              type="text"
+                              value={slot.label}
+                              onChange={(e) => handleScreenshotLabelChange(slot.id, e.target.value)}
+                              maxLength={60}
+                              placeholder="Libellé (ex: Confirmation H4)"
+                              className="flex-1 min-w-0 bg-transparent text-[11px] font-bold text-slate-300 uppercase tracking-wide focus:outline-none border-b border-transparent focus:border-[#00E676]/40"
+                            />
+                          )}
+                          {!isDefault && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveScreenshotSlot(slot.id)}
+                              className="p-1 rounded text-slate-500 hover:text-rose-400 shrink-0"
+                              title="Supprimer cet emplacement"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {slot.url ? (
+                          <div className="relative rounded-lg overflow-hidden border border-[#1B2320] group">
+                            <img
+                              src={slot.url}
+                              alt={`Capture — ${slot.label}`}
+                              className="w-full h-32 object-cover bg-[#0D1110]"
+                            />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                              <label className="px-2.5 py-1 rounded-lg bg-[#1B2320] text-white text-[11px] font-semibold cursor-pointer hover:bg-[#232D29]">
+                                Remplacer
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleChartUpload(slot.id, e)}
+                                  className="hidden"
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveScreenshot(slot.id)}
+                                className="px-2.5 py-1 rounded-lg bg-rose-500/80 text-white text-[11px] font-semibold hover:bg-rose-500"
+                              >
+                                Retirer
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <label
+                            className={`flex items-center justify-center gap-2 w-full h-32 border border-dashed border-[#1B2320] rounded-lg p-3 text-[11px] text-slate-400 cursor-pointer hover:border-[#00E676]/40 hover:text-slate-200 transition-colors text-center ${
+                              isResizingThisSlot ? "opacity-60 pointer-events-none" : ""
+                            }`}
+                          >
+                            {isResizingThisSlot ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                                Traitement…
+                              </>
+                            ) : (
+                              <>
+                                <ImagePlus className="w-4 h-4 shrink-0" />
+                                Ajouter une image
+                              </>
+                            )}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleChartUpload(slot.id, e)}
+                              disabled={resizingSlotId !== null}
+                              className="hidden"
+                            />
+                          </label>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Cellule de la grille, pas un bloc à part en dessous : avec les
+                      3 emplacements par défaut (2 colonnes), elle tombe naturellement
+                      à droite de "Après" et sous "Pendant". Même ossature (ligne
+                      d'étiquette + boîte h-32) que les autres cellules, pour un
+                      alignement vertical identique plutôt qu'un margin-top approximatif. */}
+                  {formData.chartUrls.length < MAX_SCREENSHOT_SLOTS && (
+                    <div className="space-y-1.5">
+                      <div className="h-[18px]" aria-hidden="true" />
                       <button
                         type="button"
-                        onClick={() => setFormData({ ...formData, chartUrl: "" })}
-                        className="px-3 py-1.5 rounded-lg bg-rose-500/80 text-white text-xs font-semibold hover:bg-rose-500"
+                        onClick={handleAddScreenshotSlot}
+                        className="flex flex-col items-center justify-center gap-1.5 w-full h-32 border border-dashed border-[#1B2320] rounded-lg text-[11px] font-semibold text-[#00E676] hover:text-[#00c865] hover:border-[#00E676]/40 transition-colors"
                       >
-                        Retirer
+                        <ImagePlus className="w-4 h-4" />
+                        Ajouter une capture supplémentaire
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <label
-                    className={`flex items-center justify-center gap-2 w-full border border-dashed border-[#1B2320] rounded-lg p-4 text-xs text-slate-400 cursor-pointer hover:border-[#00E676]/40 hover:text-slate-200 transition-colors ${
-                      isResizingChart ? "opacity-60 pointer-events-none" : ""
-                    }`}
-                  >
-                    {isResizingChart ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Traitement de l'image…
-                      </>
-                    ) : (
-                      <>
-                        <ImagePlus className="w-4 h-4" />
-                        Ajouter une capture d'écran (JPEG, PNG, WebP)
-                      </>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleChartUpload}
-                      disabled={isResizingChart}
-                      className="hidden"
-                    />
-                  </label>
-                )}
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1B2320]">
@@ -1380,20 +1556,30 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               </button>
             </div>
 
-            {/* Capture d'écran, ou message d'absence */}
-            {selectedChartTrade.chartUrl ? (
-              <div className="rounded-xl overflow-hidden border border-[#1B2320] bg-black max-h-[50vh] flex items-center justify-center">
-                <img
-                  src={selectedChartTrade.chartUrl}
-                  alt={`Capture d'écran ${selectedChartTrade.pair}`}
-                  className="w-full h-full object-contain"
-                />
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-[#1B2320] bg-[#0D1110] p-6 text-center text-xs text-slate-500 italic">
-                Aucune capture d'écran jointe à ce trade.
-              </div>
-            )}
+            {/* Captures d'écran, ou message d'absence */}
+            {(() => {
+              const screenshots = getFilledScreenshots(selectedChartTrade);
+              return screenshots.length > 0 ? (
+                <div className={`grid gap-3 ${screenshots.length > 1 ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
+                  {screenshots.map((shot) => (
+                    <div key={shot.id} className="space-y-1.5">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{shot.label}</span>
+                      <div className="rounded-xl overflow-hidden border border-[#1B2320] bg-black max-h-[40vh] flex items-center justify-center">
+                        <img
+                          src={shot.url}
+                          alt={`Capture ${shot.label} — ${selectedChartTrade.pair}`}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-[#1B2320] bg-[#0D1110] p-6 text-center text-xs text-slate-500 italic">
+                  Aucune capture d'écran jointe à ce trade.
+                </div>
+              );
+            })()}
 
             {/* Résumé complet de la saisie */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">

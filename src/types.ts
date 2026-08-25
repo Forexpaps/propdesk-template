@@ -72,6 +72,19 @@ export type TradeMistake =
  */
 export type PnlUnit = "USD" | "PERCENT";
 
+/**
+ * Une capture d'écran attachée à un trade. `label` distingue les 3
+ * emplacements par défaut (Début/Pendant/Après, voir
+ * `DEFAULT_SCREENSHOT_LABELS` dans `TradingJournal.tsx`) d'une capture
+ * supplémentaire à libellé libre.
+ */
+export interface TradeScreenshot {
+  id: string;
+  label: string;
+  /** Data URL (capture redimensionnée côté client) ou `https://...` — jamais vide en base, un emplacement sans image n'est pas persisté. */
+  url: string;
+}
+
 export interface Trade {
   id: string;
   /** Date d'entrée en position, au format YYYY-MM-DD. */
@@ -137,7 +150,17 @@ export interface Trade {
   /** Optionnel : absent ou vide = aucune erreur taguée pour ce trade. */
   mistakes?: TradeMistake[];
   notes: string;
+  /**
+   * @deprecated Une seule capture d'écran, remplacée par `chartUrls`
+   * (plusieurs captures labellisées : Début/Pendant/Après + supplémentaires).
+   * N'est plus jamais écrit — conservé uniquement pour la lecture de trades
+   * enregistrés avant cette fonctionnalité. `TradingJournal.tsx` absorbe
+   * automatiquement ce champ dans `chartUrls` à l'ouverture du formulaire
+   * d'édition, voir `toScreenshotSlots`.
+   */
   chartUrl?: string;
+  /** Captures d'écran du trade, chacune avec un libellé (Début/Pendant/Après/libre). */
+  chartUrls?: TradeScreenshot[];
   /**
    * @deprecated L'audit IA Gemini a été retiré de l'application. N'est plus
    * jamais écrit — conservé uniquement pour la lecture de données existantes
