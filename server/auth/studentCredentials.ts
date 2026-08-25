@@ -219,10 +219,22 @@ export function createPasswordResetToken(studentAccountId: string): {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + RESET_TOKEN_TTL_MS).toISOString();
 
-  db.prepare(
-    `INSERT INTO student_password_reset_tokens (id, student_account_id, created_at, expires_at)
-     VALUES (?, ?, ?, ?)`
-  ).run(fingerprint(token), studentAccountId, now.toISOString(), expiresAt);
+  db.transaction(() => {
+    // Invalide tout jeton encore valide de ce compte avant d'en émettre un
+    // nouveau — sans ça, si le staff régénère un lien parce que le premier a
+    // été mal transmis, l'ancien reste utilisable en parallèle (jusqu'à son
+    // expiration ou sa consommation) : quiconque l'a intercepté peut encore
+    // réinitialiser le mot de passe même après l'émission d'un lien "officiel"
+    // plus récent.
+    db.prepare(
+      "DELETE FROM student_password_reset_tokens WHERE student_account_id = ? AND used_at IS NULL"
+    ).run(studentAccountId);
+
+    db.prepare(
+      `INSERT INTO student_password_reset_tokens (id, student_account_id, created_at, expires_at)
+       VALUES (?, ?, ?, ?)`
+    ).run(fingerprint(token), studentAccountId, now.toISOString(), expiresAt);
+  })();
 
   return { token, expiresAt };
 }

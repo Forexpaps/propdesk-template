@@ -155,7 +155,14 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
   const movementPct4 = entry4Num > 0 ? (Math.abs(movement4) / entry4Num) * 100 : 0;
   const pnl4 = (direction4 === "LONG" ? movement4 : -movement4) * units4Num;
 
+  // Entrée = stop : `riskDiff1` vaut 0, `units1`/`riskAmount1`/`rr1` valent
+  // déjà silencieusement 0 (voir leurs gardes plus haut) — sans ce contrôle,
+  // le bouton restait actif et poussait ces zéros tels quels dans le
+  // Journal sans le moindre avertissement, un trade inexploitable.
+  const canApply = riskDiff1 > 0;
+
   const handleApply = () => {
+    if (!canApply) return;
     if (onApplyToJournal) {
       onApplyToJournal({
         pair,
@@ -324,7 +331,9 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
             {onApplyToJournal && (
               <button
                 onClick={handleApply}
-                className="px-5 py-2.5 rounded-xl bg-[#00E676] hover:bg-[#00c865] text-slate-950 font-extrabold text-xs shadow-lg shadow-[#00E676]/20"
+                disabled={!canApply}
+                title={canApply ? undefined : "Le prix d'entrée et le stop doivent être différents."}
+                className="px-5 py-2.5 rounded-xl bg-[#00E676] hover:bg-[#00c865] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#00E676] text-slate-950 font-extrabold text-xs shadow-lg shadow-[#00E676]/20"
               >
                 Appliquer au Journal
               </button>

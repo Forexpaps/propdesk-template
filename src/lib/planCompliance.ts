@@ -2,7 +2,8 @@ import { AppNotification, Trade, TradingPlan, TradingPlanData } from "../types";
 import { FOREX_SESSIONS, isSessionActive } from "../components/TopHeader";
 import { isRealizedDollarTrade } from "./performanceStats";
 
-const BASE_STORAGE_KEY = "horizon_trading_plan";
+/** Exportée pour `src/lib/pendingChanges.ts`, qui doit reconnaître une clé de plan namespacée par email sans connaître ce préfixe en dur. */
+export const BASE_STORAGE_KEY = "horizon_trading_plan";
 
 /** Un plan vierge, prêt pour le formulaire — `id` généré, jamais réutilisé. */
 export function createEmptyPlan(name = "Nouveau plan"): TradingPlan {
