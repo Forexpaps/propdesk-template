@@ -241,6 +241,34 @@ function withResolvedStudentAvatars<T extends { id: string; avatar?: unknown }>(
 }
 
 /**
+ * Rattrape un compte élève dont `badges`/`modules` n'ont jamais été
+ * initialisés — normalement copiés depuis le bureau staff partagé au moment
+ * de l'invitation (voir `server/auth/routes.ts`), mais un élève invité
+ * avant l'existence de ces collections (ou dont le bureau staff n'avait
+ * lui-même encore aucune définition à copier ce jour-là) reste bloqué avec
+ * une collection vide pour toujours : cette copie ne se produit qu'une
+ * fois, à l'invitation, sans mécanisme de rattrapage — exactement le bug
+ * signalé ("les badges ne s'affichent pas chez mon élève"). Appelée à
+ * chaque chargement d'état élève, mais sans effet dès que la collection a
+ * été réellement peuplée une fois (idempotent).
+ */
+function backfillStudentDefaultCollections(dataUserId: string): void {
+  for (const name of ["badges", "modules"] as const) {
+    if (listCollection(name, dataUserId).length > 0) continue;
+    const shared = listCollection<{ id: string; [key: string]: unknown }>(name, DEFAULT_USER_ID);
+    if (shared.length === 0) continue;
+    const personalCopy = shared.map((item) => ({
+      ...item,
+      id: `${dataUserId}-${item.id}`,
+      // Une définition de badge copiée ne doit jamais arriver déjà débloquée
+      // — sans objet pour `modules` (pas de champ `unlocked`), ignoré alors.
+      ...(name === "badges" ? { unlocked: false, unlockedAt: undefined } : {}),
+    }));
+    replaceCollection(name, personalCopy, dataUserId);
+  }
+}
+
+/**
  * Payload de démarrage : toutes les collections en un aller-retour, dans les
  * formes exactes attendues par le client.
  *
@@ -253,6 +281,7 @@ api.get("/state", (req, res) => {
   const dataUserId = req.auth!.dataUserId;
 
   if (req.auth!.kind === "student") {
+    backfillStudentDefaultCollections(dataUserId);
     res.json({
       bootstrapped: isBootstrapped(),
       student: buildStudentProfile(req.auth!.userId),
