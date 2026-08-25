@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Plus,
   Search,
@@ -11,12 +11,12 @@ import {
   Tag,
   Calculator,
   Download,
+  Upload,
   Eye,
   Pencil,
   X,
   ImagePlus,
-  Loader2,
-  ChevronDown
+  Loader2
 } from "lucide-react";
 import {
   Trade,
@@ -32,10 +32,10 @@ import {
   TradingPlan,
   TradeScreenshot,
 } from "../types";
-import { formatCurrency } from "../lib/format";
+import { formatCurrency, parsePriceInput } from "../lib/format";
 import { resizeChartScreenshot } from "../lib/image";
 import { computeJournalSummary } from "../lib/performanceStats";
-import { ThousandsInput } from "./ThousandsInput";
+import { Select } from "./Select";
 
 /** Valeur du sélecteur de compte quand aucun n'est choisi. */
 const SANS_COMPTE = "";
@@ -104,6 +104,92 @@ function isDefaultScreenshotLabel(label: string): boolean {
 }
 
 /**
+ * Parseur CSV minimal, miroir exact de `csvCell` côté export : guillemets
+ * doublés pour échapper un guillemet interne, cellules entre guillemets
+ * pouvant contenir des virgules ou des sauts de ligne. Volontairement
+ * artisanal plutôt qu'une dépendance — le format produit par `exportToCSV`
+ * est simple (RFC 4180 basique), pas besoin d'un vrai parseur CSV complet.
+ */
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          cell += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        cell += ch;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell);
+      cell = "";
+      if (row.some((c) => c.trim() !== "")) rows.push(row);
+      row = [];
+    } else {
+      cell += ch;
+    }
+  }
+  if (cell !== "" || row.length > 0) {
+    row.push(cell);
+    if (row.some((c) => c.trim() !== "")) rows.push(row);
+  }
+  return rows;
+}
+
+/** Colonnes attendues, dans l'ordre exact produit par `exportToCSV` — l'import retrouve chaque valeur PAR NOM de colonne, pas par position, pour tolérer un fichier réordonné à la main. */
+const CSV_IMPORT_COLUMNS = [
+  "Date Entree",
+  "Heure Entree",
+  "Date Sortie",
+  "Heure Sortie",
+  "Compte",
+  "Paire",
+  "Marche",
+  "Direction",
+  "Prix Entree",
+  "Stop Loss",
+  "Take Profit",
+  "Prix Sortie",
+  "Taille Lot",
+  "PnL",
+  "Unite PnL",
+  "Resultat",
+  "Strategie",
+  "Emotion",
+  "Erreurs",
+  "Notes",
+] as const;
+
+const CSV_MARKET_CATEGORIES: readonly MarketCategory[] = ["Forex", "Crypto", "Indices", "Matières Premières"];
+const CSV_DIRECTIONS: readonly TradeDirection[] = ["LONG", "SHORT"];
+const CSV_RESULTS: readonly TradeResult[] = ["WIN", "LOSS", "BREAKEVEN", "OPEN"];
+const CSV_EMOTIONS: readonly EmotionState[] = ["Disciplined", "FOMO", "Impulsive", "Anxious", "Calm", "Greedy"];
+const CSV_PNL_UNITS: readonly PnlUnit[] = ["USD", "PERCENT"];
+
+/** Normalise un en-tête pour la correspondance : espaces superflus et casse ignorés. */
+function normalizeHeader(h: string): string {
+  return h.trim().toLowerCase();
+}
+
+/**
  * Captures réellement présentes d'un trade, pour l'affichage en lecture
  * seule (aperçu complet) — contrairement à `toScreenshotSlots`, ne force PAS
  * les 3 emplacements par défaut : un emplacement jamais rempli ne doit rien
@@ -115,34 +201,6 @@ function getFilledScreenshots(trade: Pick<Trade, "chartUrls" | "chartUrl">): Tra
   if (fromNewField.length > 0) return fromNewField;
   return trade.chartUrl ? [{ id: "legacy", label: "Capture", url: trade.chartUrl }] : [];
 }
-
-/**
- * `<select>` personnalisé.
- *
- * Sans ça, chaque navigateur affiche son propre widget natif pour un
- * `<select>` non stylé : un simple chevron sur Chrome/Firefox, mais une
- * double flèche façon "spinner" sur Safari (macOS/iOS). Un élève sur Safari
- * et son coach sur Chrome ne voyaient donc pas le même formulaire — aucune
- * différence de code entre les deux, juste le rendu natif du navigateur.
- * `appearance-none` masque ce widget natif partout ; le chevron `ChevronDown`
- * ci-dessous, toujours identique, le remplace. Le padding droit est fixé en
- * `style` (pas en classe Tailwind) : une classe `pr-*` perdrait face à un
- * `p-2.5` du même niveau de spécificité selon l'ordre interne des utilitaires
- * Tailwind, un style inline gagne toujours.
- */
-const Select: React.FC<React.SelectHTMLAttributes<HTMLSelectElement>> = ({
-  className = "",
-  style,
-  children,
-  ...props
-}) => (
-  <div className="relative">
-    <select {...props} className={`appearance-none ${className}`} style={{ paddingRight: "1.75rem", ...style }}>
-      {children}
-    </select>
-    <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-  </div>
-);
 
 /** Erreurs proposées au tag sur un trade — voir `TradeMistake` dans types.ts. */
 const MISTAKE_OPTIONS: TradeMistake[] = [
@@ -338,6 +396,145 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Importe des trades depuis un CSV — miroir de `exportToCSV`, colonnes
+   * retrouvées PAR NOM (`CSV_IMPORT_COLUMNS`), pas par position, pour
+   * tolérer un fichier réordonné ou complété à la main dans Excel/Sheets.
+   *
+   * Chaque ligne valide devient un NOUVEAU trade (`onAddTrade`) — jamais une
+   * mise à jour. La colonne "ID" de l'export, si présente, est ignorée :
+   * réimporter son propre export ajoute donc des doublons plutôt que de les
+   * fusionner. Une ligne dont un champ obligatoire est manquant ou invalide
+   * (marché/direction/résultat hors des valeurs connues) est ignorée et
+   * comptée à part, jamais bloquante pour le reste du fichier.
+   */
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onerror = () => alert("Ce fichier n'a pas pu être lu.");
+    reader.onload = () => {
+      const text = String(reader.result ?? "");
+      const rows = parseCsv(text);
+      if (rows.length < 2) {
+        alert("Fichier CSV vide ou illisible.");
+        return;
+      }
+
+      const header = rows[0].map(normalizeHeader);
+      const columnIndex = Object.fromEntries(
+        CSV_IMPORT_COLUMNS.map((col) => [col, header.indexOf(normalizeHeader(col))])
+      ) as Record<(typeof CSV_IMPORT_COLUMNS)[number], number>;
+      const missing = CSV_IMPORT_COLUMNS.filter((col) => columnIndex[col] === -1);
+      if (missing.length > 0) {
+        alert(
+          `Ce fichier ne ressemble pas à un export du Journal — colonnes manquantes : ${missing.join(", ")}.`
+        );
+        return;
+      }
+
+      const get = (row: string[], col: (typeof CSV_IMPORT_COLUMNS)[number]) =>
+        (row[columnIndex[col]] ?? "").trim();
+
+      let imported = 0;
+      const errors: string[] = [];
+
+      rows.slice(1).forEach((row, idx) => {
+        const ligne = idx + 2; // +2 : 1-indexé + ligne d'en-tête
+
+        const pair = get(row, "Paire");
+        const date = get(row, "Date Entree");
+        const marketCategory = CSV_MARKET_CATEGORIES.find((m) => m === get(row, "Marche"));
+        const direction = CSV_DIRECTIONS.find((d) => d === get(row, "Direction"));
+        const result = CSV_RESULTS.find((r) => r === get(row, "Resultat"));
+
+        if (!pair || !date || !marketCategory || !direction || !result) {
+          const raison = !pair
+            ? "paire manquante"
+            : !date
+            ? "date d'entrée manquante"
+            : !marketCategory
+            ? `marché "${get(row, "Marche")}" inconnu`
+            : !direction
+            ? `direction "${get(row, "Direction")}" inconnue`
+            : `résultat "${get(row, "Resultat")}" inconnu`;
+          errors.push(`Ligne ${ligne} : ${raison}.`);
+          return;
+        }
+
+        const emotion = CSV_EMOTIONS.find((em) => em === get(row, "Emotion")) ?? "Disciplined";
+        const pnlUnit = CSV_PNL_UNITS.find((u) => u === get(row, "Unite PnL")) ?? "USD";
+
+        const entryPrice = parsePriceInput(get(row, "Prix Entree"));
+        const stopLoss = parsePriceInput(get(row, "Stop Loss"));
+        const takeProfit = parsePriceInput(get(row, "Take Profit"));
+        const exitPriceRaw = get(row, "Prix Sortie");
+        const lotSize = parsePriceInput(get(row, "Taille Lot"));
+        const pnl = parsePriceInput(get(row, "PnL"));
+
+        const accountName = get(row, "Compte");
+        const accountId =
+          accountName && accountName !== "Non rattache"
+            ? accounts.find((a) => a.name === accountName)?.id
+            : undefined;
+
+        const mistakesRaw = get(row, "Erreurs");
+        const mistakes = mistakesRaw
+          ? (mistakesRaw
+              .split(";")
+              .map((m) => m.trim())
+              .filter((m) => (MISTAKE_OPTIONS as string[]).includes(m)) as TradeMistake[])
+          : [];
+
+        const riskDiff = Math.abs(entryPrice - stopLoss);
+        const rewardDiff = Math.abs(takeProfit - entryPrice);
+        const riskRewardRatio = riskDiff > 0 ? Number((rewardDiff / riskDiff).toFixed(1)) : 0;
+
+        onAddTrade({
+          date,
+          time: get(row, "Heure Entree") || undefined,
+          exitDate: get(row, "Date Sortie") || undefined,
+          exitTime: get(row, "Heure Sortie") || undefined,
+          accountId,
+          pair,
+          marketCategory,
+          direction,
+          entryPrice,
+          stopLoss,
+          takeProfit,
+          exitPrice: exitPriceRaw ? parsePriceInput(exitPriceRaw) : undefined,
+          lotSize,
+          pnl,
+          pnlUnit,
+          riskRewardRatio,
+          result,
+          strategy: get(row, "Strategie"),
+          emotion,
+          mistakes,
+          notes: get(row, "Notes"),
+        });
+        imported++;
+      });
+
+      const parts = [`${imported} trade${imported > 1 ? "s" : ""} importé${imported > 1 ? "s" : ""}.`];
+      if (errors.length > 0) {
+        const affichees = errors.slice(0, 10);
+        const reste = errors.length - affichees.length;
+        parts.push(
+          `${errors.length} ligne${errors.length > 1 ? "s" : ""} ignorée${errors.length > 1 ? "s" : ""} :\n${affichees.join("\n")}${
+            reste > 0 ? `\n… et ${reste} de plus.` : ""
+          }`
+        );
+      }
+      alert(parts.join("\n\n"));
+    };
+    reader.readAsText(file, "utf-8");
   };
 
   // New Trade Form state
@@ -608,12 +805,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
    * Le champ contrôlé réaffichait alors aussitôt "0", effaçant la saisie en
    * cours. Ici, la valeur reste une chaîne pendant toute la frappe (virgule
    * convertie en point) et n'est convertie en nombre qu'à la soumission.
-   *
-   * Les 4 champs de prix (entrée/SL/TP/sortie) n'utilisent plus cette
-   * fonction — voir `ThousandsInput.tsx` : sur les indices, le point de
-   * milliers s'affiche automatiquement pendant la frappe, la virgule
-   * décimale devant rester visible telle quelle, pas juste convertie en
-   * point puis affichée comme tel.
    */
   const handleDecimalChange = (
     field: "lotSize" | "pnl",
@@ -626,12 +817,34 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     setFormData((prev) => ({ ...prev, [field]: normalized }));
   };
 
+  /**
+   * Champs de prix (entrée/SL/TP/sortie) : texte totalement libre, sans
+   * aucun formatage ni conversion pendant la frappe.
+   *
+   * Avant, ces champs utilisaient `ThousandsInput`, qui insère de force un
+   * point de milliers pendant la saisie (`4655,66` devenait `4.655,66` à
+   * l'affichage). Une bonne idée sur un indice à 5 chiffres, mais fausse et
+   * gênante sur un actif comme XAU/USD dont la cotation n'a jamais de
+   * regroupement par milliers — demande explicite du fondateur : un coach ou
+   * un élève doit pouvoir taper le point ET la virgule où il veut, sans que
+   * l'app ne réinterprète sa saisie. Seul filtre : chiffres et séparateurs
+   * (`.`/`,`), pour éviter une lettre égarée — aucune conversion, aucun
+   * caractère inséré.
+   */
+  const handlePriceChange = (
+    field: "entryPrice" | "stopLoss" | "takeProfit" | "exitPrice",
+    raw: string
+  ) => {
+    if (!/^[\d.,]*$/.test(raw)) return;
+    setFormData((prev) => ({ ...prev, [field]: raw }));
+  };
+
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     // Géométrie pure, indépendante de l'instrument : recalculable sans risque.
-    const risque = Math.abs(Number(formData.entryPrice) - Number(formData.stopLoss));
-    const gain = Math.abs(Number(formData.takeProfit) - Number(formData.entryPrice));
+    const risque = Math.abs(parsePriceInput(formData.entryPrice) - parsePriceInput(formData.stopLoss));
+    const gain = Math.abs(parsePriceInput(formData.takeProfit) - parsePriceInput(formData.entryPrice));
 
     // `risque === 0` (stop = entrée) n'a pas de ratio R:R réel — l'ancien
     // repli sur "1" enregistrait un 1:1 fictif, indiscernable d'un vrai
@@ -679,10 +892,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       pair: formData.pair,
       marketCategory: formData.marketCategory,
       direction: formData.direction,
-      entryPrice: Number(formData.entryPrice),
-      stopLoss: Number(formData.stopLoss),
-      takeProfit: Number(formData.takeProfit),
-      exitPrice: Number(formData.exitPrice),
+      entryPrice: parsePriceInput(formData.entryPrice),
+      stopLoss: parsePriceInput(formData.stopLoss),
+      takeProfit: parsePriceInput(formData.takeProfit),
+      exitPrice: parsePriceInput(formData.exitPrice),
       lotSize: Number(formData.lotSize),
       pnl,
       pnlUnit: formData.pnlUnit,
@@ -735,6 +948,26 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             <Download className="w-4 h-4 text-[#00E676]" />
             <span className="hidden sm:inline">Exporter CSV</span>
           </button>
+
+          {!readOnly && (
+            <>
+              <button
+                onClick={() => importFileInputRef.current?.click()}
+                className="flex items-center justify-center gap-2 px-3.5 py-3 rounded-xl bg-[#1B2320] hover:bg-[#1B2320] text-slate-200 border border-[#1B2320] font-bold text-xs transition-all cursor-pointer"
+                title="Importer des trades depuis un fichier CSV (même format que l'export)"
+              >
+                <Upload className="w-4 h-4 text-[#00E676]" />
+                <span className="hidden sm:inline">Importer CSV</span>
+              </button>
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                onChange={handleImportCSV}
+                className="hidden"
+              />
+            </>
+          )}
 
           {onOpenCalculator && (
             <button
@@ -1198,9 +1431,11 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Prix d'Entrée</label>
-                  <ThousandsInput
+                  <input
+                    type="text"
+                    inputMode="decimal"
                     value={formData.entryPrice}
-                    onChange={(v) => setFormData((prev) => ({ ...prev, entryPrice: v }))}
+                    onChange={(e) => handlePriceChange("entryPrice", e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
@@ -1208,9 +1443,11 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Stop Loss</label>
-                  <ThousandsInput
+                  <input
+                    type="text"
+                    inputMode="decimal"
                     value={formData.stopLoss}
-                    onChange={(v) => setFormData((prev) => ({ ...prev, stopLoss: v }))}
+                    onChange={(e) => handlePriceChange("stopLoss", e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
@@ -1218,29 +1455,30 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Take Profit</label>
-                  <ThousandsInput
+                  <input
+                    type="text"
+                    inputMode="decimal"
                     value={formData.takeProfit}
-                    onChange={(v) => setFormData((prev) => ({ ...prev, takeProfit: v }))}
+                    onChange={(e) => handlePriceChange("takeProfit", e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                     required
                   />
                 </div>
               </div>
 
-              {formData.marketCategory === "Indices" && (
-                <p className="text-[10px] text-slate-500 -mt-2 leading-snug">
-                  Sur les indices, tape directement les chiffres — le point de milliers s'affiche
-                  tout seul, la virgule reste la décimale : ça donne{" "}
-                  <span className="font-mono text-slate-400">20.637,50</span>.
-                </p>
-              )}
+              <p className="text-[10px] text-slate-500 -mt-2 leading-snug">
+                Saisis les prix comme tu les lis sur ta plateforme — point ou virgule, avec ou
+                sans séparateur de milliers, peu importe l'ordre.
+              </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Prix de Sortie (si fermé)</label>
-                  <ThousandsInput
+                  <input
+                    type="text"
+                    inputMode="decimal"
                     value={formData.exitPrice}
-                    onChange={(v) => setFormData((prev) => ({ ...prev, exitPrice: v }))}
+                    onChange={(e) => handlePriceChange("exitPrice", e.target.value)}
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
                   />
                 </div>
