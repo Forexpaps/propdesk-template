@@ -370,7 +370,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
   // Calculate Summary Statistics — partagé avec l'export PDF, voir
   // src/lib/performanceStats.ts.
-  const { totalTrades, winTrades, lossTrades, winRate, totalPnL, profitFactor, avgRR, disciplineEmoPercent } =
+  const { totalTrades, winTrades, lossTrades, breakevenTrades, winRate, totalPnL, profitFactor, avgRR, disciplineEmoPercent } =
     computeJournalSummary(trades);
 
   // Filtering
@@ -619,7 +619,9 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1">
           <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Taux de Réussite</div>
           <div className="text-xl font-black text-[#00E676] font-mono">{winRate}%</div>
-          <div className="text-[11px] text-slate-500">{winTrades} W / {lossTrades} L</div>
+          <div className="text-[11px] text-slate-500">
+            {winTrades} W / {lossTrades} L{breakevenTrades > 0 ? ` / ${breakevenTrades} BE` : ""}
+          </div>
         </div>
 
         <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1">

@@ -143,7 +143,12 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   // Métriques générales
   const totalTrades = trades.length;
   const wins = trades.filter((t) => t.result === "WIN").length;
-  const winRate = totalTrades > 0 ? Math.round((wins / totalTrades) * 100) : 0;
+  const losses = trades.filter((t) => t.result === "LOSS").length;
+  // Sur gagnants + perdants uniquement (même règle que `computeJournalSummary`
+  // plus bas) : un trade au break-even ou encore ouvert n'est ni l'un ni
+  // l'autre, le compter au dénominateur diluait artificiellement le taux.
+  const decidedTrades = wins + losses;
+  const winRate = decidedTrades > 0 ? Math.round((wins / decidedTrades) * 100) : 0;
   const totalPnL = tradesEnDollars.reduce((acc, t) => acc + t.pnl, 0);
 
   const disciplinedCount = trades.filter(
@@ -420,6 +425,8 @@ export interface JournalSummary {
   totalTrades: number;
   winTrades: number;
   lossTrades: number;
+  /** Trades clôturés au break-even (`result === "BREAKEVEN"`) — ni gagnants ni perdants. */
+  breakevenTrades: number;
   winRate: number;
   totalPnL: number;
   profitFactor: string;
@@ -432,7 +439,13 @@ export function computeJournalSummary(trades: Trade[]): JournalSummary {
   const totalTrades = trades.length;
   const winTrades = trades.filter((t) => t.result === "WIN").length;
   const lossTrades = trades.filter((t) => t.result === "LOSS").length;
-  const winRate = totalTrades > 0 ? Math.round((winTrades / totalTrades) * 100) : 0;
+  const breakevenTrades = trades.filter((t) => t.result === "BREAKEVEN").length;
+  // Sur gagnants + perdants uniquement (convention standard du "win rate") :
+  // un trade clôturé au break-even n'est ni un gagnant ni un perdant, le
+  // compter au dénominateur diluait artificiellement le taux de réussite
+  // sans jamais apparaître nulle part comme "neutre" à l'écran.
+  const decidedTrades = winTrades + lossTrades;
+  const winRate = decidedTrades > 0 ? Math.round((winTrades / decidedTrades) * 100) : 0;
 
   const tradesEnDollars = trades.filter((t) => (t.pnlUnit ?? "USD") !== "PERCENT");
   const totalPnL = tradesEnDollars.reduce((acc, t) => acc + t.pnl, 0);
@@ -452,7 +465,17 @@ export function computeJournalSummary(trades: Trade[]): JournalSummary {
         )
       : 100;
 
-  return { totalTrades, winTrades, lossTrades, winRate, totalPnL, profitFactor, avgRR, disciplineEmoPercent };
+  return {
+    totalTrades,
+    winTrades,
+    lossTrades,
+    breakevenTrades,
+    winRate,
+    totalPnL,
+    profitFactor,
+    avgRR,
+    disciplineEmoPercent,
+  };
 }
 
 export interface PeriodPnl {
