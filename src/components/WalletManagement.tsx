@@ -147,7 +147,12 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
     return acc.type === filterType;
   });
 
-  const selectedAccount = accounts.find((a) => a.id === selectedAccountId) || accounts[0];
+  // Le compte affiché doit toujours provenir de la liste déjà filtrée par
+  // onglet, sinon un compte d'un autre type (ex: SMT 10K en "Prop Firm
+  // Evaluation") reste sélectionné et s'affiche dans le détail même après
+  // avoir changé d'onglet, alors qu'il a disparu de la liste de gauche.
+  const selectedAccount =
+    filteredAccounts.find((a) => a.id === selectedAccountId) || filteredAccounts[0];
 
   const totalCombinedEquity = accounts.reduce((acc, a) => acc + a.equity, 0);
 
