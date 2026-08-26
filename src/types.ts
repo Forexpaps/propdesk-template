@@ -51,6 +51,13 @@ export interface Module {
   durationTotal: string;
   lessons: Lesson[];
   quiz?: QuizQuestion[];
+  /**
+   * `true` = masqué côté élève (encore en préparation) — reste visible et
+   * modifiable côté staff, qui seul peut le basculer. Absent ou `false` =
+   * visible normalement. Voir `getModuleIcon`/le bouton bascule dans
+   * `VideoAcademy.tsx`.
+   */
+  hidden?: boolean;
 }
 
 export type TradeDirection = "LONG" | "SHORT";
