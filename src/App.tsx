@@ -783,7 +783,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
 
   // `hiddenSidebarItems` vient déjà fusionné par le serveur (voir
   // `buildStudentProfile` dans `server/routes.ts`) : les entrées sans écran
-  // élève restent masquées quoi qu'il arrive, le reste (Module vidéo,
+  // élève restent masquées quoi qu'il arrive, le reste (Module cours,
   // Messagerie, Outils, Macro) suit le réglage de visibilité du fondateur —
   // pas de liste figée ici, sous peine de rendre ce réglage sans effet côté
   // élève.

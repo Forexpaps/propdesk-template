@@ -305,8 +305,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           {
             key: "academy",
             tab: "academy",
-            letter: "V",
-            title: "Module vidéo",
+            letter: "C",
+            title: "Module cours",
             description: "Parcours débutant → masterclass, 14 leçons.",
             badgeClasses: "text-amber-400 bg-amber-500/15 border-amber-500/30",
             borderHover: "hover:border-amber-500/40",

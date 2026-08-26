@@ -235,7 +235,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       : []),
     { key: "setups", id: "setups", label: "Setups", icon: Target },
     { key: "tradingPlan", id: null, label: "Plan de trading", icon: ClipboardList, onOpen: onOpenTradingPlan },
-    { key: "academy", id: "academy", label: "Module vidéo", icon: BookOpen, badge: `${courseCompletionPercentage}%` },
+    { key: "academy", id: "academy", label: "Module cours", icon: BookOpen, badge: `${courseCompletionPercentage}%` },
     ...(hasPermission("messaging")
       ? [{ key: "messaging" as const, id: "messaging" as const, label: "Messagerie Coach", icon: MessageSquare, badge: totalUnreadMessages > 0 ? "1" : null }]
       : []),
