@@ -27,6 +27,12 @@ import {
   Trash2,
   BookText,
   Upload,
+  ClipboardList,
+  Wallet,
+  Layers,
+  History,
+  Percent,
+  Target,
 } from "lucide-react";
 import { Module, Lesson, QuizQuestion, ModuleQuizResult, CourseLevel } from "../types";
 import { confirmDialog } from "../lib/confirmDialog";
@@ -75,7 +81,20 @@ const COURSE_LEVEL_ORDER: Record<CourseLevel, number> = {
   Intermédiaire: 1,
   Confirmé: 2,
 };
-const MODULE_ICON_NAMES = ["Compass", "TrendingUp", "Zap", "ShieldCheck", "Brain", "BookOpen"];
+const MODULE_ICON_NAMES = [
+  "BookOpen",
+  "TrendingUp",
+  "ClipboardList",
+  "Brain",
+  "Wallet",
+  "ShieldCheck",
+  "Layers",
+  "History",
+  "Percent",
+  "Compass",
+  "Target",
+  "Zap",
+];
 
 type ModuleFormState = {
   title: string;
@@ -297,15 +316,32 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
   const getModuleIcon = (iconName: string) => {
     switch (iconName) {
       case "Compass":
-        return <Compass className="w-5 h-5 text-amber-400" />;
+        return <Compass className="w-5 h-5 text-teal-400" />;
       case "TrendingUp":
         return <TrendingUp className="w-5 h-5 text-blue-400" />;
       case "Zap":
         return <Zap className="w-5 h-5 text-purple-400" />;
       case "ShieldCheck":
-        return <ShieldCheck className="w-5 h-5 text-[#00E676]" />;
+        return <ShieldCheck className="w-5 h-5 text-cyan-400" />;
       case "Brain":
         return <Brain className="w-5 h-5 text-rose-400" />;
+      // Plan/routine, checklist de règles à suivre — Trading Plan & Routine.
+      case "ClipboardList":
+        return <ClipboardList className="w-5 h-5 text-lime-400" />;
+      // Capital, gestion du risque en argent — Money Management.
+      case "Wallet":
+        return <Wallet className="w-5 h-5 text-[#00E676]" />;
+      // Structure de marché en couches/niveaux — SMC (order blocks, FVG).
+      case "Layers":
+        return <Layers className="w-5 h-5 text-indigo-400" />;
+      // Regarder en arrière — Backtesting.
+      case "History":
+        return <History className="w-5 h-5 text-orange-400" />;
+      // Statistiques, espérance mathématique — Probabilité.
+      case "Percent":
+        return <Percent className="w-5 h-5 text-violet-400" />;
+      case "Target":
+        return <Target className="w-5 h-5 text-red-400" />;
       default:
         return <BookOpen className="w-5 h-5 text-amber-400" />;
     }
