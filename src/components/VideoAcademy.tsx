@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   PlayCircle,
   CheckCircle2,
@@ -26,9 +26,11 @@ import {
   Pencil,
   Trash2,
   BookText,
+  Upload,
 } from "lucide-react";
 import { Module, Lesson, QuizQuestion, ModuleQuizResult, CourseLevel } from "../types";
 import { confirmDialog } from "../lib/confirmDialog";
+import { api } from "../lib/api";
 
 const SectionHeader: React.FC<{ children?: React.ReactNode; color?: string }> = ({
   children,
@@ -144,6 +146,30 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
   );
   const [lessonForm, setLessonForm] = useState<LessonFormState>(emptyLessonForm);
 
+  // Téléversement de vidéo (voir server/uploads.ts) — `null` : rien en
+  // cours. `videoFileInputRef` reste caché, déclenché par le bouton
+  // "Téléverser" (input file natif stylé nulle part n'étant pas fiable).
+  const videoFileInputRef = useRef<HTMLInputElement>(null);
+  const [videoUploadPercent, setVideoUploadPercent] = useState<number | null>(null);
+  const [videoUploadError, setVideoUploadError] = useState<string | null>(null);
+
+  const handleVideoFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permet de retéléverser le même fichier après une erreur
+    if (!file) return;
+
+    setVideoUploadError(null);
+    setVideoUploadPercent(0);
+    try {
+      const { url } = await api.uploadLessonVideo(file, setVideoUploadPercent);
+      setLessonForm((f) => ({ ...f, videoUrl: url }));
+    } catch (err) {
+      setVideoUploadError((err as Error).message || "Le téléversement a échoué.");
+    } finally {
+      setVideoUploadPercent(null);
+    }
+  };
+
   const openNewModuleForm = () => {
     setModuleForm(emptyModuleForm);
     setModuleEditTarget("new");
@@ -193,6 +219,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
 
   const openNewLessonForm = (moduleId: string) => {
     setLessonForm(emptyLessonForm);
+    setVideoUploadError(null);
     setLessonEditTarget({ moduleId, lessonId: "new" });
   };
 
@@ -204,6 +231,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
       description: lesson.description,
       theory: lesson.theory ?? "",
     });
+    setVideoUploadError(null);
     setLessonEditTarget({ moduleId, lessonId: lesson.id });
   };
 
@@ -1156,27 +1184,65 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">Durée (ex: "18 min")</label>
-                <input
-                  type="text"
-                  value={lessonForm.duration}
-                  onChange={(e) => setLessonForm((f) => ({ ...f, duration: e.target.value }))}
-                  placeholder="18 min"
-                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">URL de la vidéo</label>
+            <div className="max-w-[calc(50%-0.375rem)]">
+              <label className="block text-xs font-medium text-slate-300 mb-1">Durée (ex: "18 min")</label>
+              <input
+                type="text"
+                value={lessonForm.duration}
+                onChange={(e) => setLessonForm((f) => ({ ...f, duration: e.target.value }))}
+                placeholder="18 min"
+                className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
+              />
+            </div>
+
+            {/* Vidéo — deux façons d'y arriver : coller un lien existant
+                (YouTube, Vimeo, autre hébergeur) ou téléverser directement un
+                fichier, hébergé sur ce serveur (server/uploads.ts) et publié
+                sous une URL propre à l'écosystème, réinjectée automatiquement
+                ci-dessous une fois l'envoi terminé. */}
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">
+                Vidéo — lien externe ou fichier téléversé
+              </label>
+              <div className="flex items-center gap-2">
                 <input
                   type="text"
                   value={lessonForm.videoUrl}
                   onChange={(e) => setLessonForm((f) => ({ ...f, videoUrl: e.target.value }))}
-                  placeholder="https://..."
-                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
+                  placeholder="https://... (ou téléverse un fichier →)"
+                  className="flex-1 bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
                 />
+                <input
+                  ref={videoFileInputRef}
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/ogg,.mp4,.webm,.mov,.mkv,.ogv"
+                  onChange={handleVideoFileSelected}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => videoFileInputRef.current?.click()}
+                  disabled={videoUploadPercent !== null}
+                  className="shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] disabled:opacity-60 text-slate-200 text-xs font-semibold transition-colors"
+                >
+                  <Upload className="w-4 h-4 text-amber-400" />
+                  {videoUploadPercent !== null ? `${videoUploadPercent}%` : "Téléverser"}
+                </button>
               </div>
+              {videoUploadPercent !== null && (
+                <div className="w-full h-1.5 rounded-full bg-[#1B2320] overflow-hidden mt-2">
+                  <div
+                    className="h-full bg-amber-500 rounded-full transition-all"
+                    style={{ width: `${videoUploadPercent}%` }}
+                  />
+                </div>
+              )}
+              {videoUploadError && (
+                <p className="text-[11px] text-rose-400 mt-1.5">{videoUploadError}</p>
+              )}
+              <p className="text-[11px] text-slate-500 mt-1.5">
+                Formats acceptés en téléversement : mp4, webm, mov, mkv, ogv — jusqu'à 2 Go.
+              </p>
             </div>
 
             <div>

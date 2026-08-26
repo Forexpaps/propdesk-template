@@ -10,7 +10,7 @@ import path from "path";
  * remplacer cette couche par Postgres : tout le reste du serveur ne parle
  * qu'aux repositories, jamais à SQLite directement.
  */
-const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
+export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
