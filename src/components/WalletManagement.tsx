@@ -180,6 +180,10 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   const [newAccMaxTotalDrawdown, setNewAccMaxTotalDrawdown] = useState("10");
   const [newAccMaxDailyDrawdown, setNewAccMaxDailyDrawdown] = useState("5");
   const [newAccProfitTarget, setNewAccProfitTarget] = useState("10");
+  // "" = pas de règle d'inactivité pour ce portefeuille (cas par défaut,
+  // toutes les prop firms n'en imposent pas une) ; sinon un nombre de jours.
+  const [newAccHasInactivityRule, setNewAccHasInactivityRule] = useState(false);
+  const [newAccMaxInactivityDays, setNewAccMaxInactivityDays] = useState("");
 
   const filteredAccounts = accounts.filter((acc) => {
     if (filterType === "ALL") return true;
@@ -254,10 +258,19 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
       accountNumber: `ACC-${Math.floor(100000 + Math.random() * 900000)}`,
     };
 
+    if (newAccHasInactivityRule) {
+      const parsedInactivityDays = parseInt(newAccMaxInactivityDays, 10);
+      if (Number.isFinite(parsedInactivityDays) && parsedInactivityDays > 0) {
+        newAcc.maxInactivityDays = parsedInactivityDays;
+      }
+    }
+
     onAddAccount(newAcc);
     setSelectedAccountId(newAcc.id);
     setIsAddModalOpen(false);
     setNewAccName("");
+    setNewAccHasInactivityRule(false);
+    setNewAccMaxInactivityDays("");
   };
 
   const handleDeleteAccount = (account: TradingAccount) => {
@@ -891,6 +904,50 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50 font-mono"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-300 mb-1.5">
+                  Règle d'inactivité de la prop firm/broker
+                </label>
+                <div className="flex items-center gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewAccHasInactivityRule(false)}
+                    className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                      !newAccHasInactivityRule
+                        ? "bg-[#00E676] text-slate-950"
+                        : "bg-[#0D1110] border border-[#1B2320] text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Aucune
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewAccHasInactivityRule(true)}
+                    className={`flex-1 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                      newAccHasInactivityRule
+                        ? "bg-[#00E676] text-slate-950"
+                        : "bg-[#0D1110] border border-[#1B2320] text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    Limite en jours
+                  </button>
+                </div>
+                {newAccHasInactivityRule && (
+                  <input
+                    type="number"
+                    min={1}
+                    autoFocus
+                    placeholder="Ex: 21"
+                    value={newAccMaxInactivityDays}
+                    onChange={(e) => setNewAccMaxInactivityDays(e.target.value)}
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676]/50 font-mono"
+                  />
+                )}
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  Certaines prop firms invalident le compte après X jours sans trade journalisé. Modifiable plus tard depuis « Ajuster le Portefeuille ».
+                </p>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1B2320]">
