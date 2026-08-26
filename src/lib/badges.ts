@@ -43,10 +43,14 @@ const KNOWN_BADGE_IDS = [
   "badge-15", "badge-16", "badge-17",
   "badge-18", "badge-19", "badge-20",
   "badge-21", "badge-22", "badge-23",
+  "badge-24", "badge-25", "badge-26",
 ];
 function canonicalBadgeId(badgeId: string): string {
   return KNOWN_BADGE_IDS.find((id) => badgeId === id || badgeId.endsWith(`-${id}`)) ?? badgeId;
 }
+
+/** Voir badge-5 « Analyste Rigoureux » et ses paliers (badge-24 à badge-26). */
+const MIN_ANALYST_NOTE_LENGTH = 40;
 
 function computeSingleBadgeProgress(
   badgeId: string,
@@ -85,9 +89,26 @@ function computeSingleBadgeProgress(
     // formalisable, on retient une longueur minimale (40 caractères) plutôt
     // qu'une simple présence, pour écarter les notes triviales ("ok", "-").
     case "badge-5": {
-      const MIN_NOTE_LENGTH = 40;
-      const count = trades.filter((t) => (t.notes ?? "").trim().length >= MIN_NOTE_LENGTH).length;
+      const count = trades.filter((t) => (t.notes ?? "").trim().length >= MIN_ANALYST_NOTE_LENGTH).length;
       const target = 5;
+      return {
+        currentValue: count,
+        targetValue: target,
+        progressPercentage: Math.min(100, Math.round((count / target) * 100)),
+      };
+    }
+
+    // Paliers de badge-5 — même critère, cibles plus hautes.
+    case "badge-24":
+    case "badge-25":
+    case "badge-26": {
+      const targetByBadge: Record<string, number> = {
+        "badge-24": 30,
+        "badge-25": 50,
+        "badge-26": 100,
+      };
+      const target = targetByBadge[canonicalBadgeId(badgeId)];
+      const count = trades.filter((t) => (t.notes ?? "").trim().length >= MIN_ANALYST_NOTE_LENGTH).length;
       return {
         currentValue: count,
         targetValue: target,

@@ -365,6 +365,55 @@ export const initialTraderBadges: TraderBadge[] = [
     unlockedAt: "26 Août 2026",
     rewardXP: 1300,
   },
+  // Paliers de badge-5 « Analyste Rigoureux » — même critère (note technique
+  // ≥ 40 caractères sur un trade clôturé, voir `computeSingleBadgeProgress`
+  // dans `src/lib/badges.ts`), cibles plus hautes que les 5 trades de
+  // badge-5. Contrairement aux paliers de badge-1, celui-ci EST calculable
+  // en direct (la longueur de note est une vraie donnée suivie) : ces
+  // badges ont donc une vraie progression pour tout le monde, pas seulement
+  // un état figé pour le fondateur.
+  {
+    id: "badge-24",
+    title: "Analyste Rigoureux 30 Trades",
+    description: "Relire et documenter 30 trades clôturés avec une note technique complète dans le journal.",
+    iconName: "Sparkles",
+    category: "PERFORMANCE",
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 30,
+    targetValue: 30,
+    unit: "trades documentés",
+    unlockedAt: "26 Août 2026",
+    rewardXP: 550,
+  },
+  {
+    id: "badge-25",
+    title: "Analyste Rigoureux 50 Trades",
+    description: "Relire et documenter 50 trades clôturés avec une note technique complète dans le journal.",
+    iconName: "Sparkles",
+    category: "PERFORMANCE",
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 50,
+    targetValue: 50,
+    unit: "trades documentés",
+    unlockedAt: "26 Août 2026",
+    rewardXP: 800,
+  },
+  {
+    id: "badge-26",
+    title: "Analyste Rigoureux 100 Trades",
+    description: "Relire et documenter 100 trades clôturés avec une note technique complète dans le journal.",
+    iconName: "Sparkles",
+    category: "PERFORMANCE",
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 100,
+    targetValue: 100,
+    unit: "trades documentés",
+    unlockedAt: "26 Août 2026",
+    rewardXP: 1500,
+  },
 ];
 
 export const initialStudentProfile: StudentProfile = {
