@@ -1054,7 +1054,12 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
                           <code className="text-[11px] text-[#00E676] break-all flex-1">{resetLinkResult}</code>
                           <button
                             type="button"
-                            onClick={() => navigator.clipboard.writeText(resetLinkResult)}
+                            onClick={() => {
+                              navigator.clipboard.writeText(resetLinkResult).catch(() => {
+                                // Presse-papiers indisponible (contexte non sécurisé, permission
+                                // refusée) : le lien reste affiché, il pourra être recopié à la main.
+                              });
+                            }}
                             className="px-2.5 py-1.5 rounded-lg bg-[#1B2320] hover:bg-[#232D29] text-slate-300 text-[11px] font-bold shrink-0"
                           >
                             Copier
