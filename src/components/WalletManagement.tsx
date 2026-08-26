@@ -16,6 +16,7 @@ import {
   Trash2,
   Settings,
   Landmark,
+  Clock,
 } from "lucide-react";
 import { TradingAccount, AccountType, Trade } from "../types";
 import { formatCurrency } from "../lib/format";
@@ -23,6 +24,7 @@ import {
   positionsDuCompte as computePositionsDuCompte,
   dailyLossPercent as computeDailyLossPercent,
   totalDrawdownPercent as computeTotalDrawdownPercent,
+  daysSinceLastTrade as computeDaysSinceLastTrade,
 } from "../lib/walletStats";
 import { Select } from "./Select";
 
@@ -169,6 +171,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   const positionsDuCompte = (accountId: string) => computePositionsDuCompte(trades, accountId);
   const dailyLossPercent = (account: TradingAccount) => computeDailyLossPercent(trades, account);
   const totalDrawdownPercent = (account: TradingAccount) => computeTotalDrawdownPercent(account);
+  const daysSinceLastTrade = (accountId: string) => computeDaysSinceLastTrade(trades, accountId);
   const totalCombinedInitial = accounts.reduce((acc, a) => acc + a.initialBalance, 0);
   const totalCombinedPnl = totalCombinedEquity - totalCombinedInitial;
   const totalCombinedPnlPercent = totalCombinedInitial > 0 ? ((totalCombinedPnl / totalCombinedInitial) * 100).toFixed(2) : "0.00";
@@ -379,6 +382,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
             const dailyLossPct = computeDailyLossPercent(trades, acc);
             const dailyLossAmount = -Math.max(0, (-dailyLossPct / 100) * acc.initialBalance);
             const totalLossAmount = -Math.max(0, acc.initialBalance - acc.equity);
+            const inactivityDays = computeDaysSinceLastTrade(trades, acc.id);
 
             return (
               <div
@@ -441,9 +445,30 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                   />
                 </div>
 
-                <div className="flex items-center gap-1.5 pt-2 border-t border-[#1B2320] text-[11px] text-slate-500">
-                  Équité <span className="text-white font-bold font-mono">{formatCurrency(acc.equity)}</span>
-                  <span>· plancher {formatCurrency(floorEquity)}</span>
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#1B2320] text-[11px] text-slate-500">
+                  <span className="flex items-center gap-1.5">
+                    Équité <span className="text-white font-bold font-mono">{formatCurrency(acc.equity)}</span>
+                    <span>· plancher {formatCurrency(floorEquity)}</span>
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1 shrink-0 font-bold ${
+                      inactivityDays === null
+                        ? "text-slate-500"
+                        : inactivityDays >= 7
+                        ? "text-rose-400"
+                        : inactivityDays >= 3
+                        ? "text-amber-400"
+                        : "text-slate-400"
+                    }`}
+                    title="Jours écoulés depuis le dernier trade journalisé sur ce compte"
+                  >
+                    <Clock className="w-3 h-3" />
+                    {inactivityDays === null
+                      ? "Aucun trade"
+                      : inactivityDays === 0
+                      ? "Actif aujourd'hui"
+                      : `${inactivityDays} j inactif`}
+                  </span>
                 </div>
               </div>
             );
@@ -645,7 +670,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
             </div>
 
             {/* Quick Stats Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] text-xs">
               <div>
                 <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Jours de Trading</div>
                 <div className="text-sm font-bold text-white mt-1">
@@ -672,6 +697,30 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 <div className="text-sm font-bold text-[#00E676] mt-1 font-mono">
                   {formatCurrency(selectedAccount.equity)}
                 </div>
+              </div>
+
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Inactivité</div>
+                {(() => {
+                  const inactivityDays = computeDaysSinceLastTrade(trades, selectedAccount.id);
+                  const colorClass =
+                    inactivityDays === null
+                      ? "text-slate-400"
+                      : inactivityDays >= 7
+                      ? "text-rose-400"
+                      : inactivityDays >= 3
+                      ? "text-amber-400"
+                      : "text-white";
+                  return (
+                    <div className={`text-sm font-bold mt-1 ${colorClass}`}>
+                      {inactivityDays === null
+                        ? "Aucun trade"
+                        : inactivityDays === 0
+                        ? "Actif aujourd'hui"
+                        : `${inactivityDays} jour${inactivityDays > 1 ? "s" : ""}`}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
