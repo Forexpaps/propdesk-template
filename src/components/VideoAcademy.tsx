@@ -21,9 +21,14 @@ import {
   TrendingUp,
   Check,
   RotateCcw,
-  GraduationCap
+  GraduationCap,
+  Plus,
+  Pencil,
+  Trash2,
+  BookText,
 } from "lucide-react";
-import { Module, Lesson, QuizQuestion, ModuleQuizResult } from "../types";
+import { Module, Lesson, QuizQuestion, ModuleQuizResult, CourseLevel } from "../types";
+import { confirmDialog } from "../lib/confirmDialog";
 
 const SectionHeader: React.FC<{ children?: React.ReactNode; color?: string }> = ({
   children,
@@ -41,7 +46,54 @@ interface VideoAcademyProps {
   onToggleLessonCompletion: (moduleId: string, lessonId: string) => void;
   onAskCoachAboutLesson: (lessonTitle: string) => void;
   onSaveModuleQuizResult: (moduleId: string, result: ModuleQuizResult) => void;
+  /**
+   * Édition du programme — réservée au staff (voir `App.tsx`, qui ne passe
+   * ces callbacks que sur l'instance staff, jamais sur celle de l'élève).
+   * `isAdmin` gouverne uniquement l'AFFICHAGE des contrôles ; l'autorisation
+   * réelle reste vérifiée côté serveur (collection "modules", bureau
+   * partagé — voir `resolveCollectionUserId`, `server/routes.ts`).
+   */
+  isAdmin?: boolean;
+  onSaveModule?: (module: Module) => void;
+  onDeleteModule?: (moduleId: string) => void;
+  onSaveLesson?: (moduleId: string, lesson: Lesson) => void;
+  onDeleteLesson?: (moduleId: string, lessonId: string) => void;
 }
+
+const COURSE_LEVELS: CourseLevel[] = ["Débutant", "Intermédiaire", "Avancé", "Masterclass"];
+const MODULE_ICON_NAMES = ["Compass", "TrendingUp", "Zap", "ShieldCheck", "Brain", "BookOpen"];
+
+type ModuleFormState = {
+  title: string;
+  category: CourseLevel;
+  iconName: string;
+  description: string;
+  durationTotal: string;
+};
+
+type LessonFormState = {
+  title: string;
+  duration: string;
+  videoUrl: string;
+  description: string;
+  theory: string;
+};
+
+const emptyModuleForm: ModuleFormState = {
+  title: "",
+  category: "Débutant",
+  iconName: "BookOpen",
+  description: "",
+  durationTotal: "",
+};
+
+const emptyLessonForm: LessonFormState = {
+  title: "",
+  duration: "",
+  videoUrl: "",
+  description: "",
+  theory: "",
+};
 
 export const VideoAcademy: React.FC<VideoAcademyProps> = ({
   modules,
@@ -49,6 +101,11 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
   onToggleLessonCompletion,
   onAskCoachAboutLesson,
   onSaveModuleQuizResult,
+  isAdmin = false,
+  onSaveModule,
+  onDeleteModule,
+  onSaveLesson,
+  onDeleteLesson,
 }) => {
   const [selectedLevel, setSelectedLevel] = useState<string>("Tous");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -74,6 +131,116 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
 
   const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState<boolean>(false);
+
+  // Édition de module (staff) — `null` fermé, `"new"` création, sinon l'id
+  // du module en cours de modification.
+  const [moduleEditTarget, setModuleEditTarget] = useState<string | "new" | null>(null);
+  const [moduleForm, setModuleForm] = useState<ModuleFormState>(emptyModuleForm);
+
+  // Édition de leçon (staff) — `moduleId` porte toujours le module parent,
+  // `lessonId` est `"new"` pour une création, sinon l'id de la leçon éditée.
+  const [lessonEditTarget, setLessonEditTarget] = useState<{ moduleId: string; lessonId: string | "new" } | null>(
+    null
+  );
+  const [lessonForm, setLessonForm] = useState<LessonFormState>(emptyLessonForm);
+
+  const openNewModuleForm = () => {
+    setModuleForm(emptyModuleForm);
+    setModuleEditTarget("new");
+  };
+
+  const openEditModuleForm = (module: Module) => {
+    setModuleForm({
+      title: module.title,
+      category: module.category,
+      iconName: module.iconName,
+      description: module.description,
+      durationTotal: module.durationTotal,
+    });
+    setModuleEditTarget(module.id);
+  };
+
+  const handleSubmitModuleForm = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onSaveModule || !moduleEditTarget || !moduleForm.title.trim()) return;
+    const id = moduleEditTarget === "new" ? `mod-${Date.now()}` : moduleEditTarget;
+    const existing = modules.find((m) => m.id === id);
+    onSaveModule({
+      id,
+      title: moduleForm.title.trim(),
+      category: moduleForm.category,
+      iconName: moduleForm.iconName,
+      description: moduleForm.description.trim(),
+      durationTotal: moduleForm.durationTotal.trim() || "0 min",
+      lessons: existing?.lessons ?? [],
+      quiz: existing?.quiz,
+    });
+    setModuleEditTarget(null);
+  };
+
+  const handleDeleteModuleClick = async (module: Module) => {
+    if (!onDeleteModule) return;
+    if (
+      !(await confirmDialog(
+        `Supprimer le module « ${module.title} » et ses ${module.lessons.length} leçon(s) ? Chaque élève perdra sa progression sur ce module.`,
+        { title: "Supprimer un module", confirmLabel: "Supprimer", danger: true }
+      ))
+    ) {
+      return;
+    }
+    onDeleteModule(module.id);
+  };
+
+  const openNewLessonForm = (moduleId: string) => {
+    setLessonForm(emptyLessonForm);
+    setLessonEditTarget({ moduleId, lessonId: "new" });
+  };
+
+  const openEditLessonForm = (moduleId: string, lesson: Lesson) => {
+    setLessonForm({
+      title: lesson.title,
+      duration: lesson.duration,
+      videoUrl: lesson.videoUrl,
+      description: lesson.description,
+      theory: lesson.theory ?? "",
+    });
+    setLessonEditTarget({ moduleId, lessonId: lesson.id });
+  };
+
+  const handleSubmitLessonForm = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!onSaveLesson || !lessonEditTarget || !lessonForm.title.trim()) return;
+    const { moduleId, lessonId } = lessonEditTarget;
+    const module = modules.find((m) => m.id === moduleId);
+    const id = lessonId === "new" ? `lesson-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` : lessonId;
+    const existing = module?.lessons.find((l) => l.id === id);
+    onSaveLesson(moduleId, {
+      id,
+      title: lessonForm.title.trim(),
+      duration: lessonForm.duration.trim() || "0 min",
+      videoUrl: lessonForm.videoUrl.trim(),
+      description: lessonForm.description.trim(),
+      theory: lessonForm.theory.trim() || undefined,
+      isCompleted: existing?.isCompleted ?? false,
+      resources: existing?.resources,
+      quiz: existing?.quiz,
+    });
+    setLessonEditTarget(null);
+  };
+
+  const handleDeleteLessonClick = async (moduleId: string, lesson: Lesson) => {
+    if (!onDeleteLesson) return;
+    if (
+      !(await confirmDialog(`Supprimer la leçon « ${lesson.title} » ?`, {
+        title: "Supprimer une leçon",
+        confirmLabel: "Supprimer",
+        danger: true,
+      }))
+    ) {
+      return;
+    }
+    onDeleteLesson(moduleId, lesson.id);
+  };
 
   // Calculate Progress Stats
   const totalLessons = modules.reduce((acc, m) => acc + m.lessons.length, 0);
@@ -194,6 +361,16 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
             className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
           />
         </div>
+
+        {isAdmin && onSaveModule && (
+          <button
+            onClick={openNewModuleForm}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold whitespace-nowrap shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            Nouveau module
+          </button>
+        )}
       </div>
 
       {/* Modules List */}
@@ -295,6 +472,29 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                       />
                     </div>
                   </div>
+
+                  {isAdmin && (onSaveModule || onDeleteModule) && (
+                    <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5">
+                      {onSaveModule && (
+                        <button
+                          onClick={() => openEditModuleForm(module)}
+                          className="p-2 rounded-lg bg-[#1B2320] text-slate-400 hover:text-white transition-colors"
+                          title="Modifier le module"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {onDeleteModule && (
+                        <button
+                          onClick={() => handleDeleteModuleClick(module)}
+                          className="p-2 rounded-lg bg-[#1B2320] text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
+                          title="Supprimer le module"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   <button className="p-2 rounded-lg bg-[#1B2320] text-slate-400 hover:text-white">
                     {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
@@ -405,9 +605,42 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                             </>
                           )}
                         </button>
+
+                        {isAdmin && (onSaveLesson || onDeleteLesson) && (
+                          <>
+                            {onSaveLesson && (
+                              <button
+                                onClick={() => openEditLessonForm(module.id, lesson)}
+                                className="p-1.5 rounded-lg bg-[#1B2320] text-slate-400 hover:text-white transition-colors"
+                                title="Modifier la leçon"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            {onDeleteLesson && (
+                              <button
+                                onClick={() => handleDeleteLessonClick(module.id, lesson)}
+                                className="p-1.5 rounded-lg bg-[#1B2320] text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors"
+                                title="Supprimer la leçon"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
+
+                  {isAdmin && onSaveLesson && (
+                    <button
+                      onClick={() => openNewLessonForm(module.id)}
+                      className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-[#1B2320] text-slate-400 hover:text-amber-400 hover:border-amber-500/40 text-xs font-semibold transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Ajouter une leçon
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -502,6 +735,27 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Théorie — n'apparaît que si la leçon en porte une, jamais un
+                  bloc vide (voir Lesson.theory, src/types.ts). Paragraphes
+                  séparés par une ligne vide dans le texte source. */}
+              {activeLessonModal.lesson.theory && (
+                <div className="pt-4 border-t border-[#1B2320] space-y-3">
+                  <h4 className="flex items-center gap-2 text-sm font-bold text-white">
+                    <BookText className="w-4 h-4 text-amber-400" />
+                    Théorie
+                  </h4>
+                  <div className="space-y-3 text-sm text-slate-300 leading-relaxed">
+                    {activeLessonModal.lesson.theory
+                      .split(/\n\s*\n/)
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                      .map((paragraph, idx) => (
+                        <p key={idx}>{paragraph}</p>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -762,6 +1016,209 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Module Edit/Create Modal */}
+      {moduleEditTarget && (
+        <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <form
+            onSubmit={handleSubmitModuleForm}
+            className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-white">
+                {moduleEditTarget === "new" ? "Nouveau module" : "Modifier le module"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setModuleEditTarget(null)}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-[#1B2320]"
+                aria-label="Fermer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Titre</label>
+              <input
+                type="text"
+                required
+                autoFocus
+                value={moduleForm.title}
+                onChange={(e) => setModuleForm((f) => ({ ...f, title: e.target.value }))}
+                className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Niveau</label>
+                <select
+                  value={moduleForm.category}
+                  onChange={(e) => setModuleForm((f) => ({ ...f, category: e.target.value as CourseLevel }))}
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50"
+                >
+                  {COURSE_LEVELS.map((lvl) => (
+                    <option key={lvl} value={lvl}>
+                      {lvl}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Icône</label>
+                <select
+                  value={moduleForm.iconName}
+                  onChange={(e) => setModuleForm((f) => ({ ...f, iconName: e.target.value }))}
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50"
+                >
+                  {MODULE_ICON_NAMES.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Durée totale (ex: "2h30")</label>
+              <input
+                type="text"
+                value={moduleForm.durationTotal}
+                onChange={(e) => setModuleForm((f) => ({ ...f, durationTotal: e.target.value }))}
+                placeholder="2h30"
+                className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Description</label>
+              <textarea
+                rows={3}
+                value={moduleForm.description}
+                onChange={(e) => setModuleForm((f) => ({ ...f, description: e.target.value }))}
+                className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 resize-none"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setModuleEditTarget(null)}
+                className="px-4 py-2.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 font-bold text-xs"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Lesson Edit/Create Modal */}
+      {lessonEditTarget && (
+        <div className="fixed inset-0 z-50 bg-[#0D1110]/80 backdrop-blur-md flex items-center justify-center p-4">
+          <form
+            onSubmit={handleSubmitLessonForm}
+            className="bg-[#111615] border border-[#1B2320] rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-white">
+                {lessonEditTarget.lessonId === "new" ? "Nouvelle leçon" : "Modifier la leçon"}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setLessonEditTarget(null)}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-[#1B2320]"
+                aria-label="Fermer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Titre</label>
+              <input
+                type="text"
+                required
+                autoFocus
+                value={lessonForm.title}
+                onChange={(e) => setLessonForm((f) => ({ ...f, title: e.target.value }))}
+                className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">Durée (ex: "18 min")</label>
+                <input
+                  type="text"
+                  value={lessonForm.duration}
+                  onChange={(e) => setLessonForm((f) => ({ ...f, duration: e.target.value }))}
+                  placeholder="18 min"
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">URL de la vidéo</label>
+                <input
+                  type="text"
+                  value={lessonForm.videoUrl}
+                  onChange={(e) => setLessonForm((f) => ({ ...f, videoUrl: e.target.value }))}
+                  placeholder="https://..."
+                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1">Description courte</label>
+              <textarea
+                rows={2}
+                value={lessonForm.description}
+                onChange={(e) => setLessonForm((f) => ({ ...f, description: e.target.value }))}
+                className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500/50 resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-slate-300 mb-1">
+                <BookText className="w-3.5 h-3.5 text-amber-400" />
+                Théorie (optionnel — un paragraphe par ligne vide)
+              </label>
+              <textarea
+                rows={8}
+                value={lessonForm.theory}
+                onChange={(e) => setLessonForm((f) => ({ ...f, theory: e.target.value }))}
+                placeholder="Rédige ici le contenu théorique de la leçon, affiché sous la vidéo..."
+                className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/50 resize-y font-mono"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setLessonEditTarget(null)}
+                className="px-4 py-2.5 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 font-bold text-xs"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>

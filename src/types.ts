@@ -33,6 +33,13 @@ export interface Lesson {
   isCompleted: boolean;
   resources?: Resource[];
   quiz?: QuizQuestion[];
+  /**
+   * Contenu théorique écrit de la leçon (paragraphes séparés par une ligne
+   * vide) — affiché sous la vidéo dans la modale de leçon, `undefined` tant
+   * qu'aucune théorie n'a été rédigée pour cette leçon (aucune section
+   * affichée dans ce cas, jamais un bloc vide).
+   */
+  theory?: string;
 }
 
 export interface Module {
