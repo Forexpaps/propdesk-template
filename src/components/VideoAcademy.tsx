@@ -62,7 +62,7 @@ interface VideoAcademyProps {
   onDeleteLesson?: (moduleId: string, lessonId: string) => void;
 }
 
-const COURSE_LEVELS: CourseLevel[] = ["Débutant", "Intermédiaire", "Confirmé", "Masterclass"];
+const COURSE_LEVELS: CourseLevel[] = ["Débutant", "Intermédiaire", "Confirmé"];
 
 /**
  * Rang pédagogique de chaque niveau — sert à trier la liste des modules
@@ -74,7 +74,6 @@ const COURSE_LEVEL_ORDER: Record<CourseLevel, number> = {
   Débutant: 0,
   Intermédiaire: 1,
   Confirmé: 2,
-  Masterclass: 3,
 };
 const MODULE_ICON_NAMES = ["Compass", "TrendingUp", "Zap", "ShieldCheck", "Brain", "BookOpen"];
 
@@ -381,7 +380,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#111615]/60 p-4 rounded-xl border border-[#1B2320]">
         {/* Category Tabs */}
         <div className="flex items-center gap-1 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 scrollbar-none">
-          {["Tous", "Débutant", "Intermédiaire", "Confirmé", "Masterclass"].map((level) => (
+          {["Tous", "Débutant", "Intermédiaire", "Confirmé"].map((level) => (
             <button
               key={level}
               onClick={() => setSelectedLevel(level)}
