@@ -39,6 +39,7 @@ import {
 } from "./data/mockData";
 import {
   Module,
+  Lesson,
   Trade,
   CoachMessage,
   StudentProfile,
@@ -1511,6 +1512,45 @@ function AcademyApp({
     }));
   };
 
+  // Édition du programme (module Cours) — réservée au staff, jamais exposée
+  // côté élève (voir VideoAcademyProps.isAdmin, src/components/VideoAcademy.tsx) :
+  // "modules" reste le bureau PARTAGÉ pour le staff (resolveCollectionUserId,
+  // server/routes.ts), donc toute modification ici vaut pour tout le monde,
+  // coachs et élèves compris — comme pour les annonces ou le programme.
+  const handleSaveModule = (module: Module) => {
+    setModules((prev) => {
+      const exists = prev.some((m) => m.id === module.id);
+      return exists ? prev.map((m) => (m.id === module.id ? module : m)) : [...prev, module];
+    });
+  };
+
+  const handleDeleteModule = (moduleId: string) => {
+    setModules((prev) => prev.filter((m) => m.id !== moduleId));
+  };
+
+  const handleSaveLesson = (moduleId: string, lesson: Lesson) => {
+    setModules((prev) =>
+      prev.map((mod) => {
+        if (mod.id !== moduleId) return mod;
+        const exists = mod.lessons.some((l) => l.id === lesson.id);
+        return {
+          ...mod,
+          lessons: exists
+            ? mod.lessons.map((l) => (l.id === lesson.id ? lesson : l))
+            : [...mod.lessons, lesson],
+        };
+      })
+    );
+  };
+
+  const handleDeleteLesson = (moduleId: string, lessonId: string) => {
+    setModules((prev) =>
+      prev.map((mod) =>
+        mod.id === moduleId ? { ...mod, lessons: mod.lessons.filter((l) => l.id !== lessonId) } : mod
+      )
+    );
+  };
+
   // Voir le commentaire équivalent dans `StudentAuthenticatedApp` : sans ce
   // miroir synchrone, deux ajouts de trade rapprochés se basaient tous les
   // deux sur la même valeur figée de `trades`, sous-comptant `sameDayTrades`
@@ -1774,6 +1814,11 @@ function AcademyApp({
               onToggleLessonCompletion={handleToggleLessonCompletion}
               onAskCoachAboutLesson={handleAskCoachAboutLesson}
               onSaveModuleQuizResult={handleSaveModuleQuizResult}
+              isAdmin
+              onSaveModule={handleSaveModule}
+              onDeleteModule={handleDeleteModule}
+              onSaveLesson={handleSaveLesson}
+              onDeleteLesson={handleDeleteLesson}
             />
           )}
 
