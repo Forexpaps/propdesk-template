@@ -261,7 +261,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
     setLessonForm({
       title: lesson.title,
       duration: lesson.duration,
-      videoUrl: lesson.videoUrl,
+      videoUrl: lesson.videoUrl ?? "",
       description: lesson.description,
       theory: lesson.theory ?? "",
     });
@@ -280,7 +280,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
       id,
       title: lessonForm.title.trim(),
       duration: lessonForm.duration.trim() || "0 min",
-      videoUrl: lessonForm.videoUrl.trim(),
+      videoUrl: lessonForm.videoUrl.trim() || undefined,
       description: lessonForm.description.trim(),
       theory: lessonForm.theory.trim() || undefined,
       isCompleted: existing?.isCompleted ?? false,
@@ -621,9 +621,13 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                         <button
                           onClick={() => setActiveLessonModal({ module, lesson })}
                           className="mt-0.5 group shrink-0 p-2 rounded-full bg-amber-500/10 text-amber-400 hover:bg-amber-500 hover:text-slate-950 transition-all"
-                          title="Lancer le cours vidéo"
+                          title={lesson.videoUrl ? "Lancer le cours vidéo" : "Lire la leçon théorique"}
                         >
-                          <PlayCircle className="w-6 h-6" />
+                          {lesson.videoUrl ? (
+                            <PlayCircle className="w-6 h-6" />
+                          ) : (
+                            <BookText className="w-6 h-6" />
+                          )}
                         </button>
 
                         <div className="space-y-1">
@@ -634,6 +638,11 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                             <span className="text-[11px] px-2 py-0.5 rounded bg-[#1B2320] text-slate-400 font-mono">
                               {lesson.duration}
                             </span>
+                            {!lesson.videoUrl && (
+                              <span className="text-[11px] px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/30 font-semibold">
+                                Théorie
+                              </span>
+                            )}
                           </div>
                           <p className="text-xs text-slate-400">{lesson.description}</p>
 
@@ -776,15 +785,19 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
               </button>
             </div>
 
-            {/* Video Frame */}
-            <div className="relative bg-black aspect-video w-full flex items-center justify-center border-b border-[#1B2320]">
-              <video
-                src={activeLessonModal.lesson.videoUrl}
-                controls
-                autoPlay
-                className="w-full h-full object-contain"
-              />
-            </div>
+            {/* Video Frame — absent pour une leçon théorique (pas de
+                videoUrl) : on saute directement au contenu théorique
+                ci-dessous plutôt que d'afficher un lecteur vide. */}
+            {activeLessonModal.lesson.videoUrl && (
+              <div className="relative bg-black aspect-video w-full flex items-center justify-center border-b border-[#1B2320]">
+                <video
+                  src={activeLessonModal.lesson.videoUrl}
+                  controls
+                  autoPlay
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            )}
 
             {/* Video Info & Controls */}
             <div className="p-6 space-y-4">
@@ -794,7 +807,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                     {activeLessonModal.lesson.description}
                   </p>
                   <div className="text-xs text-slate-500 font-mono">
-                    Durée vidéo: {activeLessonModal.lesson.duration}
+                    {activeLessonModal.lesson.videoUrl ? "Durée vidéo" : "Durée"}: {activeLessonModal.lesson.duration}
                   </div>
                 </div>
 
@@ -1273,14 +1286,16 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
               />
             </div>
 
-            {/* Vidéo — deux façons d'y arriver : coller un lien existant
-                (YouTube, Vimeo, autre hébergeur) ou téléverser directement un
-                fichier, hébergé sur ce serveur (server/uploads.ts) et publié
-                sous une URL propre à l'écosystème, réinjectée automatiquement
-                ci-dessous une fois l'envoi terminé. */}
+            {/* Vidéo optionnelle — laisser vide pour une leçon 100%
+                théorique (voir Lesson.theory, src/types.ts). Sinon, deux
+                façons d'y arriver : coller un lien existant (YouTube, Vimeo,
+                autre hébergeur) ou téléverser directement un fichier, hébergé
+                sur ce serveur (server/uploads.ts) et publié sous une URL
+                propre à l'écosystème, réinjectée automatiquement ci-dessous
+                une fois l'envoi terminé. */}
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1">
-                Vidéo — lien externe ou fichier téléversé
+                Vidéo (optionnel) — lien externe ou fichier téléversé
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -1320,6 +1335,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
               )}
               <p className="text-[11px] text-slate-500 mt-1.5">
                 Formats acceptés en téléversement : mp4, webm, mov, mkv, ogv — jusqu'à 2 Go.
+                Laisse ce champ vide pour publier une leçon théorique sans vidéo.
               </p>
             </div>
 
