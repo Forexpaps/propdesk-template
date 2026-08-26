@@ -22,6 +22,7 @@ import { PRIVACY_POLICY_URL } from "./lib/links";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
 import { ConfirmDialogHost, confirmDialog } from "./lib/confirmDialog";
 import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, getTradingPlanStorageKey, EMPTY_TRADING_PLANS, normalizeTradingPlans } from "./lib/planCompliance";
+import { upsertWalletRiskAlerts } from "./lib/walletAlerts";
 import { computeBadgeProgress } from "./lib/badges";
 import { listPending } from "./lib/pendingChanges";
 
@@ -574,6 +575,15 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   React.useEffect(() => {
     syncedTradesRef.current = syncedTrades;
   }, [syncedTrades]);
+
+  // Alertes de risque portefeuille (inactivité, drawdown quotidien/total) —
+  // recalculées à chaque changement de compte ou de trade, donc aussi à
+  // chaque ouverture de l'app (un jour peut s'être écoulé sans aucune autre
+  // action). `upsertWalletRiskAlerts` renvoie `syncedNotifications` à
+  // l'identique quand rien de nouveau n'est déclenché, donc pas de boucle.
+  React.useEffect(() => {
+    setSyncedNotifications((prev) => upsertWalletRiskAlerts(prev, syncedAccounts, syncedTrades));
+  }, [syncedAccounts, syncedTrades]);
 
   const handleAddTrade = (newTrade: Omit<Trade, "id">) => {
     // Le suffixe aléatoire n'est pas cosmétique : deux trades ajoutés dans la
@@ -1509,6 +1519,12 @@ function AcademyApp({
   React.useEffect(() => {
     tradesRef.current = trades;
   }, [trades]);
+
+  // Voir le commentaire équivalent dans `StudentAuthenticatedApp` — mêmes
+  // alertes de risque portefeuille, pour les comptes du coach lui-même.
+  React.useEffect(() => {
+    setNotifications((prev) => upsertWalletRiskAlerts(prev, accounts, trades));
+  }, [accounts, trades]);
 
   const handleAddTrade = (newTrade: Omit<Trade, "id">) => {
     // Voir le commentaire équivalent côté élève (`StudentAuthenticatedApp`) :
