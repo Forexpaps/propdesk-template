@@ -24,6 +24,7 @@ import {
 import { authRouter, staffRouter } from "./auth/routes";
 import { studentAuthRouter, studentProtectedRouter } from "./auth/studentRoutes";
 import { requireAuth, type AuthContext } from "./auth/middleware";
+import { uploadsRouter } from "./uploads";
 import { createRateLimit } from "./middleware/rateLimit";
 import { getEconomicCalendar } from "./economicCalendar";
 import { getMarketData } from "./marketData";
@@ -132,6 +133,11 @@ api.use(requireAuth);
 // avec « Action réservée au staff » avant ce correctif.
 api.use("/auth", staffRouter);
 api.use("/auth", studentProtectedRouter);
+// Vidéos de leçon (téléversement staff + lecture avec support Range) — voir
+// server/uploads.ts. Montée ici, après la barrière d'authentification :
+// regarder une leçon exige une session valide (staff ou élève), la limite au
+// seul staff pour le téléversement est posée route par route dans ce routeur.
+api.use("/uploads", uploadsRouter);
 
 /**
  * Collections qu'une session élève peut lire/écrire : son Journal, ses

@@ -530,4 +530,45 @@ export const api = {
    */
   exportStudentData: () =>
     request<Record<string, unknown>>("/api/auth/export"),
+
+  /**
+   * Téléverse une vidéo de leçon (module Cours) — réservée au staff, voir
+   * `server/uploads.ts`. Renvoie l'URL relative à stocker telle quelle dans
+   * `Lesson.videoUrl`.
+   *
+   * En `XMLHttpRequest` et non `fetch` : c'est la seule API navigateur qui
+   * expose une progression d'upload (`upload.onprogress`) — un fichier vidéo
+   * peut peser plusieurs centaines de Mo, une barre de progression n'est pas
+   * un confort superflu ici.
+   */
+  uploadLessonVideo: (file: File, onProgress?: (percent: number) => void) =>
+    new Promise<{ url: string }>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/uploads/videos");
+      xhr.withCredentials = true;
+      xhr.upload.onprogress = (e) => {
+        if (onProgress && e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        let body: unknown;
+        try {
+          body = JSON.parse(xhr.responseText);
+        } catch {
+          body = null;
+        }
+        if (xhr.status >= 200 && xhr.status < 300 && body && typeof body === "object" && "url" in body) {
+          resolve(body as { url: string });
+        } else {
+          const message =
+            body && typeof body === "object" && "error" in body && typeof body.error === "string"
+              ? body.error
+              : "Le téléversement a échoué.";
+          reject(new Error(message));
+        }
+      };
+      xhr.onerror = () => reject(new Error("Le téléversement a échoué (connexion)."));
+      const formData = new FormData();
+      formData.append("video", file);
+      xhr.send(formData);
+    }),
 };
