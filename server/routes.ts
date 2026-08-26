@@ -256,26 +256,44 @@ function withResolvedStudentAvatars<T extends { id: string; avatar?: unknown }>(
  * chaque chargement d'état élève, mais sans effet dès que la collection a
  * été réellement peuplée une fois (idempotent).
  */
+/**
+ * Rattrape les badges MANQUANTS d'un bureau (staff partagé ou élève) par
+ * rapport au catalogue `initialTraderBadges` — pas seulement quand la
+ * collection est totalement vide (`length === 0`) : un ajout de nouveaux
+ * badges au catalogue (ex. les paliers de série de discipline au-delà de 7
+ * jours) doit aussi atteindre les comptes déjà peuplés, staff comme élèves
+ * déjà invités, sans attendre une réinvitation qui n'aura jamais lieu.
+ * Idempotent — sans effet une fois que chaque badge du catalogue a sa copie.
+ *
+ * `asStaff` distingue les deux règles d'id/état déjà en vigueur ailleurs
+ * (voir `server/auth/routes.ts`) :
+ * - bureau staff (`DEFAULT_USER_ID`) : id du catalogue tel quel
+ *   (`badge-N`), état copié tel quel — décision explicite du fondateur que
+ *   SON profil a tout de débloqué (voir le commentaire en tête de
+ *   `initialTraderBadges`).
+ * - élève : id préfixé (`${dataUserId}-badge-N`), toujours reposé
+ *   verrouillé — jamais un faux badge déjà débloqué.
+ */
+function backfillMissingBadges(dataUserId: string, asStaff: boolean): void {
+  const existing = listCollection<{ id: string; [key: string]: unknown }>("badges", dataUserId);
+  const isAlreadyPresent = (definitionId: string) =>
+    asStaff
+      ? existing.some((b) => b.id === definitionId)
+      : existing.some((b) => b.id.endsWith(`-${definitionId}`));
+
+  const missingDefinitions = initialTraderBadges.filter((def) => !isAlreadyPresent(def.id));
+  if (missingDefinitions.length === 0) return;
+
+  const newEntries = missingDefinitions.map((def) =>
+    asStaff
+      ? { ...def }
+      : { ...def, id: `${dataUserId}-${def.id}`, unlocked: false, unlockedAt: undefined }
+  );
+  replaceCollection("badges", [...existing, ...newEntries], dataUserId);
+}
+
 function backfillStudentDefaultCollections(dataUserId: string): void {
-  // Badges : catalogue FIXE du produit (jamais édité via une UI staff) — la
-  // constante partagée `initialTraderBadges` fait foi directement, plutôt
-  // que la collection "badges" du bureau staff (`DEFAULT_USER_ID`), qui n'a
-  // en réalité jamais été écrite côté serveur pour la plupart des
-  // déploiements : le tableau de bord staff affiche `initialTraderBadges`
-  // comme simple repli client (`seed()`, `src/App.tsx`) sans jamais le
-  // persister en base tant que personne n'y réclame de badge. Copier depuis
-  // cette collection revenait donc à copier... rien, laissant l'élève
-  // bloqué à "0/0" malgré le rattrapage. Toujours reposé verrouillé
-  // (`unlocked: false`), jamais un faux badge déjà débloqué.
-  if (listCollection("badges", dataUserId).length === 0) {
-    const personalBadges = initialTraderBadges.map((badge) => ({
-      ...badge,
-      id: `${dataUserId}-${badge.id}`,
-      unlocked: false,
-      unlockedAt: undefined,
-    }));
-    replaceCollection("badges", personalBadges, dataUserId);
-  }
+  backfillMissingBadges(dataUserId, false);
 
   // Modules : contenu réel du programme, personnalisable par le fondateur —
   // copié depuis SON bureau en priorité (source de vérité éditable), avec un
@@ -327,6 +345,8 @@ api.get("/state", (req, res) => {
     });
     return;
   }
+
+  backfillMissingBadges(dataUserId, true);
 
   const collections = Object.fromEntries(
     COLLECTION_NAMES.map((name) => {

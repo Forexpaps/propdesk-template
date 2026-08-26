@@ -144,6 +144,83 @@ export const initialTraderBadges: TraderBadge[] = [
     unlockedAt: "8 Septembre 2024",
     rewardXP: 500,
   },
+  // Paliers de série de discipline au-delà de badge-6 (7 jours) — même
+  // critère (`computeDisciplineStreak`), cibles plus longues. `unlocked:
+  // true` ici aussi : décision explicite du fondateur (mêmes raisons que les
+  // 9 badges précédents, voir le commentaire en tête de fichier) — pour un
+  // NOUVEL élève, `unlocked` est toujours remis à `false` à la copie
+  // (`server/auth/routes.ts`, `backfillMissingBadges` dans
+  // `server/routes.ts`), qui ne recopie jamais cet état.
+  {
+    id: "badge-10",
+    title: "Série de Discipline 14 Jours",
+    description: "Respecter à 100% ton plan de trading sans écart émotionnel pendant 14 jours de trading consécutifs.",
+    iconName: "Flame",
+    category: "DISCIPLINE",
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 14,
+    targetValue: 14,
+    unit: "jours",
+    unlockedAt: "26 Août 2026",
+    rewardXP: 450,
+  },
+  {
+    id: "badge-11",
+    title: "Série de Discipline 1 Mois",
+    description: "Respecter à 100% ton plan de trading sans écart émotionnel pendant 30 jours de trading consécutifs.",
+    iconName: "Flame",
+    category: "DISCIPLINE",
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 30,
+    targetValue: 30,
+    unit: "jours",
+    unlockedAt: "26 Août 2026",
+    rewardXP: 600,
+  },
+  {
+    id: "badge-12",
+    title: "Série de Discipline 3 Mois",
+    description: "Respecter à 100% ton plan de trading sans écart émotionnel pendant 90 jours de trading consécutifs.",
+    iconName: "Flame",
+    category: "DISCIPLINE",
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 90,
+    targetValue: 90,
+    unit: "jours",
+    unlockedAt: "26 Août 2026",
+    rewardXP: 900,
+  },
+  {
+    id: "badge-13",
+    title: "Série de Discipline 6 Mois",
+    description: "Respecter à 100% ton plan de trading sans écart émotionnel pendant 180 jours de trading consécutifs.",
+    iconName: "Flame",
+    category: "DISCIPLINE",
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 180,
+    targetValue: 180,
+    unit: "jours",
+    unlockedAt: "26 Août 2026",
+    rewardXP: 1400,
+  },
+  {
+    id: "badge-14",
+    title: "Série de Discipline 1 An",
+    description: "Respecter à 100% ton plan de trading sans écart émotionnel pendant 365 jours de trading consécutifs.",
+    iconName: "Flame",
+    category: "DISCIPLINE",
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 365,
+    targetValue: 365,
+    unit: "jours",
+    unlockedAt: "26 Août 2026",
+    rewardXP: 2500,
+  },
 ];
 
 export const initialStudentProfile: StudentProfile = {
