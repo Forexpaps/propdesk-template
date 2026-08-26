@@ -62,14 +62,23 @@ function parseLocalISODate(iso: string): Date {
 }
 
 /**
- * Nombre de jours écoulés depuis le dernier trade journalisé sur un compte
- * (0 = trade saisi aujourd'hui), ou `null` si aucun trade n'est rattaché à
- * ce compte — sert à repérer les portefeuilles inactifs (risque d'échec
- * d'une règle "minimum trading days" prop firm, ou simplement un compte
- * délaissé).
+ * Nombre de jours écoulés depuis la dernière activité connue sur un compte
+ * (0 = aujourd'hui), ou `null` si aucune date n'est disponible — sert à
+ * repérer les portefeuilles inactifs (risque d'échec d'une règle "minimum
+ * trading days" prop firm, ou simplement un compte délaissé).
+ *
+ * Prend la plus récente entre la date du dernier trade journalisé et
+ * `lastManualActivityDate` (compte tradé chez le broker sans être
+ * journalisé ici) — un compte sans aucun trade rattaché resterait sinon
+ * marqué "Aucun trade" en permanence même actif.
  */
-export function daysSinceLastTrade(trades: Trade[], accountId: string): number | null {
+export function daysSinceLastTrade(
+  trades: Trade[],
+  accountId: string,
+  lastManualActivityDate?: string
+): number | null {
   const dates = trades.filter((t) => t.accountId === accountId).map((t) => t.date);
+  if (lastManualActivityDate) dates.push(lastManualActivityDate);
   if (dates.length === 0) return null;
   const lastDate = dates.reduce((latest, d) => (d > latest ? d : latest));
   const msPerDay = 24 * 60 * 60 * 1000;
