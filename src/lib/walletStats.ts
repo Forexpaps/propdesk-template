@@ -51,6 +51,35 @@ export function dailyLossPercent(trades: Trade[], account: TradingAccount): numb
   return (pnlToday / account.initialBalance) * 100;
 }
 
+/**
+ * Convertit une date `YYYY-MM-DD` en `Date` locale à minuit — jamais
+ * `new Date("YYYY-MM-DD")`, qui parse en UTC et peut décaler le jour d'un
+ * cran selon le fuseau (même piège documenté sur `todayLocalISODate`).
+ */
+function parseLocalISODate(iso: string): Date {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/**
+ * Nombre de jours écoulés depuis le dernier trade journalisé sur un compte
+ * (0 = trade saisi aujourd'hui), ou `null` si aucun trade n'est rattaché à
+ * ce compte — sert à repérer les portefeuilles inactifs (risque d'échec
+ * d'une règle "minimum trading days" prop firm, ou simplement un compte
+ * délaissé).
+ */
+export function daysSinceLastTrade(trades: Trade[], accountId: string): number | null {
+  const dates = trades.filter((t) => t.accountId === accountId).map((t) => t.date);
+  if (dates.length === 0) return null;
+  const lastDate = dates.reduce((latest, d) => (d > latest ? d : latest));
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const diff = Math.round(
+    (parseLocalISODate(todayLocalISODate()).getTime() - parseLocalISODate(lastDate).getTime()) /
+      msPerDay
+  );
+  return Math.max(0, diff);
+}
+
 /** Drawdown total depuis le capital initial, en % — mêmes principes. */
 export function totalDrawdownPercent(account: TradingAccount): number {
   if (account.initialBalance <= 0) return 0;
