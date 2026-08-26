@@ -302,7 +302,7 @@ interface EnrolledStudentLite {
  *
  * Masquées quoi qu'il arrive, indépendamment du réglage de visibilité du
  * fondateur — ce dernier gouverne le reste (Portefeuille, Rentabilité,
- * Examen, Exercice du jour, Module vidéo, Messagerie, Mindset, Macro) :
+ * Examen, Exercice du jour, Module cours, Messagerie, Mindset, Macro) :
  * voir la fusion ci-dessous.
  */
 const ALWAYS_HIDDEN_FOR_STUDENTS = ["students"];
