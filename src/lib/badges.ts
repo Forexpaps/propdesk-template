@@ -42,6 +42,7 @@ const KNOWN_BADGE_IDS = [
   "badge-10", "badge-11", "badge-12", "badge-13", "badge-14",
   "badge-15", "badge-16", "badge-17",
   "badge-18", "badge-19", "badge-20",
+  "badge-21", "badge-22", "badge-23",
 ];
 function canonicalBadgeId(badgeId: string): string {
   return KNOWN_BADGE_IDS.find((id) => badgeId === id || badgeId.endsWith(`-${id}`)) ?? badgeId;
@@ -182,10 +183,12 @@ function computeSingleBadgeProgress(
       };
     }
 
-    // badge-1 (% de risque par trade), badge-3 (module Replay, retiré de
-    // l'app — plus aucune source de données pour ce badge), badge-8 (cumul
-    // en "R"), badge-9 (score d'examen) : aucune donnée suivie aujourd'hui
-    // ne permet de les calculer honnêtement.
+    // badge-1, badge-21, badge-22, badge-23 (% de risque par trade — le tag
+    // "Sur-risque (>1%)" n'est qu'auto-déclaré, son absence ne prouve rien),
+    // badge-3 (module Replay, retiré de l'app — plus aucune source de
+    // données pour ce badge), badge-8 (cumul en "R"), badge-9 (score
+    // d'examen) : aucune donnée suivie aujourd'hui ne permet de les calculer
+    // honnêtement.
     default:
       return null;
   }
