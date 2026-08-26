@@ -29,6 +29,7 @@ import { getEconomicCalendar } from "./economicCalendar";
 import { getMarketData } from "./marketData";
 import { buildStudentProfile, getStudentByEnrolledId } from "./auth/studentCredentials";
 import { DEFAULT_USER_ID, FOUNDER_COACH_ID } from "./db";
+import { getStaffById } from "./auth/credentials";
 // Catalogue fixe des badges + repli de dernier recours pour les modules —
 // données pures (aucune dépendance React/DOM), voir le commentaire de
 // `backfillStudentDefaultCollections` plus bas pour pourquoi le serveur en a besoin.
@@ -159,7 +160,22 @@ const STUDENT_ALLOWED_COLLECTIONS = new Set<CollectionName>([
 ]);
 
 /**
- * Profil du bureau staff partagé, `isAdmin` toujours forcé à `true`.
+ * Profil PERSONNEL d'un compte staff — nom, avatar, bio, capital, etc.
+ * `isAdmin` toujours forcé à `true`.
+ *
+ * `personalDataUserId` (voir `AuthContext.personalDataUserId`) : jamais
+ * `DEFAULT_USER_ID` tel quel pour un coach, sans quoi il verrait et pourrait
+ * modifier l'identité du fondateur au lieu de la sienne — exactement le bug
+ * signalé ("les coachs ne doivent pas voir mon profil en détail, ni celui
+ * des autres coachs"). Pour le fondateur, `personalDataUserId ===
+ * DEFAULT_USER_ID`, donc aucun changement de comportement pour lui.
+ *
+ * `hiddenSidebarItems` reste l'EXCEPTION partagée : c'est un réglage
+ * org-wide que seul le fondateur peut poser (voir `PUT /profile` plus bas et
+ * `AuthContext.isOwner`), et qui doit s'appliquer à tout le staff — jamais
+ * lu depuis le profil personnel de l'appelant, toujours depuis le bureau
+ * partagé, fusionné par-dessus (même principe que `buildStudentProfile`,
+ * `server/auth/studentCredentials.ts`).
  *
  * Tout compte staff a exactement les mêmes droits (voir
  * `StaffAccountsModal.tsx`, "Mêmes droits pour tous sur ce bureau") — `false`
@@ -170,10 +186,15 @@ const STUDENT_ALLOWED_COLLECTIONS = new Set<CollectionName>([
  * `Sidebar.tsx` (qui décide d'afficher "Suivi des Élèves" sur ce seul champ)
  * masquait silencieusement l'onglet à un vrai compte fondateur.
  */
-function buildStaffProfile(dataUserId: string): Record<string, unknown> | null {
-  const profile = getProfile<Record<string, unknown>>(dataUserId);
+function buildStaffProfile(personalDataUserId: string): Record<string, unknown> | null {
+  const profile = getProfile<Record<string, unknown>>(personalDataUserId);
   if (!profile) return null;
-  return { ...profile, isAdmin: true };
+  const sharedProfile = getProfile<{ hiddenSidebarItems?: unknown }>(DEFAULT_USER_ID);
+  return {
+    ...profile,
+    isAdmin: true,
+    hiddenSidebarItems: sharedProfile?.hiddenSidebarItems ?? [],
+  };
 }
 
 /**
@@ -285,9 +306,29 @@ function resolveCollectionUserId(auth: AuthContext, name: CollectionName): strin
  * échouerait sinon (violation de contrainte). Sans effet dès que la ligne
  * existe déjà (le fondateur en a toujours une, `personalDataUserId ===
  * DEFAULT_USER_ID`).
+ *
+ * Sème un profil minimal cohérent (nom déduit de l'email, capital par
+ * défaut) plutôt qu'un objet vide — même contenu que `minimalProfile`
+ * (`server/auth/routes.ts`, appelé pour le tout premier compte fondateur) :
+ * un coach voit ainsi tout de suite SA propre identité dans "Profil &
+ * Options", jamais un écran vide ni, pire, celle du fondateur.
  */
 function ensurePersonalUserRow(userId: string): void {
-  if (getProfile(userId) === null) saveProfile({}, userId);
+  if (getProfile(userId) !== null) return;
+  const staff = getStaffById(userId);
+  saveProfile(
+    {
+      name: staff?.name || staff?.email?.split("@")[0] || "Coach",
+      email: staff?.email ?? "",
+      avatar: "",
+      level: "Coach",
+      joinedDate: new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }),
+      startingCapital: 10000,
+      currentCapital: 10000,
+      isAdmin: true,
+    },
+    userId
+  );
 }
 
 /**
@@ -425,7 +466,7 @@ api.get("/state", (req, res) => {
 
   res.json({
     bootstrapped: isBootstrapped(),
-    student: buildStaffProfile(dataUserId),
+    student: buildStaffProfile(req.auth!.personalDataUserId),
     quizResults: getQuizResults(dataUserId),
     announcements: getAnnouncements() ?? [],
     collections,
@@ -614,48 +655,30 @@ api.put("/profile", profileRateLimit, (req, res) => {
     return;
   }
 
-  // Second verrou sur `isAdmin`. Le schéma a déjà retiré la clé du corps ; ici on
-  // réinjecte la valeur autoritative lue en base. Les deux sont utiles : le
-  // schéma protège cette route, cette ligne protège l'invariant même si une
-  // future route oublie le schéma — et elle empêche aussi qu'un client qui ne
-  // renvoie pas le champ ne l'effface.
-  const current = getProfile<{
-    isAdmin?: boolean;
-    hiddenSidebarItems?: unknown;
-  }>();
-
-  // Seul le compte fondateur règle les entrées masquées de la sidebar.
-  //
-  // La valeur en base est **réinjectée** pour un coach, elle n'est pas rejetée :
-  // `hiddenSidebarItems` voyage dans le même objet que le nom, l'avatar ou le
-  // capital, tous légitimement modifiables par un coach. Un 403 sur la requête
-  // entière lui interdirait de changer son propre profil à cause d'un champ
-  // qu'il n'a même pas touché — le client renvoie fidèlement l'objet reçu.
-  //
-  // Forcé à `true`, jamais redérivé de `current?.isAdmin` : cette route a
-  // déjà rejeté toute session non-staff plus haut (ligne 356), et tout compte
-  // staff a `isAdmin: true` par invariant (voir `buildStaffProfile`, plus
-  // bas dans ce fichier — même règle, même raison). `current?.isAdmin ===
-  // true` semblait équivalent mais ne l'était pas : sur une base migrée
-  // avant l'ajout de ce champ, `current.isAdmin` vaut `false`/absent, et
-  // cette ligne écrivait alors `isAdmin: false` en base — une valeur que
-  // plus rien ne corrigeait ensuite, puisque chaque futur PUT la relisait
-  // pour la réécrire à l'identique. `buildStaffProfile` masquait le symptôme
-  // en la forçant à `true` en lecture, mais la valeur stockée restait fausse.
+  // Forcé à `true`, jamais redérivé d'une valeur lue en base — cette route a
+  // déjà rejeté toute session non-staff plus haut, et tout compte staff a
+  // `isAdmin: true` par invariant (voir `buildStaffProfile`, plus bas dans ce
+  // fichier — même règle, même raison).
   const profile: Record<string, unknown> = {
     ...parsed.data,
     isAdmin: true,
   };
 
+  // `hiddenSidebarItems` est le SEUL champ qui n'appartient pas au profil
+  // PERSONNEL de l'appelant, même s'il voyage dans le même objet que le nom,
+  // l'avatar ou le capital côté client — c'est un réglage org-wide que seul
+  // le fondateur peut poser (voir `buildStaffProfile`, qui le lit toujours
+  // depuis le bureau partagé, jamais depuis le profil personnel écrit ici).
+  // Pour un coach, ce champ n'a donc aucune existence légitime dans SA
+  // propre ligne : plutôt que de réinjecter une valeur (celle du bureau
+  // partagé, ou une valeur périmée de son propre profil), on l'écarte
+  // simplement — `buildStaffProfile` la resservira de toute façon depuis la
+  // source autoritaire à la prochaine lecture, quoi que ce PUT ait stocké.
   if (req.auth?.isOwner !== true) {
-    if (current && "hiddenSidebarItems" in current) {
-      profile.hiddenSidebarItems = current.hiddenSidebarItems;
-    } else {
-      delete profile.hiddenSidebarItems;
-    }
+    delete profile.hiddenSidebarItems;
   }
 
-  saveProfile(profile);
+  saveProfile(profile, req.auth!.personalDataUserId);
   res.json({ success: true });
 });
 
@@ -788,7 +811,7 @@ api.post("/state/restore", stateRestoreRateLimit, (req, res) => {
     if (auth.kind === "student") {
       skipped.push("student");
     } else {
-      saveProfile(parsed.data.student, auth.dataUserId);
+      saveProfile(parsed.data.student, auth.personalDataUserId);
       imported.push("student");
     }
   }
