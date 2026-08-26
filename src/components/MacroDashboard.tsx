@@ -44,8 +44,32 @@ const IMPACT_FILTER_OPTIONS: {
   { id: "Holiday", label: "Férié", dotClass: "bg-violet-500", activeClasses: "bg-violet-500/15 border-violet-500/60 text-violet-400" },
 ];
 
-const MARKET_REFRESH_MS = 60_000;
+/**
+ * Le marché en direct ne s'actualise plus en continu : seulement à ces 3
+ * horaires (heure locale du navigateur), sur demande explicite du fondateur.
+ * Le calendrier économique garde son propre cycle (`CALENDAR_REFRESH_MS`),
+ * inchangé.
+ */
+const MARKET_REFRESH_HOURS = [8, 12, 20];
 const CALENDAR_REFRESH_MS = 10 * 60_000;
+
+/** Prochain horaire de `MARKET_REFRESH_HOURS` strictement après `from`. */
+function getNextMarketRefresh(from: Date): Date {
+  for (let dayOffset = 0; dayOffset <= 1; dayOffset++) {
+    for (const hour of MARKET_REFRESH_HOURS) {
+      const candidate = new Date(from);
+      candidate.setDate(from.getDate() + dayOffset);
+      candidate.setHours(hour, 0, 0, 0);
+      if (candidate.getTime() > from.getTime()) return candidate;
+    }
+  }
+  // Filet de sécurité — inatteignable en pratique : un créneau du lendemain
+  // est toujours strictement après `from`, la boucle ci-dessus le trouve.
+  const fallback = new Date(from);
+  fallback.setDate(from.getDate() + 1);
+  fallback.setHours(MARKET_REFRESH_HOURS[0], 0, 0, 0);
+  return fallback;
+}
 
 function formatCountdown(minutesUntil: number): string | null {
   if (minutesUntil <= 0) return null;
@@ -158,6 +182,7 @@ export const MacroDashboard: React.FC = () => {
   const [now, setNow] = useState(() => new Date());
   const [quotes, setQuotes] = useState<MarketQuote[] | null>(null);
   const [marketError, setMarketError] = useState<string | null>(null);
+  const [lastMarketUpdate, setLastMarketUpdate] = useState<Date | null>(null);
   const [rawEvents, setRawEvents] = useState<EconomicCalendarEvent[] | null>(null);
   const [calendarError, setCalendarError] = useState<string | null>(null);
   // Sélection multiple indépendante — chaque niveau d'impact est son propre
@@ -186,22 +211,35 @@ export const MacroDashboard: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
     const load = async () => {
       try {
         const { quotes: q } = await api.fetchMarketData();
         if (!cancelled) {
           setQuotes(q);
           setMarketError(null);
+          setLastMarketUpdate(new Date());
         }
       } catch (err) {
         if (!cancelled) setMarketError((err as Error).message || "Marché indisponible.");
       }
     };
+    // Chargement immédiat pour ne pas afficher une page vide à l'ouverture,
+    // puis un seul `setTimeout` reprogrammé à chaque exécution vers le
+    // prochain créneau de MARKET_REFRESH_HOURS — pas de `setInterval` à
+    // cadence fixe, l'actualisation automatique n'a lieu qu'à ces horaires.
+    const scheduleNext = () => {
+      if (cancelled) return;
+      const delay = getNextMarketRefresh(new Date()).getTime() - Date.now();
+      timer = setTimeout(() => {
+        void load().finally(scheduleNext);
+      }, delay);
+    };
     void load();
-    const timer = setInterval(() => void load(), MARKET_REFRESH_MS);
+    scheduleNext();
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      clearTimeout(timer);
     };
   }, []);
 
@@ -352,10 +390,16 @@ export const MacroDashboard: React.FC = () => {
 
       {/* Marché en direct */}
       <div className="space-y-3">
-        <h4 className="text-sm font-bold text-white flex items-center gap-2">
-          <span className="w-1 h-4 rounded-full bg-violet-500" />
-          Marché en direct
-        </h4>
+        <div className="flex items-center justify-between flex-wrap gap-1">
+          <h4 className="text-sm font-bold text-white flex items-center gap-2">
+            <span className="w-1 h-4 rounded-full bg-violet-500" />
+            Marché en direct
+          </h4>
+          <p className="text-[11px] text-slate-500">
+            {lastMarketUpdate ? `Actualisé à ${formatClock(lastMarketUpdate)}` : "Chargement…"}
+            {" · "}Prochaine actualisation à {formatClock(getNextMarketRefresh(now))}
+          </p>
+        </div>
 
         {!quotes && !marketError && (
           <div className="flex items-center gap-2 text-xs text-slate-500 py-6 justify-center">
