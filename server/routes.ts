@@ -391,6 +391,41 @@ function backfillMissingBadges(dataUserId: string, asFounder: boolean): void {
   replaceCollection("badges", [...existing, ...newEntries], dataUserId);
 }
 
+/**
+ * Resynchronise les badges DÉJÀ présents du fondateur avec le catalogue
+ * actuel (`initialTraderBadges`) — `backfillMissingBadges` n'AJOUTE que les
+ * badges manquants, il ne met jamais à jour ceux déjà stockés. Sans cette
+ * fonction, changer un `rewardXP` ou un `unlockedAt` dans
+ * `src/data/mockData.ts` (ex. remonter le total d'XP à 20 000 pour matcher
+ * un niveau max relevé) resterait invisible : la copie déjà en base du
+ * fondateur garderait ses anciennes valeurs indéfiniment.
+ *
+ * Réservée au fondateur : ses badges "unlocked: true" sont une CONVENTION
+ * du catalogue (jamais une vraie progression réclamée), donc entièrement
+ * dérivés de `initialTraderBadges` — les resynchroniser en totalité est
+ * sans risque. Un coach ou un élève, eux, ont un état `unlocked`/`unlockedAt`
+ * RÉELLEMENT gagné par leur propre progression : jamais touché ici, seul
+ * `rewardXP` (une caractéristique du catalogue, pas une donnée personnelle)
+ * mériterait la même synchronisation le jour où un badge existant change de
+ * barème — hors scope aujourd'hui, personne n'en a encore réclamé aucun.
+ */
+function syncFounderBadgeCatalog(founderPersonalId: string): void {
+  const existing = listCollection<{ id: string; [key: string]: unknown }>("badges", founderPersonalId);
+  const byId = new Map(initialTraderBadges.map((def) => [def.id, def]));
+
+  let changed = false;
+  const next = existing.map((badge) => {
+    const def = byId.get(badge.id);
+    if (!def) return badge;
+    const synced = { ...def };
+    if (JSON.stringify(synced) === JSON.stringify(badge)) return badge;
+    changed = true;
+    return synced;
+  });
+
+  if (changed) replaceCollection("badges", next, founderPersonalId);
+}
+
 function backfillStudentDefaultCollections(dataUserId: string): void {
   backfillMissingBadges(dataUserId, false);
 
@@ -450,6 +485,7 @@ api.get("/state", (req, res) => {
   // badges, verrouillés, jamais ceux déjà débloqués du fondateur.
   ensurePersonalUserRow(req.auth!.personalDataUserId);
   backfillMissingBadges(req.auth!.personalDataUserId, req.auth!.isOwner);
+  if (req.auth!.isOwner) syncFounderBadgeCatalog(req.auth!.personalDataUserId);
 
   const collections = Object.fromEntries(
     COLLECTION_NAMES.map((name) => {

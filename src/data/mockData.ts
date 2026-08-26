@@ -114,7 +114,7 @@ export const initialTraderBadges: TraderBadge[] = [
     targetValue: 3.0,
     unit: "R/R",
     unlockedAt: "12 Juillet 2024",
-    rewardXP: 300,
+    rewardXP: 350,
   },
   {
     id: "badge-8",
@@ -128,7 +128,7 @@ export const initialTraderBadges: TraderBadge[] = [
     targetValue: 10.0,
     unit: "R",
     unlockedAt: "25 Août 2024",
-    rewardXP: 600,
+    rewardXP: 650,
   },
   {
     id: "badge-9",
@@ -142,7 +142,7 @@ export const initialTraderBadges: TraderBadge[] = [
     targetValue: 80,
     unit: "pts",
     unlockedAt: "8 Septembre 2024",
-    rewardXP: 500,
+    rewardXP: 550,
   },
   // Paliers de série de discipline au-delà de badge-6 (7 jours) — même
   // critère (`computeDisciplineStreak`), cibles plus longues. `unlocked:
@@ -162,8 +162,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 14,
     targetValue: 14,
     unit: "jours",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 450,
+    unlockedAt: "20 Octobre 2024",
+    rewardXP: 500,
   },
   {
     id: "badge-11",
@@ -176,8 +176,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 30,
     targetValue: 30,
     unit: "jours",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 600,
+    unlockedAt: "15 Novembre 2024",
+    rewardXP: 700,
   },
   {
     id: "badge-12",
@@ -190,8 +190,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 90,
     targetValue: 90,
     unit: "jours",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 900,
+    unlockedAt: "20 Décembre 2024",
+    rewardXP: 1000,
   },
   {
     id: "badge-13",
@@ -204,7 +204,7 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 180,
     targetValue: 180,
     unit: "jours",
-    unlockedAt: "26 Août 2026",
+    unlockedAt: "14 Février 2025",
     rewardXP: 1400,
   },
   {
@@ -218,8 +218,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 365,
     targetValue: 365,
     unit: "jours",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 2500,
+    unlockedAt: "10 Août 2025",
+    rewardXP: 2700,
   },
   // Paliers de volume — nombre total de trades journalisés (tous confondus,
   // contrairement à badge-1 « Maître du Risk 1% » qui exige un risque ≤ 1%
@@ -238,8 +238,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 30,
     targetValue: 30,
     unit: "trades",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 350,
+    unlockedAt: "3 Septembre 2025",
+    rewardXP: 400,
   },
   {
     id: "badge-16",
@@ -252,8 +252,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 50,
     targetValue: 50,
     unit: "trades",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 550,
+    unlockedAt: "28 Septembre 2025",
+    rewardXP: 600,
   },
   {
     id: "badge-17",
@@ -266,8 +266,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 100,
     targetValue: 100,
     unit: "trades",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 1000,
+    unlockedAt: "22 Octobre 2025",
+    rewardXP: 1100,
   },
   // Paliers de badge-4 « Trader Discipliné (Zero FOMO) » — même critère
   // (trades enregistrés avec une émotion maîtrisée 'Calm'/'Disciplined'),
@@ -283,8 +283,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 30,
     targetValue: 30,
     unit: "trades sans tilt",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 400,
+    unlockedAt: "5 Novembre 2025",
+    rewardXP: 450,
   },
   {
     id: "badge-19",
@@ -297,8 +297,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 50,
     targetValue: 50,
     unit: "trades sans tilt",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 600,
+    unlockedAt: "19 Novembre 2025",
+    rewardXP: 650,
   },
   {
     id: "badge-20",
@@ -311,8 +311,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 100,
     targetValue: 100,
     unit: "trades sans tilt",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 1100,
+    unlockedAt: "3 Décembre 2025",
+    rewardXP: 1200,
   },
   // Paliers de badge-1 « Maître du Risk 1% » — même critère (risque
   // strictement ≤ 1% sur chaque trade d'une série CONSÉCUTIVE), cibles plus
@@ -334,8 +334,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 30,
     targetValue: 30,
     unit: "trades",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 500,
+    unlockedAt: "17 Décembre 2025",
+    rewardXP: 550,
   },
   {
     id: "badge-22",
@@ -348,8 +348,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 50,
     targetValue: 50,
     unit: "trades",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 750,
+    unlockedAt: "8 Janvier 2026",
+    rewardXP: 700,
   },
   {
     id: "badge-23",
@@ -362,8 +362,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 100,
     targetValue: 100,
     unit: "trades",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 1300,
+    unlockedAt: "22 Janvier 2026",
+    rewardXP: 1400,
   },
   // Paliers de badge-5 « Analyste Rigoureux » — même critère (note technique
   // ≥ 40 caractères sur un trade clôturé, voir `computeSingleBadgeProgress`
@@ -383,8 +383,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 30,
     targetValue: 30,
     unit: "trades documentés",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 550,
+    unlockedAt: "5 Février 2026",
+    rewardXP: 600,
   },
   {
     id: "badge-25",
@@ -397,8 +397,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 50,
     targetValue: 50,
     unit: "trades documentés",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 800,
+    unlockedAt: "19 Février 2026",
+    rewardXP: 850,
   },
   {
     id: "badge-26",
@@ -411,8 +411,8 @@ export const initialTraderBadges: TraderBadge[] = [
     currentValue: 100,
     targetValue: 100,
     unit: "trades documentés",
-    unlockedAt: "26 Août 2026",
-    rewardXP: 1500,
+    unlockedAt: "5 Mars 2026",
+    rewardXP: 1400,
   },
 ];
 
