@@ -28,6 +28,7 @@ import {
   listStaffAccounts,
   normalizeEmail,
   setPassword,
+  setStaffPermissions,
   updatePasswordHash,
 } from "./credentials";
 import { getLockoutStatus, registerFailedLogin, clearLoginFailures } from "./loginLockout";
@@ -55,6 +56,12 @@ import {
 } from "./studentCredentials";
 import { destroyAllStudentSessions } from "./studentSessions";
 import { requireOwner, requireStaffKind } from "./middleware";
+import {
+  requirePermission,
+  hasStaffPermission,
+  STAFF_PERMISSION_KEYS,
+  type StaffPermissionKey,
+} from "./permissions";
 import { buildOtpauthUri, formatSecretForDisplay } from "./totp";
 import {
   isTotpEnabled,
@@ -457,17 +464,76 @@ staffRouter.get("/staff", requireStaffKind, (_req, res) => {
 });
 
 /**
+ * Remplace la liste d'autorisations d'un coach — strictement réservée au
+ * fondateur (`requireOwner`), jamais délégable via l'autorisation "team"
+ * elle-même : un coach à qui "team" a été accordée pourrait sinon se
+ * l'accorder à lui-même sur un autre compte, ou retirer les autorisations
+ * d'un collègue sans que le fondateur l'ait décidé. Éditer QUI a QUOI reste
+ * la seule chose qu'aucune autorisation ne peut jamais déléguer.
+ *
+ * Le compte fondateur lui-même est refusé en cible : `isOwner` court-circuite
+ * déjà `hasStaffPermission` quoi que porte cette colonne (voir
+ * `./permissions.ts`), un appel ici serait donc un no-op trompeur — mieux
+ * vaut le refuser franchement que laisser croire qu'il a un effet.
+ */
+staffRouter.put(
+  "/staff/:id/permissions",
+  requireStaffKind,
+  requireOwner,
+  (req, res) => {
+    const target = getStaffById(req.params.id);
+    if (!target) {
+      res.status(404).json({ error: "Compte introuvable." });
+      return;
+    }
+    if (target.isOwner) {
+      res.status(400).json({ error: "Le compte fondateur a toujours toutes les autorisations." });
+      return;
+    }
+
+    const body = req.body as { permissions?: unknown };
+    if (
+      !Array.isArray(body.permissions) ||
+      !body.permissions.every((key) => (STAFF_PERMISSION_KEYS as readonly string[]).includes(key))
+    ) {
+      res.status(400).json({ error: "Liste d'autorisations invalide." });
+      return;
+    }
+
+    const keys = body.permissions as StaffPermissionKey[];
+    setStaffPermissions(target.id, keys);
+
+    recordSecurityEvent({
+      eventType: "staff_permissions_updated",
+      severity: "info",
+      accountKind: "staff",
+      accountEmail: target.email,
+      ip: req.ip,
+      detail: `autorisations : ${keys.length > 0 ? keys.join(", ") : "aucune"}`,
+    });
+
+    res.json({ success: true, permissions: keys });
+  }
+);
+
+/**
  * Invite un nouveau compte staff.
  *
  * Le mot de passe est généré côté serveur, jamais choisi par l'inviteur : il
  * n'est renvoyé qu'une seule fois, dans cette réponse, pour être transmis de
  * la main à la main. `mustChangePassword` force son remplacement à la
  * première connexion.
+ *
+ * Gouvernée par l'autorisation "team" (`requirePermission`), pas
+ * `requireOwner` : un coach à qui le fondateur l'a explicitement accordée
+ * peut inviter d'autres coachs. Volontairement asymétrique avec `DELETE
+ * /staff/:id` juste plus bas, restée strictement réservée au fondateur —
+ * inviter n'a pas le même impact que révoquer l'accès d'un collègue.
  */
 staffRouter.post(
   "/staff",
   requireStaffKind,
-  requireOwner,
+  requirePermission("team"),
   createRateLimit({
     windowMs: 15 * 60_000,
     max: 10,
@@ -534,6 +600,11 @@ staffRouter.post(
  * cette action au fondateur, plutôt que de la laisser dans le principe
  * "mêmes droits pour tous les coachs" qui s'applique par ailleurs (voir
  * `credentials.ts`, `StaffAccountsModal.tsx`).
+ *
+ * Reste `requireOwner` STRICT même après l'introduction de l'autorisation
+ * "team" (voir `POST /staff` juste au-dessus) : accorder "team" à un coach
+ * lui permet d'INVITER, jamais de révoquer un autre membre de l'équipe —
+ * l'asymétrie est volontaire, pas un oubli.
  */
 staffRouter.delete("/staff/:id", requireStaffKind, requireOwner, (req, res) => {
   // Capturé avant suppression : la ligne n'existe plus pour retrouver
@@ -765,6 +836,7 @@ interface EnrolledStudentLike {
 staffRouter.post(
   "/students/:enrolledStudentId/invite",
   requireStaffKind,
+  requirePermission("students"),
   createRateLimit({
     windowMs: 15 * 60_000,
     max: 10,
@@ -887,7 +959,7 @@ staffRouter.post(
  * La fiche elle-même, son bureau `users` et ses trades ne sont pas supprimés
  * — seul l'accès disparaît.
  */
-staffRouter.delete("/students/:enrolledStudentId/access", requireStaffKind, (req, res) => {
+staffRouter.delete("/students/:enrolledStudentId/access", requireStaffKind, requirePermission("students"), (req, res) => {
   const students = listCollection<EnrolledStudentLike>("enrolledStudents");
   const student = students.find((s) => s.id === req.params.enrolledStudentId);
 
@@ -925,6 +997,7 @@ const studentAccessRateLimit = createRateLimit({
 staffRouter.put(
   "/students/:enrolledStudentId/password",
   requireStaffKind,
+  requirePermission("students"),
   studentAccessRateLimit,
   wrap(async (req, res) => {
     const parsed = setStudentPasswordSchema.safeParse(req.body);
@@ -964,6 +1037,7 @@ staffRouter.put(
 staffRouter.put(
   "/students/:enrolledStudentId/email",
   requireStaffKind,
+  requirePermission("students"),
   studentAccessRateLimit,
   (req, res) => {
     const parsed = updateStudentEmailSchema.safeParse(req.body);
@@ -1013,6 +1087,7 @@ staffRouter.put(
 staffRouter.post(
   "/students/:enrolledStudentId/reset-link",
   requireStaffKind,
+  requirePermission("students"),
   studentAccessRateLimit,
   (req, res) => {
     const account = getStudentByEnrolledId(req.params.enrolledStudentId);
@@ -1058,6 +1133,7 @@ staffRouter.post(
 staffRouter.get(
   "/students/:enrolledStudentId/trades",
   requireStaffKind,
+  requirePermission("students"),
   createRateLimit({
     windowMs: 15 * 60_000,
     max: 30,
@@ -1082,6 +1158,7 @@ staffRouter.get(
 staffRouter.get(
   "/admin/students/:enrolledStudentId/view",
   requireStaffKind,
+  requirePermission("students"),
   createRateLimit({
     windowMs: 15 * 60_000,
     max: 30,
@@ -1137,6 +1214,7 @@ staffRouter.get(
 staffRouter.post(
   "/students/:enrolledStudentId/messages",
   requireStaffKind,
+  requirePermission("messaging"),
   createRateLimit({
     windowMs: 15 * 60_000,
     max: 10,
@@ -1184,10 +1262,11 @@ staffRouter.post(
 );
 
 /**
- * Publie la liste complète des annonces — réservée au fondateur
- * (`requireOwner`, en plus de `requireStaffKind` : un coach invité ne peut
- * que consulter). Diffuse une notification (type "academy", avec le son
- * d'alerte côté client — voir `useNotificationSound`,
+ * Publie la liste complète des annonces — gouvernée par l'autorisation
+ * "announcements" (le fondateur l'a toujours, `hasStaffPermission`
+ * court-circuite sur `isOwner` ; un coach ne l'a que si explicitement
+ * accordée, sinon 403). Diffuse une notification (type "academy", avec le
+ * son d'alerte côté client — voir `useNotificationSound`,
  * `src/hooks/useNotificationSound.ts`) dans le fil de CHAQUE élève actif,
  * mais seulement pour les entrées dont l'`id` n'existait pas dans l'ancienne
  * liste : une simple édition (même id) ne renotifie personne.
@@ -1195,7 +1274,7 @@ staffRouter.post(
 staffRouter.put(
   "/announcements",
   requireStaffKind,
-  requireOwner,
+  requirePermission("announcements"),
   createRateLimit({
     windowMs: 15 * 60_000,
     max: 30,

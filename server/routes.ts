@@ -30,6 +30,7 @@ import { getMarketData } from "./marketData";
 import { buildStudentProfile, getStudentByEnrolledId } from "./auth/studentCredentials";
 import { DEFAULT_USER_ID, FOUNDER_COACH_ID } from "./db";
 import { getStaffById } from "./auth/credentials";
+import { hasStaffPermission } from "./auth/permissions";
 // Catalogue fixe des badges + repli de dernier recours pour les modules —
 // données pures (aucune dépendance React/DOM), voir le commentaire de
 // `backfillStudentDefaultCollections` plus bas pour pourquoi le serveur en a besoin.
@@ -186,14 +187,18 @@ const STUDENT_ALLOWED_COLLECTIONS = new Set<CollectionName>([
  * `Sidebar.tsx` (qui décide d'afficher "Suivi des Élèves" sur ce seul champ)
  * masquait silencieusement l'onglet à un vrai compte fondateur.
  */
-function buildStaffProfile(personalDataUserId: string): Record<string, unknown> | null {
-  const profile = getProfile<Record<string, unknown>>(personalDataUserId);
+function buildStaffProfile(auth: AuthContext): Record<string, unknown> | null {
+  const profile = getProfile<Record<string, unknown>>(auth.personalDataUserId);
   if (!profile) return null;
   const sharedProfile = getProfile<{ hiddenSidebarItems?: unknown }>(DEFAULT_USER_ID);
   return {
     ...profile,
     isAdmin: true,
     hiddenSidebarItems: sharedProfile?.hiddenSidebarItems ?? [],
+    // `null` = tout accordé (voir `hasStaffPermission`) — le client doit
+    // distinguer ce cas d'une liste vide, jamais le traiter comme "aucune
+    // autorisation" par un `?? []` naïf (voir Sidebar.tsx).
+    permissions: auth.permissions,
   };
 }
 
@@ -466,7 +471,7 @@ api.get("/state", (req, res) => {
 
   res.json({
     bootstrapped: isBootstrapped(),
-    student: buildStaffProfile(req.auth!.personalDataUserId),
+    student: buildStaffProfile(req.auth!),
     quizResults: getQuizResults(dataUserId),
     announcements: getAnnouncements() ?? [],
     collections,
@@ -513,17 +518,19 @@ function writeCollectionForAuth(
     return { ok: false, status: 403, error: "Action réservée au staff." };
   }
 
-  // Repéré en audit : cette branche ne peut aujourd'hui jamais se déclencher
-  // — un élève est déjà arrêté juste au-dessus (`STUDENT_ALLOWED_COLLECTIONS`
-  // n'inclut pas `enrolledStudents`), et tout compte staff a `isAdmin: true`
-  // forcé (`buildStaffProfile`, `tryStaffAuth` ci-dessous) : "tous les
-  // comptes staff ont les mêmes droits" est le principe actuel du projet
-  // (voir HANDOFF.md). Gardée telle quelle en défense en profondeur pour le
-  // jour où des rôles staff différenciés seraient réintroduits — mais elle
-  // n'offre aucune protection réelle tant que ce jour n'est pas arrivé,
-  // contrairement à ce que suggérait l'ancien commentaire de cette ligne.
+  // `auth.isAdmin !== true` ne peut aujourd'hui jamais se déclencher — un
+  // élève est déjà arrêté juste au-dessus, et tout compte staff a
+  // `isAdmin: true` forcé. La vraie restriction, depuis l'introduction des
+  // autorisations par coach, est l'autorisation "students" : éditer une
+  // fiche élève (créer, modifier, supprimer) fait partie du Suivi des
+  // Élèves au même titre que les routes dédiées de `server/auth/routes.ts`
+  // (`requirePermission("students")`) — un coach à qui elle a été retirée
+  // ne doit pas pouvoir la contourner par une écriture directe de collection.
   if (ADMIN_ONLY_COLLECTIONS.has(name) && auth.isAdmin !== true) {
     return { ok: false, status: 403, error: "Action réservée à l'administrateur." };
+  }
+  if (ADMIN_ONLY_COLLECTIONS.has(name) && auth.kind === "staff" && !hasStaffPermission(auth, "students")) {
+    return { ok: false, status: 403, error: "Autorisation retirée par le fondateur pour cette action." };
   }
 
   const parsed = collectionPayloadSchema.safeParse(rawPayload);
@@ -793,13 +800,22 @@ const stateRestoreRateLimit = createRateLimit({
  * modifié à la main ne doit pas empêcher de récupérer le reste.
  */
 api.post("/state/restore", stateRestoreRateLimit, (req, res) => {
+  const auth = req.auth!;
+
+  // Autorisation "data" : ne gouverne QUE la restauration (écrase le bureau
+  // de l'appelant depuis un fichier), jamais la lecture/export — un coach a
+  // toujours besoin de lire ses propres données pour utiliser l'app. Sans
+  // objet pour une session élève, qui n'a pas de `permissions`.
+  if (auth.kind === "staff" && !hasStaffPermission(auth, "data")) {
+    res.status(403).json({ error: "Autorisation retirée par le fondateur pour cette action." });
+    return;
+  }
+
   const parsed = importStateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Fichier de sauvegarde invalide.", details: parsed.error.issues });
     return;
   }
-
-  const auth = req.auth!;
   const imported: string[] = [];
   const skipped: string[] = [];
 

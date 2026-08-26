@@ -216,19 +216,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
    * un module distinct (fiches de stratégies libres, sans scoring), ne pas
    * confondre les deux.
    */
+  // `permissions` absent/`null` = tout accordé (fondateur, coach jamais
+  // restreint, ou élève — qui n'a pas ce champ) : seule une liste EXPLICITE
+  // sans la clé masque l'onglet correspondant, jamais une simple absence.
+  const hasPermission = (key: "students" | "messaging" | "announcements") =>
+    student.permissions == null || student.permissions.includes(key);
+
   const suiviItems: SidebarEntry[] = [
-    { key: "announcements", id: "announcements", label: "Annonces", icon: Megaphone },
+    ...(hasPermission("announcements")
+      ? [{ key: "announcements" as const, id: "announcements" as const, label: "Annonces", icon: Megaphone }]
+      : []),
     { key: "journal", id: "journal", label: "Journal de trading", icon: BookMarked },
     { key: "wallets", id: "wallets", label: "Portefeuille", icon: Wallet },
     { key: "analytics", id: "analytics", label: "Rentabilité", icon: LineChart },
     { key: "calendar", id: "macro", label: "Macro", icon: Calendar },
-    ...(student.isAdmin
+    ...(student.isAdmin && hasPermission("students")
       ? [{ key: "students" as const, id: "students" as const, label: "Suivi des Élèves", icon: UserCheck }]
       : []),
     { key: "setups", id: "setups", label: "Setups", icon: Target },
     { key: "tradingPlan", id: null, label: "Plan de trading", icon: ClipboardList, onOpen: onOpenTradingPlan },
     { key: "academy", id: "academy", label: "Module vidéo", icon: BookOpen, badge: `${courseCompletionPercentage}%` },
-    { key: "messaging", id: "messaging", label: "Messagerie Coach", icon: MessageSquare, badge: totalUnreadMessages > 0 ? "1" : null },
+    ...(hasPermission("messaging")
+      ? [{ key: "messaging" as const, id: "messaging" as const, label: "Messagerie Coach", icon: MessageSquare, badge: totalUnreadMessages > 0 ? "1" : null }]
+      : []),
     { key: "mindset", id: null, label: "Mindset", icon: Brain, onOpen: onOpenMindset },
   ];
 

@@ -317,6 +317,14 @@ export interface StudentProfile {
    * c'est le serveur qui fait autorité.
    */
   hiddenSidebarItems?: string[];
+  /**
+   * Autorisations de CE compte staff connecté (voir `StaffPermissionKey`,
+   * src/lib/api.ts) — absent pour une session élève. `null` = toutes
+   * accordées (compte fondateur, ou coach jamais restreint) : ne jamais
+   * traiter `undefined`/`null` comme "aucune autorisation" (`?? []`) dans un
+   * contrôle d'affichage, ce serait l'inverse du sens voulu.
+   */
+  permissions?: import("./lib/api").StaffPermissionKey[] | null;
 }
 
 /**

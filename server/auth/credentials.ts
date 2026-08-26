@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { db, DEFAULT_USER_ID } from "../db";
 import { getProfile } from "../repositories";
+import { parseStaffPermissions, serializeStaffPermissions, type StaffPermissionKey } from "./permissions";
 
 /**
  * Accès à la table `staff_accounts`.
@@ -30,6 +31,8 @@ export interface StaffAccount {
   mustChangePassword: boolean;
   /** Voir `isOwnerRow` : compte fondateur, seul à régler la sidebar partagée. */
   isOwner: boolean;
+  /** `null` = toutes accordées — voir `parseStaffPermissions`, `./permissions.ts`. */
+  permissions: StaffPermissionKey[] | null;
 }
 
 /** Forme exposable au client : jamais de `passwordHash`. */
@@ -40,6 +43,7 @@ export interface StaffAccountSummary {
   mustChangePassword: boolean;
   createdAt: string;
   isOwner: boolean;
+  permissions: StaffPermissionKey[] | null;
 }
 
 interface StaffAccountRow {
@@ -50,6 +54,7 @@ interface StaffAccountRow {
   password_hash: string;
   must_change_password: number;
   invited_by: string | null;
+  permissions: string | null;
 }
 
 interface StaffAccountSummaryRow {
@@ -59,6 +64,7 @@ interface StaffAccountSummaryRow {
   must_change_password: number;
   created_at: string;
   invited_by: string | null;
+  permissions: string | null;
 }
 
 /**
@@ -86,6 +92,7 @@ function toStaffAccount(row: StaffAccountRow): StaffAccount {
     passwordHash: row.password_hash,
     mustChangePassword: row.must_change_password === 1,
     isOwner: isOwnerRow(row.invited_by),
+    permissions: parseStaffPermissions(row.permissions),
   };
 }
 
@@ -114,7 +121,7 @@ export function hasAnyStaffAccount(): boolean {
 export function getStaffByEmail(email: string): StaffAccount | null {
   const row = db
     .prepare(
-      `SELECT id, name, email, email_lower, password_hash, must_change_password, invited_by
+      `SELECT id, name, email, email_lower, password_hash, must_change_password, invited_by, permissions
        FROM staff_accounts WHERE email_lower = ?`
     )
     .get(normalizeEmail(email)) as StaffAccountRow | undefined;
@@ -125,7 +132,7 @@ export function getStaffByEmail(email: string): StaffAccount | null {
 export function getStaffById(id: string): StaffAccount | null {
   const row = db
     .prepare(
-      `SELECT id, name, email, email_lower, password_hash, must_change_password, invited_by
+      `SELECT id, name, email, email_lower, password_hash, must_change_password, invited_by, permissions
        FROM staff_accounts WHERE id = ?`
     )
     .get(id) as StaffAccountRow | undefined;
@@ -140,7 +147,7 @@ export function getStaffById(id: string): StaffAccount | null {
 export function listStaffAccounts(): StaffAccountSummary[] {
   const rows = db
     .prepare(
-      `SELECT id, name, email, must_change_password, created_at, invited_by
+      `SELECT id, name, email, must_change_password, created_at, invited_by, permissions
        FROM staff_accounts ORDER BY created_at ASC`
     )
     .all() as StaffAccountSummaryRow[];
@@ -162,6 +169,7 @@ export function listStaffAccounts(): StaffAccountSummary[] {
     mustChangePassword: row.must_change_password === 1,
     createdAt: row.created_at,
     isOwner: isOwnerRow(row.invited_by),
+    permissions: parseStaffPermissions(row.permissions),
   }));
 }
 
@@ -246,6 +254,23 @@ export function setPassword(id: string, passwordHash: string): void {
   db.prepare(
     "UPDATE staff_accounts SET password_hash = ?, must_change_password = 0, updated_at = ? WHERE id = ?"
   ).run(passwordHash, new Date().toISOString(), id);
+}
+
+/**
+ * Remplace la liste d'autorisations d'un compte staff — appelé UNIQUEMENT
+ * par la route `PUT /staff/:id/permissions` (réservée au fondateur, voir
+ * `requireOwner` posé dessus, `server/auth/routes.ts`). `keys` vide (pas
+ * `null`) écrit explicitement "aucune autorisation", distinct de la colonne
+ * jamais renseignée (`NULL` = toutes) — retirer la dernière autorisation
+ * d'un coach doit vraiment tout lui retirer, pas repasser silencieusement à
+ * "toutes accordées" faute de savoir distinguer les deux cas.
+ */
+export function setStaffPermissions(id: string, keys: StaffPermissionKey[]): void {
+  db.prepare("UPDATE staff_accounts SET permissions = ?, updated_at = ? WHERE id = ?").run(
+    serializeStaffPermissions(keys),
+    new Date().toISOString(),
+    id
+  );
 }
 
 /**

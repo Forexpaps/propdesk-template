@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { DEFAULT_USER_ID } from "../db";
 import { getStaffById } from "./credentials";
+import type { StaffPermissionKey } from "./permissions";
 import { recordSecurityEvent } from "./securityEvents";
 import { readSessionToken, validateSession } from "./sessions";
 import { getStudentById } from "./studentCredentials";
@@ -76,13 +77,20 @@ export interface AuthContext {
    * invités et pour toute session élève.
    *
    * Volontairement **distinct de `isAdmin`**, qui reste vrai pour tout le
-   * monde du staff : les coachs gardent l'intégralité des droits métier (suivi
-   * des élèves, écriture des collections, gestion de l'équipe). Ce drapeau ne
-   * gouverne que la configuration du bureau partagé — aujourd'hui les entrées
-   * masquées de la sidebar. Réutiliser `isAdmin` aurait retiré aux coachs bien
-   * plus que ce qui était demandé.
+   * staff (aucun élève n'a de droit d'administration) : `isOwner` gouverne en
+   * plus la configuration du bureau partagé (entrées masquées de la sidebar)
+   * ET court-circuite TOUJOURS `permissions` ci-dessous — le fondateur n'est
+   * jamais restreignable, y compris par lui-même.
    */
   isOwner: boolean;
+  /**
+   * Autorisations accordées à CE compte staff — `null` pour une session
+   * élève (non applicable) ou pour un compte staff jamais restreint (toutes
+   * accordées). Voir `hasStaffPermission`/`requirePermission`,
+   * `./permissions.ts`, posé sur les routes staff qui doivent rester
+   * retirables individuellement par le fondateur.
+   */
+  permissions: StaffPermissionKey[] | null;
 }
 
 declare global {
@@ -172,6 +180,7 @@ function tryStaffAuth(req: Request, res: Response): AuthContext | "blocked" | nu
     personalDataUserId: staff.id,
     isAdmin: true,
     isOwner: staff.isOwner,
+    permissions: staff.permissions,
   };
 }
 
@@ -199,6 +208,7 @@ function tryStudentAuth(req: Request, res: Response): AuthContext | "blocked" | 
     personalDataUserId: student.userId,
     isAdmin: false,
     isOwner: false,
+    permissions: null,
   };
 }
 

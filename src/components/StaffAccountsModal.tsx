@@ -1,7 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { UserPlus, Trash2, Clock, X, Copy, Check, Crown } from "lucide-react";
-import { api, type StaffAccountSummary } from "../lib/api";
+import { api, STAFF_PERMISSION_KEYS, type StaffAccountSummary, type StaffPermissionKey } from "../lib/api";
 import { confirmDialog } from "../lib/confirmDialog";
+
+/** Libellé court affiché sur chaque bouton d'autorisation. */
+const PERMISSION_LABELS: Record<StaffPermissionKey, string> = {
+  students: "Suivi des élèves",
+  messaging: "Messagerie",
+  announcements: "Annonces",
+  team: "Gestion d'équipe",
+  data: "Restauration de données",
+};
 
 interface StaffAccountsModalProps {
   isOpen: boolean;
@@ -13,13 +22,19 @@ interface StaffAccountsModalProps {
 /**
  * Gestion des comptes staff.
  *
- * Tous les comptes ont les mêmes droits **métier** — il n'y a donc rien à
- * régler par compte au-delà de son existence : inviter, ou révoquer. Seul le
- * compte fondateur se distingue, sur un point unique : lui seul règle les
- * modules visibles dans la sidebar, et il n'est pas révocable. Le mot de passe
- * temporaire d'une invitation n'est affiché qu'une seule fois, au moment de
- * la création ; il n'est jamais récupérable après coup, y compris par cette
- * modale.
+ * En plus d'inviter/révoquer, le fondateur règle ici les autorisations de
+ * chaque coach individuellement (Suivi des élèves, Messagerie, Annonces,
+ * Gestion d'équipe, Restauration de données — voir `PERMISSION_LABELS` et
+ * `server/auth/permissions.ts`, source de vérité du catalogue). Un compte
+ * jamais restreint (`permissions: null`) a tout par défaut, pour rester
+ * compatible avec les comptes déjà invités avant cette fonctionnalité.
+ *
+ * Le compte fondateur se distingue toujours sur deux points : lui seul règle
+ * les modules visibles dans la sidebar, et il a TOUJOURS toutes les
+ * autorisations, non révocable ni restreignable (même par lui-même). Le mot
+ * de passe temporaire d'une invitation n'est affiché qu'une seule fois, au
+ * moment de la création ; il n'est jamais récupérable après coup, y compris
+ * par cette modale.
  */
 export const StaffAccountsModal: React.FC<StaffAccountsModalProps> = ({
   isOpen,
@@ -108,6 +123,28 @@ export const StaffAccountsModal: React.FC<StaffAccountsModalProps> = ({
     }
   };
 
+  /**
+   * `account.permissions === null` veut dire "toutes accordées" (jamais
+   * restreint) — pour calculer le prochain état à envoyer, on part donc du
+   * catalogue complet dans ce cas, jamais d'un tableau vide.
+   */
+  const togglePermission = async (account: StaffAccountSummary, key: StaffPermissionKey) => {
+    const current = account.permissions ?? [...STAFF_PERMISSION_KEYS];
+    const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
+
+    setAccounts((prev) => prev.map((a) => (a.id === account.id ? { ...a, permissions: next } : a)));
+    setError(null);
+    try {
+      await api.updateStaffPermissions(account.id, next);
+    } catch (err) {
+      // Écriture refusée (réseau, session expirée) : on revient à l'état
+      // d'avant plutôt que de laisser le bouton mentir sur ce qui est
+      // réellement enregistré côté serveur.
+      setAccounts((prev) => prev.map((a) => (a.id === account.id ? { ...a, permissions: current } : a)));
+      setError((err as Error).message || "La mise à jour des autorisations a échoué.");
+    }
+  };
+
   const handleCopy = async () => {
     if (!lastInvite) return;
     try {
@@ -131,8 +168,8 @@ export const StaffAccountsModal: React.FC<StaffAccountsModalProps> = ({
           <div>
             <h3 className="text-base font-bold text-white">Membres du staff</h3>
             <p className="text-xs text-slate-400">
-              Mêmes droits pour tous sur ce bureau. Seul le compte principal
-              règle les modules visibles.
+              Un bouton par autorisation, sous chaque coach. Seul le compte
+              principal a toujours tout et règle les modules visibles.
             </p>
           </div>
           <button
@@ -216,53 +253,87 @@ export const StaffAccountsModal: React.FC<StaffAccountsModalProps> = ({
             accounts.map((account) => (
               <div
                 key={account.id}
-                className="flex items-center justify-between gap-3 bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5"
+                className="bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 space-y-2.5"
               >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-white truncate">{account.name}</span>
-                    {account.mustChangePassword && (
-                      <span
-                        title="N'a pas encore remplacé son mot de passe temporaire"
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[9px] font-semibold border border-amber-500/30 shrink-0"
-                      >
-                        <Clock className="w-2.5 h-2.5" />
-                        En attente
-                      </span>
-                    )}
-                    {account.isOwner && (
-                      <span
-                        title="Compte principal : seul à régler les modules visibles dans la sidebar, et non supprimable"
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#00E676]/15 text-[#00E676] text-[9px] font-semibold border border-[#00E676]/30 shrink-0"
-                      >
-                        <Crown className="w-2.5 h-2.5" />
-                        Compte principal
-                      </span>
-                    )}
-                    {account.id === currentUserId && (
-                      <span className="text-[9px] text-slate-500 shrink-0">(toi)</span>
-                    )}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white truncate">{account.name}</span>
+                      {account.mustChangePassword && (
+                        <span
+                          title="N'a pas encore remplacé son mot de passe temporaire"
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 text-[9px] font-semibold border border-amber-500/30 shrink-0"
+                        >
+                          <Clock className="w-2.5 h-2.5" />
+                          En attente
+                        </span>
+                      )}
+                      {account.isOwner && (
+                        <span
+                          title="Compte principal : seul à régler les modules visibles dans la sidebar, et non supprimable"
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#00E676]/15 text-[#00E676] text-[9px] font-semibold border border-[#00E676]/30 shrink-0"
+                        >
+                          <Crown className="w-2.5 h-2.5" />
+                          Compte principal
+                        </span>
+                      )}
+                      {account.id === currentUserId && (
+                        <span className="text-[9px] text-slate-500 shrink-0">(toi)</span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-400 truncate">{account.email}</p>
                   </div>
-                  <p className="text-[10px] text-slate-400 truncate">{account.email}</p>
+
+                  {/* Le compte principal n'est jamais révocable : c'est lui qui
+                      porte le réglage des modules visibles, et le serveur refuse
+                      sa suppression (409). Ne pas rendre le bouton évite de
+                      proposer une action vouée à échouer.
+                      Réservé au fondateur (`requireOwner` côté serveur, suite à
+                      un audit de sécurité) : un coach invité voyait auparavant
+                      ce bouton pour tout AUTRE coach invité, alors que seul le
+                      fondateur peut réellement l'utiliser — même logique que
+                      ci-dessus, ne pas proposer une action vouée à échouer. */}
+                  {account.id !== currentUserId && !account.isOwner && isCurrentUserOwner && (
+                    <button
+                      onClick={() => handleRemove(account)}
+                      className="p-2 rounded-lg text-slate-500 hover:text-rose-300 hover:bg-rose-500/10 transition-colors shrink-0"
+                      aria-label={`Révoquer le compte de ${account.name}`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
 
-                {/* Le compte principal n'est jamais révocable : c'est lui qui
-                    porte le réglage des modules visibles, et le serveur refuse
-                    sa suppression (409). Ne pas rendre le bouton évite de
-                    proposer une action vouée à échouer.
-                    Réservé au fondateur (`requireOwner` côté serveur, suite à
-                    un audit de sécurité) : un coach invité voyait auparavant
-                    ce bouton pour tout AUTRE coach invité, alors que seul le
-                    fondateur peut réellement l'utiliser — même logique que
-                    ci-dessus, ne pas proposer une action vouée à échouer. */}
-                {account.id !== currentUserId && !account.isOwner && isCurrentUserOwner && (
-                  <button
-                    onClick={() => handleRemove(account)}
-                    className="p-2 rounded-lg text-slate-500 hover:text-rose-300 hover:bg-rose-500/10 transition-colors shrink-0"
-                    aria-label={`Révoquer le compte de ${account.name}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                {/* Autorisations : un bouton par droit, activable/désactivable
+                    d'un clic — réservé au fondateur (`requireOwner` côté
+                    serveur, voir PUT /staff/:id/permissions), jamais proposé
+                    sur le compte principal lui-même (toujours tout, non
+                    restreignable — voir hasStaffPermission). */}
+                {!account.isOwner && isCurrentUserOwner && (
+                  <div className="flex flex-wrap gap-1.5 pt-2 border-t border-[#1B2320]">
+                    {STAFF_PERMISSION_KEYS.map((key) => {
+                      const granted = account.permissions === null || account.permissions.includes(key);
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => togglePermission(account, key)}
+                          title={
+                            granted
+                              ? `Retirer l'autorisation « ${PERMISSION_LABELS[key]} »`
+                              : `Accorder l'autorisation « ${PERMISSION_LABELS[key]} »`
+                          }
+                          className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
+                            granted
+                              ? "bg-[#00E676]/15 text-[#00E676] border-[#00E676]/30 hover:bg-[#00E676]/25"
+                              : "bg-[#1B2320] text-slate-500 border-[#1B2320] hover:text-slate-300"
+                          }`}
+                        >
+                          {PERMISSION_LABELS[key]}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             ))

@@ -173,6 +173,13 @@ db.exec(`
     -- s'il correspond encore dans la fenetre de tolerance de findMatchingTotpStep,
     -- voir server/auth/twoFactor.ts.
     totp_last_used_step   INTEGER,
+    -- Autorisations accordées à ce compte, JSON (tableau de clés parmi
+    -- STAFF_PERMISSION_KEYS, server/auth/permissions.ts) — NULL = toutes
+    -- accordées (compte fondateur, ou coach jamais restreint depuis
+    -- l'introduction de cette colonne, comportement inchangé par défaut).
+    -- Ignorée pour le fondateur (isOwner), qui a TOUJOURS tout, quoi que
+    -- cette colonne contienne — voir resolveStaffPermissions.
+    permissions           TEXT,
     created_at           TEXT NOT NULL,
     updated_at           TEXT NOT NULL
   );
@@ -532,6 +539,18 @@ function migrateAddTotpColumns(): void {
 }
 
 migrateAddTotpColumns();
+
+/**
+ * Ajoute `permissions` à `staff_accounts` sur une base existante — même
+ * principe et même raison que `migrateAddTotpColumns` juste au-dessus.
+ */
+function migrateAddPermissionsColumn(): void {
+  const columns = db.prepare("PRAGMA table_info(staff_accounts)").all() as { name: string }[];
+  if (columns.some((c) => c.name === "permissions")) return;
+  db.exec("ALTER TABLE staff_accounts ADD COLUMN permissions TEXT;");
+}
+
+migrateAddPermissionsColumn();
 
 export function getMeta(key: string): string | null {
   const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as
