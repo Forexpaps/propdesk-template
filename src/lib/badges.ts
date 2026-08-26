@@ -41,6 +41,7 @@ const KNOWN_BADGE_IDS = [
   "badge-6", "badge-7", "badge-8", "badge-9",
   "badge-10", "badge-11", "badge-12", "badge-13", "badge-14",
   "badge-15", "badge-16", "badge-17",
+  "badge-18", "badge-19", "badge-20",
 ];
 function canonicalBadgeId(badgeId: string): string {
   return KNOWN_BADGE_IDS.find((id) => badgeId === id || badgeId.endsWith(`-${id}`)) ?? badgeId;
@@ -155,6 +156,25 @@ function computeSingleBadgeProgress(
       };
       const target = targetByBadge[canonicalBadgeId(badgeId)];
       const count = trades.length;
+      return {
+        currentValue: count,
+        targetValue: target,
+        progressPercentage: Math.min(100, Math.round((count / target) * 100)),
+      };
+    }
+
+    // Paliers de badge-4 « Trader Discipliné (Zero FOMO) » — même critère
+    // (émotion 'Calm'/'Disciplined'), cibles plus hautes que 15 trades.
+    case "badge-18":
+    case "badge-19":
+    case "badge-20": {
+      const targetByBadge: Record<string, number> = {
+        "badge-18": 30,
+        "badge-19": 50,
+        "badge-20": 100,
+      };
+      const target = targetByBadge[canonicalBadgeId(badgeId)];
+      const count = trades.filter((t) => t.emotion === "Calm" || t.emotion === "Disciplined").length;
       return {
         currentValue: count,
         targetValue: target,
