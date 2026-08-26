@@ -49,6 +49,23 @@ export interface AuthContext {
    */
   dataUserId: string;
   /**
+   * Bureau PERSONNEL de la session — pour le staff, l'id du compte staff
+   * lui-même (`staff.id`, PAS `DEFAULT_USER_ID`, sauf pour le fondateur chez
+   * qui les deux coïncident historiquement, voir `createFirstStaffAccount`).
+   * Pour un élève, identique à `dataUserId`.
+   *
+   * Distinct de `dataUserId` : certaines collections restent un bureau
+   * VRAIMENT partagé entre tout le staff (fiches élèves, programme,
+   * messagerie coach — un élève doit voir un seul coach cohérent, pas un
+   * par membre du staff connecté), tandis que d'autres sont le suivi
+   * personnel de CE compte (Journal, portefeuilles, badges, alertes,
+   * setups) — un coach ne doit pas hériter des trades ni des badges déjà
+   * débloqués du fondateur simplement parce qu'il partage le même bureau.
+   * Voir `PERSONAL_STAFF_COLLECTIONS` et `resolveCollectionUserId`,
+   * `server/routes.ts`.
+   */
+  personalDataUserId: string;
+  /**
    * Toujours vrai pour une session staff, toujours faux pour une session
    * élève — décision produit, tous les comptes staff ont les mêmes droits,
    * aucun élève n'a de droit d'administration.
@@ -152,6 +169,7 @@ function tryStaffAuth(req: Request, res: Response): AuthContext | "blocked" | nu
     userId: staff.id,
     kind: "staff",
     dataUserId: DEFAULT_USER_ID,
+    personalDataUserId: staff.id,
     isAdmin: true,
     isOwner: staff.isOwner,
   };
@@ -178,6 +196,7 @@ function tryStudentAuth(req: Request, res: Response): AuthContext | "blocked" | 
     userId: student.id,
     kind: "student",
     dataUserId: student.userId,
+    personalDataUserId: student.userId,
     isAdmin: false,
     isOwner: false,
   };

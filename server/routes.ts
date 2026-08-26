@@ -245,6 +245,52 @@ function withResolvedStudentAvatars<T extends { id: string; avatar?: unknown }>(
 }
 
 /**
+ * Collections qui restent le suivi PERSONNEL du compte staff connecté
+ * (Journal, portefeuilles, badges, alertes de risque, setups) — jamais le
+ * bureau partagé `DEFAULT_USER_ID`, contrairement aux fiches élèves, au
+ * programme de formation et à la messagerie coach, qu'un élève doit voir
+ * comme un seul et même coach cohérent quel que soit le membre du staff
+ * connecté. Un coach nouvellement invité démarre donc avec un Journal et des
+ * badges à lui, vierges — jamais ceux déjà accumulés par le fondateur.
+ *
+ * Sans effet sur une session élève : `resolveCollectionUserId` ne s'en sert
+ * que pour `kind === "staff"`.
+ */
+const PERSONAL_STAFF_COLLECTIONS = new Set<CollectionName>([
+  "trades",
+  "accounts",
+  "badges",
+  "notifications",
+  "setups",
+]);
+
+/**
+ * Bureau de données à utiliser pour LIRE/ÉCRIRE une collection donnée, selon
+ * l'identité de l'appelant — voir `AuthContext.personalDataUserId` pour le
+ * pourquoi de cette distinction personnel/partagé côté staff. Une session
+ * élève n'a qu'un seul bureau (`dataUserId` === `personalDataUserId`), donc
+ * toujours la même valeur ici quelle que soit la collection.
+ */
+function resolveCollectionUserId(auth: AuthContext, name: CollectionName): string {
+  if (auth.kind === "student") return auth.dataUserId;
+  return PERSONAL_STAFF_COLLECTIONS.has(name) ? auth.personalDataUserId : auth.dataUserId;
+}
+
+/**
+ * Garantit une ligne `users` pour ce bureau personnel — `trades`/`accounts`/
+ * `badges`/`notifications`/`setups` référencent `users(id)` en clé
+ * étrangère, et un compte staff invité AVANT ce mécanisme (ou même après :
+ * `createInvitedStaffAccount` ne crée qu'une ligne `staff_accounts`, jamais
+ * `users`) n'en a aucune tant qu'il n'a rien écrit — la première écriture
+ * échouerait sinon (violation de contrainte). Sans effet dès que la ligne
+ * existe déjà (le fondateur en a toujours une, `personalDataUserId ===
+ * DEFAULT_USER_ID`).
+ */
+function ensurePersonalUserRow(userId: string): void {
+  if (getProfile(userId) === null) saveProfile({}, userId);
+}
+
+/**
  * Rattrape un compte élève dont `badges`/`modules` n'ont jamais été
  * initialisés — normalement copiés depuis le bureau staff partagé au moment
  * de l'invitation (voir `server/auth/routes.ts`), mais un élève invité
@@ -265,19 +311,26 @@ function withResolvedStudentAvatars<T extends { id: string; avatar?: unknown }>(
  * déjà invités, sans attendre une réinvitation qui n'aura jamais lieu.
  * Idempotent — sans effet une fois que chaque badge du catalogue a sa copie.
  *
- * `asStaff` distingue les deux règles d'id/état déjà en vigueur ailleurs
+ * `dataUserId` est déjà le bureau PERSONNEL de l'appelant (voir
+ * `AuthContext.personalDataUserId`, `resolveCollectionUserId`) — jamais
+ * `DEFAULT_USER_ID` tel quel pour un coach, sans quoi il rattraperait les
+ * badges déjà débloqués du fondateur au lieu des siens.
+ *
+ * `asFounder` distingue les deux règles d'id/état déjà en vigueur ailleurs
  * (voir `server/auth/routes.ts`) :
- * - bureau staff (`DEFAULT_USER_ID`) : id du catalogue tel quel
- *   (`badge-N`), état copié tel quel — décision explicite du fondateur que
- *   SON profil a tout de débloqué (voir le commentaire en tête de
+ * - fondateur (`personalDataUserId === DEFAULT_USER_ID`) : id du catalogue
+ *   tel quel (`badge-N`), état copié tel quel — décision explicite que SON
+ *   profil a tout de débloqué (voir le commentaire en tête de
  *   `initialTraderBadges`).
- * - élève : id préfixé (`${dataUserId}-badge-N`), toujours reposé
- *   verrouillé — jamais un faux badge déjà débloqué.
+ * - élève OU coach invité : id préfixé (`${dataUserId}-badge-N`), toujours
+ *   reposé verrouillé — jamais un faux badge déjà débloqué. Un coach n'a
+ *   pas encore de trade dans son Journal personnel à l'invitation : ses
+ *   badges doivent rester à débloquer par lui, exactement comme un élève.
  */
-function backfillMissingBadges(dataUserId: string, asStaff: boolean): void {
+function backfillMissingBadges(dataUserId: string, asFounder: boolean): void {
   const existing = listCollection<{ id: string; [key: string]: unknown }>("badges", dataUserId);
   const isAlreadyPresent = (definitionId: string) =>
-    asStaff
+    asFounder
       ? existing.some((b) => b.id === definitionId)
       : existing.some((b) => b.id.endsWith(`-${definitionId}`));
 
@@ -285,7 +338,7 @@ function backfillMissingBadges(dataUserId: string, asStaff: boolean): void {
   if (missingDefinitions.length === 0) return;
 
   const newEntries = missingDefinitions.map((def) =>
-    asStaff
+    asFounder
       ? { ...def }
       : { ...def, id: `${dataUserId}-${def.id}`, unlocked: false, unlockedAt: undefined }
   );
@@ -346,11 +399,16 @@ api.get("/state", (req, res) => {
     return;
   }
 
-  backfillMissingBadges(dataUserId, true);
+  // Badges : bureau PERSONNEL du compte connecté (voir
+  // `PERSONAL_STAFF_COLLECTIONS`) — un coach invité rattrape ses propres
+  // badges, verrouillés, jamais ceux déjà débloqués du fondateur.
+  ensurePersonalUserRow(req.auth!.personalDataUserId);
+  backfillMissingBadges(req.auth!.personalDataUserId, req.auth!.isOwner);
 
   const collections = Object.fromEntries(
     COLLECTION_NAMES.map((name) => {
-      const collection = listCollection(name, dataUserId);
+      const collectionUserId = resolveCollectionUserId(req.auth!, name);
+      const collection = listCollection(name, collectionUserId);
       // Collections initialement vides (badges, modules) : retourner undefined
       // pour que le client tombe sur le fallback (mockData) au démarrage.
       // Les autres collections (trades, accounts, etc.) retournent l'array même
@@ -372,7 +430,7 @@ api.get("/state", (req, res) => {
     announcements: getAnnouncements() ?? [],
     collections,
     versions: Object.fromEntries(
-      COLLECTION_NAMES.map((name) => [name, getCollectionVersion(name, dataUserId)])
+      COLLECTION_NAMES.map((name) => [name, getCollectionVersion(name, resolveCollectionUserId(req.auth!, name))])
     ),
   });
 });
@@ -452,7 +510,7 @@ function writeCollectionForAuth(
   if (auth.kind === "student" && name === "messages") {
     const existingCoachMessages = listCollection<{ id: string; sender?: string; [key: string]: unknown }>(
       name,
-      auth.dataUserId
+      resolveCollectionUserId(auth, name)
     ).filter((m) => m.sender === "coach");
 
     // Filtrer sur `sender !== "coach"` seul ne suffit pas : `replaceCollection`
@@ -480,7 +538,7 @@ function writeCollectionForAuth(
 
   let newVersion: number;
   try {
-    newVersion = replaceCollection(name, dataToWrite, auth.dataUserId, expectedVersion);
+    newVersion = replaceCollection(name, dataToWrite, resolveCollectionUserId(auth, name), expectedVersion);
   } catch (err) {
     if (err instanceof CollectionOwnershipConflictError) {
       // Un ou plusieurs `id` soumis appartiennent déjà à un autre bureau
