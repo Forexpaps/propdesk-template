@@ -467,6 +467,15 @@ export interface TradingAccount {
    * fournisseurs, absente par défaut (pas de limite affichée).
    */
   maxInactivityDays?: number;
+  /**
+   * Date (YYYY-MM-DD, locale) de dernière activité renseignée à la main —
+   * pour un compte tradé directement chez le broker/la prop firm sans
+   * journaliser chaque position ici : le compteur d'inactivité n'aurait
+   * sinon aucune date à partir de laquelle compter (0 trade rattaché =
+   * "Aucun trade" en permanence, même sur un compte actif). Comparée à la
+   * date du dernier trade journalisé, seule la plus récente des deux compte.
+   */
+  lastManualActivityDate?: string;
 }
 
 export interface TraderBadge {

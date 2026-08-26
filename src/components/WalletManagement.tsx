@@ -170,6 +170,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   const [balanceEditAccount, setBalanceEditAccount] = useState<TradingAccount | null>(null);
   const [balanceEditValue, setBalanceEditValue] = useState("");
   const [maxInactivityEditValue, setMaxInactivityEditValue] = useState("");
+  const [lastActivityEditValue, setLastActivityEditValue] = useState("");
 
   // Form state
   const [newAccName, setNewAccName] = useState("");
@@ -207,7 +208,6 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   const positionsDuCompte = (accountId: string) => computePositionsDuCompte(trades, accountId);
   const dailyLossPercent = (account: TradingAccount) => computeDailyLossPercent(trades, account);
   const totalDrawdownPercent = (account: TradingAccount) => computeTotalDrawdownPercent(account);
-  const daysSinceLastTrade = (accountId: string) => computeDaysSinceLastTrade(trades, accountId);
   const totalCombinedInitial = accounts.reduce((acc, a) => acc + a.initialBalance, 0);
   const totalCombinedPnl = totalCombinedEquity - totalCombinedInitial;
   const totalCombinedPnlPercent = totalCombinedInitial > 0 ? ((totalCombinedPnl / totalCombinedInitial) * 100).toFixed(2) : "0.00";
@@ -278,6 +278,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
     setMaxInactivityEditValue(
       account.maxInactivityDays !== undefined ? account.maxInactivityDays.toString() : ""
     );
+    setLastActivityEditValue(account.lastManualActivityDate || "");
     setBalanceEditAccount(account);
   };
 
@@ -300,6 +301,11 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
       if (Number.isFinite(parsedDays) && parsedDays > 0) {
         onUpdateAccount(balanceEditAccount.id, { maxInactivityDays: parsedDays });
       }
+    }
+    if (lastActivityEditValue !== (balanceEditAccount.lastManualActivityDate || "")) {
+      onUpdateAccount(balanceEditAccount.id, {
+        lastManualActivityDate: lastActivityEditValue || undefined,
+      });
     }
     setBalanceEditAccount(null);
   };
@@ -435,7 +441,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
             const dailyLossPct = computeDailyLossPercent(trades, acc);
             const dailyLossAmount = -Math.max(0, (-dailyLossPct / 100) * acc.initialBalance);
             const totalLossAmount = -Math.max(0, acc.initialBalance - acc.equity);
-            const inactivityDays = computeDaysSinceLastTrade(trades, acc.id);
+            const inactivityDays = computeDaysSinceLastTrade(trades, acc.id, acc.lastManualActivityDate);
 
             return (
               <div
@@ -752,7 +758,11 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
               <div>
                 <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Inactivité</div>
                 {(() => {
-                  const inactivityDays = computeDaysSinceLastTrade(trades, selectedAccount.id);
+                  const inactivityDays = computeDaysSinceLastTrade(
+                    trades,
+                    selectedAccount.id,
+                    selectedAccount.lastManualActivityDate
+                  );
                   const { label, colorClass } = inactivityStatus(inactivityDays, selectedAccount.maxInactivityDays);
                   return <div className={`text-sm font-bold mt-1 ${colorClass}`}>{label}</div>;
                 })()}
@@ -980,6 +990,21 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
               />
               <p className="text-[11px] text-slate-500 mt-1">
                 Certaines prop firms invalident le compte après X jours sans trade journalisé. Le badge d'inactivité de ce portefeuille passera en alerte à l'approche de cette limite.
+              </p>
+            </div>
+            <div>
+              <label className="block font-medium text-slate-300 mb-1 text-xs">
+                Dernière activité sur ce compte (optionnel)
+              </label>
+              <input
+                type="date"
+                value={lastActivityEditValue}
+                onChange={(e) => setLastActivityEditValue(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+                className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white font-mono focus:outline-none focus:border-[#00E676]/50"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Si vous tradez ce compte directement chez le broker sans journaliser chaque position ici, indiquez la date du dernier trade réel : le compteur d'inactivité se basera dessus plutôt que d'afficher « Aucun trade ».
               </p>
             </div>
             <div className="flex items-center justify-end gap-3 pt-2">
