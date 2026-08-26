@@ -33,6 +33,8 @@ import {
   History,
   Percent,
   Target,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Module, Lesson, QuizQuestion, ModuleQuizResult, CourseLevel } from "../types";
 import { confirmDialog } from "../lib/confirmDialog";
@@ -94,6 +96,7 @@ const MODULE_ICON_NAMES = [
   "Compass",
   "Target",
   "Zap",
+  "FileText",
 ];
 
 type ModuleFormState = {
@@ -301,9 +304,13 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
     onDeleteLesson(moduleId, lesson.id);
   };
 
+  // Modules masqués par le staff : invisibles côté élève, toujours visibles
+  // (et basculables) côté staff.
+  const visibleModules = modules.filter((m) => isAdmin || !m.hidden);
+
   // Calculate Progress Stats
-  const totalLessons = modules.reduce((acc, m) => acc + m.lessons.length, 0);
-  const completedLessonsCount = modules.reduce(
+  const totalLessons = visibleModules.reduce((acc, m) => acc + m.lessons.length, 0);
+  const completedLessonsCount = visibleModules.reduce(
     (acc, m) => acc + m.lessons.filter((l) => l.isCompleted).length,
     0
   );
@@ -342,12 +349,15 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
         return <Percent className="w-5 h-5 text-violet-400" />;
       case "Target":
         return <Target className="w-5 h-5 text-red-400" />;
+      // Documents, déclarations — Fiscalité & Statut du Trader.
+      case "FileText":
+        return <FileText className="w-5 h-5 text-sky-400" />;
       default:
         return <BookOpen className="w-5 h-5 text-amber-400" />;
     }
   };
 
-  const filteredModules = modules
+  const filteredModules = visibleModules
     .filter((m) => {
       const matchesLevel = selectedLevel === "Tous" || m.category === selectedLevel;
       const matchesSearch =
@@ -486,6 +496,12 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
                         <Clock className="w-3.5 h-3.5 text-slate-500" />
                         {module.durationTotal}
                       </span>
+                      {isAdmin && module.hidden && (
+                        <span className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#1B2320] border border-[#232D29]">
+                          <EyeOff className="w-3 h-3" />
+                          Masqué
+                        </span>
+                      )}
                     </div>
                     <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                       <SectionHeader />
@@ -556,6 +572,15 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
 
                   {isAdmin && (onSaveModule || onDeleteModule) && (
                     <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5">
+                      {onSaveModule && (
+                        <button
+                          onClick={() => onSaveModule({ ...module, hidden: !module.hidden })}
+                          className="p-2 rounded-lg bg-[#1B2320] text-slate-400 hover:text-white transition-colors"
+                          title={module.hidden ? "Rendre le module visible aux élèves" : "Masquer le module aux élèves"}
+                        >
+                          {module.hidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      )}
                       {onSaveModule && (
                         <button
                           onClick={() => openEditModuleForm(module)}
