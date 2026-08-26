@@ -461,6 +461,12 @@ export interface TradingAccount {
   minTradingDaysRequired: number;
   tradesCount: number;
   accountNumber?: string;
+  /**
+   * Nombre de jours d'inactivité (sans trade journalisé) tolérés par la
+   * prop firm/broker avant perte du compte — règle propre à certains
+   * fournisseurs, absente par défaut (pas de limite affichée).
+   */
+  maxInactivityDays?: number;
 }
 
 export interface TraderBadge {

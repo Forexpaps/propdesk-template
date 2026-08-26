@@ -98,6 +98,39 @@ const RiskProgressRow: React.FC<{
   );
 };
 
+/**
+ * Statut d'inactivité d'un portefeuille pour l'affichage (carte + détail).
+ *
+ * Sans `maxInactivityDays` défini sur le compte, on retombe sur des seuils
+ * génériques (3j / 7j) — dès qu'une limite propre à la prop firm/broker est
+ * renseignée, l'alerte se cale sur elle : ambre à 7 jours ou moins de la
+ * limite, rouge à 3 jours ou moins, et un état "compte perdu" explicite une
+ * fois la limite atteinte ou dépassée.
+ */
+function inactivityStatus(
+  inactivityDays: number | null,
+  maxInactivityDays?: number
+): { label: string; colorClass: string } {
+  if (inactivityDays === null) return { label: "Aucun trade", colorClass: "text-slate-500" };
+  if (inactivityDays === 0) return { label: "Actif aujourd'hui", colorClass: "text-slate-400" };
+
+  if (maxInactivityDays !== undefined) {
+    const remaining = maxInactivityDays - inactivityDays;
+    if (remaining <= 0) {
+      return { label: `Compte perdu (limite ${maxInactivityDays}j dépassée)`, colorClass: "text-rose-500" };
+    }
+    const label = `${inactivityDays} / ${maxInactivityDays} j`;
+    if (remaining <= 3) return { label, colorClass: "text-rose-400" };
+    if (remaining <= 7) return { label, colorClass: "text-amber-400" };
+    return { label, colorClass: "text-slate-400" };
+  }
+
+  const label = `${inactivityDays} j inactif`;
+  if (inactivityDays >= 7) return { label, colorClass: "text-rose-400" };
+  if (inactivityDays >= 3) return { label, colorClass: "text-amber-400" };
+  return { label, colorClass: "text-slate-400" };
+}
+
 interface WalletManagementProps {
   accounts: TradingAccount[];
   /**
@@ -109,6 +142,7 @@ interface WalletManagementProps {
   trades: Trade[];
   onAddAccount: (account: TradingAccount) => void;
   onUpdateAccountBalance: (id: string, newBalance: number) => void;
+  onUpdateAccount: (id: string, patch: Partial<TradingAccount>) => void;
   onDeleteAccount: (id: string) => void;
   /** Masque les actions d'ajout, d'ajustement de solde et de suppression — vue admin d'un élève. */
   readOnly?: boolean;
@@ -119,6 +153,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   trades,
   onAddAccount,
   onUpdateAccountBalance,
+  onUpdateAccount,
   onDeleteAccount,
   readOnly = false,
 }) => {
@@ -134,6 +169,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   const [deleteConfirmAccount, setDeleteConfirmAccount] = useState<TradingAccount | null>(null);
   const [balanceEditAccount, setBalanceEditAccount] = useState<TradingAccount | null>(null);
   const [balanceEditValue, setBalanceEditValue] = useState("");
+  const [maxInactivityEditValue, setMaxInactivityEditValue] = useState("");
 
   // Form state
   const [newAccName, setNewAccName] = useState("");
@@ -239,6 +275,9 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
 
   const handleOpenBalanceEdit = (account: TradingAccount) => {
     setBalanceEditValue(account.equity.toString());
+    setMaxInactivityEditValue(
+      account.maxInactivityDays !== undefined ? account.maxInactivityDays.toString() : ""
+    );
     setBalanceEditAccount(account);
   };
 
@@ -247,6 +286,20 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
     const newBal = parseFloat(balanceEditValue);
     if (!isNaN(newBal)) {
       onUpdateAccountBalance(balanceEditAccount.id, newBal);
+    }
+    // Champ vide = pas de limite (retire une limite précédemment définie) ;
+    // toute valeur non strictement positive est ignorée plutôt que
+    // silencieusement transformée en 0 (0 jour == compte déjà perdu).
+    const trimmed = maxInactivityEditValue.trim();
+    if (trimmed === "") {
+      if (balanceEditAccount.maxInactivityDays !== undefined) {
+        onUpdateAccount(balanceEditAccount.id, { maxInactivityDays: undefined });
+      }
+    } else {
+      const parsedDays = parseInt(trimmed, 10);
+      if (Number.isFinite(parsedDays) && parsedDays > 0) {
+        onUpdateAccount(balanceEditAccount.id, { maxInactivityDays: parsedDays });
+      }
     }
     setBalanceEditAccount(null);
   };
@@ -450,25 +503,22 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                     Équité <span className="text-white font-bold font-mono">{formatCurrency(acc.equity)}</span>
                     <span>· plancher {formatCurrency(floorEquity)}</span>
                   </span>
-                  <span
-                    className={`inline-flex items-center gap-1 shrink-0 font-bold ${
-                      inactivityDays === null
-                        ? "text-slate-500"
-                        : inactivityDays >= 7
-                        ? "text-rose-400"
-                        : inactivityDays >= 3
-                        ? "text-amber-400"
-                        : "text-slate-400"
-                    }`}
-                    title="Jours écoulés depuis le dernier trade journalisé sur ce compte"
-                  >
-                    <Clock className="w-3 h-3" />
-                    {inactivityDays === null
-                      ? "Aucun trade"
-                      : inactivityDays === 0
-                      ? "Actif aujourd'hui"
-                      : `${inactivityDays} j inactif`}
-                  </span>
+                  {(() => {
+                    const { label, colorClass } = inactivityStatus(inactivityDays, acc.maxInactivityDays);
+                    return (
+                      <span
+                        className={`inline-flex items-center gap-1 shrink-0 font-bold ${colorClass}`}
+                        title={
+                          acc.maxInactivityDays !== undefined
+                            ? `Jours écoulés depuis le dernier trade — limite d'inactivité de ce portefeuille : ${acc.maxInactivityDays} jours`
+                            : "Jours écoulés depuis le dernier trade journalisé sur ce compte"
+                        }
+                      >
+                        <Clock className="w-3 h-3" />
+                        {label}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             );
@@ -703,23 +753,8 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Inactivité</div>
                 {(() => {
                   const inactivityDays = computeDaysSinceLastTrade(trades, selectedAccount.id);
-                  const colorClass =
-                    inactivityDays === null
-                      ? "text-slate-400"
-                      : inactivityDays >= 7
-                      ? "text-rose-400"
-                      : inactivityDays >= 3
-                      ? "text-amber-400"
-                      : "text-white";
-                  return (
-                    <div className={`text-sm font-bold mt-1 ${colorClass}`}>
-                      {inactivityDays === null
-                        ? "Aucun trade"
-                        : inactivityDays === 0
-                        ? "Actif aujourd'hui"
-                        : `${inactivityDays} jour${inactivityDays > 1 ? "s" : ""}`}
-                    </div>
-                  );
+                  const { label, colorClass } = inactivityStatus(inactivityDays, selectedAccount.maxInactivityDays);
+                  return <div className={`text-sm font-bold mt-1 ${colorClass}`}>{label}</div>;
                 })()}
               </div>
             </div>
@@ -911,7 +946,7 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
               <div className="p-2 rounded-lg bg-[#00E676]/10 shrink-0">
                 <RefreshCw className="w-5 h-5 text-[#00E676]" />
               </div>
-              <h3 className="text-base font-bold text-white">Ajuster le Solde</h3>
+              <h3 className="text-base font-bold text-white">Ajuster le Portefeuille</h3>
             </div>
             <div>
               <label className="block font-medium text-slate-300 mb-1 text-xs">
@@ -927,6 +962,25 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
                 }}
                 className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white font-mono focus:outline-none focus:border-[#00E676]/50"
               />
+            </div>
+            <div>
+              <label className="block font-medium text-slate-300 mb-1 text-xs">
+                Limite d'inactivité avant perte du compte (jours, optionnel)
+              </label>
+              <input
+                type="number"
+                min={1}
+                placeholder="Ex: 21 — laisser vide si aucune règle"
+                value={maxInactivityEditValue}
+                onChange={(e) => setMaxInactivityEditValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") confirmBalanceEdit();
+                }}
+                className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white font-mono focus:outline-none focus:border-[#00E676]/50"
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                Certaines prop firms invalident le compte après X jours sans trade journalisé. Le badge d'inactivité de ce portefeuille passera en alerte à l'approche de cette limite.
+              </p>
             </div>
             <div className="flex items-center justify-end gap-3 pt-2">
               <button
