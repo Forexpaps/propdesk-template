@@ -63,6 +63,19 @@ interface VideoAcademyProps {
 }
 
 const COURSE_LEVELS: CourseLevel[] = ["Débutant", "Intermédiaire", "Confirmé", "Masterclass"];
+
+/**
+ * Rang pédagogique de chaque niveau — sert à trier la liste des modules
+ * (voir `filteredModules` plus bas), jamais leur ORDRE DE CRÉATION (qui n'a
+ * aucune signification pédagogique : un module "Confirmé" peut très bien
+ * être créé avant un module "Débutant").
+ */
+const COURSE_LEVEL_ORDER: Record<CourseLevel, number> = {
+  Débutant: 0,
+  Intermédiaire: 1,
+  Confirmé: 2,
+  Masterclass: 3,
+};
 const MODULE_ICON_NAMES = ["Compass", "TrendingUp", "Zap", "ShieldCheck", "Brain", "BookOpen"];
 
 type ModuleFormState = {
@@ -299,14 +312,19 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
     }
   };
 
-  const filteredModules = modules.filter((m) => {
-    const matchesLevel = selectedLevel === "Tous" || m.category === selectedLevel;
-    const matchesSearch =
-      m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      m.lessons.some((l) => l.title.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesLevel && matchesSearch;
-  });
+  const filteredModules = modules
+    .filter((m) => {
+      const matchesLevel = selectedLevel === "Tous" || m.category === selectedLevel;
+      const matchesSearch =
+        m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        m.lessons.some((l) => l.title.toLowerCase().includes(searchQuery.toLowerCase()));
+      return matchesLevel && matchesSearch;
+    })
+    // Toujours Débutant → Intermédiaire → Confirmé → Masterclass, quel que
+    // soit l'ordre dans lequel les modules ont été créés — tri stable :
+    // deux modules du même niveau gardent leur ordre relatif d'origine.
+    .sort((a, b) => COURSE_LEVEL_ORDER[a.category] - COURSE_LEVEL_ORDER[b.category]);
 
   const handleQuizAnswerSelect = (questionId: string, optionIndex: number) => {
     if (quizSubmitted) return;
