@@ -40,6 +40,7 @@ const KNOWN_BADGE_IDS = [
   "badge-1", "badge-2", "badge-3", "badge-4", "badge-5",
   "badge-6", "badge-7", "badge-8", "badge-9",
   "badge-10", "badge-11", "badge-12", "badge-13", "badge-14",
+  "badge-15", "badge-16", "badge-17",
 ];
 function canonicalBadgeId(badgeId: string): string {
   return KNOWN_BADGE_IDS.find((id) => badgeId === id || badgeId.endsWith(`-${id}`)) ?? badgeId;
@@ -138,6 +139,26 @@ function computeSingleBadgeProgress(
         currentValue: streak,
         targetValue: target,
         progressPercentage: Math.min(100, Math.round((streak / target) * 100)),
+      };
+    }
+
+    // Paliers de volume — nombre total de trades journalisés, tous
+    // confondus (contrairement à badge-4, qui ne compte que les trades
+    // marqués d'une émotion maîtrisée).
+    case "badge-15":
+    case "badge-16":
+    case "badge-17": {
+      const targetByBadge: Record<string, number> = {
+        "badge-15": 30,
+        "badge-16": 50,
+        "badge-17": 100,
+      };
+      const target = targetByBadge[canonicalBadgeId(badgeId)];
+      const count = trades.length;
+      return {
+        currentValue: count,
+        targetValue: target,
+        progressPercentage: Math.min(100, Math.round((count / target) * 100)),
       };
     }
 

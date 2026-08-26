@@ -221,6 +221,54 @@ export const initialTraderBadges: TraderBadge[] = [
     unlockedAt: "26 Août 2026",
     rewardXP: 2500,
   },
+  // Paliers de volume — nombre total de trades journalisés (tous confondus,
+  // contrairement à badge-1 « Maître du Risk 1% » qui exige un risque ≤ 1%
+  // sur chaque trade, une donnée non suivie aujourd'hui — voir le
+  // commentaire sur `trackable: false` dans `computeSingleBadgeProgress`,
+  // `src/lib/badges.ts`). `unlocked: true` ici aussi pour le fondateur, même
+  // convention que les autres badges de ce fichier.
+  {
+    id: "badge-15",
+    title: "Trader Actif 30 Trades",
+    description: "Enregistrer 30 trades dans le journal de trading.",
+    iconName: "Trophy",
+    category: "PERFORMANCE",
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 30,
+    targetValue: 30,
+    unit: "trades",
+    unlockedAt: "26 Août 2026",
+    rewardXP: 350,
+  },
+  {
+    id: "badge-16",
+    title: "Trader Actif 50 Trades",
+    description: "Enregistrer 50 trades dans le journal de trading.",
+    iconName: "Trophy",
+    category: "PERFORMANCE",
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 50,
+    targetValue: 50,
+    unit: "trades",
+    unlockedAt: "26 Août 2026",
+    rewardXP: 550,
+  },
+  {
+    id: "badge-17",
+    title: "Trader Actif 100 Trades",
+    description: "Enregistrer 100 trades dans le journal de trading.",
+    iconName: "Trophy",
+    category: "PERFORMANCE",
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 100,
+    targetValue: 100,
+    unit: "trades",
+    unlockedAt: "26 Août 2026",
+    rewardXP: 1000,
+  },
 ];
 
 export const initialStudentProfile: StudentProfile = {
