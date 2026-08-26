@@ -118,6 +118,13 @@ export type StudentAuthState =
   | { state: "unauthenticated" }
   | { state: "authenticated"; user: StudentAuthUser };
 
+/**
+ * Autorisation qu'un fondateur peut accorder/retirer à un coach — voir
+ * `server/auth/permissions.ts` (même catalogue, source de vérité).
+ */
+export const STAFF_PERMISSION_KEYS = ["students", "messaging", "announcements", "team", "data"] as const;
+export type StaffPermissionKey = (typeof STAFF_PERMISSION_KEYS)[number];
+
 /** Compte staff tel que listé dans l'écran de gestion de l'équipe. */
 export interface StaffAccountSummary {
   id: string;
@@ -127,6 +134,8 @@ export interface StaffAccountSummary {
   createdAt: string;
   /** Le compte fondateur : non supprimable, seul à régler les modules visibles. */
   isOwner: boolean;
+  /** `null` = toutes accordées (compte jamais restreint) — toujours `null` pour le fondateur. */
+  permissions: StaffPermissionKey[] | null;
 }
 
 /** Journal de sécurité — voir `server/auth/securityEvents.ts`. */
@@ -387,6 +396,13 @@ export const api = {
 
   removeStaff: (id: string) =>
     request<void>(`/api/auth/staff/${encodeURIComponent(id)}`, { method: "DELETE" }),
+
+  /** Réservé au fondateur — voir `requireOwner` sur cette route côté serveur. */
+  updateStaffPermissions: (id: string, permissions: StaffPermissionKey[]) =>
+    request<{ success: true; permissions: StaffPermissionKey[] }>(
+      `/api/auth/staff/${encodeURIComponent(id)}/permissions`,
+      { method: "PUT", body: JSON.stringify({ permissions }) }
+    ),
 
   // --- Accès élève (compte personnel, journal cloisonné) ---
 
