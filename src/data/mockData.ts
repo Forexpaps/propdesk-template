@@ -314,6 +314,57 @@ export const initialTraderBadges: TraderBadge[] = [
     unlockedAt: "26 Août 2026",
     rewardXP: 1100,
   },
+  // Paliers de badge-1 « Maître du Risk 1% » — même critère (risque
+  // strictement ≤ 1% sur chaque trade d'une série CONSÉCUTIVE), cibles plus
+  // hautes que les 15 trades de badge-1. Comme badge-1, marqués
+  // `trackable: false` dans `src/lib/badges.ts` : le % de risque réellement
+  // engagé par trade n'est pas suivi aujourd'hui (le tag "Sur-risque (>1%)"
+  // n'est qu'auto-déclaré par l'élève, absence de tag ≠ preuve de risque
+  // maîtrisé) — inventer une progression à partir de ça serait malhonnête,
+  // même raison que pour badge-1. `unlocked: true` pour le fondateur, même
+  // convention que badge-1 et tous les badges de ce fichier.
+  {
+    id: "badge-21",
+    title: "Maître du Risk 1% — 30 Trades",
+    description: "Exécuter 30 trades consécutifs avec un risque strictement inférieur ou égal à 1%.",
+    iconName: "ShieldCheck",
+    category: "DISCIPLINE",
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 30,
+    targetValue: 30,
+    unit: "trades",
+    unlockedAt: "26 Août 2026",
+    rewardXP: 500,
+  },
+  {
+    id: "badge-22",
+    title: "Maître du Risk 1% — 50 Trades",
+    description: "Exécuter 50 trades consécutifs avec un risque strictement inférieur ou égal à 1%.",
+    iconName: "ShieldCheck",
+    category: "DISCIPLINE",
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 50,
+    targetValue: 50,
+    unit: "trades",
+    unlockedAt: "26 Août 2026",
+    rewardXP: 750,
+  },
+  {
+    id: "badge-23",
+    title: "Maître du Risk 1% — 100 Trades",
+    description: "Exécuter 100 trades consécutifs avec un risque strictement inférieur ou égal à 1%.",
+    iconName: "ShieldCheck",
+    category: "DISCIPLINE",
+    unlocked: true,
+    progressPercentage: 100,
+    currentValue: 100,
+    targetValue: 100,
+    unit: "trades",
+    unlockedAt: "26 Août 2026",
+    rewardXP: 1300,
+  },
 ];
 
 export const initialStudentProfile: StudentProfile = {
