@@ -62,7 +62,7 @@ interface VideoAcademyProps {
   onDeleteLesson?: (moduleId: string, lessonId: string) => void;
 }
 
-const COURSE_LEVELS: CourseLevel[] = ["Débutant", "Intermédiaire", "Avancé", "Masterclass"];
+const COURSE_LEVELS: CourseLevel[] = ["Débutant", "Intermédiaire", "Confirmé", "Masterclass"];
 const MODULE_ICON_NAMES = ["Compass", "TrendingUp", "Zap", "ShieldCheck", "Brain", "BookOpen"];
 
 type ModuleFormState = {
@@ -363,7 +363,7 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#111615]/60 p-4 rounded-xl border border-[#1B2320]">
         {/* Category Tabs */}
         <div className="flex items-center gap-1 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 scrollbar-none">
-          {["Tous", "Débutant", "Intermédiaire", "Avancé", "Masterclass"].map((level) => (
+          {["Tous", "Débutant", "Intermédiaire", "Confirmé", "Masterclass"].map((level) => (
             <button
               key={level}
               onClick={() => setSelectedLevel(level)}

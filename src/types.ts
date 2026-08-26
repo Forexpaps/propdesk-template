@@ -1,4 +1,4 @@
-export type CourseLevel = "Débutant" | "Intermédiaire" | "Avancé" | "Masterclass";
+export type CourseLevel = "Débutant" | "Intermédiaire" | "Confirmé" | "Masterclass";
 
 export interface QuizQuestion {
   id: string;
