@@ -7,5 +7,6 @@ coverage/
 .env*
 !.env.example
 
-# Base de données locale (Phase 3)
-data/
+# Base de données locale (Phase 3) — uniquement le dossier à la racine,
+# pas src/data/ (contient mockData.ts, nécessaire au build).
+/data/
