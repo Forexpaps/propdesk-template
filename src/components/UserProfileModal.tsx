@@ -69,12 +69,15 @@ interface UserProfileModalProps {
 }
 
 /**
- * Titres de rang par niveau — 5 paliers répartis sur le total d'XP
+ * Titres de rang par niveau — 10 paliers répartis sur le total d'XP
  * réellement disponible (somme de `rewardXP` sur le catalogue de badges
- * fourni), jamais une borne fixe. Avant ce correctif, "NIVEAU 4" et
- * "Progression Niveau 5 : X / 3 000 XP" étaient codés en dur, indépendants
- * du vrai total (repéré par l'utilisateur : 3650 XP affiché comme
- * "en cours vers 3000", donc au-delà de son propre objectif).
+ * fourni), jamais une borne fixe. `computeLevelInfo` divise toujours
+ * uniformément par `LEVEL_TITLES.length` : passer de 5 à 10 paliers ici
+ * suffit, aucun autre calcul à toucher. Avant un premier correctif,
+ * "NIVEAU 4" et "Progression Niveau 5 : X / 3 000 XP" étaient codés en dur,
+ * indépendants du vrai total (repéré par l'utilisateur : 3650 XP affiché
+ * comme "en cours vers 3000", donc au-delà de son propre objectif) — passage
+ * à 10 niveaux sur demande explicite de l'utilisateur ensuite.
  */
 const LEVEL_TITLES = [
   "Trader Débutant",
@@ -82,6 +85,11 @@ const LEVEL_TITLES = [
   "Trader SMC Confirmé",
   "Trader SMC Avancé",
   "Trader SMC Élite",
+  "Trader SMC Expert",
+  "Trader SMC Vétéran",
+  "Trader SMC Maître",
+  "Trader SMC Grand Maître",
+  "Trader SMC Légende",
 ];
 
 interface LevelInfo {
