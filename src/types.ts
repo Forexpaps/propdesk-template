@@ -28,7 +28,11 @@ export interface Lesson {
   id: string;
   title: string;
   duration: string; // e.g. "18 min"
-  videoUrl: string; // placeholder embed or video source
+  /**
+   * Absent ou vide = leçon 100% théorique, sans lecteur vidéo (voir
+   * `VideoAcademy.tsx` : la modale de leçon n'affiche alors que `theory`).
+   */
+  videoUrl?: string;
   description: string;
   isCompleted: boolean;
   resources?: Resource[];
