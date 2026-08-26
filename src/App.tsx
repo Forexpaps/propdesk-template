@@ -646,6 +646,10 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     );
   };
 
+  const handleUpdateAccount = (id: string, patch: Partial<TradingAccount>) => {
+    setSyncedAccounts((prev) => prev.map((acc) => (acc.id === id ? { ...acc, ...patch } : acc)));
+  };
+
   const handleDeleteAccount = (id: string) => {
     setSyncedAccounts((prev) => prev.filter((acc) => acc.id !== id));
   };
@@ -859,6 +863,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
                 trades={syncedTrades}
                 onAddAccount={handleAddAccount}
                 onUpdateAccountBalance={handleUpdateAccountBalance}
+                onUpdateAccount={handleUpdateAccount}
                 onDeleteAccount={handleDeleteAccount}
               />
             )}
@@ -1461,6 +1466,10 @@ function AcademyApp({
     );
   };
 
+  const handleUpdateAccount = (id: string, patch: Partial<TradingAccount>) => {
+    setAccounts((prev) => prev.map((acc) => (acc.id === id ? { ...acc, ...patch } : acc)));
+  };
+
   const handleDeleteAccount = (id: string) => {
     setAccounts((prev) => prev.filter((acc) => acc.id !== id));
   };
@@ -1737,6 +1746,7 @@ function AcademyApp({
               trades={trades}
               onAddAccount={handleAddAccount}
               onUpdateAccountBalance={handleUpdateAccountBalance}
+              onUpdateAccount={handleUpdateAccount}
               onDeleteAccount={handleDeleteAccount}
             />
           )}
