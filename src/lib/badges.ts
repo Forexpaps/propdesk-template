@@ -39,6 +39,7 @@ export function computeBadgeProgress(badges: TraderBadge[], trades: Trade[], mod
 const KNOWN_BADGE_IDS = [
   "badge-1", "badge-2", "badge-3", "badge-4", "badge-5",
   "badge-6", "badge-7", "badge-8", "badge-9",
+  "badge-10", "badge-11", "badge-12", "badge-13", "badge-14",
 ];
 function canonicalBadgeId(badgeId: string): string {
   return KNOWN_BADGE_IDS.find((id) => badgeId === id || badgeId.endsWith(`-${id}`)) ?? badgeId;
@@ -113,6 +114,30 @@ function computeSingleBadgeProgress(
         currentValue: Number(best.toFixed(1)),
         targetValue: target,
         progressPercentage: Math.min(100, Math.round((best / target) * 100)),
+      };
+    }
+
+    // Séries de Discipline longues — même calcul que badge-6, cibles plus
+    // longues (jours de trading consécutifs, pas des jours calendaires, voir
+    // `computeDisciplineStreak`).
+    case "badge-10":
+    case "badge-11":
+    case "badge-12":
+    case "badge-13":
+    case "badge-14": {
+      const targetByBadge: Record<string, number> = {
+        "badge-10": 14,
+        "badge-11": 30,
+        "badge-12": 90,
+        "badge-13": 180,
+        "badge-14": 365,
+      };
+      const target = targetByBadge[canonicalBadgeId(badgeId)];
+      const streak = computeDisciplineStreak(trades);
+      return {
+        currentValue: streak,
+        targetValue: target,
+        progressPercentage: Math.min(100, Math.round((streak / target) * 100)),
       };
     }
 
