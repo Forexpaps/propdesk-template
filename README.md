@@ -72,9 +72,22 @@ pour la base SQLite) :
 
 Les fonctions serverless de Vercel ont un système de fichiers en lecture
 seule : un fichier SQLite classique ne peut donc pas y vivre. L'application
-utilise [Turso](https://turso.tech) (base SQLite-compatible, accessible en
-réseau) pour ce cas — **aucune adaptation de code n'est nécessaire**, il
-suffit de définir deux variables d'environnement.
+détecte automatiquement la base disponible via les variables
+d'environnement (voir `server/db.ts`) — **aucune adaptation de code
+n'est nécessaire**, il suffit d'attacher un stockage.
+
+**Postgres natif Vercel (recommandé — aucun compte tiers)** :
+
+1. Dans le tableau de bord de votre projet Vercel, onglet **Storage** →
+   **Create Database** → **Postgres**.
+2. Vercel provisionne la base et injecte automatiquement la variable
+   `POSTGRES_URL` dans votre projet — rien à copier/coller.
+3. Redéployer (Vercel le propose souvent automatiquement après la création
+   du store). Le premier accès à l'URL fournie affiche l'écran
+   d'installation.
+
+Alternative : **Turso** (base SQLite-compatible externe), si vous préférez
+ou avez déjà un compte :
 
 1. Créer un compte sur [turso.tech](https://turso.tech) (offre gratuite
    largement suffisante pour un usage personnel).
@@ -86,28 +99,29 @@ suffit de définir deux variables d'environnement.
    turso db show propdesk --url          # → TURSO_DATABASE_URL
    turso db tokens create propdesk        # → TURSO_AUTH_TOKEN
    ```
-3. Importer le dépôt sur [vercel.com](https://vercel.com).
-4. Dans les réglages du projet Vercel (Settings → Environment Variables),
-   définir :
-   - `TURSO_DATABASE_URL` — l'URL récupérée à l'étape 2 (`libsql://...`)
-   - `TURSO_AUTH_TOKEN` — le jeton récupéré à l'étape 2
-5. Déployer. Le premier accès à l'URL fournie affiche l'écran d'installation
-   pour créer votre compte — les données vivent désormais dans Turso, pas
-   sur le disque de la fonction Vercel.
+3. Dans les réglages du projet Vercel (Settings → Environment Variables),
+   définir `TURSO_DATABASE_URL` et `TURSO_AUTH_TOKEN` avec les valeurs
+   récupérées à l'étape précédente, puis redéployer.
 
-Sans ces deux variables, l'application bascule automatiquement sur un
-fichier SQLite local (voir `server/db.ts`) — inutilisable sur Vercel, mais
-c'est exactement ce qui permet à `npm run dev` de fonctionner en local sans
-compte Turso.
+Sans `POSTGRES_URL` ni `TURSO_DATABASE_URL`, l'application bascule
+automatiquement sur un fichier SQLite local (voir `server/db.ts`) —
+inutilisable sur Vercel (d'où l'écran « Serveur injoignable » si vous
+déployez sans configurer l'un des deux ci-dessus), mais c'est exactement ce
+qui permet à `npm run dev` de fonctionner en local sans aucun compte
+externe.
 
 ### Variables d'environnement utiles
 
 | Variable | Rôle | Défaut |
 |---|---|---|
 | `PORT` | Port d'écoute du serveur | `3000` |
-| `DATA_DIR` | Dossier de la base SQLite locale (ignoré si `TURSO_DATABASE_URL` est défini) | `./data` |
-| `TURSO_DATABASE_URL` | URL de la base Turso distante (production/Vercel) | absent = mode fichier local |
+| `DATA_DIR` | Dossier de la base SQLite locale (ignoré si `POSTGRES_URL` ou `TURSO_DATABASE_URL` est défini) | `./data` |
+| `POSTGRES_URL` | URL de la base Postgres (Vercel Storage, injectée automatiquement) | absent = mode fichier local |
+| `TURSO_DATABASE_URL` | URL de la base Turso distante, si utilisée à la place de Postgres | absent = mode fichier local |
 | `TURSO_AUTH_TOKEN` | Jeton d'authentification Turso | absent = mode fichier local |
+
+Ordre de priorité si plusieurs sont définies : `POSTGRES_URL` d'abord, puis
+`TURSO_DATABASE_URL`, sinon fichier local.
 
 Voir [.env.example](.env.example) pour la liste complète.
 
@@ -120,7 +134,7 @@ seul port et aucun proxy à configurer.
 ```
 server.ts              point d'entrée : Express + Vite/statique
 server/
-  db.ts                connexion libSQL (fichier local ou Turso) et schéma
+  db.ts                connexion base (fichier local, Postgres ou Turso) et schéma
   repositories.ts      accès aux données (seul module qui parle à la base)
   routes.ts            routes /api/*
   schemas.ts           validation zod des entrées
@@ -157,9 +171,9 @@ serveur) sont importées automatiquement. À défaut, la base est amorcée avec
 `src/data/mockData.ts`.
 
 La base vit soit dans un fichier local (`DATA_DIR`, `./data` par défaut, hors
-du dépôt), soit dans une base Turso distante si `TURSO_DATABASE_URL` est
-défini — voir « Déployer (Vercel) » plus haut. Le client libSQL
-(`server/db.ts`) choisit automatiquement entre les deux, sans aucun autre
+du dépôt), soit dans une base Postgres ou Turso distante selon la variable
+d'environnement définie — voir « Déployer (Vercel) » plus haut.
+`server/db.ts` choisit automatiquement le bon moteur, sans aucun autre
 changement de code.
 
 ### API
@@ -217,7 +231,14 @@ En local (mode fichier) :
 sqlite3 data/horizon.db "delete from staff_accounts; delete from sessions;"
 ```
 
-Sur Turso (production) :
+Sur Postgres Vercel (production) — depuis l'onglet Storage du projet
+Vercel, ouvrir la console SQL de la base, ou :
+
+```bash
+psql "$POSTGRES_URL" -c "delete from staff_accounts; delete from sessions;"
+```
+
+Sur Turso (si utilisé à la place de Postgres) :
 
 ```bash
 turso db shell propdesk "delete from staff_accounts; delete from sessions;"
