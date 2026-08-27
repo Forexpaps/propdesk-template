@@ -1,12 +1,18 @@
-# Académie de Trading Horizon — PropDesk
+# PropDesk
 
-Plateforme d'académie de trading SMC : modules vidéo, journal d'exécution,
-suivi de comptes prop firm, forum et messagerie coach. Aucune IA n'est
-utilisée nulle part dans l'application.
+Tableau de bord de trading personnel : journal d'exécution, portefeuille,
+analyse de rentabilité, calendrier macro, setups, plan de trading et suivi de
+mindset. Application **mono-utilisateur** — chaque déploiement (le vôtre, ou
+celui de n'importe quel autre trader) n'a qu'un seul compte, avec ses propres
+données isolées. Aucune IA n'est utilisée nulle part dans l'application.
 
-## Démarrage
+## Démarrage en local
+
+Prérequis : [Node.js](https://nodejs.org) 20+ et npm.
 
 ```bash
+git clone https://github.com/Forexpaps/propdesk-template.git
+cd propdesk-template
 npm install
 ```
 
@@ -19,6 +25,62 @@ npm run lint    # vérification TypeScript (strict)
 npm run build   # bundle client + serveur dans dist/
 npm start       # sert le build de production
 ```
+
+Au premier accès à `http://localhost:3000`, l'application affiche un écran
+d'installation : choisissez votre adresse e-mail et votre mot de passe (10
+caractères minimum), c'est le seul compte de cette instance.
+
+## Déployer pour un usage personnel
+
+Chaque trader qui veut utiliser PropDesk pour lui-même doit déployer **sa
+propre instance**, avec sa propre base de données — il n'y a pas de mode
+multi-comptes partagé dans une même instance.
+
+### 1. Récupérer le code
+
+Le plus simple : cliquer sur **"Use this template"** sur la page GitHub du
+dépôt pour créer votre propre copie, ou forker le dépôt.
+
+### 2. Déployer (Railway, recommandé)
+
+Railway convient bien ici car il fournit un disque persistant (nécessaire
+pour la base SQLite) :
+
+1. Créer un compte sur [railway.app](https://railway.app) et un nouveau
+   projet "Deploy from GitHub repo", en pointant vers votre copie du dépôt.
+2. Ajouter un volume persistant monté sur `/data` (Railway → onglet
+   "Volumes"), et définir la variable d'environnement `DATA_DIR=/data`.
+3. Railway détecte `npm run build` / `npm start` automatiquement. Sinon,
+   définir manuellement :
+   - Build command : `npm run build`
+   - Start command : `npm start`
+4. Une fois déployé, ouvrir l'URL fournie : le premier accès affiche l'écran
+   d'installation pour créer votre compte.
+
+### 3. Déployer (Vercel)
+
+Vercel fonctionne aussi, à condition de ne **pas** compter sur un disque
+persistant classique (le système de fichiers y est éphémère) :
+
+1. Importer le dépôt sur [vercel.com](https://vercel.com).
+2. Remplacer le stockage SQLite par une base externe persistante (ex.
+   [Turso](https://turso.tech) ou Postgres géré) — voir la note dans
+   `server/repositories.ts` : seul ce fichier est à adapter, les routes n'y
+   touchent pas.
+3. Définir les variables d'environnement nécessaires dans les réglages du
+   projet Vercel.
+
+Sans cette adaptation, les données créées sur Vercel seraient perdues à
+chaque redéploiement.
+
+### Variables d'environnement utiles
+
+| Variable | Rôle | Défaut |
+|---|---|---|
+| `PORT` | Port d'écoute du serveur | `3000` |
+| `DATA_DIR` | Dossier de la base SQLite | `./data` |
+
+Voir [.env.example](.env.example) pour la liste complète.
 
 ## Architecture
 
