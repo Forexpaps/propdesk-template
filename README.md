@@ -52,63 +52,48 @@ n'est pas autorisée.
 Cloner ce dépôt, ou cliquer sur **"Use this template"** sur sa page GitHub
 pour créer sa propre copie.
 
-### 2. Déployer (Railway, recommandé)
+### 2. Choisir un hébergeur
 
-Railway convient bien ici car il fournit un disque persistant (nécessaire
-pour la base SQLite) :
+L'application tourne sur **n'importe quel hébergeur Node.js** (`npm run
+build && npm start`) — un seul critère détermine s'il faut une étape
+supplémentaire : **son système de fichiers est-il persistant ?**
 
-1. Créer un compte sur [railway.app](https://railway.app) et un nouveau
-   projet "Deploy from GitHub repo", en pointant vers votre copie du dépôt.
-2. Ajouter un volume persistant monté sur `/data` (Railway → onglet
-   "Volumes"), et définir la variable d'environnement `DATA_DIR=/data`.
-3. Railway détecte `npm run build` / `npm start` automatiquement. Sinon,
-   définir manuellement :
-   - Build command : `npm run build`
-   - Start command : `npm start`
-4. Une fois déployé, ouvrir l'URL fournie : le premier accès affiche l'écran
-   d'installation pour créer votre compte.
+**Hébergeur à disque persistant** (Railway, Render, Fly.io, un VPS, un
+Docker avec volume monté, une machine perso...) : **rien à faire**,
+l'application fonctionne directement.
 
-### 3. Déployer (Vercel)
+1. Créer le service sur l'hébergeur choisi, en pointant vers votre copie du
+   dépôt (build : `npm run build`, démarrage : `npm start`).
+2. Si l'hébergeur le permet, monter un volume persistant et y faire pointer
+   `DATA_DIR` (ex. `DATA_DIR=/data`) — sinon la base par défaut (`./data`)
+   suffit tant que le disque du service lui-même survit aux redémarrages.
+3. Ouvrir l'URL fournie : le premier accès affiche l'écran d'installation.
 
-Les fonctions serverless de Vercel ont un système de fichiers en lecture
-seule : un fichier SQLite classique ne peut donc pas y vivre. L'application
-détecte automatiquement la base disponible via les variables
-d'environnement (voir `server/db.ts`) — **aucune adaptation de code
-n'est nécessaire**, il suffit d'attacher un stockage.
+**Hébergeur sans disque persistant** (fonctions serverless : Vercel,
+Netlify, AWS Lambda...) : il faut une base accessible en réseau, définie
+via une variable d'environnement — **aucune adaptation de code
+nécessaire**, `server/db.ts` détecte automatiquement laquelle est présente.
 
-**Postgres natif Vercel (recommandé — aucun compte tiers)** :
+- `POSTGRES_URL` — une base Postgres, **n'importe quel fournisseur** :
+  Postgres natif de l'hébergeur (ex. l'onglet Storage de Vercel, qui
+  provisionne la base et définit cette variable automatiquement), ou un
+  service tiers (Neon, Supabase, ElephantSQL, une instance auto-hébergée...).
+- `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` — alternative SQLite-compatible
+  via [Turso](https://turso.tech) :
+  ```bash
+  curl -sSfL https://get.tur.so/install.sh | bash
+  turso auth login
+  turso db create propdesk
+  turso db show propdesk --url          # → TURSO_DATABASE_URL
+  turso db tokens create propdesk        # → TURSO_AUTH_TOKEN
+  ```
 
-1. Dans le tableau de bord de votre projet Vercel, onglet **Storage** →
-   **Create Database** → **Postgres**.
-2. Vercel provisionne la base et injecte automatiquement la variable
-   `POSTGRES_URL` dans votre projet — rien à copier/coller.
-3. Redéployer (Vercel le propose souvent automatiquement après la création
-   du store). Le premier accès à l'URL fournie affiche l'écran
-   d'installation.
-
-Alternative : **Turso** (base SQLite-compatible externe), si vous préférez
-ou avez déjà un compte :
-
-1. Créer un compte sur [turso.tech](https://turso.tech) (offre gratuite
-   largement suffisante pour un usage personnel).
-2. Installer la CLI Turso puis créer une base et récupérer ses identifiants :
-   ```bash
-   curl -sSfL https://get.tur.so/install.sh | bash
-   turso auth login
-   turso db create propdesk
-   turso db show propdesk --url          # → TURSO_DATABASE_URL
-   turso db tokens create propdesk        # → TURSO_AUTH_TOKEN
-   ```
-3. Dans les réglages du projet Vercel (Settings → Environment Variables),
-   définir `TURSO_DATABASE_URL` et `TURSO_AUTH_TOKEN` avec les valeurs
-   récupérées à l'étape précédente, puis redéployer.
-
-Sans `POSTGRES_URL` ni `TURSO_DATABASE_URL`, l'application bascule
-automatiquement sur un fichier SQLite local (voir `server/db.ts`) —
-inutilisable sur Vercel (d'où l'écran « Serveur injoignable » si vous
-déployez sans configurer l'un des deux ci-dessus), mais c'est exactement ce
-qui permet à `npm run dev` de fonctionner en local sans aucun compte
-externe.
+Définir l'une des deux dans les variables d'environnement du projet, puis
+déployer/redéployer. Sans aucune des deux, l'application bascule sur un
+fichier SQLite local — inutilisable sur ce type d'hébergeur (d'où l'écran
+« Serveur injoignable » si vous déployez sans configurer l'une d'elles),
+mais c'est exactement ce qui permet à `npm run dev` de fonctionner en local
+sans aucun compte externe.
 
 ### Variables d'environnement utiles
 
@@ -116,7 +101,7 @@ externe.
 |---|---|---|
 | `PORT` | Port d'écoute du serveur | `3000` |
 | `DATA_DIR` | Dossier de la base SQLite locale (ignoré si `POSTGRES_URL` ou `TURSO_DATABASE_URL` est défini) | `./data` |
-| `POSTGRES_URL` | URL de la base Postgres (Vercel Storage, injectée automatiquement) | absent = mode fichier local |
+| `POSTGRES_URL` | URL d'une base Postgres, tout fournisseur | absent = mode fichier local |
 | `TURSO_DATABASE_URL` | URL de la base Turso distante, si utilisée à la place de Postgres | absent = mode fichier local |
 | `TURSO_AUTH_TOKEN` | Jeton d'authentification Turso | absent = mode fichier local |
 
@@ -172,7 +157,7 @@ serveur) sont importées automatiquement. À défaut, la base est amorcée avec
 
 La base vit soit dans un fichier local (`DATA_DIR`, `./data` par défaut, hors
 du dépôt), soit dans une base Postgres ou Turso distante selon la variable
-d'environnement définie — voir « Déployer (Vercel) » plus haut.
+d'environnement définie — voir « Choisir un hébergeur » plus haut.
 `server/db.ts` choisit automatiquement le bon moteur, sans aucun autre
 changement de code.
 
@@ -202,7 +187,7 @@ Limitations de débit par IP : `/api/auth/login` 10 par quart d'heure,
 ## Authentification
 
 Cette application est pensée pour un déploiement **mono-utilisateur** : chaque
-instance (votre propre Vercel/Railway, votre propre base) n'accueille qu'un
+instance (quel que soit l'hébergeur, votre propre base) n'accueille qu'un
 seul compte, celui créé à l'installation. Il n'y a pas de rôles ni de comptes
 secondaires — le compte connecté a systématiquement tous les droits sur ses
 propres données.
@@ -231,8 +216,8 @@ En local (mode fichier) :
 sqlite3 data/horizon.db "delete from staff_accounts; delete from sessions;"
 ```
 
-Sur Postgres Vercel (production) — depuis l'onglet Storage du projet
-Vercel, ouvrir la console SQL de la base, ou :
+Sur Postgres, quel que soit le fournisseur (souvent aussi accessible depuis
+une console SQL fournie par l'hébergeur) :
 
 ```bash
 psql "$POSTGRES_URL" -c "delete from staff_accounts; delete from sessions;"
