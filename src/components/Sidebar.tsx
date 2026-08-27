@@ -412,7 +412,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       PropDesk
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-400 font-normal">Académie de trading</p>
+                  <p className="text-[11px] text-slate-400 font-normal">Journal de trading</p>
                 </div>
               )}
             </div>
