@@ -18,7 +18,6 @@ import {
   Trophy,
   Star,
   Check,
-  ShieldAlert,
   DatabaseBackup,
   Download,
   KeyRound,
@@ -29,7 +28,6 @@ import { api } from "../lib/api";
 import { confirmDialog } from "../lib/confirmDialog";
 import { ChangeOwnPasswordModal } from "./ChangeOwnPasswordModal";
 import { TwoFactorSetupModal } from "./TwoFactorSetupModal";
-import { ExportDataButton } from "./ExportDataButton";
 
 const SectionHeader: React.FC<{ children?: React.ReactNode; color?: string }> = ({
   children,
@@ -49,23 +47,6 @@ interface UserProfileModalProps {
   onSaveProfile: (updatedProfile: StudentProfile) => void;
   onClaimBadge?: (badgeId: string) => void;
   initialTab?: "profile" | "badges";
-  /** Ouvre la gestion des comptes staff. Absent : replié sur l'ancien badge statique. */
-  onOpenStaffAccounts?: () => void;
-  /**
-   * Ouvre le journal de sécurité. Absent : le bouton ne s'affiche pas du
-   * tout — ce composant ne connaît pas `isOwner` lui-même, c'est son parent
-   * qui décide de fournir ou non ce callback (réservé au fondateur).
-   */
-  onOpenSecurityLog?: () => void;
-  /**
-   * Restreint le formulaire à la seule photo de profil — mode élève. Le
-   * reste de la fiche (nom, email, rôle, niveau, bio) est géré par le coach
-   * sur `StudentTracking.tsx`, jamais par l'élève lui-même : ces champs
-   * passent en lecture seule et le bloc "Mode Administrateur / Staff" (qui ne
-   * concerne que le bureau staff) ne s'affiche pas. `onSaveProfile` ne reçoit
-   * alors qu'un objet dont seul `avatar` a pu changer.
-   */
-  avatarOnly?: boolean;
 }
 
 /**
@@ -143,9 +124,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onSaveProfile,
   onClaimBadge,
   initialTab = "profile",
-  onOpenStaffAccounts,
-  onOpenSecurityLog,
-  avatarOnly = false,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<"profile" | "badges">(initialTab);
   const [badgeFilter, setBadgeFilter] = useState<string>("ALL");
@@ -161,21 +139,13 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   // champ affiché en bas de la sidebar élève, voir Sidebar.tsx), sur
   // demande explicite de l'utilisateur.
   const [role, setRole] = useState(
-    student.role || (student.isAdmin ? "Fondateur / Head Coach" : student.level)
+    student.role || student.level
   );
   const [phone, setPhone] = useState(student.phone || "+33 6 12 34 56 78");
   const [bio, setBio] = useState(student.bio || "");
   const [preferredPairs, setPreferredPairs] = useState(
     student.preferredPairs || "EUR/USD, XAU/USD, NAS100"
   );
-  /**
-   * Statut d'administrateur, en lecture seule.
-   *
-   * Ce n'est plus un état local éditable : le serveur retire `isAdmin` du corps
-   * de PUT /api/profile et réinjecte la valeur qu'il détient. Un état local
-   * laisserait croire que le basculer a un effet.
-   */
-  const isAdmin = student.isAdmin === true;
   /** Le décodage puis le rendu d'une grande image ne sont pas instantanés. */
   const [isResizing, setIsResizing] = useState(false);
 
@@ -195,7 +165,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setEmail(student.email);
     setAvatar(student.avatar);
     setLevel(student.level);
-    setRole(student.role || (student.isAdmin ? "Fondateur / Head Coach" : student.level));
+    setRole(student.role || student.level);
     setPhone(student.phone || "+33 6 12 34 56 78");
     setBio(student.bio || "");
     setPreferredPairs(student.preferredPairs || "EUR/USD, XAU/USD, NAS100");
@@ -265,7 +235,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       const result = await api.restoreState({
         student: parsed.student ?? undefined,
         collections: parsed.collections ?? undefined,
-        quizResults: parsed.quizResults ?? undefined,
       });
       setBackupStatus({
         kind: "success",
@@ -320,31 +289,21 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
    * changement d'onglet), donc un enregistrement déclenché depuis Badges
    * capture bien les mêmes modifications que depuis Profil & Options.
    */
-  const buildUpdatedProfile = (): StudentProfile =>
-    avatarOnly
-      ? // Seule la photo peut changer ici : le reste part de `student`
-        // (la source de vérité), jamais de l'état local du formulaire — au
-        // cas où celui-ci contiendrait une frappe dans un champ pourtant
-        // désactivé (ex: autofill du navigateur).
-        { ...student, avatar }
-      : {
-          ...student,
-          name,
-          email,
-          avatar,
-          level,
-          role,
-          phone,
-          bio,
-          preferredPairs,
-          // `startingCapital`/`currentCapital` ne sont plus édités ici : ils sont
-          // dérivés des portefeuilles réels à l'affichage (voir `App.tsx`,
-          // `displayStudent`/`studentProfile`). Le `...student` initial les
-          // conserve tels quels dans le payload envoyé au serveur.
-          // `isAdmin` n'est volontairement pas renvoyé : le serveur l'ignore dans le
-          // corps et réinjecte sa propre valeur. Le `...student` initial le conserve
-          // pour que l'état local reste cohérent d'ici au prochain rechargement.
-        };
+  const buildUpdatedProfile = (): StudentProfile => ({
+    ...student,
+    name,
+    email,
+    avatar,
+    level,
+    role,
+    phone,
+    bio,
+    preferredPairs,
+    // `startingCapital`/`currentCapital` ne sont plus édités ici : ils sont
+    // dérivés des portefeuilles réels à l'affichage (voir `App.tsx`,
+    // `displayStudent`). Le `...student` initial les conserve tels quels
+    // dans le payload envoyé au serveur.
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -418,13 +377,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base sm:text-lg font-bold text-white">{name}</h3>
-                {isAdmin && (
-                  <span className="px-2 py-0.5 rounded bg-[#00E676]/15 text-[#00E676] border border-[#00E676]/30 text-[10px] font-mono font-bold">
-                    Admin / Coach
-                  </span>
-                )}
               </div>
-              <p className="text-xs text-slate-400">{role || "Élève Horizon SMC"}</p>
+              <p className="text-xs text-slate-400">{role || "Trader"}</p>
             </div>
           </div>
 
@@ -559,124 +513,43 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               </div>
             </div>
 
-            {/* Admin Toggle — bureau staff uniquement, aucun sens pour un élève */}
-            {!avatarOnly && (
+            {/* Mon mot de passe — changement volontaire, self-service, depuis
+                une session déjà active (même route serveur que le
+                changement FORCÉ après invitation, `ChangePasswordScreen.tsx`). */}
             <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <Crown className="w-6 h-6 text-[#00E676] shrink-0" />
+                <KeyRound className="w-6 h-6 text-[#00E676] shrink-0" />
                 <div>
-                  <div className="text-sm font-bold text-white flex items-center gap-2">
-                    Mode Administrateur / Staff
-                    {isAdmin && (
-                      <span className="px-2 py-0.5 rounded bg-[#00E676]/15 text-[#00E676] border border-[#00E676]/30 text-[10px] font-mono font-bold">
-                        ACTIF 👑
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Accès au suivi complet des élèves, édition des fiches et gestion des portefeuilles.
-                  </p>
+                  <div className="text-sm font-bold text-white">Mon mot de passe</div>
+                  <p className="text-xs text-slate-400">Modifie le mot de passe de ce compte.</p>
                 </div>
               </div>
-
-              {/* Ce statut n'est plus un interrupteur : un interrupteur ici
-                  permettait de s'auto-promouvoir, et le serveur ignore
-                  désormais ce champ dans le corps de PUT /api/profile. Les
-                  comptes staff ont les mêmes droits métier — ce bouton mène à
-                  leur gestion (inviter, révoquer), pas à un réglage de rôle.
-                  La seule distinction est le compte fondateur, qui règle les
-                  modules visibles ; elle ne s'édite pas, elle se constate. */}
-              {onOpenStaffAccounts ? (
-                <button
-                  type="button"
-                  onClick={onOpenStaffAccounts}
-                  className="px-3 py-2 rounded-xl text-[11px] font-bold text-slate-950 bg-[#00E676] hover:bg-[#00c865] shrink-0 transition-colors"
-                >
-                  Gérer l'équipe
-                </button>
-              ) : (
-                <span className="px-3 py-2 rounded-xl text-[11px] font-medium text-slate-400 bg-[#0D1110] border border-[#1B2320] shrink-0 text-center">
-                  Défini côté serveur
-                </span>
-              )}
+              <button
+                type="button"
+                onClick={() => setIsChangePasswordOpen(true)}
+                className="px-3 py-2 rounded-xl text-[11px] font-bold text-slate-950 bg-[#00E676] hover:bg-[#00c865] shrink-0 transition-colors"
+              >
+                Modifier
+              </button>
             </div>
-            )}
 
-            {/* Mon mot de passe — n'importe quel compte staff peut changer le
-                sien, ce n'est pas réservé au fondateur (même route serveur
-                que le changement FORCÉ après invitation, `ChangePasswordScreen.tsx` —
-                ici volontaire, self-service, depuis une session déjà active).
-                Absent du mode élève (`avatarOnly`) : rien à voir avec la
-                photo de profil, et un élève a son propre flux dédié
-                (changement de mot de passe forcé après invitation, plus lien
-                de réinitialisation généré par le staff — voir
-                StudentTracking.tsx). */}
-            {!avatarOnly && (
-              <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <KeyRound className="w-6 h-6 text-[#00E676] shrink-0" />
-                  <div>
-                    <div className="text-sm font-bold text-white">Mon mot de passe</div>
-                    <p className="text-xs text-slate-400">Modifie le mot de passe de ce compte.</p>
-                  </div>
+            {/* Authentification à deux facteurs */}
+            <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="w-6 h-6 text-[#00E676] shrink-0" />
+                <div>
+                  <div className="text-sm font-bold text-white">Authentification à deux facteurs</div>
+                  <p className="text-xs text-slate-400">Ajoute un code à usage unique à la connexion.</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsChangePasswordOpen(true)}
-                  className="px-3 py-2 rounded-xl text-[11px] font-bold text-slate-950 bg-[#00E676] hover:bg-[#00c865] shrink-0 transition-colors"
-                >
-                  Modifier
-                </button>
               </div>
-            )}
-
-            {/* Authentification à deux facteurs — n'importe quel compte
-                staff peut l'activer pour lui-même, ce n'est pas réservé au
-                fondateur (même raisonnement que "Mon mot de passe"
-                juste au-dessus). Absent du mode élève (`avatarOnly`) : les
-                comptes élève n'ont pas de 2FA. */}
-            {!avatarOnly && (
-              <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="w-6 h-6 text-[#00E676] shrink-0" />
-                  <div>
-                    <div className="text-sm font-bold text-white">Authentification à deux facteurs</div>
-                    <p className="text-xs text-slate-400">Ajoute un code à usage unique à la connexion.</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsTwoFactorOpen(true)}
-                  className="px-3 py-2 rounded-xl text-[11px] font-bold text-slate-950 bg-[#00E676] hover:bg-[#00c865] shrink-0 transition-colors"
-                >
-                  Gérer
-                </button>
-              </div>
-            )}
-
-            {/* Journal de sécurité — réservé au compte fondateur. Le bouton
-                ne s'affiche que si le parent fournit onOpenSecurityLog
-                (conditionné par isOwner, jamais par isAdmin). */}
-            {onOpenSecurityLog && (
-              <div className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320] flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <ShieldAlert className="w-6 h-6 text-[#00E676] shrink-0" />
-                  <div>
-                    <div className="text-sm font-bold text-white">Journal de sécurité</div>
-                    <p className="text-xs text-slate-400">
-                      Connexions, échecs, verrouillages et accès refusés sur ton écosystème.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={onOpenSecurityLog}
-                  className="px-3 py-2 rounded-xl text-[11px] font-bold text-slate-950 bg-[#00E676] hover:bg-[#00c865] shrink-0 transition-colors"
-                >
-                  Consulter
-                </button>
-              </div>
-            )}
+              <button
+                type="button"
+                onClick={() => setIsTwoFactorOpen(true)}
+                className="px-3 py-2 rounded-xl text-[11px] font-bold text-slate-950 bg-[#00E676] hover:bg-[#00c865] shrink-0 transition-colors"
+              >
+                Gérer
+              </button>
+            </div>
 
             {/* Données & Sauvegarde — export/import JSON de tout le bureau
                 de l'utilisateur connecté. Disponible aux deux mondes (staff
@@ -738,20 +611,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               )}
             </div>
 
-            {/* Export RGPD (Article 20) — réservé à l'élève, sur sa propre
-                fiche : ce sont ses données. Distinct du bloc générique
-                juste au-dessus (sauvegarde technique complète). */}
-            {avatarOnly && (
-              <ExportDataButton className="bg-[#0D1110] p-4 rounded-xl border border-[#1B2320]" />
-            )}
-
-            {avatarOnly && (
-              <p className="text-[11px] text-slate-500 -mt-1">
-                Seule ta photo de profil est modifiable ici — le reste de ta fiche est géré par ton coach,
-                contacte-le via la Messagerie pour une modification.
-              </p>
-            )}
-
             {/* Inputs Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -759,7 +618,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <input
                   type="text"
                   required
-                  disabled={avatarOnly}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676] disabled:opacity-50 disabled:cursor-not-allowed"
@@ -771,46 +629,12 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <input
                   type="email"
                   required
-                  disabled={avatarOnly}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676] disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
-              <div>
-                <label className="block font-medium text-slate-300 mb-1">Rôle / Titre</label>
-                <input
-                  type="text"
-                  disabled={avatarOnly}
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676] disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-300 mb-1">Niveau SMC</label>
-                <input
-                  type="text"
-                  disabled={avatarOnly}
-                  value={level}
-                  onChange={(e) => setLevel(e.target.value)}
-                  className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-[#00E676] disabled:opacity-50 disabled:cursor-not-allowed"
-                />
-              </div>
-
-            </div>
-
-            <div>
-              <label className="block font-medium text-slate-300 mb-1">Bio & Présentation</label>
-              <textarea
-                rows={2}
-                disabled={avatarOnly}
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                className="w-full bg-[#0D1110] border border-[#1B2320] rounded-xl p-3 text-white focus:outline-none focus:border-[#00E676] disabled:opacity-50 disabled:cursor-not-allowed"
-              />
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1B2320]">
@@ -896,7 +720,6 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 { id: "UNLOCKED", label: `Débloqués (${unlockedBadgesCount})` },
                 { id: "IN_PROGRESS", label: `En cours (${badges.length - unlockedBadgesCount})` },
                 { id: "DISCIPLINE", label: "Discipline" },
-                { id: "ACADEMY", label: "Académie" },
                 { id: "PERFORMANCE", label: "Performance" },
                 { id: "PROPFIRM", label: "Prop Firm" },
               ].map((f) => (

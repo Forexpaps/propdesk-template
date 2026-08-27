@@ -1,18 +1,14 @@
 import { db, getMeta, setMeta } from "./db";
 import {
   replaceCollection,
-  replaceQuizResults,
   saveProfile,
   CollectionName,
 } from "./repositories";
 import {
   initialStudentProfile,
-  initialModules,
   initialTrades,
-  initialMessages,
   initialTradingAccounts,
   initialTraderBadges,
-  initialEnrolledStudents,
   initialNotifications,
 } from "../src/data/mockData";
 
@@ -31,10 +27,10 @@ function markBootstrapped(): void {
  * base comme amorcée. Sert à la fois au seed de démonstration et à l'import
  * des données que l'utilisateur avait dans son localStorage.
  *
- * L'ensemble tourne dans une seule transaction (`replaceCollection`/
- * `replaceQuizResults` s'imbriquent dedans via savepoint, better-sqlite3 le
- * supporte nativement) : repéré en audit, un échec en cours de boucle
- * (ex. `CollectionOwnershipConflictError` sur un import corrompu) laissait
+ * L'ensemble tourne dans une seule transaction (`replaceCollection`
+ * s'imbrique dedans via savepoint, better-sqlite3 le supporte nativement) :
+ * repéré en audit, un échec en cours de boucle (ex.
+ * `CollectionOwnershipConflictError` sur un import corrompu) laissait
  * auparavant les collections déjà écrites en base alors que
  * `bootstrapped_at` n'était jamais posé — état partiel visible par une
  * lecture concurrente. Toute erreur fait maintenant tout annuler.
@@ -42,7 +38,6 @@ function markBootstrapped(): void {
 export function writeFullState(state: {
   student: unknown;
   collections: Partial<Record<CollectionName, { id: string }[]>>;
-  quizResults?: Record<string, unknown>;
 }): void {
   const run = db.transaction(() => {
     saveProfile(state.student);
@@ -53,7 +48,6 @@ export function writeFullState(state: {
       }
     );
 
-    replaceQuizResults(state.quizResults ?? {});
     markBootstrapped();
   });
 
@@ -76,13 +70,9 @@ export function seedDemoData(): void {
     collections: {
       trades: initialTrades,
       accounts: initialTradingAccounts,
-      messages: initialMessages,
       notifications: initialNotifications,
-      enrolledStudents: initialEnrolledStudents,
       badges: initialTraderBadges,
-      modules: initialModules,
     },
-    quizResults: {},
   });
 
   console.log("Base Horizon amorcée avec le jeu de données de démonstration.");

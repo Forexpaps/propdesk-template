@@ -1,6 +1,6 @@
 import { api } from "./api";
 import type { CollectionName, ServerCollections } from "./api";
-import type { ModuleQuizResult, StudentProfile, TradingPlanData } from "../types";
+import type { StudentProfile, TradingPlanData } from "../types";
 import { BASE_STORAGE_KEY as TRADING_PLAN_BASE_KEY } from "./planCompliance";
 
 /**
@@ -42,12 +42,8 @@ const LABELS: Record<string, string> = {
   horizon_student: "Profil",
   horizon_trades: "Journal de trading",
   horizon_accounts: "Portefeuilles",
-  horizon_enrolled_students: "Suivi des élèves",
-  horizon_messages: "Messagerie",
   horizon_notifications: "Notifications",
   horizon_badges: "Badges",
-  horizon_modules: "Modules vidéo",
-  horizon_quiz_results: "Résultats de quiz",
   // Ajoutées après coup (module Setups, plan de trading synchronisé) :
   // sans elles, `markPending` ignorait silencieusement toute modification
   // hors ligne (ou après échec réseau) de ces deux collections, qui
@@ -61,29 +57,21 @@ const LABELS: Record<string, string> = {
   // ignore silencieusement toute clé absente de cette liste blanche.
   horizon_student_trades: "Journal de trading",
   horizon_student_accounts: "Portefeuilles",
-  horizon_student_modules: "Modules vidéo",
-  horizon_student_messages: "Messagerie",
   horizon_student_badges: "Badges",
   horizon_student_notifications: "Notifications",
-  horizon_student_quiz_results: "Résultats de quiz",
   horizon_student_setups: "Setups",
   // Les clés de plan namespacées par email (`horizon_trading_plan_<email>`)
   // ne peuvent pas être listées ici (dynamiques) — voir `isTradingPlanKey`.
 };
 
-/** Clé `localStorage` → collection serveur. Absent pour profil et quiz. */
+/** Clé `localStorage` → collection serveur. Absent pour profil. */
 const COLLECTION_BY_KEY: Record<string, CollectionName> = {
   horizon_trades: "trades",
   horizon_accounts: "accounts",
-  horizon_enrolled_students: "enrolledStudents",
-  horizon_messages: "messages",
   horizon_notifications: "notifications",
   horizon_badges: "badges",
-  horizon_modules: "modules",
   horizon_student_trades: "trades",
   horizon_student_accounts: "accounts",
-  horizon_student_modules: "modules",
-  horizon_student_messages: "messages",
   horizon_student_badges: "badges",
   horizon_student_notifications: "notifications",
   horizon_setups: "setups",
@@ -197,11 +185,6 @@ async function pushOne(localKey: string): Promise<void> {
 
   if (localKey === "horizon_student") {
     await api.saveProfile(value as StudentProfile);
-    return;
-  }
-
-  if (localKey === "horizon_quiz_results" || localKey === "horizon_student_quiz_results") {
-    await api.saveQuizResults(value as Record<string, ModuleQuizResult>);
     return;
   }
 

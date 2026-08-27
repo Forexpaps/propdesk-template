@@ -112,7 +112,7 @@ function containsDangerousUrlScheme(value: unknown, depth = 0): boolean {
  * Tout élément de collection doit porter un id non vide et unique.
  *
  * ⚠️ `.passthrough()` : un élève écrivant dans une collection qui lui est
- * autorisée (`trades`/`accounts`/`modules`/`badges`/`messages`) peut inclure
+ * autorisée (`trades`/`accounts`/`badges`/`notifications`/`setups`) peut inclure
  * n'importe quel champ supplémentaire sur SES PROPRES lignes. Sans danger
  * aujourd'hui — aucun champ de collection n'est relu avec un privilège
  * supérieur côté serveur (`isAdmin` ne vit jamais dans une collection, voir
@@ -235,87 +235,9 @@ export const tradingPlanSchema = z.object({
  */
 export const tradingPlansSchema = z.array(tradingPlanSchema).max(20);
 
-/**
- * Une annonce (`Announcement`, `src/types.ts`) — corps attendu par
- * `PUT /auth/announcements` (`server/auth/routes.ts`, réservée au
- * fondateur). `imageUrl` suit la même garde `isSafeMediaUrl` que l'avatar
- * ci-dessus : seules `https://` et `data:image/...` sont acceptées.
- */
-export const announcementSchema = z.object({
-  id: z.string().min(1).max(100),
-  title: z.string().min(1).max(200),
-  body: z.string().max(5000),
-  category: z.enum(["Général", "Alerte marché", "Pédagogie", "Événement"]),
-  pinned: z.boolean(),
-  imageUrl: z
-    .string()
-    .max(400_000)
-    .refine(isSafeMediaUrl, { message: "URL d'image invalide : seules https:// et data:image/... sont acceptées." })
-    .optional(),
-  createdAt: z.string().max(100),
-});
-
-/**
- * Toutes les annonces — plafond large mais réel, pas des milliers d'annonces
- * dans une académie. `id` unique imposé : la route `PUT /admin/announcements`
- * (`server/auth/routes.ts`) détecte une "nouvelle" annonce par un `id`
- * absent de l'ancienne liste pour décider qui notifier — un doublon d'`id`
- * casserait silencieusement cette détection (deux entrées fusionnées à tort)
- * en plus de produire deux notifications identiques (`announce-${a.id}-${student.id}`
- * collisionnerait).
- */
-const announcementListSchema = z
-  .array(announcementSchema)
-  .max(200)
-  .refine(
-    (list) => new Set(list.map((a) => a.id)).size === list.length,
-    { message: "Deux annonces ne peuvent pas avoir le même identifiant." }
-  );
-
-/**
- * `expectedVersion` : version lue par le client au dernier chargement — même
- * verrou optimiste que `replaceCollection`/`CollectionVersionConflictError`,
- * absent jusqu'ici sur cette route (les annonces ne passent pas par le
- * système générique de collections versionnées, voir `saveAnnouncements`).
- * Sans lui, le fondateur et un coach avec l'autorisation "announcements"
- * publiant à quelques secondes d'écart pouvaient s'écraser silencieusement
- * l'un l'autre — trouvé en audit de sécurité/fiabilité.
- */
-export const announcementsSchema = z
-  .object({
-    announcements: announcementListSchema,
-    expectedVersion: z.number().int().min(0),
-  })
-  .strict();
-
-/**
- * Un seul résultat de quiz de module — voir `ModuleQuizResult` dans
- * `src/types.ts`. Bornée (au lieu de `z.unknown()`) : la seule protection
- * précédente était la limite globale de 8 Mo sur le corps de la requête,
- * largement au-dessus de ce qu'un vrai résultat de quiz pèse jamais.
- */
-const quizResultEntrySchema = z.object({
-  scorePercentage: z.number().min(0).max(100),
-  totalQuestions: z.number().int().min(0).max(500),
-  correctAnswers: z.number().int().min(0).max(500),
-  passed: z.boolean(),
-  completedAt: z.string().max(100),
-});
-
-/**
- * Une clé par module — le programme réel en compte une poignée, 200 laisse
- * une marge généreuse sans autoriser un payload de milliers d'entrées.
- */
-export const quizResultsSchema = z
-  .record(z.string().min(1).max(200), quizResultEntrySchema)
-  .refine((results) => Object.keys(results).length <= 200, {
-    message: "Trop de résultats de quiz dans la même requête.",
-  });
-
 export const importStateSchema = z.object({
   student: profileSchema.optional(),
   collections: z.record(z.string(), collectionPayloadSchema).optional(),
-  quizResults: quizResultsSchema.optional(),
 });
 
 // --- Authentification ----------------------------------------------------
@@ -374,14 +296,6 @@ export const loginSchema = z
   })
   .strict();
 
-/** Invitation d'un nouveau compte staff. Le mot de passe est généré côté serveur. */
-export const inviteStaffSchema = z
-  .object({
-    name: z.string().trim().min(1).max(200),
-    email: emailField,
-  })
-  .strict();
-
 /**
  * Changement de mot de passe, qu'il soit temporaire ou déjà personnel.
  *
@@ -392,13 +306,6 @@ export const inviteStaffSchema = z
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1).max(200),
-    newPassword: z.string().min(PASSWORD_MIN).max(200),
-  })
-  .strict();
-
-/** Le staff fixe directement le mot de passe d'un élève — pas de mot de passe actuel à fournir. */
-export const setStudentPasswordSchema = z
-  .object({
     newPassword: z.string().min(PASSWORD_MIN).max(200),
   })
   .strict();
@@ -432,20 +339,6 @@ export const twoFactorLoginSchema = z
 export const disableTotpSchema = z
   .object({
     password: z.string().min(1).max(200),
-  })
-  .strict();
-
-/** Changement de l'identifiant (email) de connexion d'un compte élève. */
-export const updateStudentEmailSchema = z
-  .object({
-    email: emailField,
-  })
-  .strict();
-
-/** Réinitialisation via lien à jeton — même règle de longueur que partout ailleurs. */
-export const consumeResetTokenSchema = z
-  .object({
-    newPassword: z.string().min(PASSWORD_MIN).max(200),
   })
   .strict();
 

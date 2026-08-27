@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Bell, CheckCheck, Trash2, Zap, ArrowRight, ShieldAlert, Sparkles, BookOpen, Volume2, VolumeX, X, AlertCircle } from "lucide-react";
+import { Bell, CheckCheck, Trash2, Zap, ArrowRight, ShieldAlert, Sparkles, Volume2, VolumeX, X, AlertCircle } from "lucide-react";
 import { AppNotification } from "../types";
 import { usePersistentState } from "../hooks/usePersistentState";
 
@@ -24,7 +24,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   onNavigateToTab,
   onAddTestNotification,
 }) => {
-  const [filter, setFilter] = useState<"all" | "unread" | "risk" | "academy">("all");
+  const [filter, setFilter] = useState<"all" | "unread" | "risk">("all");
   const [soundEnabled, setSoundEnabled] = usePersistentState<boolean>(
     "horizon_sound_alerts",
     true
@@ -37,7 +37,6 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   const filteredNotifications = notifications.filter((n) => {
     if (filter === "unread") return !n.read;
     if (filter === "risk") return n.type === "risk" || n.type === "trade";
-    if (filter === "academy") return n.type === "academy";
     return true;
   });
 
@@ -59,8 +58,6 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
         return <Sparkles className="w-4 h-4 text-cyan-400" />;
       case "risk":
         return <ShieldAlert className="w-4 h-4 text-amber-400" />;
-      case "academy":
-        return <BookOpen className="w-4 h-4 text-purple-400" />;
       default:
         return <Bell className="w-4 h-4 text-blue-400" />;
     }
@@ -139,14 +136,6 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
               }`}
             >
               Risque & Trades
-            </button>
-            <button
-              onClick={() => setFilter("academy")}
-              className={`px-2.5 py-1 rounded-lg font-medium whitespace-nowrap transition-colors ${
-                filter === "academy" ? "bg-[#00E676] text-slate-950 font-bold" : "bg-[#1B2320] text-slate-400 hover:text-white"
-              }`}
-            >
-              Académie
             </button>
           </div>
 

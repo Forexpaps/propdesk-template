@@ -1,4 +1,4 @@
-import { Trade, Module, TraderBadge } from "../types";
+import { Trade, TraderBadge } from "../types";
 
 /**
  * Calcule la progression EN DIRECT de chaque badge depuis les données réelles
@@ -15,9 +15,9 @@ import { Trade, Module, TraderBadge } from "../types";
  * une progression, ils sont marqués `trackable: false` et restent à 0%
  * jusqu'à ce que le suivi correspondant existe réellement.
  */
-export function computeBadgeProgress(badges: TraderBadge[], trades: Trade[], modules: Module[]): TraderBadge[] {
+export function computeBadgeProgress(badges: TraderBadge[], trades: Trade[]): TraderBadge[] {
   return badges.map((badge) => {
-    const computed = computeSingleBadgeProgress(badge.id, trades, modules);
+    const computed = computeSingleBadgeProgress(badge.id, trades);
     if (!computed) {
       return {
         ...badge,
@@ -37,8 +37,8 @@ export function computeBadgeProgress(badges: TraderBadge[], trades: Trade[], mod
  * le critère à appliquer par le SUFFIXE de l'id, pas par égalité stricte.
  */
 const KNOWN_BADGE_IDS = [
-  "badge-1", "badge-2", "badge-3", "badge-4", "badge-5",
-  "badge-6", "badge-7", "badge-8", "badge-9",
+  "badge-1", "badge-3", "badge-4", "badge-5",
+  "badge-6", "badge-7", "badge-8",
   "badge-10", "badge-11", "badge-12", "badge-13", "badge-14",
   "badge-15", "badge-16", "badge-17",
   "badge-18", "badge-19", "badge-20",
@@ -54,24 +54,9 @@ const MIN_ANALYST_NOTE_LENGTH = 40;
 
 function computeSingleBadgeProgress(
   badgeId: string,
-  trades: Trade[],
-  modules: Module[]
+  trades: Trade[]
 ): { currentValue: number; targetValue: number; progressPercentage: number } | null {
   switch (canonicalBadgeId(badgeId)) {
-    // Diplômé SMC Horizon — 100% des leçons du programme complétées.
-    case "badge-2": {
-      const totalLessons = modules.reduce((acc, m) => acc + m.lessons.length, 0);
-      const completedLessons = modules.reduce(
-        (acc, m) => acc + m.lessons.filter((l) => l.isCompleted).length,
-        0
-      );
-      return {
-        currentValue: completedLessons,
-        targetValue: totalLessons,
-        progressPercentage: totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
-      };
-    }
-
     // Trader Discipliné (Zero FOMO) — 15 trades avec émotion Calme/Discipliné.
     case "badge-4": {
       const count = trades.filter((t) => t.emotion === "Calm" || t.emotion === "Disciplined").length;
@@ -206,7 +191,8 @@ function computeSingleBadgeProgress(
 
     // badge-1, badge-21, badge-22, badge-23 (% de risque par trade — le tag
     // "Sur-risque (>1%)" n'est qu'auto-déclaré, son absence ne prouve rien),
-    // badge-3 (module Replay, retiré de l'app — plus aucune source de
+    // badge-2 (Diplômé SMC Horizon, reposait sur le Module cours, retiré de
+    // l'app), badge-3 (module Replay, retiré de l'app — plus aucune source de
     // données pour ce badge), badge-8 (cumul en "R"), badge-9 (score
     // d'examen) : aucune donnée suivie aujourd'hui ne permet de les calculer
     // honnêtement.
