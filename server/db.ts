@@ -1,34 +1,141 @@
 import { createClient } from "@libsql/client";
+import { Pool } from "pg";
 import fs from "fs";
 import path from "path";
 
 /**
- * Connexion libSQL unique pour tout le serveur.
- *
- * Deux modes, choisis par la présence de `TURSO_DATABASE_URL` :
- *  - absent (dev local, et tout déploiement sans compte Turso) : fichier
- *    local dans DATA_DIR (./data par défaut) — le client libSQL en mode
- *    `file:` se comporte comme SQLite, aucun compte externe requis ;
- *  - présent (prod sur Vercel, disque en lecture seule) : base distante
- *    Turso, `TURSO_AUTH_TOKEN` pour l'authentification.
+ * Forme minimale partagée par les deux moteurs possibles (libSQL et
+ * Postgres) — c'est tout ce que `repositories.ts` et le reste du serveur
+ * utilisent, jamais une API spécifique à l'un ou l'autre.
+ */
+interface QueryResult {
+  rows: Record<string, unknown>[];
+  rowsAffected: number;
+}
+type Query = string | { sql: string; args?: unknown[] };
+interface DbTransaction {
+  execute(query: Query): Promise<QueryResult>;
+  commit(): Promise<void>;
+  rollback(): Promise<void>;
+  close(): void;
+}
+interface DbClient {
+  execute(query: Query): Promise<QueryResult>;
+  transaction(mode?: "write" | "read"): Promise<DbTransaction>;
+}
+
+/**
+ * Connexion unique pour tout le serveur, trois modes choisis par les
+ * variables d'environnement présentes :
+ *  - `POSTGRES_URL` (prod sur Vercel avec le stockage Postgres natif,
+ *    onglet Storage du tableau de bord Vercel) : aucun compte tiers, la
+ *    base vit entièrement dans l'écosystème Vercel ;
+ *  - `TURSO_DATABASE_URL` (prod avec un compte Turso séparé) : base SQLite
+ *    distante, `TURSO_AUTH_TOKEN` pour l'authentification ;
+ *  - aucune des deux (dev local, et tout déploiement à disque persistant) :
+ *    fichier local dans DATA_DIR (./data par défaut) via libSQL en mode
+ *    `file:`, aucun compte externe requis.
  *
  * Le reste du serveur ne parle qu'aux repositories, jamais à ce module
- * directement.
+ * directement — et les repositories n'appellent que `execute`/`transaction`
+ * ci-dessus, jamais une méthode propre à un moteur en particulier.
  */
 export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 
-const usingRemote = Boolean(process.env.TURSO_DATABASE_URL);
+const usingPostgres = Boolean(process.env.POSTGRES_URL);
+const usingTurso = !usingPostgres && Boolean(process.env.TURSO_DATABASE_URL);
+const usingLocalFile = !usingPostgres && !usingTurso;
 
-if (!usingRemote) {
+if (usingLocalFile) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-export const db = usingRemote
-  ? createClient({
-      url: process.env.TURSO_DATABASE_URL!,
-      authToken: process.env.TURSO_AUTH_TOKEN,
-    })
-  : createClient({ url: `file:${path.join(DATA_DIR, "horizon.db")}` });
+/**
+ * `?` (convention SQLite/libSQL, utilisée dans tout le reste du serveur) →
+ * `$1, $2, ...` (convention Postgres). Sûr ici : aucune requête de ce
+ * serveur ne contient de `?` littéral dans une chaîne SQL.
+ */
+function toPostgresPlaceholders(sql: string): string {
+  let index = 0;
+  return sql.replace(/\?/g, () => `$${++index}`);
+}
+
+function normalizeQuery(query: Query): { sql: string; args: unknown[] } {
+  return typeof query === "string" ? { sql: query, args: [] } : { sql: query.sql, args: query.args ?? [] };
+}
+
+/**
+ * Adapte `pg` (Postgres) à la même interface `execute`/`transaction` que
+ * libSQL, pour que `repositories.ts` et le reste du serveur n'aient jamais
+ * besoin de savoir lequel des deux moteurs est actif.
+ */
+function createPostgresClient(connectionString: string): DbClient {
+  const pool = new Pool({
+    connectionString,
+    // La plupart des fournisseurs gérés (Vercel Postgres, Neon...) exigent
+    // TLS mais présentent un certificat que Node ne valide pas par défaut ;
+    // `sslmode=disable` explicite dans l'URL (dev local sans TLS) reste
+    // respecté par `pg` indépendamment de cette option.
+    ssl: connectionString.includes("sslmode=disable") ? undefined : { rejectUnauthorized: false },
+  });
+
+  async function execute(query: Query): Promise<QueryResult> {
+    const { sql, args } = normalizeQuery(query);
+    const result = await pool.query(toPostgresPlaceholders(sql), args);
+    return { rows: result.rows, rowsAffected: result.rowCount ?? 0 };
+  }
+
+  async function transaction(): Promise<DbTransaction> {
+    const client = await pool.connect();
+    await client.query("BEGIN");
+    let released = false;
+    const releaseOnce = () => {
+      if (!released) {
+        released = true;
+        client.release();
+      }
+    };
+    return {
+      async execute(query: Query): Promise<QueryResult> {
+        const { sql, args } = normalizeQuery(query);
+        const result = await client.query(toPostgresPlaceholders(sql), args);
+        return { rows: result.rows, rowsAffected: result.rowCount ?? 0 };
+      },
+      async commit() {
+        await client.query("COMMIT");
+      },
+      async rollback() {
+        await client.query("ROLLBACK");
+      },
+      close: releaseOnce,
+    };
+  }
+
+  return { execute, transaction };
+}
+
+/** libSQL renvoie déjà `rows`/`rowsAffected` — juste besoin d'adapter le type de retour de `transaction`. */
+function createLibsqlClient(url: string, authToken?: string): DbClient {
+  const client = createClient({ url, authToken });
+  return {
+    execute: (query: Query) => client.execute(query as never) as unknown as Promise<QueryResult>,
+    transaction: async (mode: "write" | "read" = "write") => {
+      const tx = await client.transaction(mode);
+      return {
+        execute: (query: Query) => tx.execute(query as never) as unknown as Promise<QueryResult>,
+        commit: () => tx.commit(),
+        rollback: () => tx.rollback(),
+        close: () => tx.close(),
+      };
+    },
+  };
+}
+
+export const db: DbClient = usingPostgres
+  ? createPostgresClient(process.env.POSTGRES_URL!)
+  : usingTurso
+  ? createLibsqlClient(process.env.TURSO_DATABASE_URL!, process.env.TURSO_AUTH_TOKEN)
+  : createLibsqlClient(`file:${path.join(DATA_DIR, "horizon.db")}`);
 
 /**
  * Toutes les collections partagent la même forme : un identifiant stable,
@@ -38,6 +145,10 @@ export const db = usingRemote
  * `trades` promeut en colonnes les champs sur lesquels on veut pouvoir
  * requêter et indexer ; les autres collections ne sont jamais lues autrement
  * qu'en entier, leur payload suffit.
+ *
+ * Ces instructions sont écrites dans un sous-ensemble SQL commun à SQLite et
+ * Postgres (types, `REFERENCES ... ON DELETE CASCADE`, `CREATE INDEX IF NOT
+ * EXISTS` sont valables dans les deux) — aucune divergence nécessaire ici.
  */
 const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS meta (
@@ -131,9 +242,7 @@ const SCHEMA_STATEMENTS = [
     -- 2FA (TOTP), voir server/auth/twoFactor.ts. totp_secret : présent dès
     -- qu'un compte a démarré une configuration, même non encore confirmée
     -- (voir startTotpSetup) — totp_enabled_at NULL est ce qui distingue "en
-    -- cours de configuration" de "activé". Colonnes ajoutées ici pour une
-    -- base neuve ; migrateAddTotpColumns() plus bas les ajoute à une base
-    -- existante.
+    -- cours de configuration" de "activé".
     totp_secret           TEXT,
     totp_enabled_at        TEXT,
     -- Anti-rejeu : dernier pas de temps TOTP (30s) accepte pour ce compte.
@@ -230,6 +339,10 @@ const SCHEMA_STATEMENTS = [
  * lié 1:1 au bureau partagé par une clé étrangère qui interdirait tout second
  * compte).
  *
+ * SQLite/libSQL uniquement — une base Postgres est toujours créée neuve avec
+ * `staff_accounts` déjà dans sa forme finale (voir `SCHEMA_STATEMENTS`),
+ * cette migration n'a donc jamais de raison de s'y exécuter.
+ *
  * Le compte existant conserve exactement son `id` d'origine (celui qui était
  * `user_id` dans `user_credentials`, presque toujours `DEFAULT_USER_ID`) :
  * les sessions déjà émises restent donc valides, personne n'est déconnecté
@@ -295,7 +408,7 @@ async function migrateToStaffAccounts(): Promise<void> {
     }
 
     if (sessionsReferenceUsers) {
-      await tx.executeMultiple(`
+      await tx.execute(`
         CREATE TABLE sessions_new (
           id           TEXT PRIMARY KEY,
           user_id      TEXT NOT NULL REFERENCES staff_accounts(id) ON DELETE CASCADE,
@@ -304,12 +417,12 @@ async function migrateToStaffAccounts(): Promise<void> {
           last_seen_at TEXT NOT NULL,
           user_agent   TEXT
         );
-        INSERT INTO sessions_new SELECT * FROM sessions WHERE user_id IN (SELECT id FROM staff_accounts);
-        DROP TABLE sessions;
-        ALTER TABLE sessions_new RENAME TO sessions;
-        CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions(user_id);
-        CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
       `);
+      await tx.execute("INSERT INTO sessions_new SELECT * FROM sessions WHERE user_id IN (SELECT id FROM staff_accounts);");
+      await tx.execute("DROP TABLE sessions;");
+      await tx.execute("ALTER TABLE sessions_new RENAME TO sessions;");
+      await tx.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions(user_id);");
+      await tx.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);");
     }
 
     await tx.execute({
@@ -332,7 +445,8 @@ async function migrateToStaffAccounts(): Promise<void> {
  * l'utilisateur (composant, routes de rendu, types, sidebar — voir git log).
  * Confirmée vide (0 ligne) avant suppression : aucune UI n'a jamais permis
  * d'y écrire (voir HANDOFF.md, historique). `DROP TABLE IF EXISTS` est
- * idempotent par construction — pas besoin de clé `meta` dédiée.
+ * idempotent par construction (et valide sur les deux moteurs) — pas besoin
+ * de clé `meta` dédiée.
  */
 async function migrateDropCoachSignals(): Promise<void> {
   await db.execute("DROP TABLE IF EXISTS coach_signals;");
@@ -345,8 +459,8 @@ async function migrateDropCoachSignals(): Promise<void> {
  * et HANDOFF.md). Confirmées vides avant suppression : le forum n'a jamais
  * eu d'entrée dans la sidebar, aucun élève ni coach n'a donc jamais pu y
  * écrire depuis l'UI. `forum_replies` d'abord (clé étrangère vers
- * `forum_topics`), `DROP TABLE IF EXISTS` idempotent par construction — pas
- * besoin de clé `meta` dédiée.
+ * `forum_topics`), `DROP TABLE IF EXISTS` idempotent par construction (et
+ * valide sur les deux moteurs) — pas besoin de clé `meta` dédiée.
  */
 async function migrateDropForum(): Promise<void> {
   await db.execute("DROP TABLE IF EXISTS forum_replies;");
@@ -355,12 +469,10 @@ async function migrateDropForum(): Promise<void> {
 
 /**
  * Ajoute `totp_secret`/`totp_enabled_at` à `staff_accounts` sur une base
- * EXISTANTE créée avant l'introduction de la 2FA — le `CREATE TABLE IF NOT
- * EXISTS` plus haut ne les crée que sur une base neuve, où ces colonnes
- * existent donc déjà : vérifier leur présence via `PRAGMA table_info` (et
- * non une clé `meta`, qui déclencherait un `ALTER TABLE` en double sur une
- * base neuve — "duplicate column name") est ce qui rend cette migration
- * réellement idempotente dans les deux cas.
+ * SQLite/libSQL EXISTANTE créée avant l'introduction de la 2FA — le `CREATE
+ * TABLE IF NOT EXISTS` plus haut ne les crée que sur une base neuve, où ces
+ * colonnes existent donc déjà. SQLite/libSQL uniquement (voir
+ * `migrateToStaffAccounts`) : une base Postgres neuve les a toujours.
  */
 async function migrateAddTotpColumns(): Promise<void> {
   const columnsResult = await db.execute("PRAGMA table_info(staff_accounts)");
@@ -387,9 +499,8 @@ async function migrateAddTotpColumns(): Promise<void> {
 }
 
 /**
- * Ajoute `lock_count` à `login_lockouts` sur une base existante — même
- * principe et même raison que `migrateAddTotpColumns`. Voir le commentaire
- * de la colonne dans le `CREATE TABLE IF NOT EXISTS` plus haut.
+ * Ajoute `lock_count` à `login_lockouts` sur une base SQLite/libSQL existante
+ * — même principe et même raison que `migrateAddTotpColumns`.
  */
 async function migrateAddLockCountColumn(): Promise<void> {
   const columnsResult = await db.execute("PRAGMA table_info(login_lockouts)");
@@ -408,11 +519,11 @@ export async function initDb(): Promise<void> {
   if (initialized) return;
   initialized = true;
 
-  if (!usingRemote) {
-    // Pertinent seulement en mode fichier local : une base distante Turso
-    // gère elle-même son mode de journalisation, et WAL n'a pas de sens sur
-    // une connexion HTTP/WS. Non bloquant si le moteur libSQL local le
-    // refuse pour une raison quelconque.
+  if (usingLocalFile) {
+    // Pertinent seulement en mode fichier local : une base distante (Turso
+    // ou Postgres) gère elle-même son mode de journalisation, et WAL n'a pas
+    // de sens sur une connexion réseau. Non bloquant si le moteur libSQL
+    // local le refuse pour une raison quelconque.
     try {
       await db.execute("PRAGMA journal_mode = WAL;");
     } catch (err) {
@@ -420,17 +531,26 @@ export async function initDb(): Promise<void> {
     }
   }
 
-  await db.execute("PRAGMA foreign_keys = ON;");
+  if (!usingPostgres) {
+    // Postgres applique toujours les clés étrangères — pas de PRAGMA
+    // équivalent, et cette commande échouerait si on l'y envoyait.
+    await db.execute("PRAGMA foreign_keys = ON;");
+  }
 
   for (const statement of SCHEMA_STATEMENTS) {
     await db.execute(statement);
   }
 
-  await migrateToStaffAccounts();
+  if (!usingPostgres) {
+    // Migrations SQLite/libSQL uniquement — une base Postgres est toujours
+    // créée neuve, directement dans sa forme finale (voir les commentaires
+    // de chaque migration ci-dessus).
+    await migrateToStaffAccounts();
+    await migrateAddTotpColumns();
+    await migrateAddLockCountColumn();
+  }
   await migrateDropCoachSignals();
   await migrateDropForum();
-  await migrateAddTotpColumns();
-  await migrateAddLockCountColumn();
 }
 
 export async function getMeta(key: string): Promise<string | null> {
