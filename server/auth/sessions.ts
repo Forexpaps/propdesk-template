@@ -223,8 +223,16 @@ function cookieOptions() {
   };
 }
 
-export function setSessionCookie(res: Response, token: string): void {
-  res.cookie(SESSION_COOKIE, token, { ...cookieOptions(), maxAge: TTL_MS });
+/**
+ * `rememberMe = false` (poste partagé, décoché par défaut au login) pose un
+ * cookie de SESSION — sans `maxAge`, donc effacé par le navigateur à sa
+ * fermeture — même si la session serveur, elle, garde sa durée de vie
+ * normale (`TTL_MS`/`ABSOLUTE_TTL_MS`) comme filet de secours. `rememberMe =
+ * true` (défaut, comportement historique) pose le cookie persistant habituel.
+ */
+export function setSessionCookie(res: Response, token: string, rememberMe = true): void {
+  const options = cookieOptions();
+  res.cookie(SESSION_COOKIE, token, rememberMe ? { ...options, maxAge: TTL_MS } : options);
 }
 
 /**

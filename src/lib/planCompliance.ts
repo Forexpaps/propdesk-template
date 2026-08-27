@@ -5,6 +5,41 @@ import { isRealizedDollarTrade } from "./performanceStats";
 /** Exportée pour `src/lib/pendingChanges.ts`, qui doit reconnaître une clé de plan namespacée par email sans connaître ce préfixe en dur. */
 export const BASE_STORAGE_KEY = "horizon_trading_plan";
 
+/**
+ * Renomme un setup dans `authorizedSetups` de tous les plans qui le
+ * référencent (comparaison exacte insensible à la casse contre l'ancien
+ * nom, sur chaque entrée séparée par une virgule — voir `matchesAny`).
+ *
+ * Sans cette propagation, `SetupManagement` renommant un setup désynchronise
+ * silencieusement les plans existants, qui continuent de citer l'ancien nom :
+ * un trade utilisant désormais le nouveau nom de stratégie déclenche alors
+ * une fausse alerte "setup non autorisé" (`checkPlanViolations` plus bas),
+ * jusqu'à ce que l'élève recoche manuellement la case dans l'éditeur de plan.
+ * Trouvé en audit.
+ *
+ * Renvoie `plans` à l'identique (même référence) quand rien ne bouge, pour
+ * ne déclencher ni sauvegarde ni re-rendu inutile.
+ */
+export function renameSetupInPlans(
+  plans: TradingPlanData,
+  oldName: string,
+  newName: string
+): TradingPlanData {
+  const oldTrimmed = oldName.trim();
+  const newTrimmed = newName.trim();
+  if (!oldTrimmed || oldTrimmed.toLowerCase() === newTrimmed.toLowerCase()) return plans;
+
+  let changed = false;
+  const next = plans.map((plan) => {
+    const entries = plan.authorizedSetups.split(",").map((s) => s.trim()).filter(Boolean);
+    if (!entries.some((e) => e.toLowerCase() === oldTrimmed.toLowerCase())) return plan;
+    changed = true;
+    const renamed = entries.map((e) => (e.toLowerCase() === oldTrimmed.toLowerCase() ? newTrimmed : e));
+    return { ...plan, authorizedSetups: renamed.join(", ") };
+  });
+  return changed ? next : plans;
+}
+
 /** Un plan vierge, prêt pour le formulaire — `id` généré, jamais réutilisé. */
 export function createEmptyPlan(name = "Nouveau plan"): TradingPlan {
   return {

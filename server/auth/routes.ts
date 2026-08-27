@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { randomBytes } from "node:crypto";
 import { db, DEFAULT_USER_ID, FOUNDER_COACH_ID } from "../db";
-import { getProfile, saveProfile, listCollection, updateCollectionItem, replaceCollection, getTradingPlan, getAnnouncements, saveAnnouncements } from "../repositories";
+import { getProfile, saveProfile, listCollection, updateCollectionItem, replaceCollection, getTradingPlan, getAnnouncements, getAnnouncementsVersion, saveAnnouncements, CollectionVersionConflictError } from "../repositories";
 import {
   setupSchema,
   loginSchema,
@@ -346,7 +346,7 @@ authRouter.post(
     // Les sessions existantes sont conservées : plusieurs appareils peuvent
     // rester connectés en parallèle.
     const token = createSession(staff.id, req.headers["user-agent"]);
-    setSessionCookie(res, token);
+    setSessionCookie(res, token, parsed.data.rememberMe ?? true);
     recordSecurityEvent({
       eventType: "login_success", severity: "info", accountKind: "staff",
       accountEmail: staff.email, ip: req.ip, detail: "rôle admin",
@@ -418,7 +418,7 @@ authRouter.post(
     consumeTwoFactorChallenge(parsed.data.pendingToken);
 
     const token = createSession(staff.id, req.headers["user-agent"]);
-    setSessionCookie(res, token);
+    setSessionCookie(res, token, parsed.data.rememberMe ?? true);
     recordSecurityEvent({
       eventType: "login_success", severity: "info", accountKind: "staff",
       accountEmail: staff.email, ip: req.ip,
@@ -456,10 +456,22 @@ authRouter.post("/logout", (req, res) => {
 // --- Gestion des comptes staff (protégées par requireAuth) ---------------
 
 /**
+ * Seule route de lecture de ce fichier sans rate limit dédié jusqu'ici —
+ * incohérent avec le reste (toutes les autres routes du module auth en ont
+ * un), trouvé en audit de sécurité. Généreuse (lecture seule, déjà
+ * authentifiée) mais borne quand même le martelage de la base à coût nul.
+ */
+const listStaffRateLimit = createRateLimit({
+  windowMs: 5 * 60_000,
+  max: 60,
+  message: "Trop de requêtes. Réessaie dans quelques minutes.",
+});
+
+/**
  * Liste les comptes staff. Tous égaux, donc accessible à quiconque est
  * connecté — il n'y a pas de rôle "peut voir la liste" séparé de "est staff".
  */
-staffRouter.get("/staff", requireStaffKind, (_req, res) => {
+staffRouter.get("/staff", listStaffRateLimit, requireStaffKind, (_req, res) => {
   res.json({ accounts: listStaffAccounts() });
 });
 
@@ -1104,7 +1116,11 @@ staffRouter.post(
     });
 
     res.status(201).json({
-      link: `${req.protocol}://${req.get("host")}/reset-password?token=${token}`,
+      // Fragment (`#token=`), pas query string : jamais envoyé au serveur
+      // dans aucune requête HTTP, donc jamais loggué par un proxy/CDN en
+      // amont — voir le commentaire jumeau dans `src/App.tsx`. Trouvé en
+      // audit de sécurité.
+      link: `${req.protocol}://${req.get("host")}/reset-password#token=${token}`,
       expiresAt,
     });
   }
@@ -1287,35 +1303,51 @@ staffRouter.put(
       return;
     }
 
+    const { announcements: nextAnnouncements, expectedVersion } = parsed.data;
     const previousIds = new Set((getAnnouncements<{ id: string }[]>() ?? []).map((a) => a.id));
-    const newAnnouncements = parsed.data.filter((a) => !previousIds.has(a.id));
+    const newAnnouncements = nextAnnouncements.filter((a) => !previousIds.has(a.id));
 
-    db.transaction(() => {
-      saveAnnouncements(parsed.data);
+    let newVersion: number;
+    try {
+      newVersion = db.transaction(() => {
+        const version = saveAnnouncements(nextAnnouncements, expectedVersion);
 
-      if (newAnnouncements.length === 0) return;
-      const students = listAllStudentAccounts();
-      for (const student of students) {
-        const existing = listCollection("notifications", student.userId);
-        const notifications = newAnnouncements.map((a) => ({
-          id: `announce-${a.id}-${student.id}`,
-          title: `📣 ${a.title}`,
-          message: a.body.slice(0, 200),
-          time: "À l'instant",
-          type: "academy" as const,
-          read: false,
-          targetTab: "announcements",
-        }));
-        // Plafonnée : sans ça, la collection `notifications` d'un élève actif
-        // grossirait indéfiniment au fil des annonces + alertes de plan
-        // accumulées sur des mois, jamais purgée par ailleurs (voir
-        // `MAX_STUDENT_NOTIFICATIONS` côté client, `planCompliance.ts`, pour
-        // le même plafond appliqué aux alertes de plan).
-        replaceCollection("notifications", [...notifications, ...existing].slice(0, 300), student.userId);
+        if (newAnnouncements.length > 0) {
+          const students = listAllStudentAccounts();
+          for (const student of students) {
+            const existing = listCollection("notifications", student.userId);
+            const notifications = newAnnouncements.map((a) => ({
+              id: `announce-${a.id}-${student.id}`,
+              title: `📣 ${a.title}`,
+              message: a.body.slice(0, 200),
+              time: "À l'instant",
+              type: "academy" as const,
+              read: false,
+              targetTab: "announcements",
+            }));
+            // Plafonnée : sans ça, la collection `notifications` d'un élève actif
+            // grossirait indéfiniment au fil des annonces + alertes de plan
+            // accumulées sur des mois, jamais purgée par ailleurs (voir
+            // `MAX_STUDENT_NOTIFICATIONS` côté client, `planCompliance.ts`, pour
+            // le même plafond appliqué aux alertes de plan).
+            replaceCollection("notifications", [...notifications, ...existing].slice(0, 300), student.userId);
+          }
+        }
+
+        return version;
+      })();
+    } catch (err) {
+      if (err instanceof CollectionVersionConflictError) {
+        // Un autre coach (ou le fondateur, dans un autre onglet) a publié
+        // entre-temps — rien n'a été écrit, pour ne pas écraser cette autre
+        // modification en silence. Voir `announcementsSchema`.
+        res.status(409).json({ error: "Conflit de synchronisation : recharge la page et réessaie." });
+        return;
       }
-    })();
+      throw err;
+    }
 
-    res.json({ success: true, count: parsed.data.length });
+    res.json({ success: true, count: nextAnnouncements.length, version: newVersion });
   }
 );
 

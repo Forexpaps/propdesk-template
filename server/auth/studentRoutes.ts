@@ -150,7 +150,7 @@ studentAuthRouter.post(
     }
 
     const token = createStudentSession(student.id, req.headers["user-agent"]);
-    setStudentSessionCookie(res, token);
+    setStudentSessionCookie(res, token, parsed.data.rememberMe ?? true);
     recordSecurityEvent({
       eventType: "login_success", severity: "info", accountKind: "student",
       accountEmail: student.email, ip: req.ip, detail: "rôle student",

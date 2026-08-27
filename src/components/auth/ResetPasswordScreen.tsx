@@ -13,7 +13,7 @@ const ERROR_ID = "reset-password-error";
 
 /**
  * Écran public (aucune session requise) atteint via un lien
- * `/reset-password?token=...` généré par le staff depuis une fiche élève
+ * `/reset-password#token=...` généré par le staff depuis une fiche élève
  * (`StudentTracking.tsx`, section « Accès & connexion »). Consomme le jeton
  * en une seule tentative réussie : `api.consumePasswordReset` renvoie une
  * erreur explicite si le lien est déjà utilisé, invalide, ou expiré (1h).

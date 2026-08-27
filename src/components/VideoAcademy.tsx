@@ -466,6 +466,19 @@ export const VideoAcademy: React.FC<VideoAcademyProps> = ({
 
       {/* Modules List */}
       <div className="space-y-6">
+        {/* Aucun état vide auparavant : un filtre de niveau ou une recherche
+            sans résultat (ou, côté élève, un niveau dont tous les modules
+            sont masqués) affichait silencieusement une zone totalement vide,
+            indiscernable d'un chargement en cours. Trouvé en audit. */}
+        {filteredModules.length === 0 && (
+          <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+            <Search className="w-8 h-8 text-slate-600" />
+            <p className="text-sm font-semibold text-slate-400">Aucun module trouvé</p>
+            <p className="text-xs text-slate-500 max-w-xs">
+              Essaie un autre niveau ou une autre recherche.
+            </p>
+          </div>
+        )}
         {filteredModules.map((module) => {
           const modCompleted = module.lessons.filter((l) => l.isCompleted).length;
           const modTotal = module.lessons.length;

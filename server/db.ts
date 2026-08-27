@@ -308,6 +308,11 @@ db.exec(`
     window_started_at  TEXT NOT NULL,
     locked_until       TEXT,
     updated_at         TEXT NOT NULL,
+    -- Nombre de verrouillages déjà subis par ce compte — voir lockDurationFor
+    -- (loginLockout.ts) : chaque nouveau verrouillage allonge le suivant
+    -- (15 min, 1h, 4h, 24h), au lieu d'un verrouillage à durée fixe
+    -- indéfiniment répétable toutes les 15 minutes.
+    lock_count         INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (kind, email_lower)
   );
 `);
@@ -551,6 +556,19 @@ function migrateAddPermissionsColumn(): void {
 }
 
 migrateAddPermissionsColumn();
+
+/**
+ * Ajoute `lock_count` à `login_lockouts` sur une base existante — même
+ * principe et même raison que `migrateAddTotpColumns`. Voir le commentaire
+ * de la colonne dans le `CREATE TABLE IF NOT EXISTS` plus haut.
+ */
+function migrateAddLockCountColumn(): void {
+  const columns = db.prepare("PRAGMA table_info(login_lockouts)").all() as { name: string }[];
+  if (columns.some((c) => c.name === "lock_count")) return;
+  db.exec("ALTER TABLE login_lockouts ADD COLUMN lock_count INTEGER NOT NULL DEFAULT 0;");
+}
+
+migrateAddLockCountColumn();
 
 export function getMeta(key: string): string | null {
   const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type ServerState } from "../lib/api";
-import { clearPending, listPending, markPending, replayPending } from "../lib/pendingChanges";
+import { clearPending, listPending, markPending, replayPending, subscribePending } from "../lib/pendingChanges";
 import type { Trade, TradingAccount, Module, CoachMessage, ModuleQuizResult, StudentProfile, TraderBadge, Coach, AppNotification, TradingPlanData, Setup, Announcement } from "../types";
 
 export type SyncStatus = "loading" | "online" | "offline";
@@ -139,6 +139,17 @@ export function useBootstrap() {
       cancelled = true;
     };
   }, []);
+
+  // Tient `pending` à jour PENDANT la session, pas seulement au démarrage —
+  // voir le commentaire de `subscribePending` (`src/lib/pendingChanges.ts`).
+  // `status === "online"` uniquement : avant ça, l'effet ci-dessus n'a pas
+  // encore posé le `pending` initial (calculé AVANT `cacheState`, voir plus
+  // haut), une notification prématurée l'écraserait avec un instantané
+  // partiel.
+  useEffect(() => {
+    if (status !== "online") return;
+    return subscribePending(() => setPending(listPending()));
+  }, [status]);
 
   /**
    * Oublie les modifications en attente et réaligne le cache sur le serveur.

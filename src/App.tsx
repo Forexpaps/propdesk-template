@@ -21,10 +21,10 @@ import { CGUModal } from "./components/CGUModal";
 import { PRIVACY_POLICY_URL } from "./lib/links";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
 import { ConfirmDialogHost, confirmDialog } from "./lib/confirmDialog";
-import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, getTradingPlanStorageKey, EMPTY_TRADING_PLANS, normalizeTradingPlans } from "./lib/planCompliance";
+import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, getTradingPlanStorageKey, EMPTY_TRADING_PLANS, normalizeTradingPlans, renameSetupInPlans } from "./lib/planCompliance";
 import { upsertWalletRiskAlerts } from "./lib/walletAlerts";
 import { computeBadgeProgress } from "./lib/badges";
-import { listPending } from "./lib/pendingChanges";
+import { listPending, describePending } from "./lib/pendingChanges";
 
 import {
   initialStudentProfile,
@@ -118,8 +118,8 @@ function ViewFallback() {
     </div>
   );
 }
-import { formatCurrency } from "./lib/format";
-import { syncAccountsWithTrades } from "./lib/walletStats";
+import { formatCurrency, notificationTimestamp } from "./lib/format";
+import { syncAccountsWithTrades, computeRealizedPnl } from "./lib/walletStats";
 import { usePersistentState } from "./hooks/usePersistentState";
 import { useBootstrap, useSyncedState, useStudentBootstrap } from "./hooks/useServerSync";
 import { useNotificationSound } from "./hooks/useNotificationSound";
@@ -181,17 +181,24 @@ export default function App() {
   const [loginMode, setLoginMode] = useState<"staff" | "student">("staff");
 
   /**
-   * Lien de réinitialisation de mot de passe élève (`/reset-password?token=…`,
+   * Lien de réinitialisation de mot de passe élève (`/reset-password#token=…`,
    * généré par le staff depuis une fiche — `StudentTracking.tsx`). Vérifié
    * AVANT tout état d'authentification : ce lien doit fonctionner pour un
    * élève qui n'a justement plus accès à son compte, staff ou pas. Pas de
    * routeur dans cette app (voir HANDOFF) — un simple test sur
    * `window.location`, lu une seule fois au montage : l'URL ne change pas
    * pendant la vie de cet écran.
+   *
+   * Jeton en FRAGMENT (`#token=…`), pas en `?token=…` : un fragment n'est
+   * jamais envoyé au serveur dans aucune requête HTTP (ni la navigation
+   * initiale, ni un éventuel proxy/CDN en amont) — contrairement à une query
+   * string, qui peut finir dans des logs d'infra hors du contrôle de cette
+   * app. Trouvé en audit de sécurité (risque déjà atténué côté client par le
+   * `replaceState` ci-dessous, mais fermé ici à la source).
    */
   const [resetToken] = useState<string | null>(() => {
     if (window.location.pathname !== "/reset-password") return null;
-    const token = new URLSearchParams(window.location.search).get("token");
+    const token = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("token");
     // Retire le jeton de la barre d'adresse (et donc de l'historique local du
     // navigateur) dès qu'il est lu — `replaceState` modifie l'entrée
     // courante en place, sans en créer une nouvelle. Trouvé en audit de
@@ -522,7 +529,7 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     ...messageNotifications,
     ...badgeNotifications,
     ...syncedNotifications,
-  ].sort((a, b) => (a.time < b.time ? 1 : a.time > b.time ? -1 : 0));
+  ].sort((a, b) => notificationTimestamp(b.time) - notificationTimestamp(a.time));
 
   /**
    * Marque une notification comme lue. Message/badge : statut dérivé
@@ -638,7 +645,15 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
   };
 
   const handleUpdateSetup = (setup: Setup) => {
+    const previousName = syncedSetups.find((s) => s.id === setup.id)?.name;
     setSyncedSetups((prev) => prev.map((s) => (s.id === setup.id ? setup : s)));
+    // Un setup renommé reste référencé par son ANCIEN nom dans les plans de
+    // trading existants (`authorizedSetups` stocke des noms, pas des ids) —
+    // sans cette propagation, le trade utilisant désormais le nouveau nom
+    // déclenchait une fausse alerte "setup non autorisé". Trouvé en audit.
+    if (previousName && previousName !== setup.name) {
+      setSyncedTradingPlan((prev) => renameSetupInPlans(prev, previousName, setup.name));
+    }
   };
 
   const handleDeleteSetup = (id: string) => {
@@ -649,11 +664,18 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     setSyncedAccounts((prev) => [account, ...prev]);
   };
 
+  // Stocke un DELTA (`manualAdjustment`), pas l'équité cible directement :
+  // `syncAccountsWithTrades` (effet ci-dessus) recalcule `equity` à chaque
+  // changement de `trades`, où qu'il ait lieu dans l'app — sans ce delta
+  // persistant, le prochain trade ajouté (même sur un autre compte)
+  // écrasait silencieusement cet ajustement manuel. Trouvé en audit.
   const handleUpdateAccountBalance = (id: string, newBalance: number) => {
     setSyncedAccounts((prev) =>
-      prev.map((acc) =>
-        acc.id === id ? { ...acc, equity: newBalance, currentBalance: newBalance } : acc
-      )
+      prev.map((acc) => {
+        if (acc.id !== id) return acc;
+        const manualAdjustment = newBalance - acc.initialBalance - computeRealizedPnl(syncedTrades, acc.id);
+        return { ...acc, equity: newBalance, currentBalance: newBalance, manualAdjustment };
+      })
     );
   };
 
@@ -713,8 +735,14 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     setSyncedMessages((prev) => [...prev, studentMsg]);
   };
 
-  const totalLessons = syncedModules.reduce((acc, m) => acc + m.lessons.length, 0);
-  const completedLessons = syncedModules.reduce(
+  // Modules masqués exclus, comme la "Progression Globale" de VideoAcademy
+  // (`visibleModules`, `src/components/VideoAcademy.tsx`) — sinon un élève
+  // avec au moins un module masqué voyait deux pourcentages différents pour
+  // la même notion sur le même écran (badge sidebar vs bandeau Académie).
+  // Trouvé en audit.
+  const visibleSyncedModules = syncedModules.filter((m) => !m.hidden);
+  const totalLessons = visibleSyncedModules.reduce((acc, m) => acc + m.lessons.length, 0);
+  const completedLessons = visibleSyncedModules.reduce(
     (acc, m) => acc + m.lessons.filter((l) => l.isCompleted).length,
     0
   );
@@ -744,6 +772,20 @@ function StudentAuthenticatedApp({ onLoggedOut }: { onLoggedOut: () => void }) {
     if (status !== "online") {
       alert(
         "Déconnexion impossible hors ligne : les modifications de cette session ne sont pas encore enregistrées sur le serveur. Reconnecte-toi au serveur avant de te déconnecter."
+      );
+      return;
+    }
+
+    // Voir le commentaire jumeau dans `AcademyApp.handleLogout` (bureau
+    // staff) : `status` ne reflète que le dernier chargement global, pas un
+    // échec de sauvegarde survenu plus tard dans la session. Sans ce
+    // contrôle, le message "tes données restent enregistrées sur le
+    // serveur" pouvait être faux et `localStorage.clear()` détruire une
+    // modification jamais envoyée. Trouvé en audit.
+    const pending = listPending();
+    if (pending.length > 0) {
+      alert(
+        `Déconnexion impossible : ${describePending(pending).join(", ")} pas encore enregistré(e) sur le serveur. Réessaie dans quelques instants — si le problème persiste, recharge la page avant de te déconnecter.`
       );
       return;
     }
@@ -1095,27 +1137,39 @@ function AcademyApp({
     }
   };
   /**
-   * Annonces du fondateur — synchronisées au serveur (`PUT /auth/announcements`,
-   * réservé au fondateur), mais sans la mécanique `useSyncedState`/debounce :
-   * publication peu fréquente, sauvegarde immédiate à chaque action plutôt
-   * qu'un état intermédiaire à réconcilier. `setAnnouncements` échoue de
-   * façon visible (alert) plutôt que silencieusement : contrairement à un
-   * trade, une annonce non publiée n'a aucune trace locale à rattraper au
-   * prochain chargement.
+   * Annonces du fondateur — synchronisées au serveur (`PUT /auth/announcements`),
+   * mais sans la mécanique `useSyncedState`/debounce : publication peu
+   * fréquente, sauvegarde immédiate à chaque action plutôt qu'un état
+   * intermédiaire à réconcilier. `setAnnouncements` échoue de façon visible
+   * (alert) plutôt que silencieusement : contrairement à un trade, une
+   * annonce non publiée n'a aucune trace locale à rattraper au prochain
+   * chargement.
+   *
+   * `announcementsVersion` : verrou optimiste dédié (voir
+   * `announcementsVersion` sur `AuthState`, `saveAnnouncements` côté
+   * serveur) — sans lui, deux comptes publiant à quelques secondes d'écart
+   * pouvaient s'écraser silencieusement l'un l'autre. Mis à jour à chaque
+   * publication réussie ET à chaque rejet 409 (le serveur renvoie la
+   * version réelle dans son message ; on se contente ici de la re-réclamer
+   * au prochain essai via un rechargement, plus simple qu'une fusion).
    */
   const [announcements, setAnnouncementsState] = useState<Announcement[]>(() =>
     seed(initialState?.announcements, "horizon_announcements", [])
+  );
+  const [announcementsVersion, setAnnouncementsVersion] = useState<number>(
+    initialState?.announcementsVersion ?? 0
   );
   const setAnnouncements = async (next: Announcement[]) => {
     const previous = announcements;
     setAnnouncementsState(next);
     try {
-      await api.saveAnnouncements(next);
+      const result = await api.saveAnnouncements(next, announcementsVersion);
+      setAnnouncementsVersion(result.version);
       localStorage.setItem("horizon_announcements", JSON.stringify(next));
     } catch (err) {
       console.warn("[propdesk] Publication de l'annonce échouée.", err);
       setAnnouncementsState(previous);
-      alert("La publication a échoué. Vérifie ta connexion et réessaie.");
+      alert((err as Error).message || "La publication a échoué. Vérifie ta connexion et réessaie.");
     }
   };
   const [isLegalNoticeOpen, setIsLegalNoticeOpen] = useState(false);
@@ -1318,6 +1372,21 @@ function AcademyApp({
       return;
     }
 
+    // `syncEnabled` ne reflète que le résultat du DERNIER chargement/sync
+    // global — un échec ponctuel plus tard dans la session (conflit de
+    // version, coupure réseau passagère) ne le repasse jamais à `false`.
+    // Sans cette vérification, le message "tes données restent enregistrées
+    // sur le serveur" ci-dessous pouvait être FAUX : une modification restée
+    // en attente (`markPending`) était alors détruite par le
+    // `localStorage.clear()` plus bas, en toute confiance. Trouvé en audit.
+    const pending = listPending();
+    if (pending.length > 0) {
+      alert(
+        `Déconnexion impossible : ${describePending(pending).join(", ")} pas encore enregistré(e) sur le serveur. Réessaie dans quelques instants — si le problème persiste, recharge la page avant de te déconnecter.`
+      );
+      return;
+    }
+
     let confirmed: boolean;
     try {
       confirmed = await confirmDialog(
@@ -1419,7 +1488,12 @@ function AcademyApp({
   };
 
   const handleUpdateSetup = (setup: Setup) => {
+    const previousName = setups.find((s) => s.id === setup.id)?.name;
     setSetups((prev) => prev.map((s) => (s.id === setup.id ? setup : s)));
+    // Voir le commentaire jumeau côté élève (`StudentAuthenticatedApp.handleUpdateSetup`).
+    if (previousName && previousName !== setup.name) {
+      setStaffTradingPlan(renameSetupInPlans(staffTradingPlan, previousName, setup.name));
+    }
   };
 
   const handleDeleteSetup = (id: string) => {
@@ -1469,11 +1543,17 @@ function AcademyApp({
     setAccounts((prev) => [account, ...prev]);
   };
 
+  // Voir le commentaire jumeau côté élève (`StudentAuthenticatedApp.handleUpdateAccountBalance`) :
+  // `manualAdjustment` est un DELTA persistant, pour survivre au recalcul
+  // de `syncAccountsWithTrades` déclenché par le prochain trade ajouté
+  // n'importe où dans l'app. Trouvé en audit.
   const handleUpdateAccountBalance = (id: string, newBalance: number) => {
     setAccounts((prev) =>
-      prev.map((acc) =>
-        acc.id === id ? { ...acc, equity: newBalance, currentBalance: newBalance } : acc
-      )
+      prev.map((acc) => {
+        if (acc.id !== id) return acc;
+        const manualAdjustment = newBalance - acc.initialBalance - computeRealizedPnl(trades, acc.id);
+        return { ...acc, equity: newBalance, currentBalance: newBalance, manualAdjustment };
+      })
     );
   };
 

@@ -502,6 +502,18 @@ export interface TradingAccount {
    * date du dernier trade journalisé, seule la plus récente des deux compte.
    */
   lastManualActivityDate?: string;
+  /**
+   * Delta appliqué par-dessus `initialBalance + PnL des trades rattachés`
+   * (dépôts/retraits/frais absents du journal, ou trades non journalisés) —
+   * saisi via « Ajuster le Solde » (`WalletManagement.tsx`). Stocké comme un
+   * DELTA plutôt que l'équité cible directement : `syncAccountsWithTrades`
+   * (`src/lib/walletStats.ts`) recalcule `equity` à chaque changement de
+   * `trades`, où qu'il ait lieu dans l'app — sans ce delta persistant,
+   * n'importe quel trade ajouté ailleurs écrasait silencieusement un
+   * ajustement manuel antérieur. Absent ou `0` : aucun ajustement, `equity`
+   * suit exactement le PnL journalisé. Trouvé en audit.
+   */
+  manualAdjustment?: number;
 }
 
 export interface TraderBadge {

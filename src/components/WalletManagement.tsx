@@ -298,9 +298,18 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
   const confirmBalanceEdit = () => {
     if (!balanceEditAccount) return;
     const newBal = parseFloat(balanceEditValue);
-    if (!isNaN(newBal)) {
-      onUpdateAccountBalance(balanceEditAccount.id, newBal);
+    // Même règle qu'à la création du compte (`handleCreateAccount` ci-dessus) :
+    // une équité nulle ou négative n'a pas de sens pour un compte réel et
+    // n'était protégée qu'à la création, pas ici — trouvé en audit. Le champ
+    // part toujours pré-rempli d'une valeur valide (`handleOpenBalanceEdit`),
+    // donc un résultat invalide ne peut venir que d'une saisie active : on
+    // bloque toute la confirmation plutôt que d'ignorer silencieusement ce
+    // seul champ et d'enregistrer les autres.
+    if (!(Number.isFinite(newBal) && newBal > 0)) {
+      alert("Le solde doit être un nombre supérieur à 0.");
+      return;
     }
+    onUpdateAccountBalance(balanceEditAccount.id, newBal);
     // Champ vide = pas de limite (retire une limite précédemment définie) ;
     // toute valeur non strictement positive est ignorée plutôt que
     // silencieusement transformée en 0 (0 jour == compte déjà perdu).

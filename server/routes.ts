@@ -8,6 +8,7 @@ import {
   replaceQuizResults,
   getTradingPlan,
   getAnnouncements,
+  getAnnouncementsVersion,
   getCollectionVersion,
   COLLECTION_NAMES,
   CollectionOwnershipConflictError,
@@ -432,6 +433,20 @@ function syncFounderBadgeCatalog(founderPersonalId: string): void {
   if (changed) replaceCollection("badges", next, founderPersonalId);
 }
 
+/**
+ * Un module masqué (`hidden: true`, voir `VideoAcademy.tsx`) ne doit jamais
+ * atteindre un élève — ni à la copie initiale de son programme
+ * (`backfillStudentDefaultCollections`), ni dans une réponse `GET /state`
+ * pour un élève qui en aurait déjà une copie (créée avant que le module soit
+ * masqué). Sans ce filtre, `hidden` n'était appliqué qu'à l'AFFICHAGE côté
+ * client : le JSON complet (vidéo, réponses de quiz avec
+ * `correctAnswerIndex`) restait lisible via l'onglet Réseau ou un appel
+ * direct à l'API. Trouvé en audit de sécurité.
+ */
+function stripHiddenModules<T extends { id: string; [key: string]: unknown }>(modules: T[]): T[] {
+  return modules.filter((m) => m.hidden !== true);
+}
+
 function backfillStudentDefaultCollections(dataUserId: string): void {
   backfillMissingBadges(dataUserId, false);
 
@@ -440,7 +455,9 @@ function backfillStudentDefaultCollections(dataUserId: string): void {
   // repli sur le contenu par défaut seulement si même celui-ci est vide.
   if (listCollection("modules", dataUserId).length === 0) {
     const sharedModules = listCollection<{ id: string; [key: string]: unknown }>("modules", DEFAULT_USER_ID);
-    const source = sharedModules.length > 0 ? sharedModules : initialModules;
+    const source = stripHiddenModules(
+      (sharedModules.length > 0 ? sharedModules : initialModules) as { id: string; [key: string]: unknown }[]
+    );
     if (source.length > 0) {
       const personalModules = source.map((mod) => ({ ...mod, id: `${dataUserId}-${mod.id}` }));
       replaceCollection("modules", personalModules, dataUserId);
@@ -473,7 +490,10 @@ api.get("/state", (req, res) => {
       announcements: getAnnouncements() ?? [],
       coaches: buildCoachesForStudent(),
       collections: Object.fromEntries(
-        [...STUDENT_ALLOWED_COLLECTIONS].map((name) => [name, listCollection(name, dataUserId)])
+        [...STUDENT_ALLOWED_COLLECTIONS].map((name) => {
+          const collection = listCollection(name, dataUserId);
+          return [name, name === "modules" ? stripHiddenModules(collection) : collection];
+        })
       ),
       // Version actuelle de chaque collection modifiable par l'élève —
       // renvoyée avec la collection elle-même pour que `PUT
@@ -516,6 +536,10 @@ api.get("/state", (req, res) => {
     student: buildStaffProfile(req.auth!),
     quizResults: getQuizResults(dataUserId),
     announcements: getAnnouncements() ?? [],
+    // Verrou optimiste dédié aux annonces (hors du système générique de
+    // collections, voir `saveAnnouncements`) — nécessaire pour publier via
+    // `PUT /auth/announcements`.
+    announcementsVersion: getAnnouncementsVersion(),
     collections,
     versions: Object.fromEntries(
       COLLECTION_NAMES.map((name) => [name, getCollectionVersion(name, resolveCollectionUserId(req.auth!, name))])
@@ -596,8 +620,11 @@ function writeCollectionForAuth(
   // Les deux se résolvent avec la même règle : la partie « coach » du fil
   // reste toujours autoritaire côté serveur, quoi que le client envoie —
   // un élève ne peut qu'ajouter ou modifier SES PROPRES messages.
-  let dataToWrite = parsed.data;
-  if (auth.kind === "student" && name === "messages") {
+  // Fonction (pas juste une valeur calculée une fois) : appelée une seconde
+  // fois, RE-lue à l'instant, en cas de conflit de version au premier essai
+  // (voir le `catch` plus bas) — sans quoi le nouveau message du coach reçu
+  // ENTRE les deux essais ne serait pas non plus pris en compte au second.
+  const buildMergedStudentMessages = (): typeof parsed.data => {
     const existingCoachMessages = listCollection<{ id: string; sender?: string; [key: string]: unknown }>(
       name,
       resolveCollectionUserId(auth, name)
@@ -621,15 +648,41 @@ function writeCollectionForAuth(
     // `id` ne sont pas comparables entre les deux, générés différemment
     // (horodatage brut côté élève, aléatoire côté coach).
     const timestampOf = (m: Record<string, unknown>) => (typeof m.timestamp === "string" ? m.timestamp : "");
-    dataToWrite = [...existingCoachMessages, ...submittedNonCoach].sort((a, b) =>
+    return [...existingCoachMessages, ...submittedNonCoach].sort((a, b) =>
       timestampOf(a) < timestampOf(b) ? -1 : timestampOf(a) > timestampOf(b) ? 1 : 0
     ) as typeof parsed.data;
+  };
+
+  let dataToWrite = parsed.data;
+  if (auth.kind === "student" && name === "messages") {
+    dataToWrite = buildMergedStudentMessages();
   }
 
   let newVersion: number;
   try {
     newVersion = replaceCollection(name, dataToWrite, resolveCollectionUserId(auth, name), expectedVersion);
   } catch (err) {
+    // Un élève qui envoie un message pile au moment où le coach répond se
+    // heurtait ici à un 409 alors que le merge ci-dessus (toujours relu
+    // depuis l'état courant) aurait pu l'admettre sans rien écraser — le
+    // message partait alors en attente jusqu'au prochain rechargement de
+    // page, invisible au coach entre-temps. Trouvé en audit.
+    //
+    // Un seul nouvel essai, avec la version ET les messages coach RE-lus à
+    // l'INSTANT de cet essai (pas ceux d'avant le conflit) : toujours protégé
+    // par le même verrou de version au second essai, donc un vrai conflit
+    // (ex. un autre onglet du même élève ayant lui aussi ajouté un message)
+    // échoue encore normalement plutôt que d'écraser quoi que ce soit.
+    if (err instanceof CollectionVersionConflictError && auth.kind === "student" && name === "messages") {
+      try {
+        dataToWrite = buildMergedStudentMessages();
+        newVersion = replaceCollection(name, dataToWrite, resolveCollectionUserId(auth, name), err.currentVersion);
+        return { ok: true, count: dataToWrite.length, version: newVersion };
+      } catch (retryErr) {
+        err = retryErr;
+      }
+    }
+
     if (err instanceof CollectionOwnershipConflictError) {
       // Un ou plusieurs `id` soumis appartiennent déjà à un autre bureau
       // (voir le commentaire de `replaceCollection`) — rien n'a été écrit.

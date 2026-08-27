@@ -9,7 +9,7 @@ import {
 } from "./AuthShell";
 
 interface LoginScreenProps {
-  onLogin: (email: string, password: string) => Promise<void>;
+  onLogin: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   /** Vrai quand l'utilisateur arrive ici parce que sa session a expiré. */
   expired: boolean;
   /** Personnalisation du texte d'accroche — le formulaire reste identique. */
@@ -32,6 +32,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   const [visible, setVisible] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Décoché par défaut : sur un poste partagé (salle de l'académie), la
+  // session ne doit pas survivre à la fermeture du navigateur sans un choix
+  // explicite de l'utilisateur. Voir `setSessionCookie`/`useAuth.login`.
+  const [rememberMe, setRememberMe] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +45,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setPending(true);
     setError(null);
     try {
-      await onLogin(email, password);
+      await onLogin(email, password, rememberMe);
     } catch (err) {
       setError(
         err instanceof TypeError
@@ -122,6 +126,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             </button>
           </div>
         </AuthField>
+
+        <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="w-3.5 h-3.5 rounded border-slate-600 bg-transparent accent-[#00E676]"
+          />
+          Se souvenir de moi sur cet appareil
+        </label>
 
         {error && <AuthError id={ERROR_ID} message={error} />}
 

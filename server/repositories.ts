@@ -339,11 +339,53 @@ export function getAnnouncements<T>(): T | null {
   return safeParsePayload<T>(row.payload, `announcements#${DEFAULT_USER_ID}`);
 }
 
-export function saveAnnouncements(list: unknown): void {
-  db.prepare(
-    `INSERT INTO announcements (user_id, payload) VALUES (?, ?)
-     ON CONFLICT(user_id) DO UPDATE SET payload = excluded.payload`
-  ).run(DEFAULT_USER_ID, JSON.stringify(list));
+/**
+ * Pseudo-collection dans `collection_versions` (nom hors de `CollectionName`,
+ * la colonne `name` n'a pas de contrainte l'empêchant — voir `server/db.ts`) :
+ * réutilise le même verrou optimiste que les vraies collections sans migration
+ * de schéma dédiée, vu que les annonces vivent dans leur propre table à part.
+ */
+const ANNOUNCEMENTS_VERSION_KEY = "announcements";
+
+export function getAnnouncementsVersion(): number {
+  const row = db
+    .prepare("SELECT version FROM collection_versions WHERE user_id = ? AND name = ?")
+    .get(DEFAULT_USER_ID, ANNOUNCEMENTS_VERSION_KEY) as { version: number } | undefined;
+  return row?.version ?? 0;
+}
+
+/**
+ * `expectedVersion` : voir le commentaire de `announcementsSchema`
+ * (server/schemas.ts). Vérifiée et incrémentée dans la même transaction que
+ * l'écriture, comme `replaceCollection` — sans quoi deux écritures
+ * concurrentes pourraient toutes deux lire la même version avant qu'aucune
+ * n'ait eu la chance d'écrire.
+ */
+export function saveAnnouncements(list: unknown, expectedVersion: number): number {
+  const run = db.transaction(() => {
+    const current = db
+      .prepare("SELECT version FROM collection_versions WHERE user_id = ? AND name = ?")
+      .get(DEFAULT_USER_ID, ANNOUNCEMENTS_VERSION_KEY) as { version: number } | undefined;
+    const currentVersion = current?.version ?? 0;
+    if (currentVersion !== expectedVersion) {
+      throw new CollectionVersionConflictError(currentVersion);
+    }
+
+    db.prepare(
+      `INSERT INTO announcements (user_id, payload) VALUES (?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET payload = excluded.payload`
+    ).run(DEFAULT_USER_ID, JSON.stringify(list));
+
+    const { version: newVersion } = db
+      .prepare(
+        `INSERT INTO collection_versions (user_id, name, version) VALUES (?, ?, 1)
+         ON CONFLICT(user_id, name) DO UPDATE SET version = version + 1
+         RETURNING version`
+      )
+      .get(DEFAULT_USER_ID, ANNOUNCEMENTS_VERSION_KEY) as { version: number };
+    return newVersion;
+  });
+  return run();
 }
 
 export function getQuizResults<T>(

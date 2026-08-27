@@ -19,7 +19,24 @@ import { db } from "../db";
 
 const WINDOW_MS = 15 * 60_000;
 const THRESHOLD = 5;
-const LOCK_MS = 15 * 60_000;
+
+/**
+ * Durée du Nième verrouillage consécutif d'un même compte (`lock_count`,
+ * jamais remis à zéro par une simple expiration de fenêtre — seulement par
+ * une connexion réussie, `clearLoginFailures`, ou par la purge d'hygiène
+ * après 24h d'inactivité, `purgeStaleLockouts`).
+ *
+ * Sans cette progression, un compte se verrouillait toujours exactement 15
+ * minutes, indéfiniment répétable : un attaquant pouvait soutenir ~5
+ * tentatives/15 min sans jamais se heurter à un blocage plus dissuasif — un
+ * dictionnaire de mots de passe courants restait épuisable en quelques
+ * dizaines d'heures. Trouvé en audit de sécurité.
+ */
+const LOCK_SCHEDULE_MS = [15, 60, 240, 1440].map((minutes) => minutes * 60_000); // 15min, 1h, 4h, 24h
+function lockDurationFor(lockCount: number): number {
+  const index = Math.min(lockCount, LOCK_SCHEDULE_MS.length) - 1;
+  return LOCK_SCHEDULE_MS[Math.max(index, 0)];
+}
 
 export type LoginLockoutKind = "staff" | "student";
 
@@ -62,8 +79,8 @@ export function registerFailedLogin(
   const nowIso = now.toISOString();
 
   const row = db
-    .prepare("SELECT failed_count, window_started_at FROM login_lockouts WHERE kind = ? AND email_lower = ?")
-    .get(kind, emailLower) as { failed_count: number; window_started_at: string } | undefined;
+    .prepare("SELECT failed_count, window_started_at, lock_count FROM login_lockouts WHERE kind = ? AND email_lower = ?")
+    .get(kind, emailLower) as { failed_count: number; window_started_at: string; lock_count: number } | undefined;
 
   let failedCount = 1;
   let windowStartedAt = nowIso;
@@ -74,17 +91,22 @@ export function registerFailedLogin(
   }
 
   const locked = failedCount >= THRESHOLD;
-  const lockedUntil = locked ? new Date(now.getTime() + LOCK_MS) : null;
+  // `lock_count` n'avance QUE sur un nouveau verrouillage déclenché ici —
+  // pas à chaque échec, et jamais remis à zéro par une fenêtre expirée (voir
+  // le commentaire de `lockDurationFor`).
+  const lockCount = locked ? (row?.lock_count ?? 0) + 1 : row?.lock_count ?? 0;
+  const lockedUntil = locked ? new Date(now.getTime() + lockDurationFor(lockCount)) : null;
 
   db.prepare(
-    `INSERT INTO login_lockouts (kind, email_lower, failed_count, window_started_at, locked_until, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO login_lockouts (kind, email_lower, failed_count, window_started_at, locked_until, lock_count, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(kind, email_lower) DO UPDATE SET
        failed_count = excluded.failed_count,
        window_started_at = excluded.window_started_at,
        locked_until = excluded.locked_until,
+       lock_count = excluded.lock_count,
        updated_at = excluded.updated_at`
-  ).run(kind, emailLower, failedCount, windowStartedAt, lockedUntil ? lockedUntil.toISOString() : null, nowIso);
+  ).run(kind, emailLower, failedCount, windowStartedAt, lockedUntil ? lockedUntil.toISOString() : null, lockCount, nowIso);
 
   return { locked, lockedUntil };
 }
