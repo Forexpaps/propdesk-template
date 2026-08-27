@@ -71,8 +71,9 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onSetup, onRefresh }) 
       subtitle="Choisis l'adresse et le mot de passe qui protégeront ton espace."
       notice={
         <div className="rounded-xl border border-[#00E676]/25 bg-[#00E676]/10 px-3 py-2.5 text-xs text-[#69F0AE] leading-relaxed">
-          Tes données existantes sont conservées — trades, élèves, modules et
-          progression. Cette étape ne fait qu'ajouter un mot de passe.
+          Tes données existantes sont conservées — trades, portefeuille,
+          badges et progression. Cette étape ne fait qu'ajouter un mot de
+          passe.
         </div>
       }
     >
