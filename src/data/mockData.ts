@@ -365,11 +365,9 @@ export const initialStudentProfile: StudentProfile = {
   joinedDate: "",
   startingCapital: 0,
   currentCapital: 0,
-  // Ce profil ne sert jamais qu'au bureau staff (voir App.tsx, `seed()`) :
-  // un vrai compte élève reçoit le sien depuis le serveur
-  // (`buildStudentProfile`, server/routes.ts), jamais ce repli. Tout compte
-  // staff a les mêmes droits (voir StaffAccountsModal.tsx) — `false`
-  // masquerait à tort "Suivi des Élèves" (Sidebar.tsx) sur un site neuf.
+  // Repli avant que `/api/state` n'ait répondu (voir App.tsx, `seed()`) —
+  // l'unique compte de l'instance a toujours tous les droits, jamais
+  // redérivé d'une valeur lue en base.
   isAdmin: true,
 };
 

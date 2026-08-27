@@ -365,8 +365,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
             haut de la modale hors de l'écran (bug de centrage Safari observé
             avec `items-center` + `overflow-y-auto` sur le conteneur externe
             quand l'enfant dépasse la hauteur de l'écran : le début du contenu
-            devient inatteignable au lieu de défiler). Voir aussi
-            StaffAccountsModal.tsx et StudentTracking.tsx, même correctif. */}
+            devient inatteignable au lieu de défiler). */}
         <div className="shrink-0 sticky top-0 z-10 bg-[#111615] px-6 pt-6 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1B2320]">
           <div className="flex items-center gap-3">
             <img

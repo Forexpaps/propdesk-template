@@ -1,16 +1,6 @@
 import { api } from "./api";
 import type { CollectionName, ServerCollections } from "./api";
-import type { StudentProfile, TradingPlanData } from "../types";
-import { BASE_STORAGE_KEY as TRADING_PLAN_BASE_KEY } from "./planCompliance";
-
-/**
- * Une clé de plan de trading élève est namespacée par email
- * (`getTradingPlanStorageKey`, `planCompliance.ts`) — dynamique, donc jamais
- * listée telle quelle dans `LABELS`/`COLLECTION_BY_KEY`. Reconnue par préfixe.
- */
-function isTradingPlanKey(key: string): boolean {
-  return key === TRADING_PLAN_BASE_KEY || key.startsWith(`${TRADING_PLAN_BASE_KEY}_`);
-}
+import type { StudentProfile } from "../types";
 
 /**
  * Suivi des modifications faites **sans serveur**, en attente d'être envoyées.
@@ -44,24 +34,12 @@ const LABELS: Record<string, string> = {
   horizon_accounts: "Portefeuilles",
   horizon_notifications: "Notifications",
   horizon_badges: "Badges",
-  // Ajoutées après coup (module Setups, plan de trading synchronisé) :
-  // sans elles, `markPending` ignorait silencieusement toute modification
-  // hors ligne (ou après échec réseau) de ces deux collections, qui
-  // repartaient donc écrasées par l'état serveur périmé au rechargement
-  // suivant, sans jamais passer par `PendingChangesBanner`.
+  // Ajoutée après coup (module Setups) : sans elle, `markPending` ignorait
+  // silencieusement toute modification hors ligne (ou après échec réseau)
+  // de cette collection, qui repartait donc écrasée par l'état serveur
+  // périmé au rechargement suivant, sans jamais passer par
+  // `PendingChangesBanner`.
   horizon_setups: "Setups",
-  [TRADING_PLAN_BASE_KEY]: "Plan de trading",
-  // Bureau élève — mêmes collections, clés locales préfixées (voir
-  // `StudentAuthenticatedApp` dans src/App.tsx). Sans ces entrées, une
-  // sauvegarde échouée côté élève n'était jamais protégée : `markPending`
-  // ignore silencieusement toute clé absente de cette liste blanche.
-  horizon_student_trades: "Journal de trading",
-  horizon_student_accounts: "Portefeuilles",
-  horizon_student_badges: "Badges",
-  horizon_student_notifications: "Notifications",
-  horizon_student_setups: "Setups",
-  // Les clés de plan namespacées par email (`horizon_trading_plan_<email>`)
-  // ne peuvent pas être listées ici (dynamiques) — voir `isTradingPlanKey`.
 };
 
 /** Clé `localStorage` → collection serveur. Absent pour profil. */
@@ -70,12 +48,7 @@ const COLLECTION_BY_KEY: Record<string, CollectionName> = {
   horizon_accounts: "accounts",
   horizon_notifications: "notifications",
   horizon_badges: "badges",
-  horizon_student_trades: "trades",
-  horizon_student_accounts: "accounts",
-  horizon_student_badges: "badges",
-  horizon_student_notifications: "notifications",
   horizon_setups: "setups",
-  horizon_student_setups: "setups",
 };
 
 function read(): string[] {
@@ -85,7 +58,7 @@ function read(): string[] {
     const parsed: unknown = JSON.parse(raw);
     // On filtre sur la liste blanche : une clé inconnue ne doit rien déclencher.
     return Array.isArray(parsed)
-      ? parsed.filter((k): k is string => typeof k === "string" && (k in LABELS || isTradingPlanKey(k)))
+      ? parsed.filter((k): k is string => typeof k === "string" && k in LABELS)
       : [];
   } catch {
     return [];
@@ -122,7 +95,7 @@ function write(keys: string[]): void {
 
 /** Note qu'une collection a été modifiée hors ligne. Idempotent. */
 export function markPending(localKey: string): void {
-  if (!(localKey in LABELS) && !isTradingPlanKey(localKey)) return;
+  if (!(localKey in LABELS)) return;
   const current = read();
   if (current.includes(localKey)) return;
   write([...current, localKey]);
@@ -135,7 +108,7 @@ export function listPending(): string[] {
 
 /** Libellés lisibles correspondants, pour l'affichage. */
 export function describePending(keys: string[]): string[] {
-  return keys.map((k) => LABELS[k] ?? (isTradingPlanKey(k) ? "Plan de trading" : k));
+  return keys.map((k) => LABELS[k] ?? k);
 }
 
 export function clearPending(): void {
@@ -185,11 +158,6 @@ async function pushOne(localKey: string): Promise<void> {
 
   if (localKey === "horizon_student") {
     await api.saveProfile(value as StudentProfile);
-    return;
-  }
-
-  if (isTradingPlanKey(localKey)) {
-    await api.saveTradingPlan(value as TradingPlanData);
     return;
   }
 
