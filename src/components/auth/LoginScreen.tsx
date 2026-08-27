@@ -9,7 +9,7 @@ import {
 } from "./AuthShell";
 
 interface LoginScreenProps {
-  onLogin: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
+  onLogin: (password: string, rememberMe?: boolean) => Promise<void>;
   /** Vrai quand l'utilisateur arrive ici parce que sa session a expiré. */
   expired: boolean;
   /** Personnalisation du texte d'accroche — le formulaire reste identique. */
@@ -27,7 +27,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
   subtitle = "Accède à ton espace de trading.",
   footer = "Mot de passe oublié ? La procédure de secours est décrite dans le README.",
 }) => {
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [visible, setVisible] = useState(false);
   const [pending, setPending] = useState(false);
@@ -45,7 +44,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
     setPending(true);
     setError(null);
     try {
-      await onLogin(email, password, rememberMe);
+      await onLogin(password, rememberMe);
     } catch (err) {
       setError(
         err instanceof TypeError
@@ -74,28 +73,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       footer={footer}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <AuthField id="login-email" label="Adresse e-mail">
-          <input
-            id="login-email"
-            name="email"
-            type="email"
-            autoComplete="username"
-            autoCapitalize="none"
-            spellCheck={false}
-            inputMode="email"
-            required
-            autoFocus
-            readOnly={pending}
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              clearError();
-            }}
-            placeholder="toi@exemple.fr"
-            className={AUTH_INPUT_CLASS}
-          />
-        </AuthField>
-
         <AuthField id="login-password" label="Mot de passe">
           <div className="relative">
             <input
@@ -104,6 +81,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
               type={visible ? "text" : "password"}
               autoComplete="current-password"
               required
+              autoFocus
               readOnly={pending}
               value={password}
               onChange={(e) => {

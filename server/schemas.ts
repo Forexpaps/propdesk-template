@@ -222,16 +222,6 @@ export const importStateSchema = z.object({
 /** Longueur minimale d'un mot de passe, sans contrainte de composition. */
 const PASSWORD_MIN = 10;
 
-/** `z.email()` plutôt que `.email()` sur ZodString, déprécié en Zod 4. */
-const emailField = z
-  .string()
-  .trim()
-  .min(3)
-  .max(320)
-  .refine((v) => z.email().safeParse(v).success, {
-    message: "Adresse e-mail invalide.",
-  });
-
 /**
  * Première installation.
  *
@@ -240,7 +230,6 @@ const emailField = z
  */
 export const setupSchema = z
   .object({
-    email: emailField,
     password: z.string().min(PASSWORD_MIN).max(200),
   })
   .strict();
@@ -254,7 +243,6 @@ export const setupSchema = z
  */
 export const loginSchema = z
   .object({
-    email: z.string().trim().min(1).max(320),
     password: z.string().min(1).max(200),
     /**
      * Décochée par défaut côté client : le cookie de session posé est alors

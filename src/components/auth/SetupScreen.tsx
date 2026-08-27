@@ -9,7 +9,7 @@ import {
 } from "./AuthShell";
 
 interface SetupScreenProps {
-  onSetup: (email: string, password: string) => Promise<void>;
+  onSetup: (password: string) => Promise<void>;
   /** Relance la sonde d'état, quand un compte s'avère déjà exister. */
   onRefresh: () => void;
 }
@@ -20,7 +20,6 @@ const PASSWORD_MIN = 10;
 const ERROR_ID = "setup-error";
 
 export const SetupScreen: React.FC<SetupScreenProps> = ({ onSetup, onRefresh }) => {
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [visible, setVisible] = useState(false);
@@ -45,7 +44,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onSetup, onRefresh }) 
     setPending(true);
     setError(null);
     try {
-      await onSetup(email, password);
+      await onSetup(password);
     } catch (err) {
       const message = (err as Error).message ?? "";
       if (message.includes("existe déjà")) {
@@ -68,7 +67,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onSetup, onRefresh }) 
   return (
     <AuthShell
       title="Première installation"
-      subtitle="Choisis l'adresse et le mot de passe qui protégeront ton espace."
+      subtitle="Choisis le mot de passe qui protégera ton espace."
       notice={
         <div className="rounded-xl border border-[#00E676]/25 bg-[#00E676]/10 px-3 py-2.5 text-xs text-[#69F0AE] leading-relaxed">
           Tes données existantes sont conservées — trades, portefeuille,
@@ -78,28 +77,6 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onSetup, onRefresh }) 
       }
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <AuthField id="setup-email" label="Adresse e-mail">
-          <input
-            id="setup-email"
-            name="email"
-            type="email"
-            autoComplete="username"
-            autoCapitalize="none"
-            spellCheck={false}
-            inputMode="email"
-            required
-            autoFocus
-            readOnly={pending}
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              clearError();
-            }}
-            placeholder="toi@exemple.fr"
-            className={AUTH_INPUT_CLASS}
-          />
-        </AuthField>
-
         <AuthField
           id="setup-password"
           label="Mot de passe"
@@ -112,6 +89,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onSetup, onRefresh }) 
               type={visible ? "text" : "password"}
               autoComplete="new-password"
               required
+              autoFocus
               minLength={PASSWORD_MIN}
               readOnly={pending}
               value={password}
