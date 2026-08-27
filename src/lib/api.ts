@@ -73,6 +73,13 @@ export interface ServerState {
    */
   announcements?: Announcement[];
   /**
+   * Verrou optimiste dédié aux annonces (hors du système générique de
+   * collections/`versions` ci-dessous) — voir `PUT /auth/announcements`,
+   * `saveAnnouncements` (`server/repositories.ts`). Présent seulement côté
+   * staff : seul un compte avec l'autorisation "announcements" publie.
+   */
+  announcementsVersion?: number;
+  /**
    * Version actuelle de chaque collection modifiable, pour détecter qu'un
    * autre onglet (ou un autre coach sur le même bureau partagé) l'a modifiée
    * entre-temps — voir le commentaire au-dessus de `saveCollection`.
@@ -265,10 +272,11 @@ export const api = {
    * cette restriction. Voir `PUT /auth/announcements`,
    * `server/auth/routes.ts`.
    */
-  saveAnnouncements: (announcements: Announcement[]) =>
-    request<{ success: true; count: number }>("/api/auth/announcements", {
+  /** `expectedVersion` : voir `announcementsVersion` (`AuthState`) — verrou optimiste, la requête est refusée en 409 si quelqu'un d'autre a publié entre-temps. */
+  saveAnnouncements: (announcements: Announcement[], expectedVersion: number) =>
+    request<{ success: true; count: number; version: number }>("/api/auth/announcements", {
       method: "PUT",
-      body: JSON.stringify(announcements),
+      body: JSON.stringify({ announcements, expectedVersion }),
     }),
 
   saveQuizResults: (results: Record<string, ModuleQuizResult>) =>
@@ -320,25 +328,30 @@ export const api = {
   /** Sonde d'état du démarrage. Répond toujours 200. */
   fetchMe: () => request<AuthState>("/api/auth/me"),
 
-  /** Peut renvoyer `{ state: "2fa-required" }` — voir `AuthState`. */
-  login: (email: string, password: string) =>
+  /**
+   * Peut renvoyer `{ state: "2fa-required" }` — voir `AuthState`.
+   * `rememberMe` (défaut `false`) : décoché, le cookie posé est un cookie de
+   * session (effacé à la fermeture du navigateur) — pertinent sur un poste
+   * partagé (salle de l'académie). Voir `setSessionCookie`/`server/schemas.ts`.
+   */
+  login: (email: string, password: string, rememberMe = false) =>
     request<AuthState>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, rememberMe }),
     }),
 
-  /** Étape 2 de connexion : code TOTP à 6 chiffres. */
-  verifyTwoFactor: (pendingToken: string, code: string) =>
+  /** Étape 2 de connexion : code TOTP à 6 chiffres. `rememberMe` doit être le même choix qu'à l'étape 1 (mot de passe). */
+  verifyTwoFactor: (pendingToken: string, code: string, rememberMe = false) =>
     request<Extract<AuthState, { state: "authenticated" }>>("/api/auth/login/2fa", {
       method: "POST",
-      body: JSON.stringify({ pendingToken, code }),
+      body: JSON.stringify({ pendingToken, code, rememberMe }),
     }),
 
   /** Étape 2 de connexion, avec un code de récupération à usage unique à la place du TOTP. */
-  verifyTwoFactorRecovery: (pendingToken: string, recoveryCode: string) =>
+  verifyTwoFactorRecovery: (pendingToken: string, recoveryCode: string, rememberMe = false) =>
     request<Extract<AuthState, { state: "authenticated" }>>("/api/auth/login/2fa", {
       method: "POST",
-      body: JSON.stringify({ pendingToken, recoveryCode }),
+      body: JSON.stringify({ pendingToken, recoveryCode, rememberMe }),
     }),
 
   /** État 2FA du compte staff connecté. */
@@ -497,10 +510,10 @@ export const api = {
 
   fetchStudentMe: () => request<StudentAuthState>("/api/auth/student-me"),
 
-  studentLogin: (email: string, password: string) =>
+  studentLogin: (email: string, password: string, rememberMe = false) =>
     request<Extract<StudentAuthState, { state: "authenticated" }>>("/api/auth/student-login", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, rememberMe }),
     }),
 
   studentLogout: () => request<void>("/api/auth/student-logout", { method: "POST" }),

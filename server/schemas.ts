@@ -264,13 +264,29 @@ export const announcementSchema = z.object({
  * en plus de produire deux notifications identiques (`announce-${a.id}-${student.id}`
  * collisionnerait).
  */
-export const announcementsSchema = z
+const announcementListSchema = z
   .array(announcementSchema)
   .max(200)
   .refine(
     (list) => new Set(list.map((a) => a.id)).size === list.length,
     { message: "Deux annonces ne peuvent pas avoir le même identifiant." }
   );
+
+/**
+ * `expectedVersion` : version lue par le client au dernier chargement — même
+ * verrou optimiste que `replaceCollection`/`CollectionVersionConflictError`,
+ * absent jusqu'ici sur cette route (les annonces ne passent pas par le
+ * système générique de collections versionnées, voir `saveAnnouncements`).
+ * Sans lui, le fondateur et un coach avec l'autorisation "announcements"
+ * publiant à quelques secondes d'écart pouvaient s'écraser silencieusement
+ * l'un l'autre — trouvé en audit de sécurité/fiabilité.
+ */
+export const announcementsSchema = z
+  .object({
+    announcements: announcementListSchema,
+    expectedVersion: z.number().int().min(0),
+  })
+  .strict();
 
 /**
  * Un seul résultat de quiz de module — voir `ModuleQuizResult` dans
@@ -347,6 +363,14 @@ export const loginSchema = z
   .object({
     email: z.string().trim().min(1).max(320),
     password: z.string().min(1).max(200),
+    /**
+     * Décochée par défaut côté client : le cookie de session posé est alors
+     * un cookie de SESSION (sans `maxAge`), effacé à la fermeture du
+     * navigateur — pertinent sur un poste partagé (salle de l'académie).
+     * Cochée = cookie persistant, comportement historique (voir
+     * `setSessionCookie`/`setStudentSessionCookie`).
+     */
+    rememberMe: z.boolean().optional(),
   })
   .strict();
 
@@ -396,6 +420,8 @@ export const twoFactorLoginSchema = z
     pendingToken: z.string().min(1).max(200),
     code: z.string().regex(/^\d{6}$/).optional(),
     recoveryCode: z.string().trim().min(1).max(50).optional(),
+    /** Même champ que `loginSchema.rememberMe` — le choix fait à l'étape 1 (mot de passe) doit survivre jusqu'à l'étape 2 (code 2FA), qui crée la vraie session. */
+    rememberMe: z.boolean().optional(),
   })
   .strict()
   .refine((v) => (v.code ? 1 : 0) + (v.recoveryCode ? 1 : 0) === 1, {

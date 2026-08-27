@@ -95,12 +95,19 @@ export function totalDrawdownPercent(account: TradingAccount): number {
   return ((account.initialBalance - account.equity) / account.initialBalance) * 100;
 }
 
+/** Somme des PnL réalisés (dollars, clôturés — voir `isRealizedDollarTrade`) des trades rattachés à un compte. Partagé entre `syncAccountsWithTrades` et le calcul de `manualAdjustment` (`WalletManagement.tsx`, « Ajuster le Solde »). */
+export function computeRealizedPnl(trades: Trade[], accountId: string): number {
+  return trades
+    .filter((t) => t.accountId === accountId)
+    .filter(isRealizedDollarTrade)
+    .reduce((sum, t) => sum + t.pnl, 0);
+}
+
 /**
  * Recalcule le solde de chaque compte à partir des trades qui lui sont
- * rattachés : `equity = capital initial + somme des PnL des trades liés`
- * (en dollars et clôturés uniquement — voir `isRealizedDollarTrade` : un
- * trade en % n'est pas une somme d'argent, une position encore ouverte n'a
- * rien de réalisé à ajouter au solde du compte).
+ * rattachés : `equity = capital initial + somme des PnL des trades liés +
+ * manualAdjustment` (dépôts/retraits/frais absents du journal, voir
+ * `TradingAccount.manualAdjustment`).
  *
  * Un compte sans trade rattaché garde son solde tel quel — retirer le
  * dernier trade lié à un compte ne doit pas silencieusement remettre son
@@ -120,8 +127,8 @@ export function syncAccountsWithTrades(
     const linkedTrades = trades.filter((t) => t.accountId === acc.id);
     if (linkedTrades.length === 0) return acc;
 
-    const pnl = linkedTrades.filter(isRealizedDollarTrade).reduce((sum, t) => sum + t.pnl, 0);
-    const newBalance = acc.initialBalance + pnl;
+    const pnl = computeRealizedPnl(trades, acc.id);
+    const newBalance = acc.initialBalance + pnl + (acc.manualAdjustment ?? 0);
 
     if (acc.equity === newBalance && acc.currentBalance === newBalance) return acc;
     changed = true;

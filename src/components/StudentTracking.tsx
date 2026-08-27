@@ -566,6 +566,11 @@ export const StudentTracking: React.FC<StudentTrackingProps> = ({
               </div>
 
               {/* Performance & Capital Metrics */}
+              {st.studentAccountId && (
+                <p className="text-[10px] text-slate-500 italic -mb-1">
+                  Chiffres de la fiche (saisie manuelle) — ouvre la Vue Complète pour les données réelles à jour.
+                </p>
+              )}
               <div className="grid grid-cols-3 gap-2 bg-[#0D1110] p-3 rounded-xl border border-[#1B2320] text-xs">
                 <div>
                   <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold block">Capital Enregistré</span>

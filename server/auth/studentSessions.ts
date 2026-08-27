@@ -139,8 +139,10 @@ function cookieOptions() {
   };
 }
 
-export function setStudentSessionCookie(res: Response, token: string): void {
-  res.cookie(STUDENT_SESSION_COOKIE, token, { ...cookieOptions(), maxAge: TTL_MS });
+/** `rememberMe = false` : cookie de SESSION, effacé à la fermeture du navigateur — voir le commentaire jumeau dans `sessions.ts` (staff). */
+export function setStudentSessionCookie(res: Response, token: string, rememberMe = true): void {
+  const options = cookieOptions();
+  res.cookie(STUDENT_SESSION_COOKIE, token, rememberMe ? { ...options, maxAge: TTL_MS } : options);
 }
 
 export function clearStudentSessionCookie(res: Response): void {

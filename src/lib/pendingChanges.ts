@@ -104,6 +104,23 @@ function read(): string[] {
   }
 }
 
+/**
+ * Abonnement au registre — seul `PendingChangesBanner`/`useBootstrap` en ont
+ * besoin : sans lui, `pending` (`useBootstrap`) n'était calculé QU'AU
+ * DÉMARRAGE, et un échec de sauvegarde survenant en cours de session
+ * (`markPending`, appelé depuis `useSyncedState` sur un 409/coupure réseau)
+ * ne mettait jamais à jour le bandeau persistant — seul le `SyncErrorBanner`
+ * ponctuel et refermable le signalait, jusqu'au prochain rechargement complet
+ * de la page. Trouvé en audit.
+ */
+type Listener = () => void;
+const listeners = new Set<Listener>();
+
+export function subscribePending(listener: Listener): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
 function write(keys: string[]): void {
   try {
     if (keys.length === 0) localStorage.removeItem(PENDING_KEY);
@@ -112,6 +129,7 @@ function write(keys: string[]): void {
     // Stockage indisponible : on ne peut rien retenir, mais rien ne casse non
     // plus — on retombe sur le comportement d'avant, « le serveur fait foi ».
   }
+  listeners.forEach((listener) => listener());
 }
 
 /** Note qu'une collection a été modifiée hors ligne. Idempotent. */
@@ -134,6 +152,33 @@ export function describePending(keys: string[]): string[] {
 
 export function clearPending(): void {
   write([]);
+}
+
+/**
+ * Vide `localStorage` en conservant uniquement les clés portant une
+ * modification réellement non envoyée (`listPending()`) et le registre
+ * lui-même.
+ *
+ * Utilisée quand une session STAFF expire ou est révoquée pendant l'usage
+ * (`useAuth.onUnauthenticated`) : contrairement à un `localStorage.clear()`
+ * total (appliqué côté élève), cette purge CIBLÉE protège le travail non
+ * encore synchronisé d'un coach réellement hors ligne, tout en effaçant le
+ * reste du cache — notamment `horizon_enrolled_students` (roster complet des
+ * élèves), qui sinon restait lisible en clair indéfiniment sur le poste d'un
+ * coach dont l'accès vient d'être révoqué. Faille trouvée en audit de
+ * sécurité : le cache de LECTURE n'a aucune raison de survivre à une session
+ * qui n'est plus valide, seul le travail non-envoyé le justifie.
+ */
+export function purgeCacheKeepingPending(): void {
+  try {
+    const keep = new Set(listPending());
+    keep.add(PENDING_KEY);
+    for (const key of Object.keys(localStorage)) {
+      if (!keep.has(key)) localStorage.removeItem(key);
+    }
+  } catch {
+    // Stockage indisponible : rien à purger.
+  }
 }
 
 /**

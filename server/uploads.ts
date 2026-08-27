@@ -64,6 +64,45 @@ const upload = multer({
   },
 });
 
+/**
+ * Vérifie les premiers octets du fichier ÉCRIT SUR DISQUE contre la
+ * signature binaire attendue pour la FAMILLE de conteneur du mimetype
+ * déclaré par le client — `fileFilter` (multer) ne voit que ce mimetype
+ * déclaré, jamais le contenu réel (le flux est streamé directement sur
+ * disque, jamais bufferisé en mémoire — imposer un `Buffer` complet
+ * casserait l'upload de vidéos de plusieurs centaines de Mo/Go).
+ *
+ * Défense en profondeur, pas une barrière absolue (un fichier peut être
+ * fabriqué pour porter la bonne signature) : ferme le cas simple d'un
+ * fichier arbitraire (HTML, exécutable...) renommé avec une extension vidéo
+ * et un `Content-Type` menteur. `mkv`/`webm` partagent la même signature
+ * EBML, `mp4`/`mov` la même signature `ftyp` — la famille suffit, cette
+ * route ne prétend pas distinguer plus finement. Trouvé en audit de
+ * sécurité (staff uniquement, risque déjà atténué par `X-Content-Type-Options:
+ * nosniff` et l'extension toujours dérivée côté serveur — durci ici quand même).
+ */
+function matchesDeclaredVideoSignature(filePath: string, mimetype: string): boolean {
+  const fd = fs.openSync(filePath, "r");
+  try {
+    const header = Buffer.alloc(12);
+    const bytesRead = fs.readSync(fd, header, 0, 12, 0);
+    if (bytesRead < 12) return false;
+
+    if (mimetype === "video/mp4" || mimetype === "video/quicktime") {
+      return header.subarray(4, 8).toString("ascii") === "ftyp";
+    }
+    if (mimetype === "video/webm" || mimetype === "video/x-matroska") {
+      return header.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
+    }
+    if (mimetype === "video/ogg") {
+      return header.subarray(0, 4).toString("ascii") === "OggS";
+    }
+    return false;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 const uploadRateLimit = createRateLimit({
   windowMs: 15 * 60_000,
   max: 20,
@@ -99,6 +138,11 @@ uploadsRouter.post(
       }
       if (!req.file) {
         res.status(400).json({ error: "Aucun fichier vidéo reçu." });
+        return;
+      }
+      if (!matchesDeclaredVideoSignature(req.file.path, req.file.mimetype)) {
+        fs.unlink(req.file.path, () => {});
+        res.status(400).json({ error: "Le contenu du fichier ne correspond pas à un format vidéo supporté." });
         return;
       }
       res.status(201).json({ url: `/api/uploads/videos/${req.file.filename}` });

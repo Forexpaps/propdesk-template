@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, UNAUTHENTICATED_EVENT, type AuthUser, type StudentAuthUser } from "../lib/api";
+import { purgeCacheKeepingPending } from "../lib/pendingChanges";
 
 /**
  * État d'authentification de l'application.
@@ -33,8 +34,11 @@ export interface UseAuthResult {
   studentUser: StudentAuthUser | null;
   /** Renseigné quand la session vient d'expirer, pour l'expliquer à l'écran. */
   expired: boolean;
-  /** Peut faire passer `status` à `"2fa-required"` au lieu de `"authenticated"` — voir `AuthState`. */
-  login: (email: string, password: string) => Promise<void>;
+  /**
+   * Peut faire passer `status` à `"2fa-required"` au lieu de `"authenticated"`
+   * — voir `AuthState`. `rememberMe` (défaut `false`) : voir `api.login`.
+   */
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   /** Jeton de l'étape 2 en attente, renseigné seulement quand `status === "2fa-required"`. */
   pendingTwoFactorToken: string | null;
   verifyTwoFactor: (code: string) => Promise<void>;
@@ -44,7 +48,7 @@ export interface UseAuthResult {
   setup: (email: string, password: string) => Promise<void>;
   /** Change le mot de passe et lève `mustChangePassword`. */
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
-  studentLogin: (email: string, password: string) => Promise<void>;
+  studentLogin: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   studentChangePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   /** Repasse en `unauthenticated` sans appeler le serveur. */
   markLoggedOut: () => void;
@@ -57,6 +61,12 @@ export function useAuth(): UseAuthResult {
   const [studentUser, setStudentUser] = useState<StudentAuthUser | null>(null);
   const [expired, setExpired] = useState(false);
   const [pendingTwoFactorToken, setPendingTwoFactorToken] = useState<string | null>(null);
+  /**
+   * Choix "Se souvenir de moi" fait à l'étape 1 (mot de passe), à réutiliser
+   * tel quel à l'étape 2 (`verifyTwoFactor`/`verifyTwoFactorRecovery`) qui
+   * crée la vraie session — une `ref` suffit, jamais lu par le rendu.
+   */
+  const pendingRememberMeRef = useRef(false);
   /**
    * Miroir de `status`, lu dans `onUnauthenticated` (effet à dépendances
    * vides, donc fermé sur sa toute première valeur sans cette ref).
@@ -127,11 +137,16 @@ export function useAuth(): UseAuthResult {
    * autre élève, sous sa propre session. Faille de sécurité réelle, trouvée en
    * audit, corrigée ici à la source plutôt qu'au seul point d'entrée du clic.
    *
-   * Le monde STAFF n'est volontairement pas concerné : `AcademyApp` a son
-   * propre mode hors ligne où le cache local est la SEULE copie de
-   * modifications non envoyées (voir son `handleLogout`, qui refuse même de
-   * se déconnecter hors ligne pour cette raison) — le vider automatiquement
-   * ici détruirait ce filet de sécurité au lieu de le protéger.
+   * Le monde STAFF a son propre mode hors ligne où le cache local peut être
+   * la SEULE copie de modifications non envoyées (voir `AcademyApp.handleLogout`,
+   * qui refuse même de se déconnecter hors ligne pour cette raison) : un
+   * `localStorage.clear()` total détruirait ce filet de sécurité. On applique
+   * donc une purge CIBLÉE (`purgeCacheKeepingPending`) — tout le cache de
+   * lecture disparaît (notamment le roster complet des élèves,
+   * `horizon_enrolled_students`), sauf les clés qui portent une modification
+   * réellement non envoyée. Sans ça, le roster d'un coach dont l'accès vient
+   * d'être révoqué restait lisible en clair indéfiniment sur son poste —
+   * faille trouvée en audit de sécurité.
    */
   useEffect(() => {
     const onUnauthenticated = () => {
@@ -141,6 +156,8 @@ export function useAuth(): UseAuthResult {
         } catch {
           // Stockage indisponible : il n'y avait alors rien à oublier.
         }
+      } else if (statusRef.current === "authenticated") {
+        purgeCacheKeepingPending();
       }
       setUser(null);
       setStudentUser(null);
@@ -154,8 +171,9 @@ export function useAuth(): UseAuthResult {
     return () => window.removeEventListener(UNAUTHENTICATED_EVENT, onUnauthenticated);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const result = await api.login(email, password);
+  const login = useCallback(async (email: string, password: string, rememberMe = false) => {
+    pendingRememberMeRef.current = rememberMe;
+    const result = await api.login(email, password, rememberMe);
     if (result.state === "2fa-required") {
       setPendingTwoFactorToken(result.pendingToken);
       setExpired(false);
@@ -176,7 +194,7 @@ export function useAuth(): UseAuthResult {
   const verifyTwoFactor = useCallback(
     async (code: string) => {
       if (!pendingTwoFactorToken) throw new Error("Aucune connexion en attente de 2FA.");
-      const result = await api.verifyTwoFactor(pendingTwoFactorToken, code);
+      const result = await api.verifyTwoFactor(pendingTwoFactorToken, code, pendingRememberMeRef.current);
       setUser(result.user);
       setPendingTwoFactorToken(null);
       setExpired(false);
@@ -188,7 +206,7 @@ export function useAuth(): UseAuthResult {
   const verifyTwoFactorRecovery = useCallback(
     async (recoveryCode: string) => {
       if (!pendingTwoFactorToken) throw new Error("Aucune connexion en attente de 2FA.");
-      const result = await api.verifyTwoFactorRecovery(pendingTwoFactorToken, recoveryCode);
+      const result = await api.verifyTwoFactorRecovery(pendingTwoFactorToken, recoveryCode, pendingRememberMeRef.current);
       setUser(result.user);
       setPendingTwoFactorToken(null);
       setExpired(false);
@@ -214,8 +232,8 @@ export function useAuth(): UseAuthResult {
     setUser(result.user);
   }, []);
 
-  const studentLogin = useCallback(async (email: string, password: string) => {
-    const result = await api.studentLogin(email, password);
+  const studentLogin = useCallback(async (email: string, password: string, rememberMe = false) => {
+    const result = await api.studentLogin(email, password, rememberMe);
     setStudentUser(result.user);
     setExpired(false);
     setStatus("authenticated-student");

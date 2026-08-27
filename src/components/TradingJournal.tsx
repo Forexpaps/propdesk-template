@@ -444,6 +444,12 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
       let imported = 0;
       const errors: string[] = [];
+      // Distinct de `errors` : la ligne EST importée (contrairement à une
+      // ligne ignorée), seul son R:R est forcé à 0 faute de distance de
+      // risque — la saisie manuelle du même cas est bloquée avec un message
+      // explicite (`handleFormSubmit`), l'import CSV l'acceptait jusqu'ici en
+      // silence complet. Trouvé en audit.
+      const warnings: string[] = [];
 
       rows.slice(1).forEach((row, idx) => {
         const ligne = idx + 2; // +2 : 1-indexé + ligne d'en-tête
@@ -495,6 +501,9 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         const riskDiff = Math.abs(entryPrice - stopLoss);
         const rewardDiff = Math.abs(takeProfit - entryPrice);
         const riskRewardRatio = riskDiff > 0 ? Number((rewardDiff / riskDiff).toFixed(1)) : 0;
+        if (riskDiff === 0) {
+          warnings.push(`Ligne ${ligne} : Stop Loss = Prix d'entrée, R:R forcé à 0.`);
+        }
 
         onAddTrade({
           date,
@@ -528,6 +537,15 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         const reste = errors.length - affichees.length;
         parts.push(
           `${errors.length} ligne${errors.length > 1 ? "s" : ""} ignorée${errors.length > 1 ? "s" : ""} :\n${affichees.join("\n")}${
+            reste > 0 ? `\n… et ${reste} de plus.` : ""
+          }`
+        );
+      }
+      if (warnings.length > 0) {
+        const affichees = warnings.slice(0, 10);
+        const reste = warnings.length - affichees.length;
+        parts.push(
+          `${warnings.length} avertissement${warnings.length > 1 ? "s" : ""} :\n${affichees.join("\n")}${
             reste > 0 ? `\n… et ${reste} de plus.` : ""
           }`
         );
@@ -880,8 +898,14 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     const champs = {
       date: formData.date,
       time: formData.time,
-      exitDate: formData.exitDate || undefined,
-      exitTime: formData.exitTime || undefined,
+      // `formulaireVierge()` pré-remplit exitDate/exitTime avec aujourd'hui
+      // 16:00 (pratique pour un trade déjà clôturé) — mais rien n'invite
+      // l'utilisateur à les vider spécifiquement pour "⏳ Position ouverte",
+      // qui s'affichait alors comme clôturée dans le tableau (seul indicateur
+      // visuel : la présence d'`exitDate`, voir plus bas). Une position
+      // ouverte n'a par définition aucune date de sortie. Trouvé en audit.
+      exitDate: result === "OPEN" ? undefined : formData.exitDate || undefined,
+      exitTime: result === "OPEN" ? undefined : formData.exitTime || undefined,
       // `undefined` et non chaîne vide : le champ est optionnel, une chaîne
       // vide en base se lirait comme un rattachement à un compte sans id.
       accountId: formData.accountId || undefined,
