@@ -58,14 +58,14 @@ export interface UseAuthResult {
    * Peut faire passer `status` à `"2fa-required"` au lieu de `"authenticated"`
    * — voir `AuthState`. `rememberMe` (défaut `false`) : voir `api.login`.
    */
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
+  login: (password: string, rememberMe?: boolean) => Promise<void>;
   /** Jeton de l'étape 2 en attente, renseigné seulement quand `status === "2fa-required"`. */
   pendingTwoFactorToken: string | null;
   verifyTwoFactor: (code: string) => Promise<void>;
   verifyTwoFactorRecovery: (recoveryCode: string) => Promise<void>;
   /** Revient à l'écran de connexion sans appeler le serveur. */
   cancelTwoFactor: () => void;
-  setup: (email: string, password: string) => Promise<void>;
+  setup: (password: string) => Promise<void>;
   /** Change le mot de passe et lève `mustChangePassword`. */
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   /** Repasse en `unauthenticated` sans appeler le serveur. */
@@ -154,9 +154,9 @@ export function useAuth(): UseAuthResult {
     return () => window.removeEventListener(UNAUTHENTICATED_EVENT, onUnauthenticated);
   }, []);
 
-  const login = useCallback(async (email: string, password: string, rememberMe = false) => {
+  const login = useCallback(async (password: string, rememberMe = false) => {
     pendingRememberMeRef.current = rememberMe;
-    const result = await api.login(email, password, rememberMe);
+    const result = await api.login(password, rememberMe);
     if (result.state === "2fa-required") {
       setPendingTwoFactorToken(result.pendingToken);
       setExpired(false);
@@ -203,8 +203,8 @@ export function useAuth(): UseAuthResult {
     setStatus("unauthenticated");
   }, []);
 
-  const setup = useCallback(async (email: string, password: string) => {
-    const result = await api.setup(email, password);
+  const setup = useCallback(async (password: string) => {
+    const result = await api.setup(password);
     setUser(result.user);
     setExpired(false);
     setStatus("authenticated");

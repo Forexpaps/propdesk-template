@@ -65,12 +65,17 @@ export async function hasAnyStaffAccount(): Promise<boolean> {
   return result.rows.length > 0;
 }
 
-export async function getStaffByEmail(email: string): Promise<StaffAccount | null> {
-  const result = await db.execute({
-    sql: `SELECT id, name, email, email_lower, password_hash, must_change_password
-       FROM staff_accounts WHERE email_lower = ?`,
-    args: [normalizeEmail(email)],
-  });
+/**
+ * Le compte de cette instance — il n'y en a jamais qu'un (voir
+ * `hasAnyStaffAccount`). La connexion ne se fait plus par email : ce
+ * lookup remplace `getStaffByEmail` maintenant que `/auth/login` n'a
+ * qu'un mot de passe à vérifier.
+ */
+export async function getSoleStaffAccount(): Promise<StaffAccount | null> {
+  const result = await db.execute(
+    `SELECT id, name, email, email_lower, password_hash, must_change_password
+       FROM staff_accounts LIMIT 1`
+  );
   const row = result.rows[0] as unknown as StaffAccountRow | undefined;
   return row ? toStaffAccount(row) : null;
 }

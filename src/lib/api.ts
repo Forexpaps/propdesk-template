@@ -200,10 +200,10 @@ export const api = {
    * session (effacé à la fermeture du navigateur) — pertinent sur un poste
    * partagé (salle de l'académie). Voir `setSessionCookie`/`server/schemas.ts`.
    */
-  login: (email: string, password: string, rememberMe = false) =>
+  login: (password: string, rememberMe = false) =>
     request<AuthState>("/api/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password, rememberMe }),
+      body: JSON.stringify({ password, rememberMe }),
     }),
 
   /** Étape 2 de connexion : code TOTP à 6 chiffres. `rememberMe` doit être le même choix qu'à l'étape 1 (mot de passe). */
@@ -248,11 +248,11 @@ export const api = {
       body: JSON.stringify({ password }),
     }),
 
-  /** Première installation : rattache des identifiants au profil existant. */
-  setup: (email: string, password: string) =>
+  /** Première installation : définit le mot de passe du seul compte de cette instance. */
+  setup: (password: string) =>
     request<Extract<AuthState, { state: "authenticated" }>>("/api/auth/setup", {
       method: "POST",
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ password }),
     }),
 
   logout: () => request<void>("/api/auth/logout", { method: "POST" }),

@@ -35,8 +35,9 @@ npm start       # sert le build de production
 ```
 
 Au premier accès à `http://localhost:3000`, l'application affiche un écran
-d'installation : choisissez votre adresse e-mail et votre mot de passe (10
-caractères minimum), c'est le seul compte de cette instance.
+d'installation : choisissez uniquement votre mot de passe (10 caractères
+minimum) — pas d'adresse e-mail, pas de nom, pas de photo. Le profil part
+vide, à compléter plus tard si vous le souhaitez depuis Profil & Options.
 
 ## Déployer pour un usage personnel
 
@@ -193,9 +194,10 @@ secondaires — le compte connecté a systématiquement tous les droits sur ses
 propres données.
 
 Au premier démarrage, l'application détecte qu'aucun compte n'existe et
-affiche un écran d'installation : vous y choisissez une adresse et un mot de
-passe (10 caractères minimum). **Les données déjà présentes sont
-conservées.**
+affiche un écran d'installation : vous y choisissez uniquement un mot de
+passe (10 caractères minimum) — aucune adresse e-mail n'est demandée, la
+connexion se fait par mot de passe seul, ce compte étant le seul de cette
+instance. **Les données déjà présentes sont conservées.**
 
 Les mots de passe sont hachés avec `scrypt` (`node:crypto`, aucune dépendance
 ajoutée), sel aléatoire, comparaison à temps constant. Les sessions sont des
@@ -237,9 +239,10 @@ Vos données ne sont pas touchées : seuls les comptes sont à recréer.
   sur un serveur injoignable voit en revanche un écran d'erreur explicite,
   jamais l'application — voir `AuthStatus["server-error"]`,
   `src/hooks/useAuth.ts`.
-- **Un seul compte.** Chaque ligne porte déjà un `user_id` et l'unicité des
-  emails est en place, donc l'ajout de comptes multiples sera additif — mais le
-  cloisonnement des données par utilisateur reste à faire.
+- **Un seul compte.** Chaque ligne porte déjà un `user_id`, donc l'ajout de
+  comptes multiples sera additif — mais le cloisonnement des données par
+  utilisateur reste à faire. La connexion se fait par mot de passe seul
+  (aucune identification par email), cohérent avec ce modèle mono-compte.
 - **Les modifications faites hors ligne ne sont pas rejouées** à la reconnexion.
   Elles restent dans le cache local, mais le rechargement suivant reprend l'état
   du serveur.

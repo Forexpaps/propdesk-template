@@ -11,10 +11,9 @@ import {
 import { createRateLimit } from "../middleware/rateLimit";
 import { hashPassword, verifyPassword, needsRehash, verifyAgainstDecoy } from "./password";
 import {
-  getStaffByEmail,
+  getSoleStaffAccount,
   getStaffById,
   hasAnyStaffAccount,
-  normalizeEmail,
   setPassword,
   updatePasswordHash,
 } from "./credentials";
@@ -65,17 +64,20 @@ const wrap =
   };
 
 /**
- * Profil minimal créé sur une base neuve.
+ * Profil minimal créé sur une base neuve — vide (pas de nom, pas d'email,
+ * pas de photo) : rien n'est demandé à l'installation, la personne renseigne
+ * ces informations plus tard si elle le souhaite, depuis Profil & Options.
  *
- * Volontairement pauvre : les vraies valeurs viennent du jeu de démonstration
- * (`/api/state/seed`), déclenché par le client juste après l'installation.
+ * Volontairement pauvre par ailleurs : les vraies valeurs de trading viennent
+ * du jeu de démonstration (`/api/state/seed`), déclenché par le client juste
+ * après l'installation.
  */
-function minimalProfile(email: string) {
+function minimalProfile() {
   return {
-    name: email.split("@")[0],
-    email,
+    name: "",
+    email: "",
     avatar: "",
-    level: "Trader",
+    level: "",
     joinedDate: new Date().toLocaleDateString("fr-FR", {
       day: "numeric",
       month: "long",
@@ -154,17 +156,17 @@ authRouter.post(
     const parsed = setupSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({
-        error: `Adresse e-mail invalide ou mot de passe trop court (10 caractères minimum).`,
+        error: `Mot de passe trop court (10 caractères minimum).`,
         details: parsed.error.issues,
       });
       return;
     }
 
-    const { email, password } = parsed.data;
+    const { password } = parsed.data;
     const passwordHash = await hashPassword(password);
 
-    // Transaction : le bureau de données doit exister avant d'y référer un
-    // email, et un échec ne doit pas laisser un état partiel.
+    // Transaction : le bureau de données doit exister avant le compte, et un
+    // échec ne doit pas laisser un état partiel.
     const tx = await db.transaction("write");
     let created: boolean;
     try {
@@ -175,7 +177,6 @@ authRouter.post(
       if (alreadyResult.rows.length > 0) {
         created = false;
       } else {
-        const profile = minimalProfile(email);
         const existingUserRow = await tx.execute({
           sql: "SELECT 1 FROM users WHERE id = ?",
           args: [DEFAULT_USER_ID],
@@ -183,7 +184,7 @@ authRouter.post(
         if (existingUserRow.rows.length === 0) {
           await tx.execute({
             sql: "INSERT INTO users (id, payload) VALUES (?, ?)",
-            args: [DEFAULT_USER_ID, JSON.stringify(profile)],
+            args: [DEFAULT_USER_ID, JSON.stringify(minimalProfile())],
           });
         }
 
@@ -192,32 +193,8 @@ authRouter.post(
           sql: `INSERT INTO staff_accounts
              (id, name, email, email_lower, password_hash, must_change_password, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
-          args: [
-            DEFAULT_USER_ID,
-            email.split("@")[0] || "Utilisateur",
-            email.trim(),
-            normalizeEmail(email),
-            passwordHash,
-            now,
-            now,
-          ],
+          args: [DEFAULT_USER_ID, "", "", "", passwordHash, now, now],
         });
-
-        // L'email de connexion devient celui du profil, sinon deux adresses
-        // divergentes coexisteraient au tout premier démarrage.
-        const existingProfileResult = await tx.execute({
-          sql: "SELECT payload FROM users WHERE id = ?",
-          args: [DEFAULT_USER_ID],
-        });
-        const existingProfileRow = existingProfileResult.rows[0] as unknown as { payload: string } | undefined;
-        if (existingProfileRow) {
-          const currentProfile = JSON.parse(existingProfileRow.payload) as Record<string, unknown>;
-          await tx.execute({
-            sql: `INSERT INTO users (id, payload) VALUES (?, ?)
-             ON CONFLICT(id) DO UPDATE SET payload = excluded.payload`,
-            args: [DEFAULT_USER_ID, JSON.stringify({ ...currentProfile, email })],
-          });
-        }
 
         created = true;
       }
@@ -250,26 +227,25 @@ authRouter.post(
   wrap(async (req, res) => {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "Adresse e-mail et mot de passe requis." });
+      res.status(400).json({ error: "Mot de passe requis." });
       return;
     }
 
     await purgeExpiredSessions();
 
-    const { email, password } = parsed.data;
-    const emailLower = normalizeEmail(email);
+    const { password } = parsed.data;
+    // Verrouillage PAR COMPTE (distinct de la limite IP ci-dessus). Une seule
+    // clé fixe : il n'y a jamais qu'un compte par instance, donc plus
+    // d'identifiant (email) sur lequel indexer le verrouillage.
+    const lockoutKey = "singleton";
 
-    // Verrouillage PAR COMPTE (distinct de la limite IP ci-dessus), indexé
-    // sur l'email brut avant toute résolution — un email inconnu se heurte
-    // exactement au même verrouillage qu'un email réel avec mauvais mot de
-    // passe, pour ne jamais révéler qu'un compte existe.
-    const lockout = await getLockoutStatus("staff", emailLower);
+    const lockout = await getLockoutStatus("staff", lockoutKey);
     if (lockout.lockedUntil) {
       recordSecurityEvent({
         eventType: "login_blocked",
         severity: "warning",
         accountKind: "staff",
-        accountEmail: email.trim(),
+        accountEmail: null,
         ip: req.ip,
         detail: `compte verrouillé (réessai après ${lockout.lockedUntil.toLocaleTimeString("fr-FR")})`,
       });
@@ -277,46 +253,35 @@ authRouter.post(
       return;
     }
 
-    const staff = await getStaffByEmail(email);
+    const staff = await getSoleStaffAccount();
 
-    // Compte inconnu : on paie quand même le coût du hachage. Sans cela, le
-    // temps de réponse distinguerait « email inconnu » (immédiat) de « mot de
-    // passe faux » (~80 ms), ce qui offrirait une énumération des comptes.
+    // Aucun compte : la sonde /auth/me aurait dû rediriger vers l'écran
+    // d'installation avant d'atteindre cette route — filet de sécurité, pas
+    // le chemin normal. On paie quand même le coût du hachage (comparaison à
+    // temps constant avec le cas "mot de passe incorrect" ci-dessous).
     if (!staff) {
       await verifyAgainstDecoy(password);
-      const { locked } = await registerFailedLogin("staff", emailLower);
-      recordSecurityEvent({
-        eventType: "login_failed", severity: "warning", accountKind: "staff",
-        accountEmail: email.trim(), ip: req.ip, detail: "compte inconnu",
-      });
-      if (locked) {
-        recordSecurityEvent({
-          eventType: "account_locked", severity: "critical", accountKind: "staff",
-          accountEmail: email.trim(), ip: req.ip, detail: "5 échecs en 15 min",
-        });
-      }
       res.status(401).json({ error: "Identifiants incorrects." });
       return;
     }
 
     if (!(await verifyPassword(password, staff.passwordHash))) {
-      const { locked } = await registerFailedLogin("staff", emailLower);
+      const { locked } = await registerFailedLogin("staff", lockoutKey);
       recordSecurityEvent({
         eventType: "login_failed", severity: "warning", accountKind: "staff",
-        accountEmail: email.trim(), ip: req.ip, detail: "mot de passe incorrect",
+        accountEmail: null, ip: req.ip, detail: "mot de passe incorrect",
       });
       if (locked) {
         recordSecurityEvent({
           eventType: "account_locked", severity: "critical", accountKind: "staff",
-          accountEmail: email.trim(), ip: req.ip, detail: "5 échecs en 15 min",
+          accountEmail: null, ip: req.ip, detail: "5 échecs en 15 min",
         });
       }
-      // Message identique au cas précédent, délibérément.
       res.status(401).json({ error: "Identifiants incorrects." });
       return;
     }
 
-    await clearLoginFailures("staff", emailLower);
+    await clearLoginFailures("staff", lockoutKey);
 
     // Montée en robustesse transparente si les paramètres ont durci depuis.
     if (needsRehash(staff.passwordHash)) {
@@ -331,7 +296,7 @@ authRouter.post(
       const pendingToken = await createTwoFactorChallenge(staff.id);
       recordSecurityEvent({
         eventType: "login_2fa_required", severity: "info", accountKind: "staff",
-        accountEmail: staff.email, ip: req.ip, detail: "",
+        accountEmail: null, ip: req.ip, detail: "",
       });
       res.json({ state: "2fa-required", pendingToken });
       return;
@@ -343,7 +308,7 @@ authRouter.post(
     setSessionCookie(res, token, parsed.data.rememberMe ?? true);
     recordSecurityEvent({
       eventType: "login_success", severity: "info", accountKind: "staff",
-      accountEmail: staff.email, ip: req.ip, detail: "",
+      accountEmail: null, ip: req.ip, detail: "",
     });
     res.json(await authenticatedPayload(staff.id));
   })
@@ -377,8 +342,9 @@ authRouter.post(
       return;
     }
 
-    const emailLower = normalizeEmail(staff.email);
-    const lockout = await getLockoutStatus("staff", emailLower);
+    // Même clé fixe que POST /auth/login — un seul compte par instance.
+    const lockoutKey = "singleton";
+    const lockout = await getLockoutStatus("staff", lockoutKey);
     if (lockout.lockedUntil) {
       res.status(403).json({ error: "Trop de tentatives. Réessaie dans quelques minutes.", code: "ACCOUNT_LOCKED" });
       return;
@@ -389,30 +355,30 @@ authRouter.post(
       : await consumeRecoveryCode(staff.id, parsed.data.recoveryCode!);
 
     if (!valid) {
-      const { locked } = await registerFailedLogin("staff", emailLower);
+      const { locked } = await registerFailedLogin("staff", lockoutKey);
       recordSecurityEvent({
         eventType: "login_failed", severity: "warning", accountKind: "staff",
-        accountEmail: staff.email, ip: req.ip,
+        accountEmail: null, ip: req.ip,
         detail: parsed.data.code ? "code 2FA incorrect" : "code de récupération incorrect",
       });
       if (locked) {
         recordSecurityEvent({
           eventType: "account_locked", severity: "critical", accountKind: "staff",
-          accountEmail: staff.email, ip: req.ip, detail: "5 échecs en 15 min",
+          accountEmail: null, ip: req.ip, detail: "5 échecs en 15 min",
         });
       }
       res.status(401).json({ error: "Code incorrect." });
       return;
     }
 
-    await clearLoginFailures("staff", emailLower);
+    await clearLoginFailures("staff", lockoutKey);
     await consumeTwoFactorChallenge(parsed.data.pendingToken);
 
     const token = await createSession(staff.id, req.headers["user-agent"]);
     setSessionCookie(res, token, parsed.data.rememberMe ?? true);
     recordSecurityEvent({
       eventType: "login_success", severity: "info", accountKind: "staff",
-      accountEmail: staff.email, ip: req.ip,
+      accountEmail: null, ip: req.ip,
       detail: parsed.data.code ? "2FA (TOTP)" : "2FA (code de récupération)",
     });
     res.json(await authenticatedPayload(staff.id));
