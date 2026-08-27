@@ -14,9 +14,6 @@ import { PendingChangesBanner } from "./components/PendingChangesBanner";
 import { NotificationModal } from "./components/NotificationModal";
 import { MindsetJournalModal } from "./components/MindsetJournalModal";
 import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
-import { LegalNoticeModal } from "./components/LegalNoticeModal";
-import { CGUModal } from "./components/CGUModal";
-import { PRIVACY_POLICY_URL } from "./lib/links";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
 import { ConfirmDialogHost, confirmDialog } from "./lib/confirmDialog";
 import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, getTradingPlanStorageKey, EMPTY_TRADING_PLANS, normalizeTradingPlans, renameSetupInPlans } from "./lib/planCompliance";
@@ -283,8 +280,6 @@ function TraderApp({
       // Quota dépassé ou navigation privée : rien à faire de plus ici.
     }
   };
-  const [isLegalNoticeOpen, setIsLegalNoticeOpen] = useState(false);
-  const [isCguOpen, setIsCguOpen] = useState(false);
 
   // Bandeau d'avertissement immédiat quand une sauvegarde échoue en
   // arrière-plan alors que l'app se croit en ligne — la donnée elle-même est
@@ -784,32 +779,8 @@ function TraderApp({
           {activeTab === "macro" && <MacroDashboard />}
           </React.Suspense>
         </main>
-
-        <footer className="px-4 sm:px-8 py-4 flex items-center justify-between gap-4 text-[11px] text-slate-500 max-w-7xl w-full mx-auto">
-          <span>© {new Date().getFullYear()} Thomas Gauthey — Entrepreneur individuel</span>
-          <button onClick={() => setIsLegalNoticeOpen(true)} className="hover:text-[#00E676] transition-colors">
-            Mentions légales
-          </button>
-          <button onClick={() => setIsCguOpen(true)} className="hover:text-[#00E676] transition-colors">
-            CGU
-          </button>
-          {/* Politique de confidentialité : hébergée sur le site vitrine, pas
-              dans la plateforme (voir HANDOFF.md) — lien externe plutôt qu'un
-              modal. URL centralisée dans lib/links.ts (Vercel provisoire, pas
-              encore de domaine personnalisé). */}
-          <a
-            href={PRIVACY_POLICY_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-[#00E676] transition-colors"
-          >
-            Politique de confidentialité
-          </a>
-        </footer>
       </div>
 
-      <LegalNoticeModal isOpen={isLegalNoticeOpen} onClose={() => setIsLegalNoticeOpen(false)} />
-      <CGUModal isOpen={isCguOpen} onClose={() => setIsCguOpen(false)} />
       <ConfirmDialogHost />
 
       {/* User Profile Edition Modal */}
