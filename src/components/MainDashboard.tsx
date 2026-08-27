@@ -34,8 +34,6 @@ import { formatCurrency } from "../lib/format";
 import {
   StudentProfile,
   Trade,
-  Module,
-  CoachMessage,
 } from "../types";
 import { TabType, SidebarItemKey } from "./Sidebar";
 import { computeDisciplineStreak } from "../lib/badges";
@@ -60,18 +58,12 @@ const SectionHeader: React.FC<{ children: React.ReactNode; color?: string }> = (
 interface MainDashboardProps {
   student: StudentProfile;
   trades: Trade[];
-  modules: Module[];
-  messages: CoachMessage[];
-  courseCompletionPercentage: number;
   setActiveTab: (tab: TabType) => void;
 }
 
 export const MainDashboard: React.FC<MainDashboardProps> = ({
   student,
   trades,
-  modules,
-  messages,
-  courseCompletionPercentage,
   setActiveTab,
 }) => {
   // Calculate Metrics
@@ -303,11 +295,11 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             glowColor: "#00E676",
           },
           {
-            key: "academy",
-            tab: "academy",
-            letter: "C",
-            title: "Module cours",
-            description: "Parcours débutant → masterclass, 14 leçons.",
+            key: "wallets",
+            tab: "wallets",
+            letter: "P",
+            title: "Portefeuille",
+            description: "Suivi de tes comptes et de ton capital.",
             badgeClasses: "text-amber-400 bg-amber-500/15 border-amber-500/30",
             borderHover: "hover:border-amber-500/40",
             textHover: "group-hover:text-amber-400",

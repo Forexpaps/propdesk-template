@@ -2,27 +2,18 @@ import {
   StudentProfile,
   Trade,
   TradingAccount,
-  CoachMessage,
   AppNotification,
-  EnrolledStudent,
   TraderBadge,
-  Module,
-  ModuleQuizResult,
-  Coach,
   TradingPlanData,
   Setup,
-  Announcement,
 } from "../types";
 
 /** Collections synchronisées avec le serveur, dans les formes de src/types.ts. */
 export interface ServerCollections {
   trades: Trade[];
   accounts: TradingAccount[];
-  messages: CoachMessage[];
   notifications: AppNotification[];
-  enrolledStudents: EnrolledStudent[];
   badges: TraderBadge[];
-  modules: Module[];
   setups: Setup[];
 }
 
@@ -52,37 +43,11 @@ export interface MarketQuote {
 export interface ServerState {
   bootstrapped: boolean;
   student: StudentProfile | null;
-  quizResults: Record<string, ModuleQuizResult>;
   collections: ServerCollections;
   /**
-   * Présent uniquement pour une session élève : le coach reconstruit depuis
-   * le vrai profil fondateur (voir `buildCoachesForStudent`,
-   * `server/routes.ts`). Absent pour une session staff, qui construit sa
-   * propre entrée directement depuis son profil déjà en mémoire.
-   */
-  coaches?: Coach[];
-  /**
-   * Présent uniquement pour une session élève — `null` si l'élève n'a jamais
-   * enregistré de plan. Voir `getTradingPlan`, `server/repositories.ts`.
-   */
-  tradingPlan?: TradingPlanData | null;
-  /**
-   * Annonces du fondateur — jamais scopées par élève (voir `getAnnouncements`,
-   * `server/repositories.ts`), présentes dans les deux branches (élève et
-   * staff) de `GET /api/state`.
-   */
-  announcements?: Announcement[];
-  /**
-   * Verrou optimiste dédié aux annonces (hors du système générique de
-   * collections/`versions` ci-dessous) — voir `PUT /auth/announcements`,
-   * `saveAnnouncements` (`server/repositories.ts`). Présent seulement côté
-   * staff : seul un compte avec l'autorisation "announcements" publie.
-   */
-  announcementsVersion?: number;
-  /**
    * Version actuelle de chaque collection modifiable, pour détecter qu'un
-   * autre onglet (ou un autre coach sur le même bureau partagé) l'a modifiée
-   * entre-temps — voir le commentaire au-dessus de `saveCollection`.
+   * autre onglet l'a modifiée entre-temps — voir le commentaire au-dessus de
+   * `saveCollection`.
    */
   versions?: Partial<Record<CollectionName, number>>;
 }
@@ -95,12 +60,6 @@ export interface AuthUser {
   isAdmin: boolean;
   /** Vrai après une invitation, tant que le mot de passe temporaire est actif. */
   mustChangePassword: boolean;
-  /**
-   * Vrai pour le seul compte fondateur. Ne conditionne que le réglage des
-   * modules visibles dans la sidebar : les coachs gardent tous les autres
-   * droits.
-   */
-  isOwner: boolean;
 }
 
 export type AuthState =
@@ -113,70 +72,6 @@ export type AuthState =
    * `pendingToken` doit lui être transmis, il expire après 5 minutes.
    */
   | { state: "2fa-required"; pendingToken: string };
-
-/** État d'authentification élève, renvoyé par `/api/auth/student-me`. */
-export interface StudentAuthUser {
-  id: string;
-  email: string;
-  mustChangePassword: boolean;
-}
-
-export type StudentAuthState =
-  | { state: "unauthenticated" }
-  | { state: "authenticated"; user: StudentAuthUser };
-
-/**
- * Autorisation qu'un fondateur peut accorder/retirer à un coach — voir
- * `server/auth/permissions.ts` (même catalogue, source de vérité).
- */
-export const STAFF_PERMISSION_KEYS = ["students", "messaging", "announcements", "team", "data"] as const;
-export type StaffPermissionKey = (typeof STAFF_PERMISSION_KEYS)[number];
-
-/** Compte staff tel que listé dans l'écran de gestion de l'équipe. */
-export interface StaffAccountSummary {
-  id: string;
-  name: string;
-  email: string;
-  mustChangePassword: boolean;
-  createdAt: string;
-  /** Le compte fondateur : non supprimable, seul à régler les modules visibles. */
-  isOwner: boolean;
-  /** `null` = toutes accordées (compte jamais restreint) — toujours `null` pour le fondateur. */
-  permissions: StaffPermissionKey[] | null;
-}
-
-/** Journal de sécurité — voir `server/auth/securityEvents.ts`. */
-export type SecuritySeverity = "info" | "warning" | "critical";
-
-export interface SecurityEvent {
-  id: string;
-  createdAt: string;
-  eventType: string;
-  severity: SecuritySeverity;
-  accountKind: "staff" | "student" | null;
-  accountEmail: string | null;
-  ip: string | null;
-  detail: string;
-}
-
-export interface SecurityEventFilters {
-  severity?: SecuritySeverity;
-  eventType?: string;
-  limit?: number;
-  offset?: number;
-}
-
-export interface SecurityLogResponse {
-  events: SecurityEvent[];
-  total: number;
-  retentionDays: number;
-  stats: {
-    loginSuccess: number;
-    loginFailed: number;
-    lockouts: number;
-    accessDenied: number;
-  };
-}
 
 /**
  * Événement émis dès qu'une requête revient en 401.
@@ -266,25 +161,6 @@ export const api = {
       body: JSON.stringify(plan),
     }),
 
-  /**
-   * Publie la liste complète des annonces — réservé au fondateur côté
-   * serveur (`requireOwner`), jamais `saveCollection` générique qui n'a pas
-   * cette restriction. Voir `PUT /auth/announcements`,
-   * `server/auth/routes.ts`.
-   */
-  /** `expectedVersion` : voir `announcementsVersion` (`AuthState`) — verrou optimiste, la requête est refusée en 409 si quelqu'un d'autre a publié entre-temps. */
-  saveAnnouncements: (announcements: Announcement[], expectedVersion: number) =>
-    request<{ success: true; count: number; version: number }>("/api/auth/announcements", {
-      method: "PUT",
-      body: JSON.stringify({ announcements, expectedVersion }),
-    }),
-
-  saveQuizResults: (results: Record<string, ModuleQuizResult>) =>
-    request<{ success: true }>("/api/quiz-results", {
-      method: "PUT",
-      body: JSON.stringify(results),
-    }),
-
   seedDemoData: () =>
     request<{ success: true }>("/api/state/seed", { method: "POST" }),
 
@@ -299,7 +175,6 @@ export const api = {
   importState: (state: {
     student?: StudentProfile;
     collections?: Partial<ServerCollections>;
-    quizResults?: Record<string, ModuleQuizResult>;
   }) =>
     request<{ success: true; imported: string[] }>("/api/state/import", {
       method: "POST",
@@ -316,7 +191,6 @@ export const api = {
   restoreState: (state: {
     student?: StudentProfile;
     collections?: Partial<ServerCollections>;
-    quizResults?: Record<string, ModuleQuizResult>;
   }) =>
     request<{ success: true; imported: string[]; skipped: string[] }>("/api/state/restore", {
       method: "POST",
@@ -397,191 +271,4 @@ export const api = {
       body: JSON.stringify({ currentPassword, newPassword }),
     }),
 
-  listStaff: () =>
-    request<{ accounts: StaffAccountSummary[] }>("/api/auth/staff"),
-
-  /** Invite un nouveau compte staff. Le mot de passe temporaire n'est renvoyé qu'ici. */
-  inviteStaff: (name: string, email: string) =>
-    request<StaffAccountSummary & { temporaryPassword: string }>("/api/auth/staff", {
-      method: "POST",
-      body: JSON.stringify({ name, email }),
-    }),
-
-  removeStaff: (id: string) =>
-    request<void>(`/api/auth/staff/${encodeURIComponent(id)}`, { method: "DELETE" }),
-
-  /** Réservé au fondateur — voir `requireOwner` sur cette route côté serveur. */
-  updateStaffPermissions: (id: string, permissions: StaffPermissionKey[]) =>
-    request<{ success: true; permissions: StaffPermissionKey[] }>(
-      `/api/auth/staff/${encodeURIComponent(id)}/permissions`,
-      { method: "PUT", body: JSON.stringify({ permissions }) }
-    ),
-
-  // --- Accès élève (compte personnel, journal cloisonné) ---
-
-  /** Donne un accès élève depuis une fiche EnrolledStudent. Mot de passe renvoyé une seule fois. */
-  inviteStudent: (enrolledStudentId: string) =>
-    request<{ studentAccountId: string; email: string; temporaryPassword: string }>(
-      `/api/auth/students/${encodeURIComponent(enrolledStudentId)}/invite`,
-      { method: "POST" }
-    ),
-
-  /** Révoque l'accès élève d'une fiche. Ne supprime ni la fiche ni ses trades. */
-  revokeStudentAccess: (enrolledStudentId: string) =>
-    request<void>(`/api/auth/students/${encodeURIComponent(enrolledStudentId)}/access`, {
-      method: "DELETE",
-    }),
-
-  /** Fixe directement le mot de passe d'un compte élève. Déconnecte ses sessions en cours. */
-  setStudentPassword: (enrolledStudentId: string, newPassword: string) =>
-    request<void>(`/api/auth/students/${encodeURIComponent(enrolledStudentId)}/password`, {
-      method: "PUT",
-      body: JSON.stringify({ newPassword }),
-    }),
-
-  /** Change l'identifiant (email) de connexion d'un compte élève déjà créé. */
-  updateStudentEmail: (enrolledStudentId: string, email: string) =>
-    request<void>(`/api/auth/students/${encodeURIComponent(enrolledStudentId)}/email`, {
-      method: "PUT",
-      body: JSON.stringify({ email }),
-    }),
-
-  /** Génère un lien de réinitialisation à transmettre à la main. Le lien n'est renvoyé qu'ici, une seule fois. */
-  generateStudentResetLink: (enrolledStudentId: string) =>
-    request<{ link: string; expiresAt: string }>(
-      `/api/auth/students/${encodeURIComponent(enrolledStudentId)}/reset-link`,
-      { method: "POST" }
-    ),
-
-  /** Consomme un lien de réinitialisation — public, aucune session requise. */
-  consumePasswordReset: (token: string, newPassword: string) =>
-    request<void>(`/api/auth/reset-password/${encodeURIComponent(token)}`, {
-      method: "POST",
-      body: JSON.stringify({ newPassword }),
-    }),
-
-  /**
-   * Vrais trades d'un élève, en lecture — pour la fiche côté coach.
-   * `email` : le vrai email de connexion (`student_accounts.email`),
-   * distinct du champ "Email" de la fiche (`EnrolledStudent.email`).
-   */
-  fetchStudentTrades: (enrolledStudentId: string) =>
-    request<{ trades: Trade[]; accounts: TradingAccount[]; email: string }>(
-      `/api/auth/students/${encodeURIComponent(enrolledStudentId)}/trades`
-    ),
-
-  /** Vue complète d'un élève pour l'admin — profil, comptes, trades, etc. (lecture seule) */
-  fetchAdminStudentView: (enrolledStudentId: string) =>
-    request<{
-      student: StudentProfile | null;
-      collections: {
-        enrolledStudents: EnrolledStudent[];
-        accounts: TradingAccount[];
-        trades: Trade[];
-        modules: Module[];
-        messages: CoachMessage[];
-        setups: Setup[];
-      };
-      tradingPlan: TradingPlanData | null;
-    }>(`/api/auth/admin/students/${encodeURIComponent(enrolledStudentId)}/view`),
-
-  /**
-   * Journal de sécurité, réservé au compte fondateur (le serveur renvoie
-   * 403 sinon). Premier usage de `URLSearchParams` dans ce fichier : les
-   * autres routes GET n'ont aucun paramètre de filtre.
-   */
-  fetchSecurityLog: (filters: SecurityEventFilters = {}) => {
-    const params = new URLSearchParams();
-    if (filters.severity) params.set("severity", filters.severity);
-    if (filters.eventType) params.set("eventType", filters.eventType);
-    params.set("limit", String(filters.limit ?? 50));
-    params.set("offset", String(filters.offset ?? 0));
-    return request<SecurityLogResponse>(`/api/auth/security-events?${params.toString()}`);
-  },
-
-  /** Envoie un message de coach dans le fil d'un élève précis. */
-  sendMessageToStudent: (enrolledStudentId: string, text: string) =>
-    request<{ message: CoachMessage }>(
-      `/api/auth/admin/students/${encodeURIComponent(enrolledStudentId)}/messages`,
-      { method: "POST", body: JSON.stringify({ text }) }
-    ),
-
-  // --- Authentification élève ---
-
-  fetchStudentMe: () => request<StudentAuthState>("/api/auth/student-me"),
-
-  studentLogin: (email: string, password: string, rememberMe = false) =>
-    request<Extract<StudentAuthState, { state: "authenticated" }>>("/api/auth/student-login", {
-      method: "POST",
-      body: JSON.stringify({ email, password, rememberMe }),
-    }),
-
-  studentLogout: () => request<void>("/api/auth/student-logout", { method: "POST" }),
-
-  studentChangePassword: (currentPassword: string, newPassword: string) =>
-    request<Extract<StudentAuthState, { state: "authenticated" }>>(
-      "/api/auth/student-change-password",
-      {
-        method: "POST",
-        body: JSON.stringify({ currentPassword, newPassword }),
-      }
-    ),
-
-  /** Un élève choisit sa propre photo de profil — voir server/auth/studentRoutes.ts pour le détail. */
-  updateStudentAvatar: (avatar: string) =>
-    request<void>("/api/auth/profile/avatar", {
-      method: "PUT",
-      body: JSON.stringify({ avatar }),
-    }),
-
-  /**
-   * Export RGPD (Article 20) des données personnelles de l'élève connecté —
-   * profil, plan de trading, progression modules, badges obtenus. Voir
-   * `server/auth/exportData.ts`. Distinct de `fetchState`/`restoreState`
-   * (sauvegarde technique complète de tout le bureau) : celui-ci est le
-   * sous-ensemble scoping RGPD, présenté et nommé comme tel côté UI.
-   */
-  exportStudentData: () =>
-    request<Record<string, unknown>>("/api/auth/export"),
-
-  /**
-   * Téléverse une vidéo de leçon (module Cours) — réservée au staff, voir
-   * `server/uploads.ts`. Renvoie l'URL relative à stocker telle quelle dans
-   * `Lesson.videoUrl`.
-   *
-   * En `XMLHttpRequest` et non `fetch` : c'est la seule API navigateur qui
-   * expose une progression d'upload (`upload.onprogress`) — un fichier vidéo
-   * peut peser plusieurs centaines de Mo, une barre de progression n'est pas
-   * un confort superflu ici.
-   */
-  uploadLessonVideo: (file: File, onProgress?: (percent: number) => void) =>
-    new Promise<{ url: string }>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/uploads/videos");
-      xhr.withCredentials = true;
-      xhr.upload.onprogress = (e) => {
-        if (onProgress && e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-      };
-      xhr.onload = () => {
-        let body: unknown;
-        try {
-          body = JSON.parse(xhr.responseText);
-        } catch {
-          body = null;
-        }
-        if (xhr.status >= 200 && xhr.status < 300 && body && typeof body === "object" && "url" in body) {
-          resolve(body as { url: string });
-        } else {
-          const message =
-            body && typeof body === "object" && "error" in body && typeof body.error === "string"
-              ? body.error
-              : "Le téléversement a échoué.";
-          reject(new Error(message));
-        }
-      };
-      xhr.onerror = () => reject(new Error("Le téléversement a échoué (connexion)."));
-      const formData = new FormData();
-      formData.append("video", file);
-      xhr.send(formData);
-    }),
 };

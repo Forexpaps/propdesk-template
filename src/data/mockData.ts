@@ -1,4 +1,4 @@
-import { Module, Trade, CoachMessage, StudentProfile, TradingAccount, TraderBadge, EnrolledStudent, AppNotification, Setup } from "../types";
+import { Trade, StudentProfile, TradingAccount, TraderBadge, AppNotification, Setup } from "../types";
 
 /**
  * Définitions des badges — catalogue de ce qu'il est possible de débloquer.
@@ -31,20 +31,6 @@ export const initialTraderBadges: TraderBadge[] = [
     unit: "trades",
     unlockedAt: "15 Janvier 2024",
     rewardXP: 300,
-  },
-  {
-    id: "badge-2",
-    title: "Diplômé SMC Horizon",
-    description: "Compléter 100% des modules vidéo de la formation.",
-    iconName: "Award",
-    category: "ACADEMY",
-    unlocked: true,
-    progressPercentage: 100,
-    currentValue: 0,
-    targetValue: 0,
-    unit: "leçons",
-    unlockedAt: "22 Février 2024",
-    rewardXP: 500,
   },
   {
     id: "badge-3",
@@ -129,20 +115,6 @@ export const initialTraderBadges: TraderBadge[] = [
     unit: "R",
     unlockedAt: "25 Août 2024",
     rewardXP: 650,
-  },
-  {
-    id: "badge-9",
-    title: "Examen SMC 80+",
-    description: "Obtenir une note de 80/100 ou plus à l'évaluation finale.",
-    iconName: "Crown",
-    category: "ACADEMY",
-    unlocked: true,
-    progressPercentage: 100,
-    currentValue: 80,
-    targetValue: 80,
-    unit: "pts",
-    unlockedAt: "8 Septembre 2024",
-    rewardXP: 550,
   },
   // Paliers de série de discipline au-delà de badge-6 (7 jours) — même
   // critère (`computeDisciplineStreak`), cibles plus longues. `unlocked:
@@ -432,15 +404,9 @@ export const initialStudentProfile: StudentProfile = {
   isAdmin: true,
 };
 
-export const initialModules: Module[] = [];
-
 export const initialTrades: Trade[] = [];
 
-export const initialMessages: CoachMessage[] = [];
-
 export const initialTradingAccounts: TradingAccount[] = [];
-
-export const initialEnrolledStudents: EnrolledStudent[] = [];
 
 export const initialNotifications: AppNotification[] = [];
 export const initialSetups: Setup[] = [];

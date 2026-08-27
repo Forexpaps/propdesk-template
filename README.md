@@ -79,14 +79,10 @@ La base vit dans `DATA_DIR` (`./data` par défaut), hors du dépôt.
 | POST | `/api/auth/setup` | première installation, refusée si un compte existe |
 | POST | `/api/auth/login` | connexion |
 | POST | `/api/auth/logout` | déconnexion |
-| GET | `/api/auth/staff` | liste des comptes staff |
-| POST | `/api/auth/staff` | invite un compte, renvoie un mot de passe temporaire |
-| DELETE | `/api/auth/staff/:id` | révoque un compte (refusé sur le dernier) |
 | POST | `/api/auth/change-password` | remplace son propre mot de passe |
 | GET | `/api/state` | état complet de démarrage |
 | PUT | `/api/collections/:name` | remplace une collection |
-| PUT | `/api/profile` | profil de l'élève |
-| PUT | `/api/quiz-results` | résultats de quiz |
+| PUT | `/api/profile` | profil |
 | POST | `/api/state/seed` | amorce avec le jeu de démonstration |
 | POST | `/api/state/import` | reprend un état venu de `localStorage` |
 
@@ -94,62 +90,32 @@ Toutes les routes exigent une session valide, **sauf** `/api/health`,
 `/api/auth/me`, `/api/auth/setup`, `/api/auth/login` et `/api/auth/logout`.
 Toutes les entrées sont validées (zod).
 
-Trois limitations de débit par IP : `/api/auth/login` 10 par quart d'heure,
-`/api/auth/setup` 5 par quart d'heure, `/api/auth/staff` (invitation) 10 par
-quart d'heure.
+Limitations de débit par IP : `/api/auth/login` 10 par quart d'heure,
+`/api/auth/setup` 5 par quart d'heure.
 
 ## Authentification
 
-Plusieurs comptes staff peuvent se connecter, chacun avec son propre email et
-mot de passe. **Tous travaillent sur les mêmes données** : il n'y a qu'un seul
-bureau (journal, élèves, portefeuilles), pas un par compte. Se connecter avec
-un identifiant différent ne change donc rien à ce que vous voyez — seulement
-qui est actuellement aux commandes.
-
-Les droits métier sont identiques pour tous : n'importe quel compte staff peut
-écrire dans le journal, suivre les élèves, inviter ou révoquer un collègue. Une
-seule chose distingue le **compte principal** — celui créé à l'installation :
-
-- lui seul masque ou réaffiche les modules de la sidebar. Ce réglage appartient
-  au bureau partagé : il vaut pour tout le monde, c'est pourquoi un coach ne
-  peut pas le changer. Le serveur, et pas seulement l'interface, refuse la
-  modification venue d'un autre compte ;
-- il n'est pas révocable. Le supprimer laisserait le bureau sans personne pour
-  régler les modules visibles, sans recours possible.
-
-Ce n'est pas un système de rôles, et il n'y en a pas d'autre : c'est une
-exception unique, attachée au seul réglage qui soit à la fois partagé et
-structurant.
+Cette application est pensée pour un déploiement **mono-utilisateur** : chaque
+instance (votre propre Vercel/Railway, votre propre base) n'accueille qu'un
+seul compte, celui créé à l'installation. Il n'y a pas de rôles ni de comptes
+secondaires — le compte connecté a systématiquement tous les droits sur ses
+propres données.
 
 Au premier démarrage, l'application détecte qu'aucun compte n'existe et
 affiche un écran d'installation : vous y choisissez une adresse et un mot de
-passe (10 caractères minimum) pour le premier compte. **Les données déjà
-présentes sont conservées.**
-
-### Ajouter un membre de l'équipe
-
-Depuis le profil (bouton **Gérer l'équipe**), un compte déjà connecté peut en
-inviter un autre : nom et email suffisent, un mot de passe temporaire est
-généré et affiché **une seule fois** — à transmettre de la main à la main. La
-personne invitée devra le remplacer par le sien avant de pouvoir utiliser
-l'application ; jusque-là, aucune autre action ne lui est accessible.
-
-Un compte peut être révoqué depuis le même écran. **Le dernier compte restant
-ne peut pas être supprimé** : sans lui, personne ne pourrait plus jamais se
-reconnecter, et il n'existe aucune procédure de récupération pour ce cas.
+passe (10 caractères minimum). **Les données déjà présentes sont
+conservées.**
 
 Les mots de passe sont hachés avec `scrypt` (`node:crypto`, aucune dépendance
-ajoutée), sel aléatoire par compte, comparaison à temps constant. Les sessions
-sont des jetons de 256 bits portés par un cookie `HttpOnly`, valables 30 jours
-et prolongés à l'usage. Plusieurs appareils peuvent rester connectés en
+ajoutée), sel aléatoire, comparaison à temps constant. Les sessions sont des
+jetons de 256 bits portés par un cookie `HttpOnly`, valables 30 jours et
+prolongés à l'usage. Plusieurs appareils peuvent rester connectés en
 parallèle ; se déconnecter ne ferme que la session courante.
 
 ### Mot de passe oublié
 
-Il n'y a pas de récupération par e-mail. Si **au moins un autre compte**
-existe, il peut révoquer le vôtre depuis « Gérer l'équipe » et vous en créer un
-nouveau. Si vous êtes le **seul** compte, la seule issue est de supprimer
-directement les identifiants, ce qui ramène l'écran d'installation au
+Il n'y a pas de récupération par e-mail. La seule issue est de supprimer
+directement les identifiants en base, ce qui ramène l'écran d'installation au
 prochain chargement :
 
 ```bash

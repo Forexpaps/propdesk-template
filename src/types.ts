@@ -1,69 +1,3 @@
-export type CourseLevel = "Débutant" | "Intermédiaire" | "Confirmé";
-
-export interface QuizQuestion {
-  id: string;
-  question: string;
-  options: string[];
-  correctAnswerIndex: number;
-  explanation: string;
-}
-
-export interface Resource {
-  id: string;
-  title: string;
-  type: "pdf" | "excel" | "cheat_sheet";
-  size: string;
-  url: string;
-}
-
-export interface ModuleQuizResult {
-  scorePercentage: number;
-  totalQuestions: number;
-  correctAnswers: number;
-  passed: boolean;
-  completedAt: string;
-}
-
-export interface Lesson {
-  id: string;
-  title: string;
-  duration: string; // e.g. "18 min"
-  /**
-   * Absent ou vide = leçon 100% théorique, sans lecteur vidéo (voir
-   * `VideoAcademy.tsx` : la modale de leçon n'affiche alors que `theory`).
-   */
-  videoUrl?: string;
-  description: string;
-  isCompleted: boolean;
-  resources?: Resource[];
-  quiz?: QuizQuestion[];
-  /**
-   * Contenu théorique écrit de la leçon (paragraphes séparés par une ligne
-   * vide) — affiché sous la vidéo dans la modale de leçon, `undefined` tant
-   * qu'aucune théorie n'a été rédigée pour cette leçon (aucune section
-   * affichée dans ce cas, jamais un bloc vide).
-   */
-  theory?: string;
-}
-
-export interface Module {
-  id: string;
-  title: string;
-  category: CourseLevel;
-  iconName: string;
-  description: string;
-  durationTotal: string;
-  lessons: Lesson[];
-  quiz?: QuizQuestion[];
-  /**
-   * `true` = masqué côté élève (encore en préparation) — reste visible et
-   * modifiable côté staff, qui seul peut le basculer. Absent ou `false` =
-   * visible normalement. Voir `getModuleIcon`/le bouton bascule dans
-   * `VideoAcademy.tsx`.
-   */
-  hidden?: boolean;
-}
-
 export type TradeDirection = "LONG" | "SHORT";
 export type TradeResult = "WIN" | "LOSS" | "BREAKEVEN" | "OPEN";
 export type EmotionState = "Disciplined" | "FOMO" | "Impulsive" | "Anxious" | "Calm" | "Greedy";
@@ -214,37 +148,6 @@ export interface TradeDraft {
   notes?: string;
 }
 
-export interface Coach {
-  id: string;
-  name: string;
-  role: string;
-  specialty: string;
-  avatar: string;
-  isOnline: boolean;
-  /** Absent pour un coach reconstruit depuis un vrai profil — pas de note fabriquée. */
-  rating?: number;
-}
-
-/**
- * Identifiant du seul "coach" affiché côté élève — miroir client de
- * `FOUNDER_COACH_ID` (`server/db.ts`). Dupliqué plutôt que partagé via un
- * import, le client ne pouvant pas importer du code serveur (Node/
- * better-sqlite3) sans casser le bundle navigateur. Si l'un change, l'autre
- * doit changer avec lui.
- */
-export const FOUNDER_COACH_ID = "coach-thomas";
-
-export interface CoachMessage {
-  id: string;
-  sender: "student" | "coach";
-  coachId: string;
-  text: string;
-  timestamp: string;
-  attachedTradeId?: string;
-  attachedModuleTitle?: string;
-  status: "sent" | "delivered" | "read" | "replied";
-}
-
 /**
  * Un plan de trading (section Pratique, module « Plan de trading »). Un
  * élève peut en avoir plusieurs — un par setup, typiquement (voir
@@ -327,145 +230,8 @@ export interface StudentProfile {
   /**
    * Clés des entrées de la sidebar masquées (modules pas encore terminés).
    * Voir SIDEBAR_TOGGLEABLE_KEYS dans components/Sidebar.tsx.
-   *
-   * Champ du **bureau partagé** : il vaut pour tout le monde, un masquage est
-   * donc visible par tous les comptes. Seul le compte fondateur peut le
-   * modifier — le serveur réinjecte la valeur en base pour les autres
-   * (`PUT /api/profile`). Ne t'appuie pas sur l'interface pour cette règle :
-   * c'est le serveur qui fait autorité.
    */
   hiddenSidebarItems?: string[];
-  /**
-   * Autorisations de CE compte staff connecté (voir `StaffPermissionKey`,
-   * src/lib/api.ts) — absent pour une session élève. `null` = toutes
-   * accordées (compte fondateur, ou coach jamais restreint) : ne jamais
-   * traiter `undefined`/`null` comme "aucune autorisation" (`?? []`) dans un
-   * contrôle d'affichage, ce serait l'inverse du sens voulu.
-   */
-  permissions?: import("./lib/api").StaffPermissionKey[] | null;
-}
-
-/**
- * Statut du compte de trading de l'élève — compte démo, étape d'évaluation
- * Prop Firm, compte financé, ou capital propre. Remplace l'ancien statut
- * ("En Évaluation FTMO" / "Prop Firm Financé" / "Besoin Coaching" / "Alerte
- * Tilt") sur demande explicite : un seul statut, centré sur l'étape réelle
- * du compte plutôt que sur un jugement de suivi (coaching/tilt).
- */
-export type StudentStatusTag =
-  | "Compte DÉMO"
-  | "Évaluation Étape 1"
-  | "Évaluation Étape 2"
-  | "Compte Financé"
-  | "Fonds Propres";
-
-/** Horizon de tenue des positions travaillé par l'élève. */
-export type TradingStyle = "Scalping" | "Intraday" | "Swing Trading";
-
-/**
- * Statistiques de départ de l'élève, saisies une fois au diagnostic initial
- * — distinct de `winRate`/`totalTrades` sur `EnrolledStudent`, qui suivent
- * la performance en cours dans l'app. Tous les champs sont optionnels : rien
- * n'est inventé tant que le coach ne les a pas renseignés.
- */
-export interface StudentInitialDiagnostic {
-  winRatePercent?: number;
-  avgRR?: number;
-  maxDrawdownPercent?: number;
-  tradesPerWeek?: number;
-  tradedCapital?: number;
-  /** Même catalogue que `TradingAccount.type` (voir `AccountType`) — pas de liste distincte à maintenir. */
-  accountType?: AccountType;
-}
-
-/** Catalogue fermé de points faibles récurrents, cochables sur la fiche. */
-export const RECURRING_MISTAKES = [
-  "Entrées trop tôt (impatience)",
-  "FOMO",
-  "Non-respect du plan",
-  "Sorties trop tôt (peur)",
-  "Revenge trading",
-  "Over trading",
-  "Mauvaise gestion du risque",
-  "Autre",
-] as const;
-export type RecurringMistake = (typeof RECURRING_MISTAKES)[number];
-
-/**
- * Une session de coaching notée — texte libre + 4 notes sur 10, saisies par
- * le coach. `label` ("Coaching N") est calculé à la création à partir du
- * nombre de sessions déjà présentes, jamais renumboté après coup (une
- * suppression au milieu ne renomme pas les suivantes). La note globale
- * n'est pas stockée : voir `computeSessionGlobalNote` dans
- * `src/lib/coachingSessionStats.ts`, seule implémentation, ne jamais la
- * dupliquer.
- */
-export interface CoachingSessionNote {
-  id: string;
-  label: string;
-  date: string;
-  notes?: string;
-  discipline: number;
-  perceivedDifficulty: number;
-  planExecution: number;
-  performance: number;
-}
-
-export interface EnrolledStudent {
-  id: string;
-  name: string;
-  /**
-   * Email de contact sur la fiche staff — sert d'email de connexion à la
-   * création du compte élève (voir la route d'invitation), mais **diverge**
-   * dès qu'on modifie l'un des deux séparément de l'autre une fois l'accès
-   * actif : le vrai email de connexion vit dans `student_accounts.email`,
-   * modifiable via "Accès & connexion" (`StudentTracking.tsx`). Pour lire la
-   * valeur qui fait foi une fois un accès créé, voir `api.fetchStudentTrades`
-   * (champ `email` de la réponse), pas ce champ.
-   */
-  email: string;
-  avatar: string;
-  phone?: string;
-  joinedDate: string;
-  /**
-   * Nom du coach attribué — doit correspondre au nom d'un vrai compte staff
-   * (`StaffAccountSummary.name`, voir `api.listStaff`), jamais un nom
-   * inventé. Optionnel : une fiche peut n'avoir aucun coach attribué.
-   */
-  assignedCoach?: string;
-  level: string;
-  /**
-   * Optionnel : les anciennes valeurs "Besoin Coaching"/"Alerte Tilt"
-   * (retirées, sans équivalent dans le nouveau système, voir la migration
-   * `migrateStudentStatusTags` dans `server/db.ts`) laissent le champ vide
-   * plutôt que de forcer une valeur arbitraire.
-   */
-  statusTag?: StudentStatusTag;
-  /** Absent pour les fiches créées avant l'ajout du champ. */
-  tradingStyle?: TradingStyle;
-  courseCompletionPercentage: number;
-  startingCapital: number;
-  currentCapital: number;
-  totalTrades: number;
-  winRate: number;
-  riskStatus: "🟢 Risque Maîtrisé" | "⚠️ Attention Risk" | "🔴 Sur-Risque" | "🏆 Challenge Validé";
-  privateCoachNotes: string;
-  /** Diagnostic initial — statistiques de départ, distinctes du suivi en cours (`winRate`/`totalTrades`). */
-  initialDiagnostic?: StudentInitialDiagnostic;
-  /** Points faibles récurrents identifiés, catalogue fermé (voir `RECURRING_MISTAKES`). */
-  recurringMistakes?: RecurringMistake[];
-  /** Historique des sessions de coaching notées — voir `CoachingSessionNote`. */
-  coachingSessions?: CoachingSessionNote[];
-  accounts: TradingAccount[];
-  recentTrades: Trade[];
-  /**
-   * Identifiant du compte élève actif pour cette fiche, si le coach lui a
-   * donné un accès (« Donner un accès » dans Suivi des Élèves). Absent = pas
-   * de compte, `recentTrades`/`currentCapital` restent la saisie manuelle du
-   * coach. Présent = ces champs deviennent obsolètes, le coach lit les vrais
-   * trades via `GET /students/:id/trades`.
-   */
-  studentAccountId?: string;
 }
 
 export type AccountType = "Prop Firm Evaluation" | "Prop Firm Funded" | "Broker Réel" | "Compte DÉMO";
@@ -521,7 +287,7 @@ export interface TraderBadge {
   title: string;
   description: string;
   iconName: string;
-  category: "DISCIPLINE" | "ACADEMY" | "PROPFIRM" | "AUDIT" | "PERFORMANCE";
+  category: "DISCIPLINE" | "PROPFIRM" | "AUDIT" | "PERFORMANCE";
   unlocked: boolean;
   progressPercentage: number;
   currentValue?: number;
@@ -539,7 +305,7 @@ export interface TraderBadge {
 }
 
 
-export type NotificationType = "signal" | "trade" | "academy" | "risk" | "system";
+export type NotificationType = "signal" | "trade" | "risk" | "system";
 
 export interface AppNotification {
   id: string;
@@ -549,25 +315,6 @@ export interface AppNotification {
   type: NotificationType;
   read: boolean;
   targetTab?: string;
-}
-
-/**
- * Une annonce publiée par le fondateur, visible par tous les élèves — le
- * seul contenu de toute l'app qui n'est pas scopé par élève, voir le
- * commentaire de `saveAnnouncements` (`server/repositories.ts`).
- */
-export type AnnouncementCategory = "Général" | "Alerte marché" | "Pédagogie" | "Événement";
-
-export interface Announcement {
-  id: string;
-  title: string;
-  body: string;
-  category: AnnouncementCategory;
-  pinned: boolean;
-  /** Optionnel : capture d'écran/illustration jointe, même traitement que `Trade.chartUrl`. */
-  imageUrl?: string;
-  /** ISO — pour le tri chronologique (plus récent en premier). */
-  createdAt: string;
 }
 
 // (Module Forum retiré — voir HANDOFF.md pour l'historique.)

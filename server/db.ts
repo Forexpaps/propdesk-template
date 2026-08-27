@@ -58,18 +58,9 @@ db.exec(`
     payload TEXT NOT NULL
   );
 
-  -- Une seule ligne dans toute l'app (celle du fondateur, DEFAULT_USER_ID) :
-  -- les annonces sont le seul contenu partagé par tous les élèves plutôt que
-  -- scopé par élève, voir le commentaire de saveAnnouncements
-  -- (server/repositories.ts).
-  CREATE TABLE IF NOT EXISTS announcements (
-    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    payload TEXT NOT NULL
-  );
-
   -- Verrouillage optimiste sur les collections CollectionName (trades,
-  -- accounts, modules, messages, badges, setups, notifications,
-  -- enrolledStudents) : un compteur par (utilisateur, collection),
+  -- accounts, badges, setups, notifications, enrolledStudents) : un
+  -- compteur par (utilisateur, collection),
   -- incrémenté à chaque écriture réussie. PUT /api/collections/:name
   -- exige la version lue au dernier chargement et refuse (409) si elle ne
   -- correspond plus — sans ça, deux onglets ouverts sur le même bureau
@@ -98,21 +89,7 @@ db.exec(`
     payload  TEXT NOT NULL
   );
 
-  CREATE TABLE IF NOT EXISTS coach_messages (
-    id       TEXT PRIMARY KEY,
-    user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    position INTEGER NOT NULL,
-    payload  TEXT NOT NULL
-  );
-
   CREATE TABLE IF NOT EXISTS notifications (
-    id       TEXT PRIMARY KEY,
-    user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    position INTEGER NOT NULL,
-    payload  TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS enrolled_students (
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     position INTEGER NOT NULL,
@@ -124,20 +101,6 @@ db.exec(`
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     position INTEGER NOT NULL,
     payload  TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS modules (
-    id       TEXT PRIMARY KEY,
-    user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    position INTEGER NOT NULL,
-    payload  TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS quiz_results (
-    module_id TEXT NOT NULL,
-    user_id   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    payload   TEXT NOT NULL,
-    PRIMARY KEY (module_id, user_id)
   );
 
   -- Comptes staff : identité de connexion, DÉCOUPLÉE du bureau partagé.
@@ -159,7 +122,6 @@ db.exec(`
     -- remplacé par l'intéressé. Jamais vrai pour le premier compte (créé via
     -- /auth/setup, qui choisit son propre mot de passe).
     must_change_password INTEGER NOT NULL DEFAULT 0,
-    invited_by           TEXT REFERENCES staff_accounts(id) ON DELETE SET NULL,
     -- 2FA (TOTP), voir server/auth/twoFactor.ts. totp_secret : présent dès
     -- qu'un compte a démarré une configuration, même non encore confirmée
     -- (voir startTotpSetup) — totp_enabled_at NULL est ce qui distingue "en
@@ -173,13 +135,6 @@ db.exec(`
     -- s'il correspond encore dans la fenetre de tolerance de findMatchingTotpStep,
     -- voir server/auth/twoFactor.ts.
     totp_last_used_step   INTEGER,
-    -- Autorisations accordées à ce compte, JSON (tableau de clés parmi
-    -- STAFF_PERMISSION_KEYS, server/auth/permissions.ts) — NULL = toutes
-    -- accordées (compte fondateur, ou coach jamais restreint depuis
-    -- l'introduction de cette colonne, comportement inchangé par défaut).
-    -- Ignorée pour le fondateur (isOwner), qui a TOUJOURS tout, quoi que
-    -- cette colonne contienne — voir resolveStaffPermissions.
-    permissions           TEXT,
     created_at           TEXT NOT NULL,
     updated_at           TEXT NOT NULL
   );
@@ -226,64 +181,10 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions(user_id);
   CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 
-  -- Comptes élève : deuxième monde d'identité, complètement séparé du monde
-  -- staff. Chaque élève a son propre "bureau" (une ligne users(id) dédiée,
-  -- posée dans user_id), donc ses propres trades — au contraire du staff, qui
-  -- partage tous le même bureau. La fiche enrolled_students reste la source
-  -- de vérité administrative : ON DELETE CASCADE, supprimer la fiche
-  -- supprime le compte.
-  CREATE TABLE IF NOT EXISTS student_accounts (
-    id                    TEXT PRIMARY KEY,
-    enrolled_student_id  TEXT NOT NULL REFERENCES enrolled_students(id) ON DELETE CASCADE,
-    user_id               TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    email                 TEXT NOT NULL,
-    email_lower           TEXT NOT NULL UNIQUE,
-    password_hash         TEXT NOT NULL,
-    must_change_password  INTEGER NOT NULL DEFAULT 1,
-    invited_by            TEXT REFERENCES staff_accounts(id) ON DELETE SET NULL,
-    created_at            TEXT NOT NULL,
-    updated_at            TEXT NOT NULL
-  );
-  CREATE UNIQUE INDEX IF NOT EXISTS idx_student_accounts_enrolled ON student_accounts(enrolled_student_id);
-  CREATE INDEX IF NOT EXISTS idx_student_accounts_email ON student_accounts(email_lower);
-
-  -- Sessions élève, structurellement identiques à "sessions" mais FK vers
-  -- student_accounts : deux mondes séparés, jamais de session élève dans la
-  -- table staff ni l'inverse.
-  CREATE TABLE IF NOT EXISTS student_sessions (
-    id           TEXT PRIMARY KEY,
-    user_id      TEXT NOT NULL REFERENCES student_accounts(id) ON DELETE CASCADE,
-    created_at   TEXT NOT NULL,
-    expires_at   TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
-    user_agent   TEXT
-  );
-  CREATE INDEX IF NOT EXISTS idx_student_sessions_user    ON student_sessions(user_id);
-  CREATE INDEX IF NOT EXISTS idx_student_sessions_expires ON student_sessions(expires_at);
-
-  -- Jetons de réinitialisation de mot de passe élève, générés par le staff
-  -- depuis une fiche (« Générer un lien de réinitialisation »). id est
-  -- l'empreinte SHA-256 du jeton (jamais le jeton en clair, même principe que
-  -- student_sessions.id) : le lien lui-même n'est donc récupérable qu'au
-  -- moment de sa création, jamais depuis la base. used_at reste NULL tant que
-  -- le lien n'a pas été consommé ; un jeton utilisé ou expiré n'est plus
-  -- valide mais reste en base pour l'historique jusqu'à la purge périodique.
-  CREATE TABLE IF NOT EXISTS student_password_reset_tokens (
-    id                 TEXT PRIMARY KEY,
-    student_account_id TEXT NOT NULL REFERENCES student_accounts(id) ON DELETE CASCADE,
-    created_at         TEXT NOT NULL,
-    expires_at         TEXT NOT NULL,
-    used_at            TEXT
-  );
-  CREATE INDEX IF NOT EXISTS idx_student_reset_tokens_account ON student_password_reset_tokens(student_account_id);
-  CREATE INDEX IF NOT EXISTS idx_student_reset_tokens_expires ON student_password_reset_tokens(expires_at);
-
-  -- Journal de sécurité, lecture réservée au fondateur (requireOwner). Couvre
-  -- les deux mondes (staff ET élève) — account_kind distingue lequel. Purge à
-  -- 90 jours (les IP sont des données personnelles), jamais de mot de passe
-  -- ni de jeton de session stocké ici. Pas de FK vers staff_accounts/
-  -- student_accounts : un événement doit rester lisible même après
-  -- révocation du compte concerné.
+  -- Journal de sécurité. Purge à 90 jours (les IP sont des données
+  -- personnelles), jamais de mot de passe ni de jeton de session stocké ici.
+  -- Pas de FK vers staff_accounts : un événement doit rester lisible même
+  -- après révocation du compte concerné.
   CREATE TABLE IF NOT EXISTS security_events (
     id            TEXT PRIMARY KEY,
     created_at    TEXT NOT NULL,
@@ -424,69 +325,6 @@ migrateToStaffAccounts();
 
 
 /**
- * Migration ponctuelle : `enrolled_students.payload.statusTag` a changé de
- * système de valeurs — l'ancien statut ("En Évaluation FTMO" / "Prop Firm
- * Financé" / "Besoin Coaching" / "Alerte Tilt") a été remplacé par 4
- * nouvelles valeurs décrivant l'étape réelle du compte ("Évaluation Étape
- * 1"/"2", "Compte Financé", "Fonds Propres"), sans migration au moment du
- * changement de type. Décision explicite de l'utilisateur pour rattraper
- * les fiches existantes :
- * - "En Évaluation FTMO" et "Prop Firm Financé" ont une correspondance
- *   directe et sans ambiguïté vers le nouveau système ;
- * - "Besoin Coaching" et "Alerte Tilt" décrivaient un comportement/alerte
- *   sans équivalent dans le nouveau système (centré sur l'étape du compte,
- *   pas un jugement de suivi) — retirées plutôt que forcées vers une valeur
- *   arbitraire. Le champ redevient simplement absent (`statusTag` est
- *   optionnel dans le type, voir `src/types.ts`) ; l'UI affiche alors un
- *   badge neutre "Statut non défini" (voir `getStatusTagStyle` dans
- *   `StudentTracking.tsx`) jusqu'à ce que le staff renseigne le vrai statut.
- *
- * Protégée par un marqueur dans `meta`, comme les autres migrations
- * ponctuelles de ce fichier : ne s'exécute qu'une fois.
- */
-const STATUS_TAG_MIGRATION_KEY = "migrated_student_status_tags_v1";
-
-function migrateStudentStatusTags(): void {
-  const already = db.prepare("SELECT 1 FROM meta WHERE key = ?").get(STATUS_TAG_MIGRATION_KEY);
-  if (already) return;
-
-  const RENAMES: Record<string, string> = {
-    "En Évaluation FTMO": "Évaluation Étape 1",
-    "Prop Firm Financé": "Compte Financé",
-  };
-  const REMOVALS = new Set(["Besoin Coaching", "Alerte Tilt"]);
-
-  const rows = db.prepare("SELECT id, payload FROM enrolled_students").all() as {
-    id: string;
-    payload: string;
-  }[];
-  const update = db.prepare("UPDATE enrolled_students SET payload = ? WHERE id = ?");
-
-  db.transaction(() => {
-    for (const row of rows) {
-      const data = JSON.parse(row.payload) as { statusTag?: string };
-      const tag = data.statusTag;
-      if (typeof tag !== "string") continue;
-
-      if (tag in RENAMES) {
-        data.statusTag = RENAMES[tag];
-        update.run(JSON.stringify(data), row.id);
-      } else if (REMOVALS.has(tag)) {
-        delete data.statusTag;
-        update.run(JSON.stringify(data), row.id);
-      }
-    }
-
-    db.prepare("INSERT INTO meta (key, value) VALUES (?, ?)").run(
-      STATUS_TAG_MIGRATION_KEY,
-      new Date().toISOString()
-    );
-  })();
-}
-
-migrateStudentStatusTags();
-
-/**
  * Migration ponctuelle : supprime `coach_signals`, table du module "Signaux
  * & Analyses" retiré entièrement de l'application sur demande explicite de
  * l'utilisateur (composant, routes de rendu, types, sidebar — voir git log).
@@ -546,18 +384,6 @@ function migrateAddTotpColumns(): void {
 migrateAddTotpColumns();
 
 /**
- * Ajoute `permissions` à `staff_accounts` sur une base existante — même
- * principe et même raison que `migrateAddTotpColumns` juste au-dessus.
- */
-function migrateAddPermissionsColumn(): void {
-  const columns = db.prepare("PRAGMA table_info(staff_accounts)").all() as { name: string }[];
-  if (columns.some((c) => c.name === "permissions")) return;
-  db.exec("ALTER TABLE staff_accounts ADD COLUMN permissions TEXT;");
-}
-
-migrateAddPermissionsColumn();
-
-/**
  * Ajoute `lock_count` à `login_lockouts` sur une base existante — même
  * principe et même raison que `migrateAddTotpColumns`. Voir le commentaire
  * de la colonne dans le `CREATE TABLE IF NOT EXISTS` plus haut.
@@ -589,14 +415,3 @@ export function setMeta(key: string, value: string): void {
  * l'ajout d'un écran de connexion ne demande aucune migration de schéma.
  */
 export const DEFAULT_USER_ID = "user-local";
-
-/**
- * Identifiant du seul "coach" affiché côté élève (`CoachMessaging.tsx`) :
- * tout le staff partage un unique bureau, donc un unique fil de discussion,
- * quel que soit le compte staff qui répond réellement. Partagé entre
- * `buildCoachesForStudent` (server/routes.ts, qui construit l'entrée
- * affichée à l'élève) et la route qui écrit la réponse du coach
- * (server/auth/routes.ts) pour que les deux ne dérivent jamais l'un de
- * l'autre.
- */
-export const FOUNDER_COACH_ID = "coach-thomas";

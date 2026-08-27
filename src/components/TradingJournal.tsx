@@ -6,7 +6,6 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Trash2,
-  MessageSquare,
   Zap,
   Tag,
   Calculator,
@@ -243,18 +242,11 @@ interface TradingJournalProps {
   /** Remplace un trade existant, identifié par son `id`. */
   onUpdateTrade: (trade: Trade) => void;
   onDeleteTrade: (id: string) => void;
-  onSendTradeToCoach: (trade: Trade) => void;
   onOpenCalculator?: () => void;
   /** Ébauche envoyée par le calculateur de position ou l'analyseur de setup. */
   prefillDraft?: TradeDraft | null;
   /** Appelé une fois l'ébauche appliquée, pour que le parent la remette à null. */
   onPrefillConsumed?: () => void;
-  /**
-   * Masque le bouton « Discuter avec le coach » sur chaque ligne. Sert au
-   * Journal élève, qui n'a pas accès à la messagerie coach — voir
-   * `StudentAuthenticatedApp` dans `src/App.tsx`.
-   */
-  hideAiAndCoachActions?: boolean;
   /** Mode lecture seule : masque les boutons d'ajout, édition, suppression. */
   readOnly?: boolean;
   /**
@@ -281,11 +273,9 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   onAddTrade,
   onUpdateTrade,
   onDeleteTrade,
-  onSendTradeToCoach,
   onOpenCalculator,
   prefillDraft,
   onPrefillConsumed,
-  hideAiAndCoachActions = false,
   readOnly = false,
   setups = [],
   plans = [],
@@ -1282,17 +1272,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                             title="Modifier ce trade"
                           >
                             <Pencil className="w-4 h-4" />
-                          </button>
-                        )}
-
-                        {/* Send to Coach button */}
-                        {!hideAiAndCoachActions && (
-                          <button
-                            onClick={() => onSendTradeToCoach(trade)}
-                            className="p-1.5 rounded-lg bg-[#1B2320] text-slate-400 hover:text-white hover:bg-[#232D29]"
-                            title="Discuter de ce trade avec le coach"
-                          >
-                            <MessageSquare className="w-4 h-4 text-amber-400" />
                           </button>
                         )}
 

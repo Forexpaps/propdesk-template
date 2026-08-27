@@ -7,21 +7,15 @@ import { db, DEFAULT_USER_ID } from "./db";
 export type CollectionName =
   | "trades"
   | "accounts"
-  | "messages"
   | "notifications"
-  | "enrolledStudents"
   | "badges"
-  | "modules"
   | "setups";
 
 const TABLES: Record<CollectionName, string> = {
   trades: "trades",
   accounts: "trading_accounts",
-  messages: "coach_messages",
   notifications: "notifications",
-  enrolledStudents: "enrolled_students",
   badges: "badges",
-  modules: "modules",
   setups: "setups",
 };
 
@@ -107,13 +101,8 @@ export function listCollection<T extends WithId>(
  * correspond exactement à sa sémantique, et elle est idempotente.
  *
  * Implémentée en UPSERT (+ suppression des seules lignes disparues), et non
- * en vidage puis réinsertion complète : sur `enrolledStudents`, un vidage même
- * suivi d'une réinsertion identique fait passer chaque ligne par un `DELETE`
- * réel, qui déclenche le `ON DELETE CASCADE` de `student_accounts` — un coach
- * qui modifierait la note d'un élève sans rapport supprimerait ainsi l'accès
- * actif de tous les autres élèves de la fiche en un seul enregistrement. Une
- * ligne qui continue d'exister par son `id` doit donc être mise à jour en
- * place, jamais recréée.
+ * en vidage puis réinsertion complète : une ligne qui continue d'exister par
+ * son `id` est mise à jour en place, jamais recréée.
  */
 export function replaceCollection<T extends WithId>(
   name: CollectionName,
@@ -187,39 +176,10 @@ export function replaceCollection<T extends WithId>(
 
     if (staleIds.length > 0) {
       const placeholdersForDelete = staleIds.map(() => "?").join(", ");
-
-      // Effacement RGPD (Article 17) : supprimer une fiche élève ne doit pas
-      // laisser son bureau personnel (trades, plan de trading, setups,
-      // progression, badges...) orphelin en base. `student_accounts.
-      // enrolled_student_id` cascade déjà (ON DELETE CASCADE) quand la ligne
-      // `enrolled_students` disparaît juste en dessous — mais cascade
-      // seulement jusqu'à `student_accounts`, jamais jusqu'à `users`, qui n'a
-      // aucune FK entrante depuis cette table. Il faut donc lire les
-      // `user_id` concernés AVANT la suppression (sans quoi la ligne
-      // `student_accounts` qui les portait aura déjà disparu), puis
-      // supprimer ces lignes `users` explicitement — leur propre `ON DELETE
-      // CASCADE` (voir server/db.ts) entraîne alors trades/trading_accounts/
-      // coach_messages/notifications/badges/modules/setups/trading_plans/
-      // quiz_results dans la foulée, en une seule transaction.
-      let orphanedUserIds: string[] = [];
-      if (name === "enrolledStudents") {
-        const rows = db
-          .prepare(
-            `SELECT user_id FROM student_accounts WHERE enrolled_student_id IN (${placeholdersForDelete})`
-          )
-          .all(...staleIds) as { user_id: string }[];
-        orphanedUserIds = rows.map((r) => r.user_id);
-      }
-
       db.prepare(`DELETE FROM ${table} WHERE user_id = ? AND id IN (${placeholdersForDelete})`).run(
         userId,
         ...staleIds
       );
-
-      if (orphanedUserIds.length > 0) {
-        const placeholdersForUsers = orphanedUserIds.map(() => "?").join(", ");
-        db.prepare(`DELETE FROM users WHERE id IN (${placeholdersForUsers})`).run(...orphanedUserIds);
-      }
     }
 
     rows.forEach((item, index) => {
@@ -323,105 +283,6 @@ export function saveTradingPlan(plan: unknown, userId: string = DEFAULT_USER_ID)
     `INSERT INTO trading_plans (user_id, payload) VALUES (?, ?)
      ON CONFLICT(user_id) DO UPDATE SET payload = excluded.payload`
   ).run(userId, JSON.stringify(plan));
-}
-
-/**
- * Annonces du fondateur — toujours `DEFAULT_USER_ID`, jamais un paramètre :
- * contrairement à tout le reste de cette app (scopé par élève), il n'existe
- * qu'UNE seule liste d'annonces, partagée par tout le monde. Même
- * passthrough générique que `getTradingPlan`/`saveTradingPlan`.
- */
-export function getAnnouncements<T>(): T | null {
-  const row = db.prepare("SELECT payload FROM announcements WHERE user_id = ?").get(DEFAULT_USER_ID) as
-    | { payload: string }
-    | undefined;
-  if (!row) return null;
-  return safeParsePayload<T>(row.payload, `announcements#${DEFAULT_USER_ID}`);
-}
-
-/**
- * Pseudo-collection dans `collection_versions` (nom hors de `CollectionName`,
- * la colonne `name` n'a pas de contrainte l'empêchant — voir `server/db.ts`) :
- * réutilise le même verrou optimiste que les vraies collections sans migration
- * de schéma dédiée, vu que les annonces vivent dans leur propre table à part.
- */
-const ANNOUNCEMENTS_VERSION_KEY = "announcements";
-
-export function getAnnouncementsVersion(): number {
-  const row = db
-    .prepare("SELECT version FROM collection_versions WHERE user_id = ? AND name = ?")
-    .get(DEFAULT_USER_ID, ANNOUNCEMENTS_VERSION_KEY) as { version: number } | undefined;
-  return row?.version ?? 0;
-}
-
-/**
- * `expectedVersion` : voir le commentaire de `announcementsSchema`
- * (server/schemas.ts). Vérifiée et incrémentée dans la même transaction que
- * l'écriture, comme `replaceCollection` — sans quoi deux écritures
- * concurrentes pourraient toutes deux lire la même version avant qu'aucune
- * n'ait eu la chance d'écrire.
- */
-export function saveAnnouncements(list: unknown, expectedVersion: number): number {
-  const run = db.transaction(() => {
-    const current = db
-      .prepare("SELECT version FROM collection_versions WHERE user_id = ? AND name = ?")
-      .get(DEFAULT_USER_ID, ANNOUNCEMENTS_VERSION_KEY) as { version: number } | undefined;
-    const currentVersion = current?.version ?? 0;
-    if (currentVersion !== expectedVersion) {
-      throw new CollectionVersionConflictError(currentVersion);
-    }
-
-    db.prepare(
-      `INSERT INTO announcements (user_id, payload) VALUES (?, ?)
-       ON CONFLICT(user_id) DO UPDATE SET payload = excluded.payload`
-    ).run(DEFAULT_USER_ID, JSON.stringify(list));
-
-    const { version: newVersion } = db
-      .prepare(
-        `INSERT INTO collection_versions (user_id, name, version) VALUES (?, ?, 1)
-         ON CONFLICT(user_id, name) DO UPDATE SET version = version + 1
-         RETURNING version`
-      )
-      .get(DEFAULT_USER_ID, ANNOUNCEMENTS_VERSION_KEY) as { version: number };
-    return newVersion;
-  });
-  return run();
-}
-
-export function getQuizResults<T>(
-  userId: string = DEFAULT_USER_ID
-): Record<string, T> {
-  const rows = db
-    .prepare("SELECT module_id, payload FROM quiz_results WHERE user_id = ?")
-    .all(userId) as { module_id: string; payload: string }[];
-
-  const entries = rows
-    .map((r): [string, T] | null => {
-      const parsed = safeParsePayload<T>(r.payload, `quiz_results#${r.module_id}`);
-      return parsed === null ? null : [r.module_id, parsed];
-    })
-    .filter((entry): entry is [string, T] => entry !== null);
-
-  return Object.fromEntries(entries);
-}
-
-export function replaceQuizResults(
-  results: Record<string, unknown>,
-  userId: string = DEFAULT_USER_ID
-): void {
-  const clear = db.prepare("DELETE FROM quiz_results WHERE user_id = ?");
-  const insert = db.prepare(
-    "INSERT INTO quiz_results (module_id, user_id, payload) VALUES (?, ?, ?)"
-  );
-
-  const run = db.transaction((entries: [string, unknown][]) => {
-    clear.run(userId);
-    entries.forEach(([moduleId, payload]) => {
-      insert.run(moduleId, userId, JSON.stringify(payload));
-    });
-  });
-
-  run(Object.entries(results));
 }
 
 export const COLLECTION_NAMES = Object.keys(TABLES) as CollectionName[];

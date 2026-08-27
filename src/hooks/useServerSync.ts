@@ -1,22 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, type ServerState } from "../lib/api";
-import { clearPending, listPending, markPending, replayPending, subscribePending } from "../lib/pendingChanges";
-import type { Trade, TradingAccount, Module, CoachMessage, ModuleQuizResult, StudentProfile, TraderBadge, Coach, AppNotification, TradingPlanData, Setup, Announcement } from "../types";
+import { clearPending, listPending, markPending, subscribePending } from "../lib/pendingChanges";
 
 export type SyncStatus = "loading" | "online" | "offline";
 
 /** Clés localStorage utilisées avant l'arrivée de la persistance serveur. */
 const LEGACY_KEYS = {
   student: "horizon_student",
-  quizResults: "horizon_quiz_results",
   collections: {
     trades: "horizon_trades",
     accounts: "horizon_accounts",
-    messages: "horizon_messages",
     notifications: "horizon_notifications",
-    enrolledStudents: "horizon_enrolled_students",
     badges: "horizon_badges",
-    modules: "horizon_modules",
     setups: "horizon_setups",
   },
 } as const;
@@ -42,12 +37,11 @@ function collectLegacyState() {
   );
 
   const student = readLegacy<Record<string, unknown>>(LEGACY_KEYS.student);
-  const quizResults = readLegacy<Record<string, unknown>>(LEGACY_KEYS.quizResults);
 
   const hasSomething =
     Object.keys(collections).length > 0 || student !== undefined;
 
-  return hasSomething ? { student, collections, quizResults } : null;
+  return hasSomething ? { student, collections } : null;
 }
 
 /**
@@ -62,10 +56,6 @@ function cacheState(state: ServerState): void {
     if (state.student) {
       localStorage.setItem(LEGACY_KEYS.student, JSON.stringify(state.student));
     }
-    localStorage.setItem(
-      LEGACY_KEYS.quizResults,
-      JSON.stringify(state.quizResults ?? {})
-    );
     Object.entries(LEGACY_KEYS.collections).forEach(([name, key]) => {
       const items = state.collections?.[name as keyof typeof state.collections];
       if (Array.isArray(items)) localStorage.setItem(key, JSON.stringify(items));
@@ -173,81 +163,6 @@ export function useBootstrap() {
   const acknowledgePending = useCallback(() => setPending([]), []);
 
   return { status, state, pending, discardPending, acknowledgePending };
-}
-
-/**
- * Chargement minimal pour le Journal élève.
- *
- * Volontairement plus simple que `useBootstrap` : pas d'import depuis un
- * ancien `localStorage` (aucun élève n'a de données antérieures à son
- * compte), pas de bandeau interactif de modifications hors ligne — un élève
- * est seul propriétaire de ses données, donc pas de conflit possible avec un
- * collègue à arbitrer, contrairement au bureau staff partagé. Une
- * modification restée en attente (`markPending`, suite à un échec de
- * `useSyncedState` signalé par `SyncErrorBanner`) est donc rejouée
- * silencieusement ici, avant même d'appliquer l'état serveur : sans ça, rien
- * ne la renvoyait jamais, et `resolveStudentValue` (App.tsx) la réappliquait
- * indéfiniment par-dessus l'état serveur à chaque rechargement sans jamais
- * réellement l'envoyer. `GET /api/state` est déjà filtré côté serveur pour
- * une session élève — il ne renvoie que les collections listées dans
- * `STUDENT_ALLOWED_COLLECTIONS` (voir `server/routes.ts`) : trades, accounts
- * (ses propres portefeuilles), modules (sa copie personnelle du programme),
- * messages (son fil avec le coach) et badges (son état de réclamation
- * personnel — la progression elle-même est recalculée en direct depuis
- * trades/modules, voir `src/lib/badges.ts`).
- */
-export function useStudentBootstrap() {
-  const [status, setStatus] = useState<SyncStatus>("loading");
-  const [trades, setTrades] = useState<Trade[]>([]);
-  const [accounts, setAccounts] = useState<TradingAccount[]>([]);
-  const [modules, setModules] = useState<Module[]>([]);
-  const [messages, setMessages] = useState<CoachMessage[]>([]);
-  const [badges, setBadges] = useState<TraderBadge[]>([]);
-  const [setups, setSetups] = useState<Setup[]>([]);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [quizResults, setQuizResults] = useState<Record<string, ModuleQuizResult>>({});
-  const [student, setStudent] = useState<StudentProfile | null>(null);
-  const [coaches, setCoaches] = useState<Coach[]>([]);
-  const [tradingPlan, setTradingPlan] = useState<TradingPlanData | null>(null);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        if (listPending().length > 0) {
-          await replayPending().catch(() => undefined);
-        }
-
-        const serverState = await api.fetchState();
-        if (!cancelled) {
-          setTrades(serverState.collections.trades ?? []);
-          setAccounts(serverState.collections.accounts ?? []);
-          setModules(serverState.collections.modules ?? []);
-          setMessages(serverState.collections.messages ?? []);
-          setBadges(serverState.collections.badges ?? []);
-          setSetups(serverState.collections.setups ?? []);
-          setNotifications(serverState.collections.notifications ?? []);
-          setQuizResults(serverState.quizResults ?? {});
-          setStudent((serverState.student as StudentProfile | null) ?? null);
-          setCoaches(serverState.coaches ?? []);
-          setTradingPlan(serverState.tradingPlan ?? null);
-          setAnnouncements(serverState.announcements ?? []);
-          setStatus("online");
-        }
-      } catch (err) {
-        console.warn("[propdesk] Serveur injoignable.", err);
-        if (!cancelled) setStatus("offline");
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return { status, trades, accounts, modules, messages, badges, setups, notifications, quizResults, student, setStudent, coaches, tradingPlan, announcements };
 }
 
 /**

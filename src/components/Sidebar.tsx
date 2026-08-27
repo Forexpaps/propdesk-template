@@ -1,22 +1,10 @@
 import React from "react";
 import {
   LayoutDashboard,
-  BookOpen,
   BookMarked,
-  MessageSquare,
   LineChart,
-  ShieldCheck,
-  Users,
-  Menu,
-  X,
-  ChevronRight,
-  TrendingUp,
   Wallet,
-  PanelLeftClose,
   PanelLeftOpen,
-  Crown,
-  UserCheck,
-  User,
   Sliders,
   Eye,
   EyeOff,
@@ -27,7 +15,7 @@ import {
   LogOut,
   ClipboardList,
   Target,
-  Megaphone,
+  X,
 } from "lucide-react";
 import { StudentProfile } from "../types";
 
@@ -47,12 +35,8 @@ import { StudentProfile } from "../types";
  */
 export const ALL_TABS = [
   "dashboard",
-  "students",
   "wallets",
-  "academy",
-  "announcements",
   "journal",
-  "messaging",
   "analytics",
   "macro",
   "setups",
@@ -82,10 +66,6 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
   "journal",
   "wallets",
   "analytics",
-  "students",
-  "academy",
-  "announcements",
-  "messaging",
   "mindset",
   "calendar",
   "tradingPlan",
@@ -106,10 +86,6 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   journal: "journal",
   wallets: "wallets",
   analytics: "analytics",
-  students: "students",
-  academy: "academy",
-  announcements: "announcements",
-  messaging: "messaging",
   mindset: null,
   calendar: "macro",
   tradingPlan: null,
@@ -139,8 +115,6 @@ interface SidebarProps {
   activeTab: TabType;
   setActiveTab: (tab: TabType) => void;
   student: StudentProfile;
-  courseCompletionPercentage: number;
-  totalUnreadMessages: number;
   mobileOpen: boolean;
   setMobileOpen: (open: boolean) => void;
   isCollapsed: boolean;
@@ -171,8 +145,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
   student,
-  courseCompletionPercentage,
-  totalUnreadMessages,
   mobileOpen,
   setMobileOpen,
   isCollapsed,
@@ -216,29 +188,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
    * un module distinct (fiches de stratégies libres, sans scoring), ne pas
    * confondre les deux.
    */
-  // `permissions` absent/`null` = tout accordé (fondateur, coach jamais
-  // restreint, ou élève — qui n'a pas ce champ) : seule une liste EXPLICITE
-  // sans la clé masque l'onglet correspondant, jamais une simple absence.
-  const hasPermission = (key: "students" | "messaging" | "announcements") =>
-    student.permissions == null || student.permissions.includes(key);
-
   const suiviItems: SidebarEntry[] = [
-    ...(hasPermission("announcements")
-      ? [{ key: "announcements" as const, id: "announcements" as const, label: "Annonces", icon: Megaphone }]
-      : []),
     { key: "journal", id: "journal", label: "Journal de trading", icon: BookMarked },
     { key: "wallets", id: "wallets", label: "Portefeuille", icon: Wallet },
     { key: "analytics", id: "analytics", label: "Rentabilité", icon: LineChart },
     { key: "calendar", id: "macro", label: "Macro", icon: Calendar },
-    ...(student.isAdmin && hasPermission("students")
-      ? [{ key: "students" as const, id: "students" as const, label: "Suivi des Élèves", icon: UserCheck }]
-      : []),
     { key: "setups", id: "setups", label: "Setups", icon: Target },
     { key: "tradingPlan", id: null, label: "Plan de trading", icon: ClipboardList, onOpen: onOpenTradingPlan },
-    { key: "academy", id: "academy", label: "Module cours", icon: BookOpen, badge: `${courseCompletionPercentage}%` },
-    ...(hasPermission("messaging")
-      ? [{ key: "messaging" as const, id: "messaging" as const, label: "Messagerie Coach", icon: MessageSquare, badge: totalUnreadMessages > 0 ? "1" : null }]
-      : []),
     { key: "mindset", id: null, label: "Mindset", icon: Brain, onOpen: onOpenMindset },
   ];
 
@@ -543,15 +499,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-bold text-white truncate">{student.name}</span>
-                      {student.isAdmin && (
-                        <span className="px-1.5 py-0.2 rounded bg-[#00E676]/15 text-[#00E676] text-[9px] font-semibold border border-[#00E676]/30 shrink-0">
-                          Administrateur
-                        </span>
-                      )}
                     </div>
-                    <p className="text-[10px] text-slate-400 truncate">
-                      {student.isAdmin ? "Admin · Coach principal" : student.level}
-                    </p>
+                    <p className="text-[10px] text-slate-400 truncate">{student.level}</p>
                   </div>
                 </div>
 

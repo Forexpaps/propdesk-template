@@ -88,16 +88,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     switch (activeTab) {
       case "dashboard":
         return "Tableau de bord";
-      case "students":
-        return "Suivi des Élèves";
       case "wallets":
         return "Portefeuille";
-      case "academy":
-        return "Module cours";
       case "journal":
         return "Journal de trading";
-      case "messaging":
-        return "Messagerie Coach";
       case "analytics":
         return "Rentabilité";
       case "macro":

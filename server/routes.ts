@@ -4,11 +4,6 @@ import {
   replaceCollection,
   getProfile,
   saveProfile,
-  getQuizResults,
-  replaceQuizResults,
-  getTradingPlan,
-  getAnnouncements,
-  getAnnouncementsVersion,
   getCollectionVersion,
   COLLECTION_NAMES,
   CollectionOwnershipConflictError,
@@ -19,24 +14,18 @@ import { isBootstrapped, writeFullState, seedDemoData } from "./seed";
 import {
   collectionPayloadSchema,
   profileSchema,
-  quizResultsSchema,
   importStateSchema,
 } from "./schemas";
 import { authRouter, staffRouter } from "./auth/routes";
-import { studentAuthRouter, studentProtectedRouter } from "./auth/studentRoutes";
 import { requireAuth, type AuthContext } from "./auth/middleware";
-import { uploadsRouter } from "./uploads";
 import { createRateLimit } from "./middleware/rateLimit";
 import { getEconomicCalendar } from "./economicCalendar";
 import { getMarketData } from "./marketData";
-import { buildStudentProfile, getStudentByEnrolledId } from "./auth/studentCredentials";
-import { DEFAULT_USER_ID, FOUNDER_COACH_ID } from "./db";
-import { getStaffById } from "./auth/credentials";
-import { hasStaffPermission } from "./auth/permissions";
-// Catalogue fixe des badges + repli de dernier recours pour les modules —
-// données pures (aucune dépendance React/DOM), voir le commentaire de
-// `backfillStudentDefaultCollections` plus bas pour pourquoi le serveur en a besoin.
-import { initialTraderBadges, initialModules } from "../src/data/mockData";
+import { DEFAULT_USER_ID } from "./db";
+// Catalogue fixe des badges — données pures (aucune dépendance React/DOM),
+// voir le commentaire de `backfillMissingBadges` plus bas pour pourquoi le
+// serveur en a besoin.
+import { initialTraderBadges } from "../src/data/mockData";
 
 export const api = Router();
 
@@ -68,11 +57,7 @@ const publicDataRateLimit = createRateLimit({
   message: "Trop de requêtes. Réessaie dans quelques instants.",
 });
 
-/**
- * Public : donnée non sensible, identique pour tout visiteur, qu'il soit
- * staff ou élève — pas de raison de la coupler à l'un des deux mondes
- * d'authentification.
- */
+/** Public : donnée non sensible, identique pour tout visiteur. */
 api.get(
   "/economic-calendar",
   publicDataRateLimit,
@@ -103,7 +88,6 @@ api.get(
 );
 
 api.use("/auth", authRouter);
-api.use("/auth", studentAuthRouter);
 
 /**
  * Barrière d'authentification.
@@ -115,225 +99,26 @@ api.use("/auth", studentAuthRouter);
  * Elle est ici, sur le routeur, et non en `app.use` : Vite est monté après l'API
  * dans `startServer()`, un middleware au niveau application casserait le
  * rechargement à chaud.
- *
- * Accepte désormais deux mondes de session (staff ou élève) — voir
- * `server/auth/middleware.ts`. `req.auth.kind` distingue les deux ensuite.
  */
 api.use(requireAuth);
 
-// Montées ici et non avec les routeurs publics plus haut : ces routes exigent
-// une session valide, donc doivent passer APRÈS la barrière.
-//
-// `requireStaffKind`/`requireStudentKind` sont appliquées route par route,
-// À L'INTÉRIEUR de chaque routeur (voir `server/auth/routes.ts` et
-// `studentRoutes.ts`) — jamais ici, au niveau du montage. Les deux routeurs
-// partagent le même préfixe "/auth" : une garde posée ici s'exécuterait pour
-// TOUTE requête sous "/auth", y compris celles destinées à l'autre monde,
-// avant même qu'Express n'ait pu constater qu'aucune route de ce routeur ne
-// correspond. C'est exactement ce qui bloquait `/auth/student-change-password`
-// avec « Action réservée au staff » avant ce correctif.
+// Montée ici et non avec le routeur public plus haut : ces routes exigent une
+// session valide, donc doivent passer APRÈS la barrière.
 api.use("/auth", staffRouter);
-api.use("/auth", studentProtectedRouter);
-// Vidéos de leçon (téléversement staff + lecture avec support Range) — voir
-// server/uploads.ts. Montée ici, après la barrière d'authentification :
-// regarder une leçon exige une session valide (staff ou élève), la limite au
-// seul staff pour le téléversement est posée route par route dans ce routeur.
-api.use("/uploads", uploadsRouter);
 
 /**
- * Collections qu'une session élève peut lire/écrire : son Journal, ses
- * propres portefeuilles (comptes Prop Firm / broker), sa copie personnelle
- * du programme de formation (leçons vues), son fil de messagerie avec
- * le coach, et son état de badges (réclamation — la progression elle-même
- * est recalculée en direct côté client, voir `src/lib/badges.ts`) — jamais
- * les collections du bureau staff (fiches élèves) ni celles d'un autre élève.
- */
-const STUDENT_ALLOWED_COLLECTIONS = new Set<CollectionName>([
-  "trades",
-  "accounts",
-  "modules",
-  "messages",
-  "badges",
-  // Alertes de non-respect du plan de trading (client, voir
-  // src/lib/planCompliance.ts) : un élève a désormais besoin d'une vraie
-  // collection persistée pour ces notifications, au même titre que le
-  // bureau staff — avant, `studentNotifications` (App.tsx) était
-  // entièrement dérivé des messages/badges, sans mécanisme pour pousser
-  // une notification arbitraire.
-  "notifications",
-  // Stratégies de trading définies par l'élève (module Setups) — voir
-  // `Setup`, `src/types.ts`. Source du multi-choix `authorizedSetups` du
-  // Plan de trading et du champ Stratégie du Journal.
-  "setups",
-]);
-
-/**
- * Profil PERSONNEL d'un compte staff — nom, avatar, bio, capital, etc.
- * `isAdmin` toujours forcé à `true`.
- *
- * `personalDataUserId` (voir `AuthContext.personalDataUserId`) : jamais
- * `DEFAULT_USER_ID` tel quel pour un coach, sans quoi il verrait et pourrait
- * modifier l'identité du fondateur au lieu de la sienne — exactement le bug
- * signalé ("les coachs ne doivent pas voir mon profil en détail, ni celui
- * des autres coachs"). Pour le fondateur, `personalDataUserId ===
- * DEFAULT_USER_ID`, donc aucun changement de comportement pour lui.
- *
- * `hiddenSidebarItems` reste l'EXCEPTION partagée : c'est un réglage
- * org-wide que seul le fondateur peut poser (voir `PUT /profile` plus bas et
- * `AuthContext.isOwner`), et qui doit s'appliquer à tout le staff — jamais
- * lu depuis le profil personnel de l'appelant, toujours depuis le bureau
- * partagé, fusionné par-dessus (même principe que `buildStudentProfile`,
- * `server/auth/studentCredentials.ts`).
- *
- * Tout compte staff a exactement les mêmes droits (voir
- * `StaffAccountsModal.tsx`, "Mêmes droits pour tous sur ce bureau") — `false`
- * ou absent n'est jamais un état légitime ici, seulement un profil jamais
- * réenregistré depuis sa création (le profil par défaut, `initialStudentProfile`
- * dans `src/data/mockData.ts`, n'a longtemps porté aucun champ `isAdmin` du
- * tout). Sans ce correctif, le champ restait figé à `false`/`undefined` et
- * `Sidebar.tsx` (qui décide d'afficher "Suivi des Élèves" sur ce seul champ)
- * masquait silencieusement l'onglet à un vrai compte fondateur.
- */
-function buildStaffProfile(auth: AuthContext): Record<string, unknown> | null {
-  const profile = getProfile<Record<string, unknown>>(auth.personalDataUserId);
-  if (!profile) return null;
-  const sharedProfile = getProfile<{ hiddenSidebarItems?: unknown }>(DEFAULT_USER_ID);
-  return {
-    ...profile,
-    isAdmin: true,
-    hiddenSidebarItems: sharedProfile?.hiddenSidebarItems ?? [],
-    // `null` = tout accordé (voir `hasStaffPermission`) — le client doit
-    // distinguer ce cas d'une liste vide, jamais le traiter comme "aucune
-    // autorisation" par un `?? []` naïf (voir Sidebar.tsx).
-    permissions: auth.permissions,
-  };
-}
-
-/**
- * "Coach" affiché côté élève dans la Messagerie — reconstruit depuis le vrai
- * profil du bureau staff partagé (`DEFAULT_USER_ID`), jamais une identité
- * fictive. Seuls des champs publics (nom, avatar, rôle/niveau) traversent
- * cette frontière — jamais l'email, le téléphone ni aucun champ privé du
- * profil fondateur.
- *
- * `id` est fixé sur `FOUNDER_COACH_ID` : `CoachMessaging` filtre son fil par
- * ce champ, et la route qui écrit la réponse du coach
- * (`server/auth/routes.ts`) l'utilise pour taguer chaque message — les deux
- * doivent rester le même identifiant, quel que soit le compte staff qui
- * répond réellement (bureau partagé, voir §"Qui l'utilise" du HANDOFF).
- *
- * Si le profil fondateur n'a pas encore de nom renseigné (juste après la
- * toute première installation), renvoie `[]` : `CoachMessaging` affiche
- * alors honnêtement "Aucun coach disponible" plutôt qu'une fiche vide.
- */
-function buildCoachesForStudent(): Array<Record<string, unknown>> {
-  const staffProfile = getProfile<{
-    name?: string;
-    avatar?: string;
-    role?: string;
-    level?: string;
-  }>(DEFAULT_USER_ID);
-
-  if (!staffProfile?.name) return [];
-
-  return [
-    {
-      id: FOUNDER_COACH_ID,
-      name: staffProfile.name,
-      role: staffProfile.role || "Coach",
-      specialty: staffProfile.level || "",
-      avatar: staffProfile.avatar || "",
-      isOnline: true,
-    },
-  ];
-}
-
-/**
- * Fusionne, pour chaque fiche élève, sa vraie photo de profil personnelle
- * (téléversée par l'élève lui-même, `PUT /auth/profile/avatar`) par-dessus
- * `avatar` de la fiche — même résolution que `buildStudentProfile`
- * (`ownProfile.avatar` prioritaire sur `enrolled.avatar`), mais appliquée à
- * TOUTE la collection d'un coup, pour la carte résumé du Suivi des Élèves
- * (`StudentTracking.tsx`), qui affichait jusqu'ici la photo figée sur la
- * fiche même après que l'élève ait changé la sienne — bug signalé par
- * l'utilisateur, la fiche n'ayant jamais eu accès au bureau personnel de
- * l'élève avant ce correctif.
- *
- * Une fiche sans accès élève actif (`getStudentByEnrolledId` renvoie `null`)
- * n'a par construction aucun bureau personnel à consulter : elle repart
- * inchangée.
- */
-function withResolvedStudentAvatars<T extends { id: string; avatar?: unknown }>(
-  enrolledStudents: T[]
-): T[] {
-  return enrolledStudents.map((enrolled) => {
-    const account = getStudentByEnrolledId(enrolled.id);
-    if (!account) return enrolled;
-
-    const ownProfile = getProfile<{ avatar?: string }>(account.userId);
-    if (!ownProfile?.avatar) return enrolled;
-
-    return { ...enrolled, avatar: ownProfile.avatar };
-  });
-}
-
-/**
- * Collections qui restent le suivi PERSONNEL du compte staff connecté
- * (Journal, portefeuilles, badges, alertes de risque, setups) — jamais le
- * bureau partagé `DEFAULT_USER_ID`, contrairement aux fiches élèves, au
- * programme de formation et à la messagerie coach, qu'un élève doit voir
- * comme un seul et même coach cohérent quel que soit le membre du staff
- * connecté. Un coach nouvellement invité démarre donc avec un Journal et des
- * badges à lui, vierges — jamais ceux déjà accumulés par le fondateur.
- *
- * Sans effet sur une session élève : `resolveCollectionUserId` ne s'en sert
- * que pour `kind === "staff"`.
- */
-const PERSONAL_STAFF_COLLECTIONS = new Set<CollectionName>([
-  "trades",
-  "accounts",
-  "badges",
-  "notifications",
-  "setups",
-]);
-
-/**
- * Bureau de données à utiliser pour LIRE/ÉCRIRE une collection donnée, selon
- * l'identité de l'appelant — voir `AuthContext.personalDataUserId` pour le
- * pourquoi de cette distinction personnel/partagé côté staff. Une session
- * élève n'a qu'un seul bureau (`dataUserId` === `personalDataUserId`), donc
- * toujours la même valeur ici quelle que soit la collection.
- */
-function resolveCollectionUserId(auth: AuthContext, name: CollectionName): string {
-  if (auth.kind === "student") return auth.dataUserId;
-  return PERSONAL_STAFF_COLLECTIONS.has(name) ? auth.personalDataUserId : auth.dataUserId;
-}
-
-/**
- * Garantit une ligne `users` pour ce bureau personnel — `trades`/`accounts`/
- * `badges`/`notifications`/`setups` référencent `users(id)` en clé
- * étrangère, et un compte staff invité AVANT ce mécanisme (ou même après :
- * `createInvitedStaffAccount` ne crée qu'une ligne `staff_accounts`, jamais
- * `users`) n'en a aucune tant qu'il n'a rien écrit — la première écriture
- * échouerait sinon (violation de contrainte). Sans effet dès que la ligne
- * existe déjà (le fondateur en a toujours une, `personalDataUserId ===
- * DEFAULT_USER_ID`).
- *
- * Sème un profil minimal cohérent (nom déduit de l'email, capital par
- * défaut) plutôt qu'un objet vide — même contenu que `minimalProfile`
- * (`server/auth/routes.ts`, appelé pour le tout premier compte fondateur) :
- * un coach voit ainsi tout de suite SA propre identité dans "Profil &
- * Options", jamais un écran vide ni, pire, celle du fondateur.
+ * Garantit une ligne `users` pour le bureau de données — utile seulement sur
+ * une base migrée depuis un état antérieur ; sur une base neuve, `/auth/setup`
+ * l'a déjà créée.
  */
 function ensurePersonalUserRow(userId: string): void {
   if (getProfile(userId) !== null) return;
-  const staff = getStaffById(userId);
   saveProfile(
     {
-      name: staff?.name || staff?.email?.split("@")[0] || "Coach",
-      email: staff?.email ?? "",
+      name: "Utilisateur",
+      email: "",
       avatar: "",
-      level: "Coach",
+      level: "Trader",
       joinedDate: new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }),
       startingCapital: 10000,
       currentCapital: 10000,
@@ -344,80 +129,36 @@ function ensurePersonalUserRow(userId: string): void {
 }
 
 /**
- * Rattrape un compte élève dont `badges`/`modules` n'ont jamais été
- * initialisés — normalement copiés depuis le bureau staff partagé au moment
- * de l'invitation (voir `server/auth/routes.ts`), mais un élève invité
- * avant l'existence de ces collections (ou dont le bureau staff n'avait
- * lui-même encore aucune définition à copier ce jour-là) reste bloqué avec
- * une collection vide pour toujours : cette copie ne se produit qu'une
- * fois, à l'invitation, sans mécanisme de rattrapage — exactement le bug
- * signalé ("les badges ne s'affichent pas chez mon élève"). Appelée à
- * chaque chargement d'état élève, mais sans effet dès que la collection a
- * été réellement peuplée une fois (idempotent).
+ * Rattrape les badges MANQUANTS par rapport au catalogue `initialTraderBadges`
+ * — pas seulement quand la collection est totalement vide (`length === 0`) :
+ * un ajout de nouveaux badges au catalogue doit aussi atteindre un compte déjà
+ * peuplé. Idempotent — sans effet une fois que chaque badge du catalogue a sa
+ * copie.
  */
-/**
- * Rattrape les badges MANQUANTS d'un bureau (staff partagé ou élève) par
- * rapport au catalogue `initialTraderBadges` — pas seulement quand la
- * collection est totalement vide (`length === 0`) : un ajout de nouveaux
- * badges au catalogue (ex. les paliers de série de discipline au-delà de 7
- * jours) doit aussi atteindre les comptes déjà peuplés, staff comme élèves
- * déjà invités, sans attendre une réinvitation qui n'aura jamais lieu.
- * Idempotent — sans effet une fois que chaque badge du catalogue a sa copie.
- *
- * `dataUserId` est déjà le bureau PERSONNEL de l'appelant (voir
- * `AuthContext.personalDataUserId`, `resolveCollectionUserId`) — jamais
- * `DEFAULT_USER_ID` tel quel pour un coach, sans quoi il rattraperait les
- * badges déjà débloqués du fondateur au lieu des siens.
- *
- * `asFounder` distingue les deux règles d'id/état déjà en vigueur ailleurs
- * (voir `server/auth/routes.ts`) :
- * - fondateur (`personalDataUserId === DEFAULT_USER_ID`) : id du catalogue
- *   tel quel (`badge-N`), état copié tel quel — décision explicite que SON
- *   profil a tout de débloqué (voir le commentaire en tête de
- *   `initialTraderBadges`).
- * - élève OU coach invité : id préfixé (`${dataUserId}-badge-N`), toujours
- *   reposé verrouillé — jamais un faux badge déjà débloqué. Un coach n'a
- *   pas encore de trade dans son Journal personnel à l'invitation : ses
- *   badges doivent rester à débloquer par lui, exactement comme un élève.
- */
-function backfillMissingBadges(dataUserId: string, asFounder: boolean): void {
+function backfillMissingBadges(dataUserId: string): void {
   const existing = listCollection<{ id: string; [key: string]: unknown }>("badges", dataUserId);
-  const isAlreadyPresent = (definitionId: string) =>
-    asFounder
-      ? existing.some((b) => b.id === definitionId)
-      : existing.some((b) => b.id.endsWith(`-${definitionId}`));
+  const isAlreadyPresent = (definitionId: string) => existing.some((b) => b.id === definitionId);
 
   const missingDefinitions = initialTraderBadges.filter((def) => !isAlreadyPresent(def.id));
   if (missingDefinitions.length === 0) return;
 
-  const newEntries = missingDefinitions.map((def) =>
-    asFounder
-      ? { ...def }
-      : { ...def, id: `${dataUserId}-${def.id}`, unlocked: false, unlockedAt: undefined }
-  );
-  replaceCollection("badges", [...existing, ...newEntries], dataUserId);
+  replaceCollection("badges", [...existing, ...missingDefinitions.map((def) => ({ ...def }))], dataUserId);
 }
 
 /**
- * Resynchronise les badges DÉJÀ présents du fondateur avec le catalogue
- * actuel (`initialTraderBadges`) — `backfillMissingBadges` n'AJOUTE que les
- * badges manquants, il ne met jamais à jour ceux déjà stockés. Sans cette
- * fonction, changer un `rewardXP` ou un `unlockedAt` dans
- * `src/data/mockData.ts` (ex. remonter le total d'XP à 20 000 pour matcher
- * un niveau max relevé) resterait invisible : la copie déjà en base du
- * fondateur garderait ses anciennes valeurs indéfiniment.
+ * Resynchronise les badges DÉJÀ présents avec le catalogue actuel
+ * (`initialTraderBadges`) — `backfillMissingBadges` n'AJOUTE que les badges
+ * manquants, il ne met jamais à jour ceux déjà stockés. Sans cette fonction,
+ * changer un `rewardXP` ou un `unlockedAt` dans `src/data/mockData.ts`
+ * resterait invisible : la copie déjà en base garderait ses anciennes
+ * valeurs indéfiniment.
  *
- * Réservée au fondateur : ses badges "unlocked: true" sont une CONVENTION
- * du catalogue (jamais une vraie progression réclamée), donc entièrement
- * dérivés de `initialTraderBadges` — les resynchroniser en totalité est
- * sans risque. Un coach ou un élève, eux, ont un état `unlocked`/`unlockedAt`
- * RÉELLEMENT gagné par leur propre progression : jamais touché ici, seul
- * `rewardXP` (une caractéristique du catalogue, pas une donnée personnelle)
- * mériterait la même synchronisation le jour où un badge existant change de
- * barème — hors scope aujourd'hui, personne n'en a encore réclamé aucun.
+ * Sans risque ici : ces badges "unlocked: true" sont une CONVENTION du
+ * catalogue (jamais une vraie progression réclamée par un tiers), donc
+ * entièrement dérivés de `initialTraderBadges`.
  */
-function syncFounderBadgeCatalog(founderPersonalId: string): void {
-  const existing = listCollection<{ id: string; [key: string]: unknown }>("badges", founderPersonalId);
+function syncBadgeCatalog(dataUserId: string): void {
+  const existing = listCollection<{ id: string; [key: string]: unknown }>("badges", dataUserId);
   const byId = new Map(initialTraderBadges.map((def) => [def.id, def]));
 
   let changed = false;
@@ -430,102 +171,26 @@ function syncFounderBadgeCatalog(founderPersonalId: string): void {
     return synced;
   });
 
-  if (changed) replaceCollection("badges", next, founderPersonalId);
+  if (changed) replaceCollection("badges", next, dataUserId);
 }
 
-/**
- * Un module masqué (`hidden: true`, voir `VideoAcademy.tsx`) ne doit jamais
- * atteindre un élève — ni à la copie initiale de son programme
- * (`backfillStudentDefaultCollections`), ni dans une réponse `GET /state`
- * pour un élève qui en aurait déjà une copie (créée avant que le module soit
- * masqué). Sans ce filtre, `hidden` n'était appliqué qu'à l'AFFICHAGE côté
- * client : le JSON complet (vidéo, réponses de quiz avec
- * `correctAnswerIndex`) restait lisible via l'onglet Réseau ou un appel
- * direct à l'API. Trouvé en audit de sécurité.
- */
-function stripHiddenModules<T extends { id: string; [key: string]: unknown }>(modules: T[]): T[] {
-  return modules.filter((m) => m.hidden !== true);
-}
-
-function backfillStudentDefaultCollections(dataUserId: string): void {
-  backfillMissingBadges(dataUserId, false);
-
-  // Modules : contenu réel du programme, personnalisable par le fondateur —
-  // copié depuis SON bureau en priorité (source de vérité éditable), avec un
-  // repli sur le contenu par défaut seulement si même celui-ci est vide.
-  if (listCollection("modules", dataUserId).length === 0) {
-    const sharedModules = listCollection<{ id: string; [key: string]: unknown }>("modules", DEFAULT_USER_ID);
-    const source = stripHiddenModules(
-      (sharedModules.length > 0 ? sharedModules : initialModules) as { id: string; [key: string]: unknown }[]
-    );
-    if (source.length > 0) {
-      const personalModules = source.map((mod) => ({ ...mod, id: `${dataUserId}-${mod.id}` }));
-      replaceCollection("modules", personalModules, dataUserId);
-    }
-  }
-}
-
-/**
- * Payload de démarrage : toutes les collections en un aller-retour, dans les
- * formes exactes attendues par le client.
- *
- * Une session élève ne reçoit que les collections listées dans
- * `STUDENT_ALLOWED_COLLECTIONS` (+ son profil reconstruit et ses résultats de
- * quiz) — un filtrage franc côté serveur, pas une forme complète à moitié
- * cachée côté client.
- */
+/** Payload de démarrage : toutes les collections en un aller-retour, dans les formes exactes attendues par le client. */
 api.get("/state", (req, res) => {
   const dataUserId = req.auth!.dataUserId;
 
-  if (req.auth!.kind === "student") {
-    backfillStudentDefaultCollections(dataUserId);
-    res.json({
-      bootstrapped: isBootstrapped(),
-      student: buildStudentProfile(req.auth!.userId),
-      quizResults: getQuizResults(dataUserId),
-      tradingPlan: getTradingPlan(dataUserId),
-      // Annonces du fondateur : jamais scopées par élève (voir
-      // `getAnnouncements`, `server/repositories.ts`) — la même liste part
-      // dans les deux branches de cette route (élève et staff).
-      announcements: getAnnouncements() ?? [],
-      coaches: buildCoachesForStudent(),
-      collections: Object.fromEntries(
-        [...STUDENT_ALLOWED_COLLECTIONS].map((name) => {
-          const collection = listCollection(name, dataUserId);
-          return [name, name === "modules" ? stripHiddenModules(collection) : collection];
-        })
-      ),
-      // Version actuelle de chaque collection modifiable par l'élève —
-      // renvoyée avec la collection elle-même pour que `PUT
-      // /collections/:name` puisse détecter qu'un autre onglet l'a modifiée
-      // entre-temps (voir `CollectionVersionConflictError`).
-      versions: Object.fromEntries(
-        [...STUDENT_ALLOWED_COLLECTIONS].map((name) => [name, getCollectionVersion(name, dataUserId)])
-      ),
-    });
-    return;
-  }
-
-  // Badges : bureau PERSONNEL du compte connecté (voir
-  // `PERSONAL_STAFF_COLLECTIONS`) — un coach invité rattrape ses propres
-  // badges, verrouillés, jamais ceux déjà débloqués du fondateur.
-  ensurePersonalUserRow(req.auth!.personalDataUserId);
-  backfillMissingBadges(req.auth!.personalDataUserId, req.auth!.isOwner);
-  if (req.auth!.isOwner) syncFounderBadgeCatalog(req.auth!.personalDataUserId);
+  ensurePersonalUserRow(dataUserId);
+  backfillMissingBadges(dataUserId);
+  syncBadgeCatalog(dataUserId);
 
   const collections = Object.fromEntries(
     COLLECTION_NAMES.map((name) => {
-      const collectionUserId = resolveCollectionUserId(req.auth!, name);
-      const collection = listCollection(name, collectionUserId);
-      // Collections initialement vides (badges, modules) : retourner undefined
-      // pour que le client tombe sur le fallback (mockData) au démarrage.
-      // Les autres collections (trades, accounts, etc.) retournent l'array même
-      // s'il est vide — c'est l'état correct.
-      if (collection.length === 0 && (name === "badges" || name === "modules")) {
+      const collection = listCollection(name, dataUserId);
+      // Collection initialement vide (badges) : retourner undefined pour que
+      // le client tombe sur le fallback (mockData) au démarrage. Les autres
+      // collections (trades, accounts, etc.) retournent l'array même s'il
+      // est vide — c'est l'état correct.
+      if (collection.length === 0 && name === "badges") {
         return [name, undefined];
-      }
-      if (name === "enrolledStudents") {
-        return [name, withResolvedStudentAvatars(collection as { id: string; avatar?: unknown }[])];
       }
       return [name, collection];
     })
@@ -533,22 +198,14 @@ api.get("/state", (req, res) => {
 
   res.json({
     bootstrapped: isBootstrapped(),
-    student: buildStaffProfile(req.auth!),
-    quizResults: getQuizResults(dataUserId),
-    announcements: getAnnouncements() ?? [],
-    // Verrou optimiste dédié aux annonces (hors du système générique de
-    // collections, voir `saveAnnouncements`) — nécessaire pour publier via
-    // `PUT /auth/announcements`.
-    announcementsVersion: getAnnouncementsVersion(),
+    student: (() => {
+      const profile = getProfile<Record<string, unknown>>(dataUserId);
+      return profile ? { ...profile, isAdmin: true } : null;
+    })(),
     collections,
-    versions: Object.fromEntries(
-      COLLECTION_NAMES.map((name) => [name, getCollectionVersion(name, resolveCollectionUserId(req.auth!, name))])
-    ),
+    versions: Object.fromEntries(COLLECTION_NAMES.map((name) => [name, getCollectionVersion(name, dataUserId)])),
   });
 });
-
-/** Collections que seul un administrateur peut écrire. */
-const ADMIN_ONLY_COLLECTIONS = new Set<CollectionName>(["enrolledStudents"]);
 
 const collectionsRateLimit = createRateLimit({
   windowMs: 15 * 60_000,
@@ -559,10 +216,7 @@ const collectionsRateLimit = createRateLimit({
 /**
  * Cœur de l'écriture d'une collection, partagé par `PUT /collections/:name`
  * ET par la restauration de sauvegarde (`POST /state/restore`) — jamais
- * dupliqué, pour que les deux chemins appliquent exactement les mêmes règles
- * d'autorisation et la même fusion protectrice des messages coach. Toute
- * évolution de cette logique (nouvelle collection réservée, nouvelle règle de
- * fusion) n'a besoin d'être écrite qu'ici.
+ * dupliqué, pour que les deux chemins appliquent exactement les mêmes règles.
  */
 function writeCollectionForAuth(
   auth: AuthContext,
@@ -571,118 +225,21 @@ function writeCollectionForAuth(
   /**
    * Version lue par l'appelant à son dernier chargement — `undefined`
    * désactive la vérification (restauration de sauvegarde : toujours
-   * autoritaire, jamais un client concurrent). Fournie par
-   * `PUT /collections/:name`, chemin normal d'un client vivant qui peut
-   * avoir un autre onglet ouvert sur le même bureau — voir
-   * `CollectionVersionConflictError`, `server/repositories.ts`.
+   * autoritaire, jamais un client concurrent).
    */
   expectedVersion?: number
 ): { ok: true; count: number; version: number } | { ok: false; status: number; error: string } {
-  // Une session élève ne touche jamais qu'à son propre Journal — ni les
-  // collections du bureau staff, ni celles d'un autre élève.
-  if (auth.kind === "student" && !STUDENT_ALLOWED_COLLECTIONS.has(name)) {
-    return { ok: false, status: 403, error: "Action réservée au staff." };
-  }
-
-  // `auth.isAdmin !== true` ne peut aujourd'hui jamais se déclencher — un
-  // élève est déjà arrêté juste au-dessus, et tout compte staff a
-  // `isAdmin: true` forcé. La vraie restriction, depuis l'introduction des
-  // autorisations par coach, est l'autorisation "students" : éditer une
-  // fiche élève (créer, modifier, supprimer) fait partie du Suivi des
-  // Élèves au même titre que les routes dédiées de `server/auth/routes.ts`
-  // (`requirePermission("students")`) — un coach à qui elle a été retirée
-  // ne doit pas pouvoir la contourner par une écriture directe de collection.
-  if (ADMIN_ONLY_COLLECTIONS.has(name) && auth.isAdmin !== true) {
-    return { ok: false, status: 403, error: "Action réservée à l'administrateur." };
-  }
-  if (ADMIN_ONLY_COLLECTIONS.has(name) && auth.kind === "staff" && !hasStaffPermission(auth, "students")) {
-    return { ok: false, status: 403, error: "Autorisation retirée par le fondateur pour cette action." };
-  }
-
   const parsed = collectionPayloadSchema.safeParse(rawPayload);
   if (!parsed.success) {
     return { ok: false, status: 400, error: "Collection invalide." };
   }
 
-  // `collectionPayloadSchema` ne valide qu'un `id` et laisse tout le reste
-  // passer tel quel, et le client envoie toujours le tableau complet tel
-  // qu'il l'avait en mémoire au moment de la modification — jamais un delta.
-  // Pour `messages` côté élève, ces deux faits combinés ouvrent deux
-  // problèmes distincts si on se contente de tout remplacer tel quel :
-  //  1. Un élève pourrait fabriquer un item `sender: "coach"` de toutes
-  //     pièces, qui semblerait alors venir du coach.
-  //  2. Une réponse du coach postée par `POST .../messages` PENDANT que
-  //     l'élève avait déjà son propre tableau (sans cette réponse) chargé en
-  //     mémoire disparaîtrait silencieusement au prochain envoi de l'élève —
-  //     son tableau, ne la contenant pas, l'effacerait purement et
-  //     simplement en écrasant toute la collection.
-  //
-  // Les deux se résolvent avec la même règle : la partie « coach » du fil
-  // reste toujours autoritaire côté serveur, quoi que le client envoie —
-  // un élève ne peut qu'ajouter ou modifier SES PROPRES messages.
-  // Fonction (pas juste une valeur calculée une fois) : appelée une seconde
-  // fois, RE-lue à l'instant, en cas de conflit de version au premier essai
-  // (voir le `catch` plus bas) — sans quoi le nouveau message du coach reçu
-  // ENTRE les deux essais ne serait pas non plus pris en compte au second.
-  const buildMergedStudentMessages = (): typeof parsed.data => {
-    const existingCoachMessages = listCollection<{ id: string; sender?: string; [key: string]: unknown }>(
-      name,
-      resolveCollectionUserId(auth, name)
-    ).filter((m) => m.sender === "coach");
-
-    // Filtrer sur `sender !== "coach"` seul ne suffit pas : `replaceCollection`
-    // fait un upsert par `id` (`ON CONFLICT(id) DO UPDATE`), donc un item
-    // soumis avec un `id` identique à celui d'un vrai message coach — même
-    // avec un `sender` différent — écraserait ce message à l'écriture, l'ordre
-    // du tri par `timestamp` (contrôlé par l'élève sur son propre item)
-    // décidant lequel des deux gagne. On exclut donc en plus tout id qui
-    // appartient déjà à un message coach existant : un tel item est
-    // simplement abandonné plutôt qu'admis sous un id qui n'est pas le sien.
-    const existingCoachIds = new Set(existingCoachMessages.map((m) => m.id));
-    const submittedNonCoach = (
-      parsed.data as { id: string; sender?: string; [key: string]: unknown }[]
-    ).filter((item) => item.sender !== "coach" && !existingCoachIds.has(item.id));
-
-    // Fusionnés puis triés par `timestamp` (ISO 8601 des deux côtés — voir
-    // `handleSendMessage` côté élève et la route de réponse du coach) : les
-    // `id` ne sont pas comparables entre les deux, générés différemment
-    // (horodatage brut côté élève, aléatoire côté coach).
-    const timestampOf = (m: Record<string, unknown>) => (typeof m.timestamp === "string" ? m.timestamp : "");
-    return [...existingCoachMessages, ...submittedNonCoach].sort((a, b) =>
-      timestampOf(a) < timestampOf(b) ? -1 : timestampOf(a) > timestampOf(b) ? 1 : 0
-    ) as typeof parsed.data;
-  };
-
-  let dataToWrite = parsed.data;
-  if (auth.kind === "student" && name === "messages") {
-    dataToWrite = buildMergedStudentMessages();
-  }
+  const dataToWrite = parsed.data;
 
   let newVersion: number;
   try {
-    newVersion = replaceCollection(name, dataToWrite, resolveCollectionUserId(auth, name), expectedVersion);
+    newVersion = replaceCollection(name, dataToWrite, auth.dataUserId, expectedVersion);
   } catch (err) {
-    // Un élève qui envoie un message pile au moment où le coach répond se
-    // heurtait ici à un 409 alors que le merge ci-dessus (toujours relu
-    // depuis l'état courant) aurait pu l'admettre sans rien écraser — le
-    // message partait alors en attente jusqu'au prochain rechargement de
-    // page, invisible au coach entre-temps. Trouvé en audit.
-    //
-    // Un seul nouvel essai, avec la version ET les messages coach RE-lus à
-    // l'INSTANT de cet essai (pas ceux d'avant le conflit) : toujours protégé
-    // par le même verrou de version au second essai, donc un vrai conflit
-    // (ex. un autre onglet du même élève ayant lui aussi ajouté un message)
-    // échoue encore normalement plutôt que d'écraser quoi que ce soit.
-    if (err instanceof CollectionVersionConflictError && auth.kind === "student" && name === "messages") {
-      try {
-        dataToWrite = buildMergedStudentMessages();
-        newVersion = replaceCollection(name, dataToWrite, resolveCollectionUserId(auth, name), err.currentVersion);
-        return { ok: true, count: dataToWrite.length, version: newVersion };
-      } catch (retryErr) {
-        err = retryErr;
-      }
-    }
-
     if (err instanceof CollectionOwnershipConflictError) {
       // Un ou plusieurs `id` soumis appartiennent déjà à un autre bureau
       // (voir le commentaire de `replaceCollection`) — rien n'a été écrit.
@@ -695,11 +252,9 @@ function writeCollectionForAuth(
       };
     }
     if (err instanceof CollectionVersionConflictError) {
-      // Un autre onglet (ou un autre coach sur le même bureau partagé) a
-      // écrit cette collection entre le chargement de CETTE session et
-      // maintenant — rien n'a été écrit, pour ne pas écraser cette autre
-      // modification. Même message que le conflit d'id ci-dessus : dans les
-      // deux cas, la seule action correcte est de recharger.
+      // Un autre onglet a écrit cette collection entre le chargement de
+      // CETTE session et maintenant — rien n'a été écrit, pour ne pas
+      // écraser cette autre modification.
       return {
         ok: false,
         status: 409,
@@ -743,63 +298,20 @@ const profileRateLimit = createRateLimit({
 });
 
 api.put("/profile", profileRateLimit, (req, res) => {
-  // Le profil élève n'existe pas en tant que tel dans ce chantier (pas de
-  // capital, pas d'avatar à gérer côté élève) — cette route reste réservée au
-  // bureau staff.
-  if (req.auth!.kind === "student") {
-    res.status(403).json({ error: "Action réservée au staff." });
-    return;
-  }
-
   const parsed = profileSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Profil invalide.", details: parsed.error.issues });
     return;
   }
 
-  // Forcé à `true`, jamais redérivé d'une valeur lue en base — cette route a
-  // déjà rejeté toute session non-staff plus haut, et tout compte staff a
-  // `isAdmin: true` par invariant (voir `buildStaffProfile`, plus bas dans ce
-  // fichier — même règle, même raison).
+  // Forcé à `true`, jamais redérivé d'une valeur lue en base — cette instance
+  // n'a qu'un seul compte, avec tous les droits.
   const profile: Record<string, unknown> = {
     ...parsed.data,
     isAdmin: true,
   };
 
-  // `hiddenSidebarItems` est le SEUL champ qui n'appartient pas au profil
-  // PERSONNEL de l'appelant, même s'il voyage dans le même objet que le nom,
-  // l'avatar ou le capital côté client — c'est un réglage org-wide que seul
-  // le fondateur peut poser (voir `buildStaffProfile`, qui le lit toujours
-  // depuis le bureau partagé, jamais depuis le profil personnel écrit ici).
-  // Pour un coach, ce champ n'a donc aucune existence légitime dans SA
-  // propre ligne : plutôt que de réinjecter une valeur (celle du bureau
-  // partagé, ou une valeur périmée de son propre profil), on l'écarte
-  // simplement — `buildStaffProfile` la resservira de toute façon depuis la
-  // source autoritaire à la prochaine lecture, quoi que ce PUT ait stocké.
-  if (req.auth?.isOwner !== true) {
-    delete profile.hiddenSidebarItems;
-  }
-
-  saveProfile(profile, req.auth!.personalDataUserId);
-  res.json({ success: true });
-});
-
-const quizResultsRateLimit = createRateLimit({
-  windowMs: 15 * 60_000,
-  max: 30,
-  message: "Trop de mises à jour de résultats. Réessaie dans quelques minutes.",
-});
-
-api.put("/quiz-results", quizResultsRateLimit, (req, res) => {
-  const parsed = quizResultsSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Résultats de quiz invalides.", details: parsed.error.issues });
-    return;
-  }
-
-  // Portée par bureau de données : un élève n'écrit que les siens, jamais
-  // ceux du bureau staff partagé (`dataUserId` fait déjà cette distinction).
-  replaceQuizResults(parsed.data, req.auth!.dataUserId);
+  saveProfile(profile, req.auth!.dataUserId);
   res.json({ success: true });
 });
 
@@ -815,11 +327,6 @@ const stateImportRateLimit = createRateLimit({
  * deux onglets ouverts ne puissent pas réimporter et dupliquer.
  */
 api.post("/state/import", stateImportRateLimit, (req, res) => {
-  if (req.auth!.kind === "student") {
-    res.status(403).json({ error: "Action réservée au staff." });
-    return;
-  }
-
   if (isBootstrapped()) {
     res.status(409).json({ error: "Base déjà amorcée, import ignoré." });
     return;
@@ -840,7 +347,6 @@ api.post("/state/import", stateImportRateLimit, (req, res) => {
   writeFullState({
     student: parsed.data.student ?? getProfile(),
     collections,
-    quizResults: parsed.data.quizResults,
   });
 
   res.json({ success: true, imported: Object.keys(collections) });
@@ -856,12 +362,7 @@ const stateSeedRateLimit = createRateLimit({
  * Amorce la base avec le jeu de démonstration. Appelé par le client quand il
  * découvre une base vierge et qu'il n'a rien à reprendre de son localStorage.
  */
-api.post("/state/seed", stateSeedRateLimit, (req, res) => {
-  if (req.auth!.kind === "student") {
-    res.status(403).json({ error: "Action réservée au staff." });
-    return;
-  }
-
+api.post("/state/seed", stateSeedRateLimit, (_req, res) => {
   if (isBootstrapped()) {
     res.status(409).json({ error: "Base déjà amorcée." });
     return;
@@ -879,32 +380,19 @@ const stateRestoreRateLimit = createRateLimit({
 
 /**
  * Restaure une sauvegarde JSON précédemment exportée (section « Données &
- * Sauvegarde » du profil) — remplace le profil, les collections et les
- * résultats de quiz du bureau de l'appelant SEULEMENT. Contrairement à
- * `/state/import` (réservée au tout premier amorçage, voir plus haut),
- * fonctionne à tout moment sur une base déjà en service : c'est une
- * restauration volontaire de SES PROPRES données par l'appelant, jamais
- * celles d'un autre bureau.
+ * Sauvegarde » du profil) — remplace le profil et les collections du bureau
+ * de l'appelant. Contrairement à `/state/import` (réservée au tout premier
+ * amorçage, voir plus haut), fonctionne à tout moment sur une base déjà en
+ * service.
  *
  * Chaque collection passe par `writeCollectionForAuth`, exactement comme un
- * `PUT /collections/:name` normal : une session élève ne peut restaurer que
- * les collections qui lui sont déjà autorisées, avec la même fusion
- * protectrice des messages coach. Une collection inconnue, refusée ou
+ * `PUT /collections/:name` normal. Une collection inconnue, refusée ou
  * invalide est simplement ignorée (renvoyée dans `skipped`) plutôt que de
  * bloquer toute la restauration — un fichier partiellement corrompu ou
  * modifié à la main ne doit pas empêcher de récupérer le reste.
  */
 api.post("/state/restore", stateRestoreRateLimit, (req, res) => {
   const auth = req.auth!;
-
-  // Autorisation "data" : ne gouverne QUE la restauration (écrase le bureau
-  // de l'appelant depuis un fichier), jamais la lecture/export — un coach a
-  // toujours besoin de lire ses propres données pour utiliser l'app. Sans
-  // objet pour une session élève, qui n'a pas de `permissions`.
-  if (auth.kind === "staff" && !hasStaffPermission(auth, "data")) {
-    res.status(403).json({ error: "Autorisation retirée par le fondateur pour cette action." });
-    return;
-  }
 
   const parsed = importStateSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -915,16 +403,8 @@ api.post("/state/restore", stateRestoreRateLimit, (req, res) => {
   const skipped: string[] = [];
 
   if (parsed.data.student) {
-    // Une session élève n'a pas de profil éditable côté serveur (voir
-    // PUT /profile juste en dessous, réservée au staff) : le profil élève
-    // exporté est de toute façon reconstruit depuis la fiche enrolledStudents
-    // à chaque lecture, jamais depuis un profil restauré ici.
-    if (auth.kind === "student") {
-      skipped.push("student");
-    } else {
-      saveProfile(parsed.data.student, auth.personalDataUserId);
-      imported.push("student");
-    }
+    saveProfile(parsed.data.student, auth.dataUserId);
+    imported.push("student");
   }
 
   for (const [name, payload] of Object.entries(parsed.data.collections ?? {})) {
@@ -938,11 +418,6 @@ api.post("/state/restore", stateRestoreRateLimit, (req, res) => {
     } else {
       skipped.push(name);
     }
-  }
-
-  if (parsed.data.quizResults) {
-    replaceQuizResults(parsed.data.quizResults, auth.dataUserId);
-    imported.push("quizResults");
   }
 
   res.json({ success: true, imported, skipped });

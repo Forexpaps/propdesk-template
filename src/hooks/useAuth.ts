@@ -1,22 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, UNAUTHENTICATED_EVENT, type AuthUser, type StudentAuthUser } from "../lib/api";
+import { api, UNAUTHENTICATED_EVENT, type AuthUser } from "../lib/api";
 import { purgeCacheKeepingPending } from "../lib/pendingChanges";
 
 /**
  * État d'authentification de l'application.
  *
  * - `loading` : la sonde de démarrage est en cours.
- * - `no-account` : la base n'a aucun identifiant staff → première installation.
- * - `unauthenticated` : aucune session (ni staff, ni élève) valide.
- * - `2fa-required` : mot de passe staff vérifié, en attente du second
- *   facteur (`TwoFactorVerifyScreen`) avant qu'une session existe.
- * - `authenticated` : session staff valide, `AcademyApp` peut se monter.
- * - `authenticated-student` : session élève valide, le Journal cloisonné peut
- *   se monter — jamais `AcademyApp`.
+ * - `no-account` : la base n'a aucun compte → première installation.
+ * - `unauthenticated` : aucune session valide.
+ * - `2fa-required` : mot de passe vérifié, en attente du second facteur
+ *   (`TwoFactorVerifyScreen`) avant qu'une session existe.
+ * - `authenticated` : session valide, `TraderApp` peut se monter.
  * - `offline` : le serveur est injoignable. On ne peut alors rien vérifier, et
  *   l'application démarre sur le cache local comme avant l'authentification —
- *   c'est un filet anti-perte de données, assumé (voir le README). Ne
- *   concerne que le monde staff : il n'existe pas de mode hors ligne élève.
+ *   c'est un filet anti-perte de données, assumé (voir le README).
  */
 export type AuthStatus =
   | "loading"
@@ -24,14 +21,11 @@ export type AuthStatus =
   | "unauthenticated"
   | "2fa-required"
   | "authenticated"
-  | "authenticated-student"
   | "offline";
 
 export interface UseAuthResult {
   status: AuthStatus;
   user: AuthUser | null;
-  /** Renseigné seulement quand `status === "authenticated-student"`. */
-  studentUser: StudentAuthUser | null;
   /** Renseigné quand la session vient d'expirer, pour l'expliquer à l'écran. */
   expired: boolean;
   /**
@@ -48,8 +42,6 @@ export interface UseAuthResult {
   setup: (email: string, password: string) => Promise<void>;
   /** Change le mot de passe et lève `mustChangePassword`. */
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
-  studentLogin: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
-  studentChangePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   /** Repasse en `unauthenticated` sans appeler le serveur. */
   markLoggedOut: () => void;
   refresh: () => Promise<void>;
@@ -58,7 +50,6 @@ export interface UseAuthResult {
 export function useAuth(): UseAuthResult {
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [studentUser, setStudentUser] = useState<StudentAuthUser | null>(null);
   const [expired, setExpired] = useState(false);
   const [pendingTwoFactorToken, setPendingTwoFactorToken] = useState<string | null>(null);
   /**
@@ -76,41 +67,22 @@ export function useAuth(): UseAuthResult {
     statusRef.current = status;
   }, [status]);
 
-  /**
-   * Deux mondes de session possibles, deux cookies distincts : on interroge
-   * d'abord `/api/auth/me` (staff, comportement inchangé), et seulement s'il
-   * ne trouve aucune session valide, `/api/auth/student-me`. Un navigateur
-   * n'a normalement jamais les deux à la fois, mais si c'était le cas, le
-   * staff prime.
-   */
   const refresh = useCallback(async () => {
     try {
       const result = await api.fetchMe();
       if (result.state === "authenticated") {
         setUser(result.user);
-        setStudentUser(null);
         setStatus("authenticated");
         setExpired(false);
         return;
       }
 
-      const studentResult = await api.fetchStudentMe();
-      if (studentResult.state === "authenticated") {
-        setUser(null);
-        setStudentUser(studentResult.user);
-        setStatus("authenticated-student");
-        setExpired(false);
-        return;
-      }
-
       setUser(null);
-      setStudentUser(null);
       setStatus(result.state);
     } catch (err) {
       // Échec réseau, pas un refus : on ne peut rien vérifier sans serveur.
       console.warn("[propdesk] Serveur injoignable, mode hors ligne.", err);
       setUser(null);
-      setStudentUser(null);
       setStatus("offline");
     }
   }, []);
@@ -124,47 +96,21 @@ export function useAuth(): UseAuthResult {
    * ou été révoquée. On ramène à l'écran de connexion plutôt que de laisser
    * l'utilisateur travailler dans le vide.
    *
-   * Pour une session ÉLÈVE, ceci vide aussi `localStorage` — même geste que
-   * la déconnexion volontaire (`App.tsx`, `StudentAuthenticatedApp.handleLogout`).
-   * Sans ça, l'expiration NATURELLE d'une session (cas de loin le plus
-   * fréquent en pratique — fermeture d'onglet, cookie qui expire tout seul —
-   * plutôt qu'un clic explicite sur "Déconnexion") laissait le cache
-   * `horizon_student_*` intact. Sur un poste partagé (salle de l'académie),
-   * l'élève suivant qui se connectait pouvait alors se voir *rejouer
-   * automatiquement* les données en attente du précédent
-   * (`useStudentBootstrap`, rejeu silencieux ajouté pour ne jamais laisser une
-   * sauvegarde échouée bloquée) — écrasant son propre journal avec celui d'un
-   * autre élève, sous sa propre session. Faille de sécurité réelle, trouvée en
-   * audit, corrigée ici à la source plutôt qu'au seul point d'entrée du clic.
-   *
-   * Le monde STAFF a son propre mode hors ligne où le cache local peut être
-   * la SEULE copie de modifications non envoyées (voir `AcademyApp.handleLogout`,
-   * qui refuse même de se déconnecter hors ligne pour cette raison) : un
-   * `localStorage.clear()` total détruirait ce filet de sécurité. On applique
-   * donc une purge CIBLÉE (`purgeCacheKeepingPending`) — tout le cache de
-   * lecture disparaît (notamment le roster complet des élèves,
-   * `horizon_enrolled_students`), sauf les clés qui portent une modification
-   * réellement non envoyée. Sans ça, le roster d'un coach dont l'accès vient
-   * d'être révoqué restait lisible en clair indéfiniment sur son poste —
-   * faille trouvée en audit de sécurité.
+   * Le cache local peut être la SEULE copie de modifications non envoyées
+   * (mode hors ligne, voir `TraderApp.handleLogout`, qui refuse même de se
+   * déconnecter hors ligne pour cette raison) : un `localStorage.clear()`
+   * total détruirait ce filet de sécurité. On applique donc une purge CIBLÉE
+   * (`purgeCacheKeepingPending`) — tout le cache de lecture disparaît, sauf
+   * les clés qui portent une modification réellement non envoyée.
    */
   useEffect(() => {
     const onUnauthenticated = () => {
-      if (statusRef.current === "authenticated-student") {
-        try {
-          localStorage.clear();
-        } catch {
-          // Stockage indisponible : il n'y avait alors rien à oublier.
-        }
-      } else if (statusRef.current === "authenticated") {
+      if (statusRef.current === "authenticated") {
         purgeCacheKeepingPending();
       }
       setUser(null);
-      setStudentUser(null);
       setExpired(true);
-      setStatus((prev) =>
-        prev === "authenticated" || prev === "authenticated-student" ? "unauthenticated" : prev
-      );
+      setStatus((prev) => (prev === "authenticated" ? "unauthenticated" : prev));
     };
 
     window.addEventListener(UNAUTHENTICATED_EVENT, onUnauthenticated);
@@ -232,24 +178,8 @@ export function useAuth(): UseAuthResult {
     setUser(result.user);
   }, []);
 
-  const studentLogin = useCallback(async (email: string, password: string, rememberMe = false) => {
-    const result = await api.studentLogin(email, password, rememberMe);
-    setStudentUser(result.user);
-    setExpired(false);
-    setStatus("authenticated-student");
-  }, []);
-
-  const studentChangePassword = useCallback(
-    async (currentPassword: string, newPassword: string) => {
-      const result = await api.studentChangePassword(currentPassword, newPassword);
-      setStudentUser(result.user);
-    },
-    []
-  );
-
   const markLoggedOut = useCallback(() => {
     setUser(null);
-    setStudentUser(null);
     setPendingTwoFactorToken(null);
     setExpired(false);
     setStatus("unauthenticated");
@@ -258,7 +188,6 @@ export function useAuth(): UseAuthResult {
   return {
     status,
     user,
-    studentUser,
     expired,
     login,
     pendingTwoFactorToken,
@@ -267,8 +196,6 @@ export function useAuth(): UseAuthResult {
     cancelTwoFactor,
     setup,
     changePassword,
-    studentLogin,
-    studentChangePassword,
     markLoggedOut,
     refresh,
   };
