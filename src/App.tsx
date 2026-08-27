@@ -117,6 +117,35 @@ function LoadingScreen({ message }: { message: string }) {
 }
 
 /**
+ * Serveur injoignable sans aucune trace d'authentification antérieure sur ce
+ * navigateur (voir `AuthStatus["server-error"]`, `useAuth.ts`). Un écran
+ * d'erreur explicite plutôt que l'application : mieux vaut un visiteur qui
+ * comprend que le déploiement est mal configuré qu'un faux tableau de bord
+ * "connecté" présenté à quelqu'un qui n'a jamais créé de compte.
+ */
+function ServerErrorScreen({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="min-h-screen bg-[#0B0F0E] text-slate-300 flex flex-col items-center justify-center gap-4 font-sans px-4 text-center">
+      <img src="/icon.png" alt="" className="w-10 h-10 rounded-xl" />
+      <p className="text-sm font-bold text-white">Serveur injoignable</p>
+      <p className="text-xs text-slate-500 max-w-sm">
+        Impossible de contacter le serveur pour vérifier ton compte. Si tu
+        viens de déployer cette instance, vérifie que la base de données peut
+        s'initialiser (voir la section « Déployer » du README — SQLite a
+        besoin d'un disque persistant).
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-2 px-4 py-2 rounded-xl bg-[#1B2320] hover:bg-[#232D29] text-slate-300 text-xs font-bold border border-[#232D29]/60 transition-colors"
+      >
+        Réessayer
+      </button>
+    </div>
+  );
+}
+
+/**
  * Porte d'entrée : décide quel écran monter selon l'état d'authentification.
  *
  * Ce composant ne fait *que* `useAuth()`. Le chargement des données vit dans
@@ -149,6 +178,10 @@ export default function App() {
 
   if (status === "no-account") {
     return <SetupScreen onSetup={setup} onRefresh={() => void refresh()} />;
+  }
+
+  if (status === "server-error") {
+    return <ServerErrorScreen onRetry={() => void refresh()} />;
   }
 
   if (status === "unauthenticated") {
