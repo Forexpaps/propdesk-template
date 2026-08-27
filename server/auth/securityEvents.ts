@@ -32,11 +32,10 @@ export interface RecordSecurityEventInput {
  * d'authentification (login, changement de mot de passe, etc.).
  */
 export function recordSecurityEvent(input: RecordSecurityEventInput): void {
-  try {
-    db.prepare(
-      `INSERT INTO security_events (id, created_at, event_type, severity, account_kind, account_email, ip_address, detail)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
+  db.execute({
+    sql: `INSERT INTO security_events (id, created_at, event_type, severity, account_kind, account_email, ip_address, detail)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    args: [
       `evt-${randomBytes(12).toString("base64url")}`,
       new Date().toISOString(),
       input.eventType,
@@ -44,20 +43,30 @@ export function recordSecurityEvent(input: RecordSecurityEventInput): void {
       input.accountKind ?? null,
       input.accountEmail ?? null,
       input.ip ?? null,
-      input.detail ?? ""
-    );
-  } catch (err) {
+      input.detail ?? "",
+    ],
+  }).catch((err) => {
     console.error("[propdesk] Écriture du journal de sécurité échouée.", err);
-  }
+  });
 }
 
 /** Purge RGPD : les IP sont des données personnelles, conservées 90 jours max. */
-export function purgeOldSecurityEvents(): number {
+export async function purgeOldSecurityEvents(): Promise<number> {
   const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
-  return db.prepare("DELETE FROM security_events WHERE created_at <= ?").run(cutoff).changes;
+  const result = await db.execute({
+    sql: "DELETE FROM security_events WHERE created_at <= ?",
+    args: [cutoff],
+  });
+  return result.rowsAffected;
 }
 
 export function startSecurityEventCleanup(): void {
-  purgeOldSecurityEvents();
-  setInterval(purgeOldSecurityEvents, 60 * 60 * 1000).unref();
+  purgeOldSecurityEvents().catch((err) => {
+    console.error("[propdesk] Purge du journal de sécurité échouée.", err);
+  });
+  setInterval(() => {
+    purgeOldSecurityEvents().catch((err) => {
+      console.error("[propdesk] Purge du journal de sécurité échouée.", err);
+    });
+  }, 60 * 60 * 1000).unref();
 }

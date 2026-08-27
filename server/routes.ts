@@ -111,9 +111,9 @@ api.use("/auth", staffRouter);
  * une base migrée depuis un état antérieur ; sur une base neuve, `/auth/setup`
  * l'a déjà créée.
  */
-function ensurePersonalUserRow(userId: string): void {
-  if (getProfile(userId) !== null) return;
-  saveProfile(
+async function ensurePersonalUserRow(userId: string): Promise<void> {
+  if ((await getProfile(userId)) !== null) return;
+  await saveProfile(
     {
       name: "Utilisateur",
       email: "",
@@ -135,14 +135,14 @@ function ensurePersonalUserRow(userId: string): void {
  * peuplé. Idempotent — sans effet une fois que chaque badge du catalogue a sa
  * copie.
  */
-function backfillMissingBadges(dataUserId: string): void {
-  const existing = listCollection<{ id: string; [key: string]: unknown }>("badges", dataUserId);
+async function backfillMissingBadges(dataUserId: string): Promise<void> {
+  const existing = await listCollection<{ id: string; [key: string]: unknown }>("badges", dataUserId);
   const isAlreadyPresent = (definitionId: string) => existing.some((b) => b.id === definitionId);
 
   const missingDefinitions = initialTraderBadges.filter((def) => !isAlreadyPresent(def.id));
   if (missingDefinitions.length === 0) return;
 
-  replaceCollection("badges", [...existing, ...missingDefinitions.map((def) => ({ ...def }))], dataUserId);
+  await replaceCollection("badges", [...existing, ...missingDefinitions.map((def) => ({ ...def }))], dataUserId);
 }
 
 /**
@@ -159,11 +159,13 @@ function backfillMissingBadges(dataUserId: string): void {
  * acquise d'un compte (le fondateur actuel en a plusieurs) à chaque
  * changement du catalogue.
  */
-function syncBadgeCatalog(dataUserId: string): void {
-  const existing = listCollection<{ id: string; unlocked?: boolean; unlockedAt?: string; [key: string]: unknown }>(
-    "badges",
-    dataUserId
-  );
+async function syncBadgeCatalog(dataUserId: string): Promise<void> {
+  const existing = await listCollection<{
+    id: string;
+    unlocked?: boolean;
+    unlockedAt?: string;
+    [key: string]: unknown;
+  }>("badges", dataUserId);
   const byId = new Map(initialTraderBadges.map((def) => [def.id, def]));
 
   let changed = false;
@@ -176,41 +178,47 @@ function syncBadgeCatalog(dataUserId: string): void {
     return synced;
   });
 
-  if (changed) replaceCollection("badges", next, dataUserId);
+  if (changed) await replaceCollection("badges", next, dataUserId);
 }
 
 /** Payload de démarrage : toutes les collections en un aller-retour, dans les formes exactes attendues par le client. */
-api.get("/state", (req, res) => {
-  const dataUserId = req.auth!.dataUserId;
+api.get(
+  "/state",
+  wrap(async (req, res) => {
+    const dataUserId = req.auth!.dataUserId;
 
-  ensurePersonalUserRow(dataUserId);
-  backfillMissingBadges(dataUserId);
-  syncBadgeCatalog(dataUserId);
+    await ensurePersonalUserRow(dataUserId);
+    await backfillMissingBadges(dataUserId);
+    await syncBadgeCatalog(dataUserId);
 
-  const collections = Object.fromEntries(
-    COLLECTION_NAMES.map((name) => {
-      const collection = listCollection(name, dataUserId);
-      // Collection initialement vide (badges) : retourner undefined pour que
-      // le client tombe sur le fallback (mockData) au démarrage. Les autres
-      // collections (trades, accounts, etc.) retournent l'array même s'il
-      // est vide — c'est l'état correct.
-      if (collection.length === 0 && name === "badges") {
-        return [name, undefined];
-      }
-      return [name, collection];
-    })
-  );
+    const collectionEntries = await Promise.all(
+      COLLECTION_NAMES.map(async (name) => {
+        const collection = await listCollection(name, dataUserId);
+        // Collection initialement vide (badges) : retourner undefined pour que
+        // le client tombe sur le fallback (mockData) au démarrage. Les autres
+        // collections (trades, accounts, etc.) retournent l'array même s'il
+        // est vide — c'est l'état correct.
+        if (collection.length === 0 && name === "badges") {
+          return [name, undefined] as const;
+        }
+        return [name, collection] as const;
+      })
+    );
+    const collections = Object.fromEntries(collectionEntries);
 
-  res.json({
-    bootstrapped: isBootstrapped(),
-    student: (() => {
-      const profile = getProfile<Record<string, unknown>>(dataUserId);
-      return profile ? { ...profile, isAdmin: true } : null;
-    })(),
-    collections,
-    versions: Object.fromEntries(COLLECTION_NAMES.map((name) => [name, getCollectionVersion(name, dataUserId)])),
-  });
-});
+    const profile = await getProfile<Record<string, unknown>>(dataUserId);
+    const versionEntries = await Promise.all(
+      COLLECTION_NAMES.map(async (name) => [name, await getCollectionVersion(name, dataUserId)] as const)
+    );
+
+    res.json({
+      bootstrapped: await isBootstrapped(),
+      student: profile ? { ...profile, isAdmin: true } : null,
+      collections,
+      versions: Object.fromEntries(versionEntries),
+    });
+  })
+);
 
 const collectionsRateLimit = createRateLimit({
   windowMs: 15 * 60_000,
@@ -223,7 +231,7 @@ const collectionsRateLimit = createRateLimit({
  * ET par la restauration de sauvegarde (`POST /state/restore`) — jamais
  * dupliqué, pour que les deux chemins appliquent exactement les mêmes règles.
  */
-function writeCollectionForAuth(
+async function writeCollectionForAuth(
   auth: AuthContext,
   name: CollectionName,
   rawPayload: unknown,
@@ -233,7 +241,7 @@ function writeCollectionForAuth(
    * autoritaire, jamais un client concurrent).
    */
   expectedVersion?: number
-): { ok: true; count: number; version: number } | { ok: false; status: number; error: string } {
+): Promise<{ ok: true; count: number; version: number } | { ok: false; status: number; error: string }> {
   const parsed = collectionPayloadSchema.safeParse(rawPayload);
   if (!parsed.success) {
     return { ok: false, status: 400, error: "Collection invalide." };
@@ -243,7 +251,7 @@ function writeCollectionForAuth(
 
   let newVersion: number;
   try {
-    newVersion = replaceCollection(name, dataToWrite, auth.dataUserId, expectedVersion);
+    newVersion = await replaceCollection(name, dataToWrite, auth.dataUserId, expectedVersion);
   } catch (err) {
     if (err instanceof CollectionOwnershipConflictError) {
       // Un ou plusieurs `id` soumis appartiennent déjà à un autre bureau
@@ -271,30 +279,34 @@ function writeCollectionForAuth(
   return { ok: true, count: dataToWrite.length, version: newVersion };
 }
 
-api.put("/collections/:name", collectionsRateLimit, (req, res) => {
-  const name = req.params.name as CollectionName;
-  if (!COLLECTION_NAMES.includes(name)) {
-    res.status(404).json({ error: `Collection inconnue : ${req.params.name}` });
-    return;
-  }
+api.put(
+  "/collections/:name",
+  collectionsRateLimit,
+  wrap(async (req, res) => {
+    const name = req.params.name as CollectionName;
+    if (!COLLECTION_NAMES.includes(name)) {
+      res.status(404).json({ error: `Collection inconnue : ${req.params.name}` });
+      return;
+    }
 
-  // Corps `{ items, version }` — `version` est la valeur renvoyée par le
-  // dernier `GET /state` ou la dernière écriture réussie pour cette
-  // collection (voir `versions` dans la réponse de bootstrap plus bas, et
-  // `useSyncedState`/`api.ts` côté client). Absente ou non numérique :
-  // traitée comme "pas de vérification demandée" plutôt que rejetée, pour
-  // ne pas casser un appel direct à l'API qui ignorerait ce détail.
-  const body = req.body as { items?: unknown; version?: unknown };
-  const items = body && typeof body === "object" && "items" in body ? body.items : req.body;
-  const version = typeof body?.version === "number" ? body.version : undefined;
+    // Corps `{ items, version }` — `version` est la valeur renvoyée par le
+    // dernier `GET /state` ou la dernière écriture réussie pour cette
+    // collection (voir `versions` dans la réponse de bootstrap plus bas, et
+    // `useSyncedState`/`api.ts` côté client). Absente ou non numérique :
+    // traitée comme "pas de vérification demandée" plutôt que rejetée, pour
+    // ne pas casser un appel direct à l'API qui ignorerait ce détail.
+    const body = req.body as { items?: unknown; version?: unknown };
+    const items = body && typeof body === "object" && "items" in body ? body.items : req.body;
+    const version = typeof body?.version === "number" ? body.version : undefined;
 
-  const result = writeCollectionForAuth(req.auth!, name, items, version);
-  if (!result.ok) {
-    res.status(result.status).json({ error: result.error });
-    return;
-  }
-  res.json({ success: true, count: result.count, version: result.version });
-});
+    const result = await writeCollectionForAuth(req.auth!, name, items, version);
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    res.json({ success: true, count: result.count, version: result.version });
+  })
+);
 
 const profileRateLimit = createRateLimit({
   windowMs: 15 * 60_000,
@@ -302,23 +314,27 @@ const profileRateLimit = createRateLimit({
   message: "Trop de mises à jour du profil. Réessaie dans quelques minutes.",
 });
 
-api.put("/profile", profileRateLimit, (req, res) => {
-  const parsed = profileSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Profil invalide.", details: parsed.error.issues });
-    return;
-  }
+api.put(
+  "/profile",
+  profileRateLimit,
+  wrap(async (req, res) => {
+    const parsed = profileSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Profil invalide.", details: parsed.error.issues });
+      return;
+    }
 
-  // Forcé à `true`, jamais redérivé d'une valeur lue en base — cette instance
-  // n'a qu'un seul compte, avec tous les droits.
-  const profile: Record<string, unknown> = {
-    ...parsed.data,
-    isAdmin: true,
-  };
+    // Forcé à `true`, jamais redérivé d'une valeur lue en base — cette instance
+    // n'a qu'un seul compte, avec tous les droits.
+    const profile: Record<string, unknown> = {
+      ...parsed.data,
+      isAdmin: true,
+    };
 
-  saveProfile(profile, req.auth!.dataUserId);
-  res.json({ success: true });
-});
+    await saveProfile(profile, req.auth!.dataUserId);
+    res.json({ success: true });
+  })
+);
 
 const stateImportRateLimit = createRateLimit({
   windowMs: 15 * 60_000,
@@ -331,31 +347,35 @@ const stateImportRateLimit = createRateLimit({
  * la persistance serveur existe. Refusée si la base est déjà amorcée, pour que
  * deux onglets ouverts ne puissent pas réimporter et dupliquer.
  */
-api.post("/state/import", stateImportRateLimit, (req, res) => {
-  if (isBootstrapped()) {
-    res.status(409).json({ error: "Base déjà amorcée, import ignoré." });
-    return;
-  }
+api.post(
+  "/state/import",
+  stateImportRateLimit,
+  wrap(async (req, res) => {
+    if (await isBootstrapped()) {
+      res.status(409).json({ error: "Base déjà amorcée, import ignoré." });
+      return;
+    }
 
-  const parsed = importStateSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "État importé invalide.", details: parsed.error.issues });
-    return;
-  }
+    const parsed = importStateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "État importé invalide.", details: parsed.error.issues });
+      return;
+    }
 
-  const collections = Object.fromEntries(
-    Object.entries(parsed.data.collections ?? {}).filter(([name]) =>
-      COLLECTION_NAMES.includes(name as CollectionName)
-    )
-  ) as Partial<Record<CollectionName, { id: string }[]>>;
+    const collections = Object.fromEntries(
+      Object.entries(parsed.data.collections ?? {}).filter(([name]) =>
+        COLLECTION_NAMES.includes(name as CollectionName)
+      )
+    ) as Partial<Record<CollectionName, { id: string }[]>>;
 
-  writeFullState({
-    student: parsed.data.student ?? getProfile(),
-    collections,
-  });
+    await writeFullState({
+      student: parsed.data.student ?? (await getProfile()),
+      collections,
+    });
 
-  res.json({ success: true, imported: Object.keys(collections) });
-});
+    res.json({ success: true, imported: Object.keys(collections) });
+  })
+);
 
 const stateSeedRateLimit = createRateLimit({
   windowMs: 15 * 60_000,
@@ -367,15 +387,19 @@ const stateSeedRateLimit = createRateLimit({
  * Amorce la base avec le jeu de démonstration. Appelé par le client quand il
  * découvre une base vierge et qu'il n'a rien à reprendre de son localStorage.
  */
-api.post("/state/seed", stateSeedRateLimit, (_req, res) => {
-  if (isBootstrapped()) {
-    res.status(409).json({ error: "Base déjà amorcée." });
-    return;
-  }
+api.post(
+  "/state/seed",
+  stateSeedRateLimit,
+  wrap(async (_req, res) => {
+    if (await isBootstrapped()) {
+      res.status(409).json({ error: "Base déjà amorcée." });
+      return;
+    }
 
-  seedDemoData();
-  res.json({ success: true });
-});
+    await seedDemoData();
+    res.json({ success: true });
+  })
+);
 
 const stateRestoreRateLimit = createRateLimit({
   windowMs: 15 * 60_000,
@@ -396,37 +420,41 @@ const stateRestoreRateLimit = createRateLimit({
  * bloquer toute la restauration — un fichier partiellement corrompu ou
  * modifié à la main ne doit pas empêcher de récupérer le reste.
  */
-api.post("/state/restore", stateRestoreRateLimit, (req, res) => {
-  const auth = req.auth!;
+api.post(
+  "/state/restore",
+  stateRestoreRateLimit,
+  wrap(async (req, res) => {
+    const auth = req.auth!;
 
-  const parsed = importStateSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Fichier de sauvegarde invalide.", details: parsed.error.issues });
-    return;
-  }
-  const imported: string[] = [];
-  const skipped: string[] = [];
-
-  if (parsed.data.student) {
-    saveProfile(parsed.data.student, auth.dataUserId);
-    imported.push("student");
-  }
-
-  for (const [name, payload] of Object.entries(parsed.data.collections ?? {})) {
-    if (!COLLECTION_NAMES.includes(name as CollectionName)) {
-      skipped.push(name);
-      continue;
+    const parsed = importStateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Fichier de sauvegarde invalide.", details: parsed.error.issues });
+      return;
     }
-    const result = writeCollectionForAuth(auth, name as CollectionName, payload);
-    if (result.ok) {
-      imported.push(name);
-    } else {
-      skipped.push(name);
-    }
-  }
+    const imported: string[] = [];
+    const skipped: string[] = [];
 
-  res.json({ success: true, imported, skipped });
-});
+    if (parsed.data.student) {
+      await saveProfile(parsed.data.student, auth.dataUserId);
+      imported.push("student");
+    }
+
+    for (const [name, payload] of Object.entries(parsed.data.collections ?? {})) {
+      if (!COLLECTION_NAMES.includes(name as CollectionName)) {
+        skipped.push(name);
+        continue;
+      }
+      const result = await writeCollectionForAuth(auth, name as CollectionName, payload);
+      if (result.ok) {
+        imported.push(name);
+      } else {
+        skipped.push(name);
+      }
+    }
+
+    res.json({ success: true, imported, skipped });
+  })
+);
 
 /**
  * Gestionnaire d'erreurs : une exception non prévue renvoie un 500 propre.

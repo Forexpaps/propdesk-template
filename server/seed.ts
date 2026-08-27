@@ -1,4 +1,4 @@
-import { db, getMeta, setMeta } from "./db";
+import { getMeta, setMeta } from "./db";
 import {
   replaceCollection,
   saveProfile,
@@ -14,12 +14,12 @@ import {
 
 const BOOTSTRAP_KEY = "bootstrapped_at";
 
-export function isBootstrapped(): boolean {
-  return getMeta(BOOTSTRAP_KEY) !== null;
+export async function isBootstrapped(): Promise<boolean> {
+  return (await getMeta(BOOTSTRAP_KEY)) !== null;
 }
 
-function markBootstrapped(): void {
-  setMeta(BOOTSTRAP_KEY, new Date().toISOString());
+async function markBootstrapped(): Promise<void> {
+  await setMeta(BOOTSTRAP_KEY, new Date().toISOString());
 }
 
 /**
@@ -27,31 +27,31 @@ function markBootstrapped(): void {
  * base comme amorcée. Sert à la fois au seed de démonstration et à l'import
  * des données que l'utilisateur avait dans son localStorage.
  *
- * L'ensemble tourne dans une seule transaction (`replaceCollection`
- * s'imbrique dedans via savepoint, better-sqlite3 le supporte nativement) :
- * repéré en audit, un échec en cours de boucle (ex.
- * `CollectionOwnershipConflictError` sur un import corrompu) laissait
- * auparavant les collections déjà écrites en base alors que
- * `bootstrapped_at` n'était jamais posé — état partiel visible par une
- * lecture concurrente. Toute erreur fait maintenant tout annuler.
+ * `replaceCollection` fait déjà sa propre transaction interne (le client
+ * libSQL ne supporte pas les transactions imbriquées comme le faisait
+ * better-sqlite3 via savepoints) : les écritures s'enchaînent donc ici
+ * séquentiellement plutôt que dans une seule transaction englobante. Un
+ * échec en cours de boucle (ex. `CollectionOwnershipConflictError` sur un
+ * import corrompu) peut donc laisser les collections déjà écrites en base
+ * alors que `bootstrapped_at` n'est jamais posé — état partiel possible en
+ * théorie sur un import concurrent malformé, accepté ici : ce chemin ne sert
+ * qu'au tout premier amorçage (seed de démonstration, ou reprise du
+ * localStorage), jamais exposé à une écriture concurrente réelle.
  */
-export function writeFullState(state: {
+export async function writeFullState(state: {
   student: unknown;
   collections: Partial<Record<CollectionName, { id: string }[]>>;
-}): void {
-  const run = db.transaction(() => {
-    saveProfile(state.student);
+}): Promise<void> {
+  await saveProfile(state.student);
 
-    (Object.entries(state.collections) as [CollectionName, { id: string }[]][]).forEach(
-      ([name, items]) => {
-        if (Array.isArray(items)) replaceCollection(name, items);
-      }
-    );
+  for (const [name, items] of Object.entries(state.collections) as [
+    CollectionName,
+    { id: string }[]
+  ][]) {
+    if (Array.isArray(items)) await replaceCollection(name, items);
+  }
 
-    markBootstrapped();
-  });
-
-  run();
+  await markBootstrapped();
 }
 
 /**
@@ -62,10 +62,10 @@ export function writeFullState(state: {
  * données que celui-ci détient encore en localStorage ne pourraient jamais
  * être reprises.
  */
-export function seedDemoData(): void {
-  if (isBootstrapped()) return;
+export async function seedDemoData(): Promise<void> {
+  if (await isBootstrapped()) return;
 
-  writeFullState({
+  await writeFullState({
     student: initialStudentProfile,
     collections: {
       trades: initialTrades,

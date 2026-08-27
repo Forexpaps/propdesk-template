@@ -60,30 +60,28 @@ export function normalizeEmail(email: string): string {
  * verrouille la route de setup — sans quoi n'importe qui pourrait créer le
  * compte à distance. Cette instance n'accueille jamais qu'un seul compte.
  */
-export function hasAnyStaffAccount(): boolean {
-  const row = db.prepare("SELECT 1 FROM staff_accounts LIMIT 1").get();
-  return row !== undefined;
+export async function hasAnyStaffAccount(): Promise<boolean> {
+  const result = await db.execute("SELECT 1 FROM staff_accounts LIMIT 1");
+  return result.rows.length > 0;
 }
 
-export function getStaffByEmail(email: string): StaffAccount | null {
-  const row = db
-    .prepare(
-      `SELECT id, name, email, email_lower, password_hash, must_change_password
-       FROM staff_accounts WHERE email_lower = ?`
-    )
-    .get(normalizeEmail(email)) as StaffAccountRow | undefined;
-
+export async function getStaffByEmail(email: string): Promise<StaffAccount | null> {
+  const result = await db.execute({
+    sql: `SELECT id, name, email, email_lower, password_hash, must_change_password
+       FROM staff_accounts WHERE email_lower = ?`,
+    args: [normalizeEmail(email)],
+  });
+  const row = result.rows[0] as unknown as StaffAccountRow | undefined;
   return row ? toStaffAccount(row) : null;
 }
 
-export function getStaffById(id: string): StaffAccount | null {
-  const row = db
-    .prepare(
-      `SELECT id, name, email, email_lower, password_hash, must_change_password
-       FROM staff_accounts WHERE id = ?`
-    )
-    .get(id) as StaffAccountRow | undefined;
-
+export async function getStaffById(id: string): Promise<StaffAccount | null> {
+  const result = await db.execute({
+    sql: `SELECT id, name, email, email_lower, password_hash, must_change_password
+       FROM staff_accounts WHERE id = ?`,
+    args: [id],
+  });
+  const row = result.rows[0] as unknown as StaffAccountRow | undefined;
   return row ? toStaffAccount(row) : null;
 }
 
@@ -93,38 +91,41 @@ export function getStaffById(id: string): StaffAccount | null {
  * Réutilise `DEFAULT_USER_ID` comme identifiant : il n'y a qu'un compte par
  * déploiement, confondu avec le bureau de données.
  */
-export function createFirstStaffAccount(input: { email: string; passwordHash: string }): void {
+export async function createFirstStaffAccount(input: { email: string; passwordHash: string }): Promise<void> {
   const now = new Date().toISOString();
-  db.prepare(
-    `INSERT INTO staff_accounts
+  await db.execute({
+    sql: `INSERT INTO staff_accounts
        (id, name, email, email_lower, password_hash, must_change_password, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 0, ?, ?)`
-  ).run(
-    DEFAULT_USER_ID,
-    input.email.split("@")[0] || "Utilisateur",
-    input.email.trim(),
-    normalizeEmail(input.email),
-    input.passwordHash,
-    now,
-    now
-  );
+     VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
+    args: [
+      DEFAULT_USER_ID,
+      input.email.split("@")[0] || "Utilisateur",
+      input.email.trim(),
+      normalizeEmail(input.email),
+      input.passwordHash,
+      now,
+      now,
+    ],
+  });
 }
 
 /** Remplace le hash d'un compte. Sert au re-hachage transparent après connexion. */
-export function updatePasswordHash(id: string, passwordHash: string): void {
-  db.prepare(
-    "UPDATE staff_accounts SET password_hash = ?, updated_at = ? WHERE id = ?"
-  ).run(passwordHash, new Date().toISOString(), id);
+export async function updatePasswordHash(id: string, passwordHash: string): Promise<void> {
+  await db.execute({
+    sql: "UPDATE staff_accounts SET password_hash = ?, updated_at = ? WHERE id = ?",
+    args: [passwordHash, new Date().toISOString(), id],
+  });
 }
 
 /**
  * Remplace le mot de passe ET lève le drapeau d'obligation de changement, en
  * une seule écriture — c'est le chemin de `/auth/change-password`.
  */
-export function setPassword(id: string, passwordHash: string): void {
-  db.prepare(
-    "UPDATE staff_accounts SET password_hash = ?, must_change_password = 0, updated_at = ? WHERE id = ?"
-  ).run(passwordHash, new Date().toISOString(), id);
+export async function setPassword(id: string, passwordHash: string): Promise<void> {
+  await db.execute({
+    sql: "UPDATE staff_accounts SET password_hash = ?, must_change_password = 0, updated_at = ? WHERE id = ?",
+    args: [passwordHash, new Date().toISOString(), id],
+  });
 }
 
 /**
@@ -135,15 +136,16 @@ export function setPassword(id: string, passwordHash: string): void {
  * base neuve. Un profil existant n'est jamais écrasé : c'est ce qui préserve
  * les données lors de l'installation sur une base déjà peuplée.
  */
-export function ensureUserRow(profile: Record<string, unknown>): void {
-  const existing = db
-    .prepare("SELECT 1 FROM users WHERE id = ?")
-    .get(DEFAULT_USER_ID);
+export async function ensureUserRow(profile: Record<string, unknown>): Promise<void> {
+  const existing = await db.execute({
+    sql: "SELECT 1 FROM users WHERE id = ?",
+    args: [DEFAULT_USER_ID],
+  });
 
-  if (existing === undefined) {
-    db.prepare("INSERT INTO users (id, payload) VALUES (?, ?)").run(
-      DEFAULT_USER_ID,
-      JSON.stringify(profile)
-    );
+  if (existing.rows.length === 0) {
+    await db.execute({
+      sql: "INSERT INTO users (id, payload) VALUES (?, ?)",
+      args: [DEFAULT_USER_ID, JSON.stringify(profile)],
+    });
   }
 }

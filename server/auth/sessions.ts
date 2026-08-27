@@ -95,23 +95,17 @@ export function readCookie(req: Request, name: string): string | null {
  * Les sessions existantes ne sont pas révoquées — décision produit : plusieurs
  * appareils peuvent rester connectés en parallèle.
  */
-export function createSession(userId: string, userAgent?: string): string {
+export async function createSession(userId: string, userAgent?: string): Promise<string> {
   const token = randomBytes(32).toString("base64url");
   const now = new Date();
   const nowIso = now.toISOString();
   const expiresIso = new Date(now.getTime() + TTL_MS).toISOString();
 
-  db.prepare(
-    `INSERT INTO sessions (id, user_id, created_at, expires_at, last_seen_at, user_agent)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(
-    fingerprint(token),
-    userId,
-    nowIso,
-    expiresIso,
-    nowIso,
-    userAgent?.slice(0, 200) ?? null
-  );
+  await db.execute({
+    sql: `INSERT INTO sessions (id, user_id, created_at, expires_at, last_seen_at, user_agent)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [fingerprint(token), userId, nowIso, expiresIso, nowIso, userAgent?.slice(0, 200) ?? null],
+  });
 
   return token;
 }
@@ -124,34 +118,37 @@ export function createSession(userId: string, userAgent?: string): string {
  *
  * Prolonge la session si la dernière vue est ancienne.
  */
-export function validateSession(token: string): SessionRecord | null {
+export async function validateSession(token: string): Promise<SessionRecord | null> {
   const id = fingerprint(token);
   const nowIso = new Date().toISOString();
   const absoluteCutoffIso = new Date(Date.now() - ABSOLUTE_TTL_MS).toISOString();
 
-  const row = db
-    .prepare(
-      `SELECT id, user_id, last_seen_at FROM sessions
-       WHERE id = ? AND expires_at > ? AND created_at > ?`
-    )
-    .get(id, nowIso, absoluteCutoffIso) as { id: string; user_id: string; last_seen_at: string } | undefined;
+  const result = await db.execute({
+    sql: `SELECT id, user_id, last_seen_at FROM sessions
+       WHERE id = ? AND expires_at > ? AND created_at > ?`,
+    args: [id, nowIso, absoluteCutoffIso],
+  });
+  const row = result.rows[0] as unknown as
+    | { id: string; user_id: string; last_seen_at: string }
+    | undefined;
 
   if (!row) return null;
 
   const lastSeen = Date.parse(row.last_seen_at);
   if (Number.isNaN(lastSeen) || Date.now() - lastSeen > SLIDING_THRESHOLD_MS) {
     const expiresIso = new Date(Date.now() + TTL_MS).toISOString();
-    db.prepare(
-      "UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?"
-    ).run(nowIso, expiresIso, id);
+    await db.execute({
+      sql: "UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?",
+      args: [nowIso, expiresIso, id],
+    });
   }
 
   return { id: row.id, userId: row.user_id };
 }
 
 /** Révoque une session précise. Idempotent. */
-export function destroySession(token: string): void {
-  db.prepare("DELETE FROM sessions WHERE id = ?").run(fingerprint(token));
+export async function destroySession(token: string): Promise<void> {
+  await db.execute({ sql: "DELETE FROM sessions WHERE id = ?", args: [fingerprint(token)] });
 }
 
 /**
@@ -170,11 +167,13 @@ export function destroySession(token: string): void {
  * FORCÉ après invitation l'utilisait, où l'effet passait inaperçu — l'écran
  * suivant est de toute façon le tableau de bord fraîchement chargé).
  */
-export function destroyOtherSessions(userId: string, currentToken: string): number {
+export async function destroyOtherSessions(userId: string, currentToken: string): Promise<number> {
   const currentId = fingerprint(currentToken);
-  return db
-    .prepare("DELETE FROM sessions WHERE user_id = ? AND id != ?")
-    .run(userId, currentId).changes;
+  const result = await db.execute({
+    sql: "DELETE FROM sessions WHERE user_id = ? AND id != ?",
+    args: [userId, currentId],
+  });
+  return result.rowsAffected;
 }
 
 /**
@@ -183,13 +182,14 @@ export function destroyOtherSessions(userId: string, currentToken: string): numb
  * Hygiène, pas sécurité : `validateSession` filtre déjà sur l'expiration.
  * Renvoie le nombre de lignes supprimées.
  */
-export function purgeExpiredSessions(): number {
+export async function purgeExpiredSessions(): Promise<number> {
   const nowIso = new Date().toISOString();
   const absoluteCutoffIso = new Date(Date.now() - ABSOLUTE_TTL_MS).toISOString();
-  const result = db
-    .prepare("DELETE FROM sessions WHERE expires_at <= ? OR created_at <= ?")
-    .run(nowIso, absoluteCutoffIso);
-  return result.changes;
+  const result = await db.execute({
+    sql: "DELETE FROM sessions WHERE expires_at <= ? OR created_at <= ?",
+    args: [nowIso, absoluteCutoffIso],
+  });
+  return result.rowsAffected;
 }
 
 /**
@@ -197,10 +197,19 @@ export function purgeExpiredSessions(): number {
  *
  * `.unref()` est indispensable : sans lui, le minuteur garde la boucle
  * d'événements active et le processus ne se termine jamais proprement.
+ * Le rejet éventuel de la purge (asynchrone désormais) est intercepté ici :
+ * sans ce filet, une panne transitoire de la base deviendrait un rejet de
+ * promesse non géré et ferait planter le processus.
  */
 export function startSessionCleanup(): void {
-  purgeExpiredSessions();
-  setInterval(purgeExpiredSessions, 60 * 60 * 1000).unref();
+  purgeExpiredSessions().catch((err) => {
+    console.error("[propdesk] Purge des sessions expirées échouée.", err);
+  });
+  setInterval(() => {
+    purgeExpiredSessions().catch((err) => {
+      console.error("[propdesk] Purge des sessions expirées échouée.", err);
+    });
+  }, 60 * 60 * 1000).unref();
 }
 
 /**

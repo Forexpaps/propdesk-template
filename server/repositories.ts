@@ -48,10 +48,15 @@ export class CollectionVersionConflictError extends Error {
 }
 
 /** Version actuelle d'une collection pour un utilisateur — `0` si jamais écrite. */
-export function getCollectionVersion(name: CollectionName, userId: string = DEFAULT_USER_ID): number {
-  const row = db
-    .prepare("SELECT version FROM collection_versions WHERE user_id = ? AND name = ?")
-    .get(userId, name) as { version: number } | undefined;
+export async function getCollectionVersion(
+  name: CollectionName,
+  userId: string = DEFAULT_USER_ID
+): Promise<number> {
+  const result = await db.execute({
+    sql: "SELECT version FROM collection_versions WHERE user_id = ? AND name = ?",
+    args: [userId, name],
+  });
+  const row = result.rows[0] as unknown as { version: number } | undefined;
   return row?.version ?? 0;
 }
 
@@ -78,17 +83,16 @@ function safeParsePayload<T>(payload: string, context: string): T | null {
   }
 }
 
-export function listCollection<T extends WithId>(
+export async function listCollection<T extends WithId>(
   name: CollectionName,
   userId: string = DEFAULT_USER_ID
-): T[] {
-  const rows = db
-    .prepare(
-      `SELECT id, payload FROM ${TABLES[name]} WHERE user_id = ? ORDER BY position ASC`
-    )
-    .all(userId) as { id: string; payload: string }[];
+): Promise<T[]> {
+  const result = await db.execute({
+    sql: `SELECT id, payload FROM ${TABLES[name]} WHERE user_id = ? ORDER BY position ASC`,
+    args: [userId],
+  });
 
-  return rows
+  return (result.rows as unknown as { id: string; payload: string }[])
     .map((r) => safeParsePayload<T>(r.payload, `${TABLES[name]}#${r.id}`))
     .filter((item): item is T => item !== null);
 }
@@ -104,7 +108,7 @@ export function listCollection<T extends WithId>(
  * en vidage puis réinsertion complète : une ligne qui continue d'exister par
  * son `id` est mise à jour en place, jamais recréée.
  */
-export function replaceCollection<T extends WithId>(
+export async function replaceCollection<T extends WithId>(
   name: CollectionName,
   items: T[],
   userId: string = DEFAULT_USER_ID,
@@ -117,43 +121,37 @@ export function replaceCollection<T extends WithId>(
    * entre-temps par un autre onglet/coach.
    */
   expectedVersion?: number
-): number {
+): Promise<number> {
   const table = TABLES[name];
   const promoted = PROMOTED[name] ?? [];
   const columns = ["id", "user_id", "position", ...promoted, "payload"];
   const placeholders = columns.map(() => "?").join(", ");
   const updateSet = [...promoted, "payload"].map((col) => `${col} = excluded.${col}`).join(", ");
 
-  const upsert = db.prepare(
-    `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${placeholders})
-     ON CONFLICT(id) DO UPDATE SET position = excluded.position, ${updateSet}`
-  );
-
-  const versionRow = db.prepare(
-    `INSERT INTO collection_versions (user_id, name, version) VALUES (?, ?, 1)
-     ON CONFLICT(user_id, name) DO UPDATE SET version = version + 1
-     RETURNING version`
-  );
-
-  const run = db.transaction((rows: T[]) => {
+  const tx = await db.transaction("write");
+  try {
     // Vérifiée EN PREMIER, dans la même transaction que l'écriture : sans
     // cette atomicité, deux requêtes pourraient toutes les deux lire la même
     // version périmée avant qu'aucune n'ait eu la chance d'écrire, et
     // écraser quand même l'une l'autre malgré le contrôle.
     if (expectedVersion !== undefined) {
-      const current = db
-        .prepare("SELECT version FROM collection_versions WHERE user_id = ? AND name = ?")
-        .get(userId, name) as { version: number } | undefined;
+      const currentResult = await tx.execute({
+        sql: "SELECT version FROM collection_versions WHERE user_id = ? AND name = ?",
+        args: [userId, name],
+      });
+      const current = currentResult.rows[0] as unknown as { version: number } | undefined;
       const currentVersion = current?.version ?? 0;
       if (currentVersion !== expectedVersion) {
         throw new CollectionVersionConflictError(currentVersion);
       }
     }
 
-    const existingIds = db
-      .prepare(`SELECT id FROM ${table} WHERE user_id = ?`)
-      .all(userId) as { id: string }[];
-    const incomingIds = new Set(rows.map((r) => r.id));
+    const existingResult = await tx.execute({
+      sql: `SELECT id FROM ${table} WHERE user_id = ?`,
+      args: [userId],
+    });
+    const existingIds = existingResult.rows as unknown as { id: string }[];
+    const incomingIds = new Set(items.map((r) => r.id));
     const staleIds = existingIds.map((r) => r.id).filter((id) => !incomingIds.has(id));
 
     // `id` est une clé primaire GLOBALE de la table, pas composite avec
@@ -166,9 +164,11 @@ export function replaceCollection<T extends WithId>(
     if (incomingIds.size > 0) {
       const ids = [...incomingIds];
       const placeholdersForCheck = ids.map(() => "?").join(", ");
-      const conflicting = db
-        .prepare(`SELECT id FROM ${table} WHERE id IN (${placeholdersForCheck}) AND user_id != ?`)
-        .all(...ids, userId) as { id: string }[];
+      const conflictingResult = await tx.execute({
+        sql: `SELECT id FROM ${table} WHERE id IN (${placeholdersForCheck}) AND user_id != ?`,
+        args: [...ids, userId],
+      });
+      const conflicting = conflictingResult.rows as unknown as { id: string }[];
       if (conflicting.length > 0) {
         throw new CollectionOwnershipConflictError(conflicting.map((r) => r.id));
       }
@@ -176,13 +176,13 @@ export function replaceCollection<T extends WithId>(
 
     if (staleIds.length > 0) {
       const placeholdersForDelete = staleIds.map(() => "?").join(", ");
-      db.prepare(`DELETE FROM ${table} WHERE user_id = ? AND id IN (${placeholdersForDelete})`).run(
-        userId,
-        ...staleIds
-      );
+      await tx.execute({
+        sql: `DELETE FROM ${table} WHERE user_id = ? AND id IN (${placeholdersForDelete})`,
+        args: [userId, ...staleIds],
+      });
     }
 
-    rows.forEach((item, index) => {
+    for (const [index, item] of items.entries()) {
       const values = [
         item.id,
         userId,
@@ -190,14 +190,29 @@ export function replaceCollection<T extends WithId>(
         ...promoted.map((col) => (item[col] ?? null) as string | number | null),
       ];
 
-      upsert.run(...values, JSON.stringify(item));
+      await tx.execute({
+        sql: `INSERT INTO ${table} (${columns.join(", ")}) VALUES (${placeholders})
+         ON CONFLICT(id) DO UPDATE SET position = excluded.position, ${updateSet}`,
+        args: [...values, JSON.stringify(item)],
+      });
+    }
+
+    const versionResult = await tx.execute({
+      sql: `INSERT INTO collection_versions (user_id, name, version) VALUES (?, ?, 1)
+     ON CONFLICT(user_id, name) DO UPDATE SET version = version + 1
+     RETURNING version`,
+      args: [userId, name],
     });
+    const { version: newVersion } = versionResult.rows[0] as unknown as { version: number };
 
-    const { version: newVersion } = versionRow.get(userId, name) as { version: number };
+    await tx.commit();
     return newVersion;
-  });
-
-  return run(items);
+  } catch (err) {
+    await tx.rollback();
+    throw err;
+  } finally {
+    tx.close();
+  }
 }
 
 /**
@@ -210,12 +225,12 @@ export function replaceCollection<T extends WithId>(
  * Cette fonction ne fait qu'un `UPDATE` ciblé : la ligne parente ne disparaît
  * jamais, même un instant.
  */
-export function updateCollectionItem<T extends WithId>(
+export async function updateCollectionItem<T extends WithId>(
   name: CollectionName,
   id: string,
   item: T,
   userId: string = DEFAULT_USER_ID
-): void {
+): Promise<void> {
   const table = TABLES[name];
   const promoted = PROMOTED[name] ?? [];
 
@@ -225,11 +240,10 @@ export function updateCollectionItem<T extends WithId>(
     JSON.stringify(item),
   ];
 
-  db.prepare(`UPDATE ${table} SET ${setClauses} WHERE id = ? AND user_id = ?`).run(
-    ...values,
-    id,
-    userId
-  );
+  await db.execute({
+    sql: `UPDATE ${table} SET ${setClauses} WHERE id = ? AND user_id = ?`,
+    args: [...values, id, userId],
+  });
 
   // Incrémente aussi la version de la collection (voir `replaceCollection`) :
   // sans ça, un onglet qui a chargé cette collection AVANT cette écriture
@@ -238,25 +252,26 @@ export function updateCollectionItem<T extends WithId>(
   // modification faite en coulisses par une route staff (invitation, révocation,
   // changement d'email). L'incrément force ce type de push à échouer en
   // conflit plutôt qu'à écraser en silence.
-  db.prepare(
-    `INSERT INTO collection_versions (user_id, name, version) VALUES (?, ?, 1)
-     ON CONFLICT(user_id, name) DO UPDATE SET version = version + 1`
-  ).run(userId, name);
+  await db.execute({
+    sql: `INSERT INTO collection_versions (user_id, name, version) VALUES (?, ?, 1)
+     ON CONFLICT(user_id, name) DO UPDATE SET version = version + 1`,
+    args: [userId, name],
+  });
 }
 
-export function getProfile<T>(userId: string = DEFAULT_USER_ID): T | null {
-  const row = db.prepare("SELECT payload FROM users WHERE id = ?").get(userId) as
-    | { payload: string }
-    | undefined;
+export async function getProfile<T>(userId: string = DEFAULT_USER_ID): Promise<T | null> {
+  const result = await db.execute({ sql: "SELECT payload FROM users WHERE id = ?", args: [userId] });
+  const row = result.rows[0] as unknown as { payload: string } | undefined;
   if (!row) return null;
   return safeParsePayload<T>(row.payload, `users#${userId}`);
 }
 
-export function saveProfile(profile: unknown, userId: string = DEFAULT_USER_ID): void {
-  db.prepare(
-    `INSERT INTO users (id, payload) VALUES (?, ?)
-     ON CONFLICT(id) DO UPDATE SET payload = excluded.payload`
-  ).run(userId, JSON.stringify(profile));
+export async function saveProfile(profile: unknown, userId: string = DEFAULT_USER_ID): Promise<void> {
+  await db.execute({
+    sql: `INSERT INTO users (id, payload) VALUES (?, ?)
+     ON CONFLICT(id) DO UPDATE SET payload = excluded.payload`,
+    args: [userId, JSON.stringify(profile)],
+  });
 }
 
 export const COLLECTION_NAMES = Object.keys(TABLES) as CollectionName[];
