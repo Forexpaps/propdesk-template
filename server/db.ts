@@ -26,19 +26,24 @@ interface DbClient {
 
 /**
  * Connexion unique pour tout le serveur, trois modes choisis par les
- * variables d'environnement présentes :
- *  - `POSTGRES_URL` (prod sur Vercel avec le stockage Postgres natif,
- *    onglet Storage du tableau de bord Vercel) : aucun compte tiers, la
- *    base vit entièrement dans l'écosystème Vercel ;
- *  - `TURSO_DATABASE_URL` (prod avec un compte Turso séparé) : base SQLite
- *    distante, `TURSO_AUTH_TOKEN` pour l'authentification ;
- *  - aucune des deux (dev local, et tout déploiement à disque persistant) :
- *    fichier local dans DATA_DIR (./data par défaut) via libSQL en mode
- *    `file:`, aucun compte externe requis.
+ * variables d'environnement présentes — indépendamment de l'hébergeur,
+ * qu'il s'agisse de Vercel, Railway, Render, Fly.io, un VPS ou autre :
+ *  - `POSTGRES_URL` : base Postgres, **n'importe quel fournisseur**
+ *    (Postgres natif d'un hébergeur, Neon, Supabase, une instance
+ *    auto-hébergée...) — utile sur un hébergeur dont le système de
+ *    fichiers n'est pas persistant (fonctions serverless) ;
+ *  - `TURSO_DATABASE_URL` : base SQLite distante chez Turso,
+ *    `TURSO_AUTH_TOKEN` pour l'authentification — alternative à Postgres,
+ *    même cas d'usage ;
+ *  - aucune des deux (dev local, et tout hébergeur à disque persistant,
+ *    Postgres ou pas) : fichier local dans DATA_DIR (./data par défaut) via
+ *    libSQL en mode `file:`, aucun compte externe requis.
  *
  * Le reste du serveur ne parle qu'aux repositories, jamais à ce module
  * directement — et les repositories n'appellent que `execute`/`transaction`
- * ci-dessus, jamais une méthode propre à un moteur en particulier.
+ * ci-dessus, jamais une méthode propre à un moteur ou un hébergeur en
+ * particulier. Ajouter un nouveau fournisseur de base ne demande donc de
+ * toucher que ce fichier.
  */
 export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 
