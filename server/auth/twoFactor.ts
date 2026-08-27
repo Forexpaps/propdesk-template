@@ -9,17 +9,22 @@ import { generateTotpSecret, findMatchingTotpStep } from "./totp";
  * reste dans la fenêtre ±1 de `findMatchingTotpStep`. Le pas est enregistré
  * dès qu'il est accepté, pour qu'il ne puisse plus jamais être réutilisé.
  */
-function verifyAndConsumeTotpStep(staffId: string, secretBase32: string, code: string): boolean {
-  const row = db.prepare("SELECT totp_last_used_step FROM staff_accounts WHERE id = ?").get(staffId) as
-    | { totp_last_used_step: number | null }
-    | undefined;
+async function verifyAndConsumeTotpStep(staffId: string, secretBase32: string, code: string): Promise<boolean> {
+  const result = await db.execute({
+    sql: "SELECT totp_last_used_step FROM staff_accounts WHERE id = ?",
+    args: [staffId],
+  });
+  const row = result.rows[0] as unknown as { totp_last_used_step: number | null } | undefined;
   const lastUsedStep = row?.totp_last_used_step ?? null;
 
   const matchedStep = findMatchingTotpStep(secretBase32, code);
   if (matchedStep === null) return false;
   if (lastUsedStep !== null && matchedStep <= lastUsedStep) return false;
 
-  db.prepare("UPDATE staff_accounts SET totp_last_used_step = ? WHERE id = ?").run(matchedStep, staffId);
+  await db.execute({
+    sql: "UPDATE staff_accounts SET totp_last_used_step = ? WHERE id = ?",
+    args: [matchedStep, staffId],
+  });
   return true;
 }
 
@@ -37,10 +42,12 @@ function fingerprint(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
-export function isTotpEnabled(staffId: string): boolean {
-  const row = db.prepare("SELECT totp_enabled_at FROM staff_accounts WHERE id = ?").get(staffId) as
-    | { totp_enabled_at: string | null }
-    | undefined;
+export async function isTotpEnabled(staffId: string): Promise<boolean> {
+  const result = await db.execute({
+    sql: "SELECT totp_enabled_at FROM staff_accounts WHERE id = ?",
+    args: [staffId],
+  });
+  const row = result.rows[0] as unknown as { totp_enabled_at: string | null } | undefined;
   return row?.totp_enabled_at != null;
 }
 
@@ -51,12 +58,12 @@ export function isTotpEnabled(staffId: string): boolean {
  * précédemment en attente — un compte qui relance la configuration sans
  * avoir confirmé la précédente repart proprement, aucun état orphelin.
  */
-export function startTotpSetup(staffId: string): string {
+export async function startTotpSetup(staffId: string): Promise<string> {
   const secret = generateTotpSecret();
-  db.prepare("UPDATE staff_accounts SET totp_secret = ?, totp_enabled_at = NULL WHERE id = ?").run(
-    secret,
-    staffId
-  );
+  await db.execute({
+    sql: "UPDATE staff_accounts SET totp_secret = ?, totp_enabled_at = NULL WHERE id = ?",
+    args: [secret, staffId],
+  });
   return secret;
 }
 
@@ -66,34 +73,49 @@ export function startTotpSetup(staffId: string): string {
  * ne devienne active. Renvoie `false` sans rien modifier si le code est
  * invalide ou qu'aucun secret n'est en attente.
  */
-export function confirmTotpSetup(staffId: string, code: string): boolean {
-  const row = db.prepare("SELECT totp_secret FROM staff_accounts WHERE id = ?").get(staffId) as
-    | { totp_secret: string | null }
-    | undefined;
-  if (!row?.totp_secret || !verifyAndConsumeTotpStep(staffId, row.totp_secret, code)) return false;
+export async function confirmTotpSetup(staffId: string, code: string): Promise<boolean> {
+  const result = await db.execute({
+    sql: "SELECT totp_secret FROM staff_accounts WHERE id = ?",
+    args: [staffId],
+  });
+  const row = result.rows[0] as unknown as { totp_secret: string | null } | undefined;
+  if (!row?.totp_secret || !(await verifyAndConsumeTotpStep(staffId, row.totp_secret, code))) return false;
 
-  db.prepare("UPDATE staff_accounts SET totp_enabled_at = ? WHERE id = ?").run(
-    new Date().toISOString(),
-    staffId
-  );
+  await db.execute({
+    sql: "UPDATE staff_accounts SET totp_enabled_at = ? WHERE id = ?",
+    args: [new Date().toISOString(), staffId],
+  });
   return true;
 }
 
 /** Désactive entièrement la 2FA du compte : secret et codes de récupération purgés. */
-export function disableTotp(staffId: string): void {
-  db.transaction(() => {
-    db.prepare("UPDATE staff_accounts SET totp_secret = NULL, totp_enabled_at = NULL WHERE id = ?").run(
-      staffId
-    );
-    db.prepare("DELETE FROM staff_recovery_codes WHERE staff_id = ?").run(staffId);
-  })();
+export async function disableTotp(staffId: string): Promise<void> {
+  const tx = await db.transaction("write");
+  try {
+    await tx.execute({
+      sql: "UPDATE staff_accounts SET totp_secret = NULL, totp_enabled_at = NULL WHERE id = ?",
+      args: [staffId],
+    });
+    await tx.execute({
+      sql: "DELETE FROM staff_recovery_codes WHERE staff_id = ?",
+      args: [staffId],
+    });
+    await tx.commit();
+  } catch (err) {
+    await tx.rollback();
+    throw err;
+  } finally {
+    tx.close();
+  }
 }
 
 /** Vérifie un code TOTP contre le secret ACTIF du compte (2FA déjà activée) — `false` si la 2FA n'est pas active. */
-export function verifyStaffTotpCode(staffId: string, code: string): boolean {
-  const row = db
-    .prepare("SELECT totp_secret FROM staff_accounts WHERE id = ? AND totp_enabled_at IS NOT NULL")
-    .get(staffId) as { totp_secret: string | null } | undefined;
+export async function verifyStaffTotpCode(staffId: string, code: string): Promise<boolean> {
+  const result = await db.execute({
+    sql: "SELECT totp_secret FROM staff_accounts WHERE id = ? AND totp_enabled_at IS NOT NULL",
+    args: [staffId],
+  });
+  const row = result.rows[0] as unknown as { totp_secret: string | null } | undefined;
   if (!row?.totp_secret) return false;
   return verifyAndConsumeTotpStep(staffId, row.totp_secret, code);
 }
@@ -115,19 +137,26 @@ function generateRecoveryCode(): string {
  * les précédents (les anciens deviennent inutilisables), renvoyés en clair
  * une seule fois, jamais relisibles ensuite (seul le hash est conservé).
  */
-export function generateRecoveryCodes(staffId: string): string[] {
+export async function generateRecoveryCodes(staffId: string): Promise<string[]> {
   const codes = Array.from({ length: RECOVERY_CODE_COUNT }, generateRecoveryCode);
   const now = new Date().toISOString();
 
-  db.transaction(() => {
-    db.prepare("DELETE FROM staff_recovery_codes WHERE staff_id = ?").run(staffId);
-    const insert = db.prepare(
-      "INSERT INTO staff_recovery_codes (id, staff_id, code_hash, created_at, used_at) VALUES (?, ?, ?, ?, NULL)"
-    );
+  const tx = await db.transaction("write");
+  try {
+    await tx.execute({ sql: "DELETE FROM staff_recovery_codes WHERE staff_id = ?", args: [staffId] });
     for (const code of codes) {
-      insert.run(`rc-${randomBytes(8).toString("hex")}`, staffId, fingerprint(code), now);
+      await tx.execute({
+        sql: "INSERT INTO staff_recovery_codes (id, staff_id, code_hash, created_at, used_at) VALUES (?, ?, ?, ?, NULL)",
+        args: [`rc-${randomBytes(8).toString("hex")}`, staffId, fingerprint(code), now],
+      });
     }
-  })();
+    await tx.commit();
+  } catch (err) {
+    await tx.rollback();
+    throw err;
+  } finally {
+    tx.close();
+  }
 
   return codes;
 }
@@ -137,27 +166,29 @@ export function generateRecoveryCodes(staffId: string): string[] {
  * marqué utilisé s'il correspond à un code jamais consommé de ce compte ;
  * `false` sinon, sans effet de bord.
  */
-export function consumeRecoveryCode(staffId: string, code: string): boolean {
+export async function consumeRecoveryCode(staffId: string, code: string): Promise<boolean> {
   const hash = fingerprint(code.trim().toUpperCase());
-  const row = db
-    .prepare(
-      "SELECT id FROM staff_recovery_codes WHERE staff_id = ? AND code_hash = ? AND used_at IS NULL"
-    )
-    .get(staffId, hash) as { id: string } | undefined;
+  const result = await db.execute({
+    sql: "SELECT id FROM staff_recovery_codes WHERE staff_id = ? AND code_hash = ? AND used_at IS NULL",
+    args: [staffId, hash],
+  });
+  const row = result.rows[0] as unknown as { id: string } | undefined;
   if (!row) return false;
 
-  db.prepare("UPDATE staff_recovery_codes SET used_at = ? WHERE id = ?").run(
-    new Date().toISOString(),
-    row.id
-  );
+  await db.execute({
+    sql: "UPDATE staff_recovery_codes SET used_at = ? WHERE id = ?",
+    args: [new Date().toISOString(), row.id],
+  });
   return true;
 }
 
 /** Nombre de codes de récupération encore valides — affiché côté profil pour inciter à en régénérer avant épuisement. */
-export function countRemainingRecoveryCodes(staffId: string): number {
-  const row = db
-    .prepare("SELECT COUNT(*) AS n FROM staff_recovery_codes WHERE staff_id = ? AND used_at IS NULL")
-    .get(staffId) as { n: number };
+export async function countRemainingRecoveryCodes(staffId: string): Promise<number> {
+  const result = await db.execute({
+    sql: "SELECT COUNT(*) AS n FROM staff_recovery_codes WHERE staff_id = ? AND used_at IS NULL",
+    args: [staffId],
+  });
+  const row = result.rows[0] as unknown as { n: number };
   return row.n;
 }
 
@@ -169,31 +200,37 @@ const CHALLENGE_TTL_MS = 5 * 60_000;
  * encore à ce stade, seulement ce jeton à courte durée de vie (empreinte
  * SHA-256 en base, même raisonnement que `sessions.ts`).
  */
-export function createTwoFactorChallenge(staffId: string): string {
+export async function createTwoFactorChallenge(staffId: string): Promise<string> {
   const token = randomBytes(32).toString("hex");
   const now = Date.now();
-  db.prepare(
-    "INSERT INTO staff_2fa_challenges (token_hash, staff_id, created_at, expires_at) VALUES (?, ?, ?, ?)"
-  ).run(fingerprint(token), staffId, new Date(now).toISOString(), new Date(now + CHALLENGE_TTL_MS).toISOString());
+  await db.execute({
+    sql: "INSERT INTO staff_2fa_challenges (token_hash, staff_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
+    args: [fingerprint(token), staffId, new Date(now).toISOString(), new Date(now + CHALLENGE_TTL_MS).toISOString()],
+  });
   return token;
 }
 
 /** `staffId` associé au jeton s'il est valide et non expiré, `null` sinon. Ne consomme PAS le jeton — plusieurs essais de code sont autorisés dans la fenêtre de 5 minutes (le rate-limit HTTP et le verrouillage par compte bornent déjà les tentatives). */
-export function peekTwoFactorChallenge(token: string): string | null {
-  const row = db
-    .prepare("SELECT staff_id, expires_at FROM staff_2fa_challenges WHERE token_hash = ?")
-    .get(fingerprint(token)) as { staff_id: string; expires_at: string } | undefined;
+export async function peekTwoFactorChallenge(token: string): Promise<string | null> {
+  const result = await db.execute({
+    sql: "SELECT staff_id, expires_at FROM staff_2fa_challenges WHERE token_hash = ?",
+    args: [fingerprint(token)],
+  });
+  const row = result.rows[0] as unknown as { staff_id: string; expires_at: string } | undefined;
   if (!row) return null;
   if (new Date(row.expires_at).getTime() <= Date.now()) return null;
   return row.staff_id;
 }
 
 /** Supprime le défi — appelé une fois la connexion aboutie (succès) pour qu'il ne serve plus qu'une fois. */
-export function consumeTwoFactorChallenge(token: string): void {
-  db.prepare("DELETE FROM staff_2fa_challenges WHERE token_hash = ?").run(fingerprint(token));
+export async function consumeTwoFactorChallenge(token: string): Promise<void> {
+  await db.execute({ sql: "DELETE FROM staff_2fa_challenges WHERE token_hash = ?", args: [fingerprint(token)] });
 }
 
 /** Purge périodique des défis expirés — même motif que `purgeExpiredSessions` (`sessions.ts`), appelé au fil des requêtes de connexion plutôt qu'un timer dédié. */
-export function purgeExpiredTwoFactorChallenges(): void {
-  db.prepare("DELETE FROM staff_2fa_challenges WHERE expires_at <= ?").run(new Date().toISOString());
+export async function purgeExpiredTwoFactorChallenges(): Promise<void> {
+  await db.execute({
+    sql: "DELETE FROM staff_2fa_challenges WHERE expires_at <= ?",
+    args: [new Date().toISOString()],
+  });
 }

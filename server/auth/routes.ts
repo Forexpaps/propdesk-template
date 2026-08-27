@@ -1,6 +1,5 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db, DEFAULT_USER_ID } from "../db";
-import { getProfile, saveProfile } from "../repositories";
 import {
   setupSchema,
   loginSchema,
@@ -12,8 +11,6 @@ import {
 import { createRateLimit } from "../middleware/rateLimit";
 import { hashPassword, verifyPassword, needsRehash, verifyAgainstDecoy } from "./password";
 import {
-  createFirstStaffAccount,
-  ensureUserRow,
   getStaffByEmail,
   getStaffById,
   hasAnyStaffAccount,
@@ -91,8 +88,8 @@ function minimalProfile(email: string) {
 }
 
 /** Forme renvoyée au client pour une session authentifiée. */
-function authenticatedPayload(staffId: string) {
-  const staff = getStaffById(staffId);
+async function authenticatedPayload(staffId: string) {
+  const staff = await getStaffById(staffId);
 
   return {
     state: "authenticated" as const,
@@ -113,22 +110,25 @@ function authenticatedPayload(staffId: string) {
  * est l'état normal au premier chargement : répondre 401 polluerait la console du
  * navigateur et pousserait à traiter un état comme une erreur.
  */
-authRouter.get("/me", (req, res) => {
-  if (!hasAnyStaffAccount()) {
-    res.json({ state: "no-account" });
-    return;
-  }
+authRouter.get(
+  "/me",
+  wrap(async (req, res) => {
+    if (!(await hasAnyStaffAccount())) {
+      res.json({ state: "no-account" });
+      return;
+    }
 
-  const token = readSessionToken(req);
-  const session = token ? validateSession(token) : null;
+    const token = readSessionToken(req);
+    const session = token ? await validateSession(token) : null;
 
-  if (!session) {
-    res.json({ state: "unauthenticated" });
-    return;
-  }
+    if (!session) {
+      res.json({ state: "unauthenticated" });
+      return;
+    }
 
-  res.json(authenticatedPayload(session.userId));
-});
+    res.json(await authenticatedPayload(session.userId));
+  })
+);
 
 /**
  * Première installation : crée le compte, unique pour cette instance,
@@ -146,7 +146,7 @@ authRouter.post(
     message: "Trop de tentatives d'installation. Réessaie dans quelques minutes.",
   }),
   wrap(async (req, res) => {
-    if (hasAnyStaffAccount()) {
+    if (await hasAnyStaffAccount()) {
       res.status(409).json({ error: "Un compte existe déjà." });
       return;
     }
@@ -165,31 +165,78 @@ authRouter.post(
 
     // Transaction : le bureau de données doit exister avant d'y référer un
     // email, et un échec ne doit pas laisser un état partiel.
-    const created = db.transaction(() => {
+    const tx = await db.transaction("write");
+    let created: boolean;
+    try {
       // Re-contrôle DANS la transaction : le hachage a pris ~80 ms, une seconde
       // requête a pu passer le test initial pendant ce temps. On renvoie un
       // booléen plutôt que de lever, pour répondre 409 et non 500.
-      if (hasAnyStaffAccount()) return false;
+      const alreadyResult = await tx.execute("SELECT 1 FROM staff_accounts LIMIT 1");
+      if (alreadyResult.rows.length > 0) {
+        created = false;
+      } else {
+        const profile = minimalProfile(email);
+        const existingUserRow = await tx.execute({
+          sql: "SELECT 1 FROM users WHERE id = ?",
+          args: [DEFAULT_USER_ID],
+        });
+        if (existingUserRow.rows.length === 0) {
+          await tx.execute({
+            sql: "INSERT INTO users (id, payload) VALUES (?, ?)",
+            args: [DEFAULT_USER_ID, JSON.stringify(profile)],
+          });
+        }
 
-      ensureUserRow(minimalProfile(email));
-      createFirstStaffAccount({ email, passwordHash });
+        const now = new Date().toISOString();
+        await tx.execute({
+          sql: `INSERT INTO staff_accounts
+             (id, name, email, email_lower, password_hash, must_change_password, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
+          args: [
+            DEFAULT_USER_ID,
+            email.split("@")[0] || "Utilisateur",
+            email.trim(),
+            normalizeEmail(email),
+            passwordHash,
+            now,
+            now,
+          ],
+        });
 
-      // L'email de connexion devient celui du profil, sinon deux adresses
-      // divergentes coexisteraient au tout premier démarrage.
-      const profile = getProfile<Record<string, unknown>>(DEFAULT_USER_ID);
-      if (profile) saveProfile({ ...profile, email }, DEFAULT_USER_ID);
+        // L'email de connexion devient celui du profil, sinon deux adresses
+        // divergentes coexisteraient au tout premier démarrage.
+        const existingProfileResult = await tx.execute({
+          sql: "SELECT payload FROM users WHERE id = ?",
+          args: [DEFAULT_USER_ID],
+        });
+        const existingProfileRow = existingProfileResult.rows[0] as unknown as { payload: string } | undefined;
+        if (existingProfileRow) {
+          const currentProfile = JSON.parse(existingProfileRow.payload) as Record<string, unknown>;
+          await tx.execute({
+            sql: `INSERT INTO users (id, payload) VALUES (?, ?)
+             ON CONFLICT(id) DO UPDATE SET payload = excluded.payload`,
+            args: [DEFAULT_USER_ID, JSON.stringify({ ...currentProfile, email })],
+          });
+        }
 
-      return true;
-    })();
+        created = true;
+      }
+      await tx.commit();
+    } catch (err) {
+      await tx.rollback();
+      throw err;
+    } finally {
+      tx.close();
+    }
 
     if (!created) {
       res.status(409).json({ error: "Un compte existe déjà." });
       return;
     }
 
-    const token = createSession(DEFAULT_USER_ID, req.headers["user-agent"]);
+    const token = await createSession(DEFAULT_USER_ID, req.headers["user-agent"]);
     setSessionCookie(res, token);
-    res.status(201).json(authenticatedPayload(DEFAULT_USER_ID));
+    res.status(201).json(await authenticatedPayload(DEFAULT_USER_ID));
   })
 );
 
@@ -207,7 +254,7 @@ authRouter.post(
       return;
     }
 
-    purgeExpiredSessions();
+    await purgeExpiredSessions();
 
     const { email, password } = parsed.data;
     const emailLower = normalizeEmail(email);
@@ -216,7 +263,7 @@ authRouter.post(
     // sur l'email brut avant toute résolution — un email inconnu se heurte
     // exactement au même verrouillage qu'un email réel avec mauvais mot de
     // passe, pour ne jamais révéler qu'un compte existe.
-    const lockout = getLockoutStatus("staff", emailLower);
+    const lockout = await getLockoutStatus("staff", emailLower);
     if (lockout.lockedUntil) {
       recordSecurityEvent({
         eventType: "login_blocked",
@@ -230,14 +277,14 @@ authRouter.post(
       return;
     }
 
-    const staff = getStaffByEmail(email);
+    const staff = await getStaffByEmail(email);
 
     // Compte inconnu : on paie quand même le coût du hachage. Sans cela, le
     // temps de réponse distinguerait « email inconnu » (immédiat) de « mot de
     // passe faux » (~80 ms), ce qui offrirait une énumération des comptes.
     if (!staff) {
       await verifyAgainstDecoy(password);
-      const { locked } = registerFailedLogin("staff", emailLower);
+      const { locked } = await registerFailedLogin("staff", emailLower);
       recordSecurityEvent({
         eventType: "login_failed", severity: "warning", accountKind: "staff",
         accountEmail: email.trim(), ip: req.ip, detail: "compte inconnu",
@@ -253,7 +300,7 @@ authRouter.post(
     }
 
     if (!(await verifyPassword(password, staff.passwordHash))) {
-      const { locked } = registerFailedLogin("staff", emailLower);
+      const { locked } = await registerFailedLogin("staff", emailLower);
       recordSecurityEvent({
         eventType: "login_failed", severity: "warning", accountKind: "staff",
         accountEmail: email.trim(), ip: req.ip, detail: "mot de passe incorrect",
@@ -269,19 +316,19 @@ authRouter.post(
       return;
     }
 
-    clearLoginFailures("staff", emailLower);
+    await clearLoginFailures("staff", emailLower);
 
     // Montée en robustesse transparente si les paramètres ont durci depuis.
     if (needsRehash(staff.passwordHash)) {
-      updatePasswordHash(staff.id, await hashPassword(password));
+      await updatePasswordHash(staff.id, await hashPassword(password));
     }
 
     // Mot de passe vérifié, mais 2FA active sur ce compte : pas de session
     // créée ici — seulement un défi temporaire (5 min), à échanger contre
     // une vraie session via POST /auth/login/2fa. Le mot de passe seul ne
     // suffit donc plus à authentifier un compte 2FA.
-    if (isTotpEnabled(staff.id)) {
-      const pendingToken = createTwoFactorChallenge(staff.id);
+    if (await isTotpEnabled(staff.id)) {
+      const pendingToken = await createTwoFactorChallenge(staff.id);
       recordSecurityEvent({
         eventType: "login_2fa_required", severity: "info", accountKind: "staff",
         accountEmail: staff.email, ip: req.ip, detail: "",
@@ -292,13 +339,13 @@ authRouter.post(
 
     // Les sessions existantes sont conservées : plusieurs appareils peuvent
     // rester connectés en parallèle.
-    const token = createSession(staff.id, req.headers["user-agent"]);
+    const token = await createSession(staff.id, req.headers["user-agent"]);
     setSessionCookie(res, token, parsed.data.rememberMe ?? true);
     recordSecurityEvent({
       eventType: "login_success", severity: "info", accountKind: "staff",
       accountEmail: staff.email, ip: req.ip, detail: "",
     });
-    res.json(authenticatedPayload(staff.id));
+    res.json(await authenticatedPayload(staff.id));
   })
 );
 
@@ -321,28 +368,28 @@ authRouter.post(
       return;
     }
 
-    purgeExpiredTwoFactorChallenges();
+    await purgeExpiredTwoFactorChallenges();
 
-    const staffId = peekTwoFactorChallenge(parsed.data.pendingToken);
-    const staff = staffId ? getStaffById(staffId) : null;
+    const staffId = await peekTwoFactorChallenge(parsed.data.pendingToken);
+    const staff = staffId ? await getStaffById(staffId) : null;
     if (!staff) {
       res.status(401).json({ error: "Session de connexion expirée, recommence depuis le début." });
       return;
     }
 
     const emailLower = normalizeEmail(staff.email);
-    const lockout = getLockoutStatus("staff", emailLower);
+    const lockout = await getLockoutStatus("staff", emailLower);
     if (lockout.lockedUntil) {
       res.status(403).json({ error: "Trop de tentatives. Réessaie dans quelques minutes.", code: "ACCOUNT_LOCKED" });
       return;
     }
 
     const valid = parsed.data.code
-      ? verifyStaffTotpCode(staff.id, parsed.data.code)
-      : consumeRecoveryCode(staff.id, parsed.data.recoveryCode!);
+      ? await verifyStaffTotpCode(staff.id, parsed.data.code)
+      : await consumeRecoveryCode(staff.id, parsed.data.recoveryCode!);
 
     if (!valid) {
-      const { locked } = registerFailedLogin("staff", emailLower);
+      const { locked } = await registerFailedLogin("staff", emailLower);
       recordSecurityEvent({
         eventType: "login_failed", severity: "warning", accountKind: "staff",
         accountEmail: staff.email, ip: req.ip,
@@ -358,17 +405,17 @@ authRouter.post(
       return;
     }
 
-    clearLoginFailures("staff", emailLower);
-    consumeTwoFactorChallenge(parsed.data.pendingToken);
+    await clearLoginFailures("staff", emailLower);
+    await consumeTwoFactorChallenge(parsed.data.pendingToken);
 
-    const token = createSession(staff.id, req.headers["user-agent"]);
+    const token = await createSession(staff.id, req.headers["user-agent"]);
     setSessionCookie(res, token, parsed.data.rememberMe ?? true);
     recordSecurityEvent({
       eventType: "login_success", severity: "info", accountKind: "staff",
       accountEmail: staff.email, ip: req.ip,
       detail: parsed.data.code ? "2FA (TOTP)" : "2FA (code de récupération)",
     });
-    res.json(authenticatedPayload(staff.id));
+    res.json(await authenticatedPayload(staff.id));
   })
 );
 
@@ -377,25 +424,28 @@ authRouter.post(
  * doit pouvoir se déconnecter, sinon l'utilisateur reçoit un 401 en essayant de
  * partir, ce qui n'a aucun sens.
  */
-authRouter.post("/logout", (req, res) => {
-  const token = readSessionToken(req);
-  if (token) {
-    // Résolu avant destruction : après, la session n'existe plus pour
-    // retrouver le compte. Rien n'est journalisé si le token est
-    // absent/déjà invalide — pas de bruit sur une déconnexion sans session.
-    const session = validateSession(token);
-    const staff = session ? getStaffById(session.userId) : null;
-    if (staff) {
-      recordSecurityEvent({
-        eventType: "logout", severity: "info", accountKind: "staff",
-        accountEmail: staff.email, ip: req.ip, detail: "",
-      });
+authRouter.post(
+  "/logout",
+  wrap(async (req, res) => {
+    const token = readSessionToken(req);
+    if (token) {
+      // Résolu avant destruction : après, la session n'existe plus pour
+      // retrouver le compte. Rien n'est journalisé si le token est
+      // absent/déjà invalide — pas de bruit sur une déconnexion sans session.
+      const session = await validateSession(token);
+      const staff = session ? await getStaffById(session.userId) : null;
+      if (staff) {
+        recordSecurityEvent({
+          eventType: "logout", severity: "info", accountKind: "staff",
+          accountEmail: staff.email, ip: req.ip, detail: "",
+        });
+      }
+      await destroySession(token);
     }
-    destroySession(token);
-  }
-  clearSessionCookie(res);
-  res.status(204).end();
-});
+    clearSessionCookie(res);
+    res.status(204).end();
+  })
+);
 
 // --- Gestion du compte (protégées par requireAuth) ------------------------
 
@@ -422,7 +472,7 @@ staffRouter.post(
       return;
     }
 
-    const staff = getStaffById(req.auth!.userId);
+    const staff = await getStaffById(req.auth!.userId);
     if (!staff || !(await verifyPassword(parsed.data.currentPassword, staff.passwordHash))) {
       recordSecurityEvent({
         eventType: "password_change_failed", severity: "warning", accountKind: "staff",
@@ -436,18 +486,18 @@ staffRouter.post(
       return;
     }
 
-    setPassword(staff.id, await hashPassword(parsed.data.newPassword));
+    await setPassword(staff.id, await hashPassword(parsed.data.newPassword));
     // Le jeton courant est déjà connu (vérifié par `requireAuth` en amont) :
     // on l'exclut de la révocation pour ne pas déconnecter l'auteur du
     // changement — voir le commentaire de `destroyOtherSessions`.
     const currentToken = readSessionToken(req)!;
-    const destroyed = destroyOtherSessions(staff.id, currentToken);
+    const destroyed = await destroyOtherSessions(staff.id, currentToken);
     recordSecurityEvent({
       eventType: "password_changed", severity: "info", accountKind: "staff",
       accountEmail: staff.email, ip: req.ip,
       detail: `${destroyed} autre(s) session(s) fermée(s)`,
     });
-    res.json(authenticatedPayload(staff.id));
+    res.json(await authenticatedPayload(staff.id));
   })
 );
 
@@ -459,12 +509,15 @@ const twoFactorRateLimit = createRateLimit({
   message: "Trop de tentatives. Réessaie dans quelques minutes.",
 });
 
-staffRouter.get("/2fa/status", (req, res) => {
-  res.json({
-    enabled: isTotpEnabled(req.auth!.userId),
-    remainingRecoveryCodes: countRemainingRecoveryCodes(req.auth!.userId),
-  });
-});
+staffRouter.get(
+  "/2fa/status",
+  wrap(async (req, res) => {
+    res.json({
+      enabled: await isTotpEnabled(req.auth!.userId),
+      remainingRecoveryCodes: await countRemainingRecoveryCodes(req.auth!.userId),
+    });
+  })
+);
 
 /**
  * Démarre une configuration 2FA : nouveau secret stocké mais PAS encore
@@ -472,66 +525,78 @@ staffRouter.get("/2fa/status", (req, res) => {
  * valide (`POST /2fa/enable`) avant que la 2FA ne s'applique réellement à sa
  * prochaine connexion.
  */
-staffRouter.post("/2fa/setup", twoFactorRateLimit, (req, res) => {
-  const staff = getStaffById(req.auth!.userId);
-  if (!staff) {
-    res.status(404).json({ error: "Compte introuvable." });
-    return;
-  }
+staffRouter.post(
+  "/2fa/setup",
+  twoFactorRateLimit,
+  wrap(async (req, res) => {
+    const staff = await getStaffById(req.auth!.userId);
+    if (!staff) {
+      res.status(404).json({ error: "Compte introuvable." });
+      return;
+    }
 
-  const secret = startTotpSetup(staff.id);
-  res.json({
-    secret: formatSecretForDisplay(secret),
-    otpauthUri: buildOtpauthUri(secret, staff.email),
-  });
-});
+    const secret = await startTotpSetup(staff.id);
+    res.json({
+      secret: formatSecretForDisplay(secret),
+      otpauthUri: buildOtpauthUri(secret, staff.email),
+    });
+  })
+);
 
 /**
  * Confirme la configuration en cours et active la 2FA. Génère les codes de
  * récupération à cet instant précis et les renvoie une seule fois.
  */
-staffRouter.post("/2fa/enable", twoFactorRateLimit, (req, res) => {
-  const parsed = totpCodeSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Code à 6 chiffres requis." });
-    return;
-  }
+staffRouter.post(
+  "/2fa/enable",
+  twoFactorRateLimit,
+  wrap(async (req, res) => {
+    const parsed = totpCodeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Code à 6 chiffres requis." });
+      return;
+    }
 
-  const staff = getStaffById(req.auth!.userId);
-  if (!staff || !confirmTotpSetup(staff.id, parsed.data.code)) {
-    res.status(400).json({ error: "Code incorrect ou expiré." });
-    return;
-  }
+    const staff = await getStaffById(req.auth!.userId);
+    if (!staff || !(await confirmTotpSetup(staff.id, parsed.data.code))) {
+      res.status(400).json({ error: "Code incorrect ou expiré." });
+      return;
+    }
 
-  const recoveryCodes = generateRecoveryCodes(staff.id);
-  recordSecurityEvent({
-    eventType: "two_factor_enabled", severity: "info", accountKind: "staff",
-    accountEmail: staff.email, ip: req.ip, detail: "",
-  });
-  res.json({ recoveryCodes });
-});
+    const recoveryCodes = await generateRecoveryCodes(staff.id);
+    recordSecurityEvent({
+      eventType: "two_factor_enabled", severity: "info", accountKind: "staff",
+      accountEmail: staff.email, ip: req.ip, detail: "",
+    });
+    res.json({ recoveryCodes });
+  })
+);
 
 /** Désactive la 2FA — mot de passe actuel requis, même garde que `/change-password`. */
-staffRouter.post("/2fa/disable", twoFactorRateLimit, wrap(async (req, res) => {
-  const parsed = disableTotpSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Mot de passe requis." });
-    return;
-  }
+staffRouter.post(
+  "/2fa/disable",
+  twoFactorRateLimit,
+  wrap(async (req, res) => {
+    const parsed = disableTotpSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Mot de passe requis." });
+      return;
+    }
 
-  const staff = getStaffById(req.auth!.userId);
-  if (!staff || !(await verifyPassword(parsed.data.password, staff.passwordHash))) {
-    res.status(403).json({ error: "Mot de passe incorrect." });
-    return;
-  }
+    const staff = await getStaffById(req.auth!.userId);
+    if (!staff || !(await verifyPassword(parsed.data.password, staff.passwordHash))) {
+      res.status(403).json({ error: "Mot de passe incorrect." });
+      return;
+    }
 
-  disableTotp(staff.id);
-  recordSecurityEvent({
-    eventType: "two_factor_disabled", severity: "warning", accountKind: "staff",
-    accountEmail: staff.email, ip: req.ip, detail: "",
-  });
-  res.status(204).end();
-}));
+    await disableTotp(staff.id);
+    recordSecurityEvent({
+      eventType: "two_factor_disabled", severity: "warning", accountKind: "staff",
+      accountEmail: staff.email, ip: req.ip, detail: "",
+    });
+    res.status(204).end();
+  })
+);
 
 /** Régénère les codes de récupération — invalide tous les précédents, mot de passe requis. */
 staffRouter.post(
@@ -544,17 +609,17 @@ staffRouter.post(
       return;
     }
 
-    const staff = getStaffById(req.auth!.userId);
+    const staff = await getStaffById(req.auth!.userId);
     if (!staff || !(await verifyPassword(parsed.data.password, staff.passwordHash))) {
       res.status(403).json({ error: "Mot de passe incorrect." });
       return;
     }
-    if (!isTotpEnabled(staff.id)) {
+    if (!(await isTotpEnabled(staff.id))) {
       res.status(400).json({ error: "La 2FA n'est pas activée sur ce compte." });
       return;
     }
 
-    const recoveryCodes = generateRecoveryCodes(staff.id);
+    const recoveryCodes = await generateRecoveryCodes(staff.id);
     recordSecurityEvent({
       eventType: "two_factor_recovery_regenerated", severity: "info", accountKind: "staff",
       accountEmail: staff.email, ip: req.ip, detail: "",
@@ -562,4 +627,3 @@ staffRouter.post(
     res.json({ recoveryCodes });
   })
 );
-

@@ -50,10 +50,12 @@ export interface RegisterFailedLoginResult {
 }
 
 /** Verrouillage actif pour ce compte, ou `null` si aucun (jamais échoué, ou expiré). */
-export function getLockoutStatus(kind: LoginLockoutKind, emailLower: string): LockoutStatus {
-  const row = db
-    .prepare("SELECT locked_until FROM login_lockouts WHERE kind = ? AND email_lower = ?")
-    .get(kind, emailLower) as { locked_until: string | null } | undefined;
+export async function getLockoutStatus(kind: LoginLockoutKind, emailLower: string): Promise<LockoutStatus> {
+  const result = await db.execute({
+    sql: "SELECT locked_until FROM login_lockouts WHERE kind = ? AND email_lower = ?",
+    args: [kind, emailLower],
+  });
+  const row = result.rows[0] as unknown as { locked_until: string | null } | undefined;
 
   if (!row?.locked_until) return { lockedUntil: null };
 
@@ -71,16 +73,20 @@ export function getLockoutStatus(kind: LoginLockoutKind, emailLower: string): Lo
  * sinon repart à 1 avec une fenêtre neuve. Verrouille dès que le compteur
  * atteint le seuil.
  */
-export function registerFailedLogin(
+export async function registerFailedLogin(
   kind: LoginLockoutKind,
   emailLower: string
-): RegisterFailedLoginResult {
+): Promise<RegisterFailedLoginResult> {
   const now = new Date();
   const nowIso = now.toISOString();
 
-  const row = db
-    .prepare("SELECT failed_count, window_started_at, lock_count FROM login_lockouts WHERE kind = ? AND email_lower = ?")
-    .get(kind, emailLower) as { failed_count: number; window_started_at: string; lock_count: number } | undefined;
+  const result = await db.execute({
+    sql: "SELECT failed_count, window_started_at, lock_count FROM login_lockouts WHERE kind = ? AND email_lower = ?",
+    args: [kind, emailLower],
+  });
+  const row = result.rows[0] as unknown as
+    | { failed_count: number; window_started_at: string; lock_count: number }
+    | undefined;
 
   let failedCount = 1;
   let windowStartedAt = nowIso;
@@ -97,23 +103,35 @@ export function registerFailedLogin(
   const lockCount = locked ? (row?.lock_count ?? 0) + 1 : row?.lock_count ?? 0;
   const lockedUntil = locked ? new Date(now.getTime() + lockDurationFor(lockCount)) : null;
 
-  db.prepare(
-    `INSERT INTO login_lockouts (kind, email_lower, failed_count, window_started_at, locked_until, lock_count, updated_at)
+  await db.execute({
+    sql: `INSERT INTO login_lockouts (kind, email_lower, failed_count, window_started_at, locked_until, lock_count, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(kind, email_lower) DO UPDATE SET
        failed_count = excluded.failed_count,
        window_started_at = excluded.window_started_at,
        locked_until = excluded.locked_until,
        lock_count = excluded.lock_count,
-       updated_at = excluded.updated_at`
-  ).run(kind, emailLower, failedCount, windowStartedAt, lockedUntil ? lockedUntil.toISOString() : null, lockCount, nowIso);
+       updated_at = excluded.updated_at`,
+    args: [
+      kind,
+      emailLower,
+      failedCount,
+      windowStartedAt,
+      lockedUntil ? lockedUntil.toISOString() : null,
+      lockCount,
+      nowIso,
+    ],
+  });
 
   return { locked, lockedUntil };
 }
 
 /** Efface le compteur d'échecs — appelé après une connexion réussie. */
-export function clearLoginFailures(kind: LoginLockoutKind, emailLower: string): void {
-  db.prepare("DELETE FROM login_lockouts WHERE kind = ? AND email_lower = ?").run(kind, emailLower);
+export async function clearLoginFailures(kind: LoginLockoutKind, emailLower: string): Promise<void> {
+  await db.execute({
+    sql: "DELETE FROM login_lockouts WHERE kind = ? AND email_lower = ?",
+    args: [kind, emailLower],
+  });
 }
 
 /**
@@ -122,12 +140,22 @@ export function clearLoginFailures(kind: LoginLockoutKind, emailLower: string): 
  * mises à jour depuis plus de 24h sont forcément hors de toute fenêtre ou
  * verrouillage actif (15 min chacun).
  */
-export function purgeStaleLockouts(): number {
+export async function purgeStaleLockouts(): Promise<number> {
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  return db.prepare("DELETE FROM login_lockouts WHERE updated_at <= ?").run(cutoff).changes;
+  const result = await db.execute({
+    sql: "DELETE FROM login_lockouts WHERE updated_at <= ?",
+    args: [cutoff],
+  });
+  return result.rowsAffected;
 }
 
 export function startLockoutCleanup(): void {
-  purgeStaleLockouts();
-  setInterval(purgeStaleLockouts, 60 * 60 * 1000).unref();
+  purgeStaleLockouts().catch((err) => {
+    console.error("[propdesk] Purge des verrouillages échouée.", err);
+  });
+  setInterval(() => {
+    purgeStaleLockouts().catch((err) => {
+      console.error("[propdesk] Purge des verrouillages échouée.", err);
+    });
+  }, 60 * 60 * 1000).unref();
 }

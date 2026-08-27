@@ -8,9 +8,10 @@ import { readSessionToken, validateSession } from "./sessions";
  * Résout l'email d'une session déjà authentifiée, pour journaliser un
  * `access_denied` — `req.auth` ne porte que l'identifiant, jamais l'email.
  */
-function resolveAuthEmail(req: Request): string | null {
+async function resolveAuthEmail(req: Request): Promise<string | null> {
   if (!req.auth) return null;
-  return getStaffById(req.auth.userId)?.email ?? null;
+  const staff = await getStaffById(req.auth.userId);
+  return staff?.email ?? null;
 }
 
 /**
@@ -89,37 +90,39 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
     return;
   }
 
-  const token = readSessionToken(req);
-  const session = token ? validateSession(token) : null;
+  (async () => {
+    const token = readSessionToken(req);
+    const session = token ? await validateSession(token) : null;
 
-  if (!session) {
-    res.status(401).json({ error: "Session expirée ou absente." });
-    return;
-  }
+    if (!session) {
+      res.status(401).json({ error: "Session expirée ou absente." });
+      return;
+    }
 
-  // Relu en base à chaque requête, jamais pris dans le cookie : un
-  // changement de mot de passe prend effet immédiatement, sans attendre
-  // l'expiration de la session.
-  const staff = getStaffById(session.userId);
-  if (!staff) {
-    res.status(401).json({ error: "Session expirée ou absente." });
-    return;
-  }
+    // Relu en base à chaque requête, jamais pris dans le cookie : un
+    // changement de mot de passe prend effet immédiatement, sans attendre
+    // l'expiration de la session.
+    const staff = await getStaffById(session.userId);
+    if (!staff) {
+      res.status(401).json({ error: "Session expirée ou absente." });
+      return;
+    }
 
-  if (staff.mustChangePassword && req.path !== CHANGE_PASSWORD_PATH) {
-    res.status(403).json({
-      error: "Mot de passe temporaire : choisis-en un nouveau avant de continuer.",
-      code: "MUST_CHANGE_PASSWORD",
-    });
-    return;
-  }
+    if (staff.mustChangePassword && req.path !== CHANGE_PASSWORD_PATH) {
+      res.status(403).json({
+        error: "Mot de passe temporaire : choisis-en un nouveau avant de continuer.",
+        code: "MUST_CHANGE_PASSWORD",
+      });
+      return;
+    }
 
-  req.auth = {
-    userId: staff.id,
-    dataUserId: DEFAULT_USER_ID,
-    isAdmin: true,
-  };
-  next();
+    req.auth = {
+      userId: staff.id,
+      dataUserId: DEFAULT_USER_ID,
+      isAdmin: true,
+    };
+    next();
+  })().catch(next);
 };
 
 /**
@@ -131,14 +134,18 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction) => 
  */
 export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (req.auth?.isAdmin !== true) {
-    recordSecurityEvent({
-      eventType: "access_denied",
-      severity: "critical",
-      accountKind: "staff",
-      accountEmail: resolveAuthEmail(req),
-      ip: req.ip,
-      detail: `réservé à l'administrateur (${req.method} ${req.path})`,
-    });
+    resolveAuthEmail(req)
+      .then((accountEmail) => {
+        recordSecurityEvent({
+          eventType: "access_denied",
+          severity: "critical",
+          accountKind: "staff",
+          accountEmail,
+          ip: req.ip,
+          detail: `réservé à l'administrateur (${req.method} ${req.path})`,
+        });
+      })
+      .catch((err) => console.error("[propdesk] Journalisation access_denied échouée.", err));
     res.status(403).json({ error: "Action réservée à l'administrateur." });
     return;
   }

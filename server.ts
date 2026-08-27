@@ -5,6 +5,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { api, apiErrorHandler } from "./server/routes";
+import { initDb } from "./server/db";
 import { startSessionCleanup } from "./server/auth/sessions";
 import { startSecurityEventCleanup } from "./server/auth/securityEvents";
 import { startLockoutCleanup } from "./server/auth/loginLockout";
@@ -98,17 +99,22 @@ app.use(express.json({ limit: "8mb" }));
 app.use("/api", api);
 app.use("/api", apiErrorHandler);
 
-// Hygiène : retire les sessions expirées au démarrage puis toutes les heures.
-startSessionCleanup();
-// Journal de sécurité : purge RGPD à 90 jours (IP = donnée personnelle).
-startSecurityEventCleanup();
-// Verrouillages de compte : purge d'hygiène des lignes hors de toute fenêtre active.
-startLockoutCleanup();
-
 // Serve public static assets
 app.use("/public", express.static(path.join(ROOT,"public")));
 
 async function startServer() {
+  // Schéma + migrations d'abord, avant que quoi que ce soit ne touche `db` —
+  // le client libSQL n'a pas de setup synchrone au chargement du module comme
+  // le faisait better-sqlite3, il faut donc l'attendre explicitement ici.
+  await initDb();
+
+  // Hygiène : retire les sessions expirées au démarrage puis toutes les heures.
+  startSessionCleanup();
+  // Journal de sécurité : purge RGPD à 90 jours (IP = donnée personnelle).
+  startSecurityEventCleanup();
+  // Verrouillages de compte : purge d'hygiène des lignes hors de toute fenêtre active.
+  startLockoutCleanup();
+
   // Le serveur HTTP est créé explicitement, au lieu de laisser `app.listen()`
   // le faire : en développement, Vite a besoin d'une référence dessus pour y
   // brancher le rechargement à chaud (voir plus bas).
