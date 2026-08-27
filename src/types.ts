@@ -180,14 +180,9 @@ export interface TradingPlan {
 }
 
 /**
- * Tous les plans de trading d'un élève.
- *
- * Élève : synchronisé serveur (`PUT /auth/trading-plan`, `getTradingPlan`/
- * `saveTradingPlan` dans `server/repositories.ts`), avec mise en cache locale
- * via `useSyncedState` — voir `src/App.tsx`. Le coach le consulte en lecture
- * seule dans la Vue Complète (`AdminStudentView.tsx`), sans route d'écriture
- * exposée côté staff. L'instance du bureau staff (son propre plan personnel)
- * reste en `localStorage` seul, non synchronisée — hors périmètre demandé.
+ * Tous les plans de trading du compte connecté — `localStorage` seul, jamais
+ * synchronisé au serveur (hors périmètre, voir le commentaire sur
+ * `staffTradingPlan` dans `src/App.tsx`).
  *
  * Anciennes valeurs enregistrées avant l'introduction du multi-plan : un
  * objet `TradingPlan` unique, pas un tableau. Toujours lire une valeur

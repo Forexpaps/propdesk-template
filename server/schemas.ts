@@ -206,35 +206,6 @@ export const updateAvatarSchema = z.object({
     }),
 });
 
-/**
- * Un plan de trading (`TradingPlan`, `src/types.ts`). Un élève en a
- * plusieurs — voir `tradingPlansSchema` juste en dessous, qui valide le
- * tableau complet reçu par `PUT /trading-plan`. Bornes larges (les champs
- * texte sont saisis à la main dans un formulaire) mais présentes, même
- * raisonnement que `quizResultEntrySchema` juste en dessous.
- */
-export const tradingPlanSchema = z.object({
-  id: z.string().min(1).max(100),
-  name: z.string().min(1).max(100),
-  authorizedSessions: z.array(z.string().max(50)).max(20),
-  tradingHours: z.string().max(200),
-  trackedAssets: z.string().max(500),
-  authorizedSetups: z.string().max(500),
-  riskPerTradePercent: z.string().max(20),
-  maxTradesPerDay: z.string().max(20),
-  maxDailyLossPercent: z.string().max(20),
-  entryConditions: z.string().max(2000),
-  stopConditions: z.string().max(2000),
-  goldenRules: z.string().max(2000),
-});
-
-/**
- * Tous les plans de trading d'un élève — corps attendu par
- * `PUT /trading-plan` (`server/auth/studentRoutes.ts`). Plafond large mais
- * réel : un élève n'aura jamais des dizaines de plans distincts.
- */
-export const tradingPlansSchema = z.array(tradingPlanSchema).max(20);
-
 export const importStateSchema = z.object({
   student: profileSchema.optional(),
   collections: z.record(z.string(), collectionPayloadSchema).optional(),

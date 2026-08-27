@@ -53,11 +53,6 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_trades_user ON trades(user_id, position);
   CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(user_id, date);
 
-  CREATE TABLE IF NOT EXISTS trading_plans (
-    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    payload TEXT NOT NULL
-  );
-
   -- Verrouillage optimiste sur les collections CollectionName (trades,
   -- accounts, badges, setups, notifications, enrolledStudents) : un
   -- compteur par (utilisateur, collection),

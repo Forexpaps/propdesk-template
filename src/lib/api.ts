@@ -4,7 +4,6 @@ import {
   TradingAccount,
   AppNotification,
   TraderBadge,
-  TradingPlanData,
   Setup,
 } from "../types";
 
@@ -152,13 +151,6 @@ export const api = {
     request<{ success: true }>("/api/profile", {
       method: "PUT",
       body: JSON.stringify(student),
-    }),
-
-  /** Enregistre le plan de trading de l'élève connecté (lui seul peut l'écrire). */
-  saveTradingPlan: (plan: TradingPlanData) =>
-    request<void>("/api/auth/trading-plan", {
-      method: "PUT",
-      body: JSON.stringify(plan),
     }),
 
   seedDemoData: () =>

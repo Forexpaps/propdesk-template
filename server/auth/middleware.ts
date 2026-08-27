@@ -66,9 +66,14 @@ const PUBLIC_PATHS = new Set([
 
 /**
  * Préfixes publics, pour les routes paramétrées qu'un `Set` de chemins exacts
- * ne peut structurellement pas couvrir.
+ * ne peut structurellement pas couvrir. Vide aujourd'hui — il n'existe pas de
+ * route paramétrée sans session. Réintroduire une entrée ici SEULEMENT à
+ * côté de l'implémentation réelle de la route correspondante (jamais par
+ * anticipation) : une entrée orpheline accorderait un accès non authentifié
+ * silencieux dès qu'une route paraissant correspondre au préfixe serait
+ * ajoutée sans revue dédiée.
  */
-const PUBLIC_PATH_PREFIXES = ["/auth/reset-password/"];
+const PUBLIC_PATH_PREFIXES: string[] = [];
 
 /**
  * Seule route accessible à une session dont le mot de passe est encore

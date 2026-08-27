@@ -22,12 +22,7 @@ interface TradingPlanEditorModalProps {
    */
   plans?: TradingPlanData;
   onChange?: (plans: TradingPlanData) => void;
-  /**
-   * Vue Complète du coach : consultation seule, aucune saisie ni bouton
-   * "Enregistrer"/"Nouveau plan"/suppression — les plans appartiennent à
-   * l'élève, voir `saveTradingPlan` (`server/repositories.ts`), qui n'a pas
-   * de route d'écriture côté staff.
-   */
+  /** Mode consultation seule : aucune saisie ni bouton "Enregistrer"/"Nouveau plan"/suppression. */
   readOnly?: boolean;
   /**
    * Setups de l'élève (module Setups, voir `SetupManagement.tsx`) — source du

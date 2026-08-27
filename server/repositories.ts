@@ -259,30 +259,4 @@ export function saveProfile(profile: unknown, userId: string = DEFAULT_USER_ID):
   ).run(userId, JSON.stringify(profile));
 }
 
-/**
- * Plans de trading d'un élève — payload JSON opaque (un tableau de
- * `TradingPlan`, voir `TradingPlanData` dans `src/types.ts`) sur une ligne
- * par utilisateur, même modèle que `getProfile`/`saveProfile`, sur sa propre
- * table plutôt que forcé dans le moule `CollectionName`. Passthrough
- * générique : le passage d'un objet unique (avant l'introduction du
- * multi-plan) à un tableau ne demande aucun changement ici, ni de migration
- * SQL — seule la validation applicative (`tradingPlansSchema`,
- * `server/schemas.ts`) et la normalisation à la lecture
- * (`normalizeTradingPlans`, `src/lib/planCompliance.ts`) en tiennent compte.
- */
-export function getTradingPlan<T>(userId: string = DEFAULT_USER_ID): T | null {
-  const row = db.prepare("SELECT payload FROM trading_plans WHERE user_id = ?").get(userId) as
-    | { payload: string }
-    | undefined;
-  if (!row) return null;
-  return safeParsePayload<T>(row.payload, `trading_plans#${userId}`);
-}
-
-export function saveTradingPlan(plan: unknown, userId: string = DEFAULT_USER_ID): void {
-  db.prepare(
-    `INSERT INTO trading_plans (user_id, payload) VALUES (?, ?)
-     ON CONFLICT(user_id) DO UPDATE SET payload = excluded.payload`
-  ).run(userId, JSON.stringify(plan));
-}
-
 export const COLLECTION_NAMES = Object.keys(TABLES) as CollectionName[];
