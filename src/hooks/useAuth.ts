@@ -11,9 +11,18 @@ import { purgeCacheKeepingPending } from "../lib/pendingChanges";
  * - `2fa-required` : mot de passe vérifié, en attente du second facteur
  *   (`TwoFactorVerifyScreen`) avant qu'une session existe.
  * - `authenticated` : session valide, `TraderApp` peut se monter.
- * - `offline` : le serveur est injoignable. On ne peut alors rien vérifier, et
- *   l'application démarre sur le cache local comme avant l'authentification —
+ * - `offline` : le serveur est injoignable, MAIS ce navigateur porte déjà un
+ *   cache local d'une session précédemment authentifiée (`horizon_student`
+ *   présent) — l'application démarre dessus comme avant l'authentification,
  *   c'est un filet anti-perte de données, assumé (voir le README).
+ * - `server-error` : le serveur est injoignable ET ce navigateur n'a AUCUNE
+ *   trace d'une authentification antérieure. Contrairement à `offline`, on
+ *   ne peut pas distinguer ce cas d'un serveur mal configuré (ex. base de
+ *   données qui ne peut pas s'initialiser sur un hébergement au système de
+ *   fichiers non persistant) présentant une fausse app "connectée" à
+ *   n'importe quel visiteur n'ayant jamais créé de compte — voir le
+ *   commentaire dans `refresh()`. On affiche donc une erreur claire plutôt
+ *   que l'application.
  */
 export type AuthStatus =
   | "loading"
@@ -21,7 +30,24 @@ export type AuthStatus =
   | "unauthenticated"
   | "2fa-required"
   | "authenticated"
-  | "offline";
+  | "offline"
+  | "server-error";
+
+/**
+ * Trace qu'une authentification a déjà réussi sur ce navigateur — seule
+ * façon fiable de distinguer un utilisateur légitime temporairement
+ * déconnecté (`offline`, filet anti-perte de données) d'un visiteur qui n'a
+ * jamais eu de session et tombe sur un serveur en panne (`server-error`).
+ * Voir `horizon_student` dans `src/hooks/useServerSync.ts` : posé après
+ * chaque bootstrap réussi, jamais avant.
+ */
+function hasLocalSessionEvidence(): boolean {
+  try {
+    return localStorage.getItem("horizon_student") !== null;
+  } catch {
+    return false;
+  }
+}
 
 export interface UseAuthResult {
   status: AuthStatus;
@@ -81,9 +107,20 @@ export function useAuth(): UseAuthResult {
       setStatus(result.state);
     } catch (err) {
       // Échec réseau, pas un refus : on ne peut rien vérifier sans serveur.
-      console.warn("[propdesk] Serveur injoignable, mode hors ligne.", err);
+      // Ne démarrer sur le cache local (`offline`) que si ce navigateur a
+      // déjà authentifié une fois — sinon un serveur mal configuré (ex. base
+      // de données qui échoue à s'initialiser sur un hébergement au système
+      // de fichiers non persistant) présenterait une fausse app "connectée"
+      // à n'importe quel visiteur n'ayant jamais créé de compte.
+      const offline = hasLocalSessionEvidence();
+      console.warn(
+        offline
+          ? "[propdesk] Serveur injoignable, mode hors ligne."
+          : "[propdesk] Serveur injoignable et aucune session locale connue — refus d'afficher l'application.",
+        err
+      );
       setUser(null);
-      setStatus("offline");
+      setStatus(offline ? "offline" : "server-error");
     }
   }, []);
 

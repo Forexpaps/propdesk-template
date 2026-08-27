@@ -69,8 +69,15 @@ pour la base SQLite) :
 
 ### 3. Déployer (Vercel)
 
-Vercel fonctionne aussi, à condition de ne **pas** compter sur un disque
-persistant classique (le système de fichiers y est éphémère) :
+⚠️ **SQLite ne fonctionne pas tel quel sur Vercel** : les fonctions serverless
+y ont un système de fichiers en lecture seule (sauf `/tmp`, non persistant),
+donc `better-sqlite3` ne peut même pas créer sa base au premier démarrage.
+Le serveur échoue alors sur chaque requête — l'application affiche l'écran
+« Serveur injoignable » à tout nouveau visiteur (ou, pour un navigateur ayant
+déjà une session locale, redémarre en mode dégradé sur son cache, voir la
+section Authentification plus bas).
+
+Pour déployer réellement sur Vercel :
 
 1. Importer le dépôt sur [vercel.com](https://vercel.com).
 2. Remplacer le stockage SQLite par une base externe persistante (ex.
@@ -80,8 +87,9 @@ persistant classique (le système de fichiers y est éphémère) :
 3. Définir les variables d'environnement nécessaires dans les réglages du
    projet Vercel.
 
-Sans cette adaptation, les données créées sur Vercel seraient perdues à
-chaque redéploiement.
+Sans cette adaptation, l'application ne fonctionnera pas du tout sur Vercel.
+**Railway (option 2 ci-dessus) est donc la voie recommandée** — il fonctionne
+directement, sans rien à adapter.
 
 ### Variables d'environnement utiles
 
@@ -199,13 +207,18 @@ Vos données ne sont pas touchées : seuls les comptes sont à recréer.
 
 ## Limites connues
 
-- **Le verrou ne protège pas les données déjà en cache.** Si le serveur est
-  injoignable, l'application démarre sur le cache `localStorage` sans écran de
-  connexion — aucune vérification n'est possible sans serveur. C'est un choix
-  assumé : il préserve le filet anti-perte de données. Le cache est effacé à la
-  déconnexion volontaire, mais quelqu'un ayant accès physique à la machine et
-  coupant le serveur verrait les données. Ce n'est donc pas une protection
-  contre un tiers présent devant l'écran.
+- **Le verrou ne protège pas les données déjà en cache.** Si le serveur
+  devient injoignable APRÈS qu'une authentification a déjà réussi sur ce
+  navigateur, l'application redémarre sur le cache `localStorage` sans écran
+  de connexion — aucune vérification n'est possible sans serveur. C'est un
+  choix assumé : il préserve le filet anti-perte de données. Le cache est
+  effacé à la déconnexion volontaire, mais quelqu'un ayant accès physique à
+  la machine et coupant le serveur verrait les données. Ce n'est donc pas une
+  protection contre un tiers présent devant l'écran. **Un navigateur qui n'a
+  jamais authentifié** sur cette instance (aucune trace locale) et qui tombe
+  sur un serveur injoignable voit en revanche un écran d'erreur explicite,
+  jamais l'application — voir `AuthStatus["server-error"]`,
+  `src/hooks/useAuth.ts`.
 - **Un seul compte.** Chaque ligne porte déjà un `user_id` et l'unicité des
   emails est en place, donc l'ajout de comptes multiples sera additif — mais le
   cloisonnement des données par utilisateur reste à faire.
