@@ -149,23 +149,28 @@ function backfillMissingBadges(dataUserId: string): void {
  * Resynchronise les badges DÉJÀ présents avec le catalogue actuel
  * (`initialTraderBadges`) — `backfillMissingBadges` n'AJOUTE que les badges
  * manquants, il ne met jamais à jour ceux déjà stockés. Sans cette fonction,
- * changer un `rewardXP` ou un `unlockedAt` dans `src/data/mockData.ts`
+ * changer un `rewardXP` ou une description dans `src/data/mockData.ts`
  * resterait invisible : la copie déjà en base garderait ses anciennes
  * valeurs indéfiniment.
  *
- * Sans risque ici : ces badges "unlocked: true" sont une CONVENTION du
- * catalogue (jamais une vraie progression réclamée par un tiers), donc
- * entièrement dérivés de `initialTraderBadges`.
+ * `unlocked`/`unlockedAt` sont volontairement EXCLUS de la resynchronisation
+ * — ce sont des états réclamés par l'utilisateur (`onClaimBadge`), jamais une
+ * convention du catalogue. Les resynchroniser écraserait la progression déjà
+ * acquise d'un compte (le fondateur actuel en a plusieurs) à chaque
+ * changement du catalogue.
  */
 function syncBadgeCatalog(dataUserId: string): void {
-  const existing = listCollection<{ id: string; [key: string]: unknown }>("badges", dataUserId);
+  const existing = listCollection<{ id: string; unlocked?: boolean; unlockedAt?: string; [key: string]: unknown }>(
+    "badges",
+    dataUserId
+  );
   const byId = new Map(initialTraderBadges.map((def) => [def.id, def]));
 
   let changed = false;
   const next = existing.map((badge) => {
     const def = byId.get(badge.id);
     if (!def) return badge;
-    const synced = { ...def };
+    const synced = { ...def, unlocked: badge.unlocked, unlockedAt: badge.unlockedAt };
     if (JSON.stringify(synced) === JSON.stringify(badge)) return badge;
     changed = true;
     return synced;
