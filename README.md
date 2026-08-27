@@ -102,7 +102,8 @@ src/
   data/mockData.ts     jeu de données d'amorçage
   hooks/               persistance locale et synchronisation serveur
   lib/api.ts           client typé de l'API
-  components/          10 vues d'onglets + 9 modales
+  components/          vues d'onglets et modales (journal, portefeuille,
+                       rentabilité, macro, setups, plan de trading, mindset...)
 ```
 
 ### Navigation
