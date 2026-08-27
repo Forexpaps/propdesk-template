@@ -58,28 +58,63 @@ L'application tourne sur **n'importe quel hébergeur Node.js** (`npm run
 build && npm start`) — un seul critère détermine s'il faut une étape
 supplémentaire : **son système de fichiers est-il persistant ?**
 
-**Hébergeur à disque persistant** (Railway, Render, Fly.io, un VPS, un
-Docker avec volume monté, une machine perso...) : **rien à faire**,
-l'application fonctionne directement.
+- **Oui** (Railway, Render, Fly.io, un VPS, un Docker avec volume monté, une
+  machine perso...) → rien à faire, l'application fonctionne directement
+  avec sa base SQLite embarquée.
+- **Non** (fonctions serverless : Vercel, Netlify, AWS Lambda...) → il faut
+  une base accessible en réseau (Postgres ou Turso), voir plus bas.
 
-1. Créer le service sur l'hébergeur choisi, en pointant vers votre copie du
-   dépôt (build : `npm run build`, démarrage : `npm start`).
+#### Option A — Railway (recommandé, le plus simple)
+
+Railway a un disque persistant ET une base Postgres en un clic — l'un ou
+l'autre fonctionne, au choix.
+
+1. Créer un compte sur [railway.app](https://railway.app), puis **New
+   Project → Deploy from GitHub repo**, et choisir votre copie du dépôt.
+2. Railway détecte `npm run build`/`npm start` automatiquement (sinon, les
+   définir dans Settings → Deploy).
+3. Choisir l'une des deux façons de stocker les données :
+   - **Le plus simple : rien configurer.** Railway donne un disque
+     persistant par défaut au service, la base SQLite embarquée (dans
+     `./data`) survit donc aux redémarrages sans rien ajouter.
+   - **Ou, si vous préférez une vraie base Postgres gérée** : dans le
+     projet Railway, cliquer **+ New → Database → Add PostgreSQL**. Railway
+     crée la base et l'attache automatiquement à votre service (variable
+     `DATABASE_URL`, visible dans l'onglet **Variables** du service). Il
+     suffit alors d'ajouter, dans les variables du service applicatif (pas
+     de la base), une variable `POSTGRES_URL` avec la même valeur que
+     `DATABASE_URL` (copier-coller, ou une référence Railway
+     `${{Postgres.DATABASE_URL}}`) — c'est le nom que `server/db.ts`
+     recherche.
+4. Une fois déployé, ouvrir l'URL fournie par Railway (onglet
+   **Settings → Networking → Generate Domain** si aucune n'est encore
+   visible) : le premier accès affiche l'écran d'installation.
+
+#### Option B — un autre hébergeur à disque persistant (Render, Fly.io, VPS...)
+
+1. Créer le service, en pointant vers votre copie du dépôt (build :
+   `npm run build`, démarrage : `npm start`).
 2. Si l'hébergeur le permet, monter un volume persistant et y faire pointer
    `DATA_DIR` (ex. `DATA_DIR=/data`) — sinon la base par défaut (`./data`)
    suffit tant que le disque du service lui-même survit aux redémarrages.
 3. Ouvrir l'URL fournie : le premier accès affiche l'écran d'installation.
 
-**Hébergeur sans disque persistant** (fonctions serverless : Vercel,
-Netlify, AWS Lambda...) : il faut une base accessible en réseau, définie
-via une variable d'environnement — **aucune adaptation de code
-nécessaire**, `server/db.ts` détecte automatiquement laquelle est présente.
+#### Option C — un hébergeur serverless (Vercel, Netlify...) : il faut une base externe
 
-- `POSTGRES_URL` — une base Postgres, **n'importe quel fournisseur** :
-  Postgres natif de l'hébergeur (ex. l'onglet Storage de Vercel, qui
-  provisionne la base et définit cette variable automatiquement), ou un
-  service tiers (Neon, Supabase, ElephantSQL, une instance auto-hébergée...).
-- `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` — alternative SQLite-compatible
-  via [Turso](https://turso.tech) :
+**Aucune adaptation de code nécessaire** — `server/db.ts` détecte
+automatiquement la base disponible via l'une de ces deux variables
+d'environnement :
+
+- **`POSTGRES_URL`** — une base Postgres, **n'importe quel fournisseur** :
+  - Postgres natif de l'hébergeur si disponible (ex. onglet **Storage** →
+    **Create Database → Postgres** sur Vercel : la base est créée et
+    `POSTGRES_URL` définie automatiquement, rien à copier) ;
+  - ou un service Postgres géré indépendant si l'hébergeur n'en propose
+    pas — par exemple [neon.com](https://neon.com) (offre gratuite) :
+    créer un compte, un projet, puis copier la « Connection string »
+    fournie dans la variable `POSTGRES_URL` du projet.
+- **`TURSO_DATABASE_URL`** + **`TURSO_AUTH_TOKEN`** — alternative
+  SQLite-compatible via [Turso](https://turso.tech) (offre gratuite) :
   ```bash
   curl -sSfL https://get.tur.so/install.sh | bash
   turso auth login
@@ -89,11 +124,14 @@ nécessaire**, `server/db.ts` détecte automatiquement laquelle est présente.
   ```
 
 Définir l'une des deux dans les variables d'environnement du projet, puis
-déployer/redéployer. Sans aucune des deux, l'application bascule sur un
-fichier SQLite local — inutilisable sur ce type d'hébergeur (d'où l'écran
-« Serveur injoignable » si vous déployez sans configurer l'une d'elles),
-mais c'est exactement ce qui permet à `npm run dev` de fonctionner en local
-sans aucun compte externe.
+déployer/redéployer — le premier accès à l'URL fournie affiche l'écran
+d'installation.
+
+Sans aucune des deux, l'application bascule sur un fichier SQLite local —
+inutilisable sur ce type d'hébergeur (d'où l'écran « Serveur injoignable »
+si vous déployez sans configurer l'une d'elles), mais c'est exactement ce
+qui permet à `npm run dev` de fonctionner en local sans aucun compte
+externe.
 
 ### Variables d'environnement utiles
 
