@@ -1,35 +1,71 @@
-Copyright © 2026 Thomas Gauthey. Tous droits réservés.
+Licence d'usage personnel non commercial
+Copyright © 2026 Thomas Gauthey. Tous droits non expressément accordés
+ci-dessous sont réservés.
 
-Ce dépôt (code source, structure, documentation, contenu) est la propriété
-exclusive de Thomas Gauthey. Aucune licence open source n'est accordée.
+Cette licence régit l'utilisation du code source, de la structure et de la
+documentation de ce dépôt (« le Logiciel »).
 
-Sauf autorisation écrite préalable et explicite de Thomas Gauthey, il est
-strictement interdit à toute personne ou entité de :
+## 1. Ce qui est autorisé
 
-  1. Copier, cloner, télécharger ou dupliquer tout ou partie de ce code,
-     de quelque manière que ce soit ;
-  2. Modifier, adapter, transformer ou créer une œuvre dérivée à partir
-     de ce code ;
-  3. Utiliser ce code, en tout ou partie, pour un usage personnel,
-     commercial, éducatif ou tout autre usage ;
-  4. Déployer, héberger, publier ou rendre accessible une instance de ce
-     code ou d'une version modifiée de celui-ci ;
-  5. Redistribuer, sous-licencier, vendre, louer ou transférer ce code à
-     un tiers, sous quelque forme que ce soit ;
-  6. Utiliser ce code, en tout ou partie, comme entrée ou contexte fourni
-     à un outil d'intelligence artificielle (y compris, sans s'y limiter,
-     Claude, ChatGPT, Copilot ou tout assistant de génération de code)
-     dans le but de le reproduire, le modifier, le contourner ou en
-     produire une version dérivée.
+Toute personne ayant accès à ce dépôt peut, gratuitement et sans demande
+d'autorisation préalable :
 
-Le simple fait d'avoir accès à ce dépôt (en lecture, en tant que
-collaborateur invité, ou par tout autre moyen) ne constitue en aucun cas
-une autorisation d'exercer l'un des droits ci-dessus. Toute autorisation
-doit être accordée explicitement, par écrit, et au cas par cas par
-Thomas Gauthey.
+  a. Copier, cloner ou télécharger le Logiciel ;
+  b. Déployer et héberger une instance du Logiciel, y compris modifié,
+     sur son propre hébergeur, pour son usage personnel (par exemple :
+     comme outil personnel de suivi de trading) ;
+  c. Modifier le Logiciel pour l'adapter à son usage personnel.
 
-Toute violation de ces conditions expose son auteur à des poursuites au
-titre du droit d'auteur et de la propriété intellectuelle applicable.
+Ces autorisations sont limitées à un usage **personnel et non commercial**,
+tel que défini à la section 2.
 
-Ce texte ne constitue pas une licence de logiciel libre ou open source au
-sens de l'Open Source Initiative ou de la Free Software Foundation.
+## 2. Ce qui est strictement interdit
+
+Sans autorisation écrite préalable et explicite de Thomas Gauthey, il est
+interdit de :
+
+  a. **Vendre** le Logiciel, en tout ou partie, sous quelque forme que ce
+     soit (vente directe, abonnement, licence payante, etc.) ;
+  b. Faire payer l'accès à une instance déployée du Logiciel ou d'une
+     version modifiée de celui-ci (ex. : vendre des comptes, des places, un
+     abonnement à une plateforme construite dessus) ;
+  c. Utiliser le Logiciel, en tout ou partie, comme **base pour créer,
+     commercialiser ou promouvoir** un produit, un service ou un
+     « écosystème », en le présentant — explicitement ou implicitement —
+     comme sa propre création originale ;
+  d. Retirer, masquer ou altérer les mentions de copyright de Thomas
+     Gauthey présentes dans le Logiciel ou sa documentation ;
+  e. Redistribuer le Logiciel (modifié ou non) à des tiers dans un cadre
+     commercial, ou en vue de leur permettre d'en tirer un usage commercial ;
+  f. Utiliser le Logiciel, en tout ou partie, comme entrée ou contexte
+     fourni à un outil d'intelligence artificielle (Claude, ChatGPT,
+     Copilot ou autre) dans un but qui contreviendrait à l'une des
+     interdictions ci-dessus (par exemple, générer un produit commercial
+     dérivé en s'appuyant sur ce code).
+
+## 3. Attribution
+
+Toute instance déployée ou copie modifiée du Logiciel doit conserver la
+mention de son auteur original (Thomas Gauthey) dans le code ou sa
+documentation. Se présenter comme l'auteur ou le créateur original du
+Logiciel constitue une violation de cette licence.
+
+## 4. Absence de garantie
+
+Le Logiciel est fourni « tel quel », sans garantie d'aucune sorte, expresse
+ou implicite. Thomas Gauthey ne pourra être tenu responsable d'aucun
+dommage résultant de l'utilisation du Logiciel.
+
+## 5. Résiliation
+
+Le non-respect de l'une des conditions de cette licence met fin
+automatiquement, et sans préavis, aux autorisations accordées à la section
+1. Le Logiciel redevient alors soumis au régime par défaut du droit
+d'auteur (tous droits réservés), et l'usage antérieur ou en cours devient
+une contrefaçon exposant son auteur à des poursuites.
+
+## 6. Contact
+
+Toute demande d'autorisation pour un usage non couvert par la section 1
+(notamment tout usage commercial) doit être adressée directement à Thomas
+Gauthey.

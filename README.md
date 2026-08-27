@@ -2,17 +2,17 @@
 
 Tableau de bord de trading personnel : journal d'exécution, portefeuille,
 analyse de rentabilité, calendrier macro, setups, plan de trading et suivi de
-mindset. Application **mono-utilisateur** — cette instance n'a qu'un seul
+mindset. Application **mono-utilisateur** — chaque déploiement n'a qu'un seul
 compte, avec ses propres données isolées. Aucune IA n'est utilisée nulle part
 dans l'application.
 
-> **⚠️ Propriété privée — voir [LICENSE](LICENSE).** Ce dépôt n'est **pas**
-> open source. Tous droits réservés à Thomas Gauthey. La documentation
-> ci-dessous (démarrage, déploiement) décrit le fonctionnement du projet
-> pour son titulaire ; elle ne constitue **en aucun cas** une autorisation
-> pour un tiers de copier, cloner, modifier, déployer ou réutiliser ce code,
-> y compris à l'aide d'un assistant IA (Claude, ChatGPT ou autre). Le simple
-> accès en lecture à ce dépôt n'accorde aucun droit d'usage.
+> **⚠️ Usage personnel uniquement — voir [LICENSE](LICENSE).** Vous pouvez
+> librement cloner, déployer et modifier ce code pour votre propre usage
+> personnel (votre propre plateforme de trading, sur votre propre
+> hébergeur). **Toute exploitation commerciale est interdite** : vendre ce
+> code, faire payer l'accès à une instance qui en découle, ou l'utiliser
+> comme base pour vendre un produit en le présentant comme votre propre
+> création. Voir [LICENSE](LICENSE) pour les conditions complètes.
 
 ## Démarrage en local
 
@@ -38,16 +38,18 @@ Au premier accès à `http://localhost:3000`, l'application affiche un écran
 d'installation : choisissez votre adresse e-mail et votre mot de passe (10
 caractères minimum), c'est le seul compte de cette instance.
 
-## Déployer (pour le titulaire des droits)
+## Déployer pour un usage personnel
 
-Cette section documente comment ce projet se déploie — réservé à Thomas
-Gauthey ou toute personne expressément autorisée par écrit (voir
-[LICENSE](LICENSE)). L'application ne supporte qu'un seul compte par
-instance déployée, avec sa propre base de données.
+Chaque personne qui veut utiliser PropDesk pour elle-même doit déployer **sa
+propre instance**, avec sa propre base de données — il n'y a pas de mode
+multi-comptes partagé dans une même instance. Usage personnel uniquement,
+voir [LICENSE](LICENSE) : la revente du code ou d'un produit basé dessus
+n'est pas autorisée.
 
 ### 1. Récupérer le code
 
-Cloner ce dépôt (accès déjà requis, voir [LICENSE](LICENSE)).
+Cloner ce dépôt, ou cliquer sur **"Use this template"** sur sa page GitHub
+pour créer sa propre copie.
 
 ### 2. Déployer (Railway, recommandé)
 
@@ -55,7 +57,7 @@ Railway convient bien ici car il fournit un disque persistant (nécessaire
 pour la base SQLite) :
 
 1. Créer un compte sur [railway.app](https://railway.app) et un nouveau
-   projet "Deploy from GitHub repo", en pointant vers ce dépôt.
+   projet "Deploy from GitHub repo", en pointant vers votre copie du dépôt.
 2. Ajouter un volume persistant monté sur `/data` (Railway → onglet
    "Volumes"), et définir la variable d'environnement `DATA_DIR=/data`.
 3. Railway détecte `npm run build` / `npm start` automatiquement. Sinon,
@@ -214,6 +216,8 @@ Vos données ne sont pas touchées : seuls les comptes sont à recréer.
 
 ## Licence
 
-Tous droits réservés — voir [LICENSE](LICENSE). Aucune permission n'est
-accordée de copier, modifier, déployer ou réutiliser ce code sans
-autorisation écrite explicite de Thomas Gauthey.
+Usage personnel non commercial — voir [LICENSE](LICENSE). Vous pouvez
+librement copier, déployer et modifier ce code pour votre propre usage
+personnel. La vente du code, la vente d'accès à une instance qui en découle,
+ou son usage comme base pour vendre un produit en le présentant comme votre
+propre création sont interdits sans autorisation écrite de Thomas Gauthey.
