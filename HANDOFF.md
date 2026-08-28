@@ -1,761 +1,295 @@
-# HANDOFF — PropDesk (Académie de Trading)
+# HANDOFF — PropDesk
 
-Document de reprise. Il suppose que tu n'as accès ni à la conversation qui
-l'a produit, ni à autre chose que ce dépôt. Lis-le en entier avant de
-toucher au code.
+Document de reprise, à lire avant de toucher au code. Écrit pour quelqu'un
+(humain ou IA) qui n'a aucun contexte préalable sur ce dépôt.
 
-> **État à la dernière mise à jour de ce document**
-> Branche **`main`**, working tree **propre**, dernier commit **poussé ET
-> déployé avec succès sur Railway** : `3f3c6d0` (« Élargit le catalogue
-> d'icônes des modules et corrige celles déjà attribuées »). Statut
-> confirmé via `railway status` (`● Online`).
->
-> Application déployée sur **Railway**, domaine
-> `https://propdesk-academie.up.railway.app`.
->
-> **Aucun correctif en attente, aucun fichier modifié non commité.** Le
-> projet est dans un état stable. La seule chose à savoir avant de
-> continuer : un écart réel entre l'environnement de dev local et la
-> production, voir §0.
+## État au moment de l'écriture
 
----
+- Branche : `main`, arbre de travail propre (`git status` clean).
+- Dernier commit : `5a02cea` — "Détaille les instructions de déploiement,
+  avec un guide pas à pas pour Railway".
+- `main` est à jour avec `origin/main` (rien à pousser).
+- Pas de tests automatisés dans le projet (`npm run lint` = `tsc --noEmit`
+  est la seule vérification statique disponible).
 
-## 0. Piège n°1 à connaître avant tout : dev local ≠ production Railway
+## Qu'est-ce que PropDesk, aujourd'hui
 
-Ce projet a **deux bases de données SQLite totalement séparées**, chacune
-avec son propre volume :
-- **Locale** : `data/horizon.db` (répertoire `./data`, ignoré par git),
-  utilisée par `npm run dev`.
-- **Production Railway** : volume persistant monté sur `/data`
-  (`DATA_DIR=/data` dans les variables d'environnement Railway), jamais
-  accessible directement depuis l'environnement de dev — pas de `railway
-  ssh`/`railway run` donnant un accès shell au conteneur ni à son volume.
+PropDesk est un tableau de bord de trading **personnel et mono-utilisateur** :
+journal d'exécution, portefeuille (comptes de trading), analyse de
+rentabilité, calendrier macro, gestion de setups, plan de trading et suivi de
+mindset. Chaque déploiement n'héberge **qu'un seul compte**, créé une fois
+pour toutes à l'installation, avec ses propres données isolées. Il n'y a
+aucune notion de rôles, d'équipe, d'élèves ou de coachs — le compte connecté a
+systématiquement tous les droits sur ses propres données, et c'est le seul
+compte de l'instance. Aucune IA n'est utilisée nulle part dans l'application.
 
-**Conséquence concrète et actuelle** : lors de la session qui a produit ce
-handoff, **8 modules du Module Cours** (Analyse Technique, Trading Plan &
-Routine, Psychologie en Trading, Money Management, Règles Prop Firm &
-Challenges, Backtesting & Journal de Trading, Probabilité en trading,
-Concepts SMC Avancés — voir §5) ont été créés et peaufinés (niveaux,
-icônes) **uniquement dans la base de dev locale**, pour vérifier chaque
-fonctionnalité en conditions réelles avant de livrer le code. **Ils
-n'existent PAS sur le site en ligne.** L'utilisateur en a été informé à
-chaque fois et sait qu'il doit les recréer lui-même via "+ Nouveau module"
-dans Module Cours (formulaire complet : titre, niveau, icône, durée,
-description — voir §6.7). Si l'utilisateur demande "pourquoi je ne vois pas
-mes modules sur le site", c'est la réponse : rien n'est cassé, il faut les
-recréer en ligne, ou lui proposer de le faire pour lui s'il se connecte
-lui-même (voir juste en dessous, aucun accès direct possible sinon).
+Stack : React 19 + TypeScript + Vite côté client, Express côté serveur, un
+seul process Node sert l'API et l'app (pas de proxy à configurer). Le module
+`server/db.ts` abstrait trois moteurs de base de données possibles (détaillé
+plus bas).
 
-**Aucun moyen de publier du contenu créé en local vers la production** sauf
-si l'utilisateur se connecte lui-même dans un onglet du navigateur pané par
-l'outil `Browser` (jamais taper son mot de passe à sa place — interdit) :
-une fois sa session active dans cet onglet, on peut exécuter les mêmes
-appels `fetch` authentifiés (`PUT /api/collections/modules`, etc.) contre
-`https://propdesk-academie.up.railway.app` que ceux utilisés en local. Le
-site en ligne est en plus derrière une vérification anti-bot Cloudflare
-("Checking your browser…") au premier chargement, que seul un humain peut
-valider.
+Licence : **usage personnel non commercial** (`LICENSE`, "Licence d'usage
+personnel non commercial", © Thomas Gauthey). N'importe qui peut cloner,
+déployer et modifier le code gratuitement pour son propre usage personnel
+(sa propre plateforme de trading, sur son propre hébergeur). Est en revanche
+interdit sans autorisation écrite : vendre le code ou l'accès à une instance
+qui en découle, l'utiliser comme base pour commercialiser un produit en le
+présentant comme sa propre création, retirer les mentions de copyright, ou
+s'en servir comme contexte fourni à un outil d'IA dans un but qui
+contreviendrait à ces interdictions.
 
----
+Authentification : **mot de passe seul, aucune adresse e-mail**. À la
+première visite, l'app détecte qu'aucun compte n'existe et affiche un écran
+d'installation où l'on choisit uniquement un mot de passe (10 caractères
+minimum). Il n'y a ni nom, ni email, ni photo à ce stade — le profil part
+vide et se complète plus tard depuis Profil & Options si on le souhaite.
 
-## 1. Le projet en bref
+## Pièges et points d'attention avant de coder
 
-**PropDesk** est une plateforme d'académie de trading SMC (*Smart Money
-Concepts*) destinée à un fondateur (compte staff propriétaire), ses coachs
-invités, et ses élèves. Interface **entièrement en français**, ton direct,
-tutoiement. Devise unique : **`$`**, jamais `€` (exception assumée : le
-module Calculateurs, qui affiche `€/$` sur certains champs pour coller à
-une maquette externe). **Aucune IA n'est utilisée nulle part** — décision
-produit explicite et répétée plusieurs fois, ne jamais la réintroduire sans
-nouvelle demande explicite.
+- **Pas de hot-reload sur le code serveur.** `npm run dev` lance `tsx
+  server.ts`, qui monte Vite en middleware pour le HMR du client — mais toute
+  modification de `server.ts` ou de `server/**` exige un redémarrage manuel
+  du process `tsx`. Le HMR client, lui, fonctionne normalement.
 
-C'est un **vrai projet full-stack** : React 19 + TypeScript + Vite côté
-client, Express + `better-sqlite3` (SQLite, mode WAL) côté serveur, un seul
-process Node sert les deux.
+- **`server/db.ts` choisit le moteur de base selon les variables
+  d'environnement présentes, silencieusement.** Ordre de priorité strict :
+  1. `POSTGRES_URL` défini → Postgres (`pg`), n'importe quel fournisseur.
+  2. Sinon, `TURSO_DATABASE_URL` défini → SQLite distant via Turso/libSQL
+     (`TURSO_AUTH_TOKEN` pour l'auth).
+  3. Sinon → fichier SQLite local, `DATA_DIR/horizon.db` (`DATA_DIR` par
+     défaut `./data`), via libSQL en mode `file:`.
+  Se tromper de variable (ou en laisser traîner une d'un ancien
+  environnement) change silencieusement la base utilisée — aucune erreur ne
+  le signale. `POSTGRES_URL` a toujours priorité sur Turso si les deux sont
+  présentes.
 
-**Trois mondes d'identité**, jamais mélangés :
-- **Élève** (`StudentAuthenticatedApp`, `src/App.tsx`) : chaque élève a son
-  propre bureau isolé (`student-<id>`), ses propres trades, comptes, plan,
-  badges, modules (copie personnelle du programme, progression
-  individuelle).
-- **Staff — bureau PARTAGÉ** (`AcademyApp`, `src/App.tsx`) : fiches élèves
-  (`enrolledStudents`), programme de formation MAÎTRE (`modules`),
-  messagerie coach (`messages`), annonces — un élève doit voir un seul
-  coach/programme cohérent, peu importe qui répond ou édite. Tout compte
-  staff a `isAdmin: true`.
-- **Staff — bureau PERSONNEL** (nouveau depuis cette session, voir §5/§8) :
-  chaque compte staff (fondateur ET chaque coach invité séparément) a
-  maintenant son PROPRE Journal de trades, portefeuilles, badges,
-  notifications de risque, setups, et profil (nom/avatar/bio/capital) — un
-  coach ne voit ni ne peut modifier ceux d'un autre coach ni du fondateur.
-  Seul le fondateur (`isOwner`) a toujours absolument tout débloqué/tout
-  accordé, jamais restreignable.
+- **`AuthStatus["server-error"]` est distinct de `"offline"`, et la
+  distinction est délibérée** (`src/hooks/useAuth.ts`). Si `/api/auth/me`
+  échoue en réseau, l'app ne bascule sur le cache `localStorage` (`offline`,
+  filet anti-perte de données) que si ce navigateur porte déjà une preuve
+  d'authentification antérieure (`localStorage["horizon_student"]` présent).
+  Un navigateur qui n'a **jamais** authentifié sur l'instance et qui tombe
+  sur un serveur injoignable voit un écran d'erreur explicite
+  (`ServerErrorScreen`, dans `src/App.tsx`), jamais l'application. Cela évite
+  qu'un serveur mal configuré (ex. base qui échoue à s'initialiser sur un
+  hébergement au disque non persistant) ne présente une fausse app
+  "connectée" à n'importe quel visiteur n'ayant jamais créé de compte. Ne pas
+  fusionner ces deux états en corrigeant/refactorant `useAuth.ts` sans
+  comprendre pourquoi ils existent séparément.
 
-Format des nombres **totalement libre** dans les champs de prix du Journal
-de trading et du Calculateur : point ou virgule, avec ou sans séparateur de
-milliers — `parsePriceInput` (`src/lib/format.ts`) retrouve le bon nombre
-quelle que soit la convention utilisée. Convention "PnL réalisé"
-(`isRealizedDollarTrade`, `src/lib/performanceStats.ts`) : un trade `OPEN`
-n'entre dans AUCUN total $ agrégé nulle part dans l'app.
+- **`NODE_ENV` gouverne silencieusement `trust proxy`, la CSP, HSTS et le
+  flag `secure` des cookies de session** (voir les commentaires en tête de
+  `server.ts`). Il n'y a pas de garde-fou strict (un `throw` casserait le
+  tout premier déploiement avant que la variable soit configurée) : juste un
+  avertissement en log si `DATA_DIR` est positionné (signe d'un déploiement
+  voulu en production) alors que `NODE_ENV !== "production"`.
 
-Le projet possède : mentions légales/CGU, gestion d'accès/mot de passe
-élève complète, **2FA (TOTP) maison** pour les comptes staff, journal de
-sécurité, photo de profil élève, **export RGPD Article 20**, effacement en
-cascade Article 17, système de niveau/XP dynamique (10 niveaux, 20 000 XP
-total répartis sur 26 badges, voir §5), module **Setups**, **Plans de
-trading multiples**, module **Annonces**, **captures d'écran multiples par
-trade**, **import/export CSV** du Journal, un onglet **Suivi de
-performance** dédié dans les fiches élèves, des **menus déroulants à
-l'apparence identique sur tous les navigateurs** (`Select.tsx`), une
-**gestion complète du Module Cours** avec éditeur (créer/modifier/supprimer
-modules et leçons), **téléversement direct de vidéo** en plus des liens
-externes, un système d'**autorisations granulaires par coach**, et des
-**alertes automatiques de risque portefeuille** (inactivité, drawdown).
+- **`server/db.ts` conserve un modèle `staff_accounts` complet** (nom,
+  email, hash de mot de passe, 2FA/TOTP, codes de récupération) hérité de
+  l'ancien système multi-comptes, mais **une seule ligne y existe jamais** en
+  pratique : `server/auth/credentials.ts` n'expose que
+  `getSoleStaffAccount()`/`hasAnyStaffAccount()`/`createFirstStaffAccount()`,
+  jamais de recherche par email, et `/auth/login` ne prend qu'un mot de
+  passe. L'email stocké en base n'est renseigné qu'à des fins historiques de
+  migration (ancien compte) et n'est plus jamais demandé ni affiché côté
+  client. Ne pas réintroduire de flux de connexion par email en pensant
+  combler un manque : c'est un choix assumé documenté dans
+  `credentials.ts`.
 
----
+- **Verrouillage optimiste sur les collections.** Chaque écriture sur
+  `PUT /api/collections/:name` doit fournir la version lue au dernier
+  chargement (table `collection_versions`) ; sinon 409. Deux onglets ouverts
+  sur la même session peuvent sinon s'écraser silencieusement l'un l'autre.
 
-## 2. Démarrage immédiat
-
-| Commande | Effet |
-|---|---|
-| `npm install` | installe les dépendances (client + serveur, même `package.json`) |
-| `npm run dev` | lance le serveur Express + Vite en mode dev (HMR côté client uniquement) |
-| `npm run lint` (= `tsc --noEmit`) | vérifie le typage sur tout le projet — c'est le "lint" de ce projet |
-| `npm run build` | build de production (`vite build` + `esbuild server.ts` → `dist/`) |
-| `npm run start` | lance le build de production (`node dist/server.cjs`) |
-| `git push origin main` | Railway redéploie automatiquement sur push (déploiement continu configuré, confirmé sur toute cette session — pas besoin de `railway up`/`redeploy` manuel) |
-| `railway status` | statut du service (`● Online`/`Building`/`Deploying`/`Crashed`), URL publique |
-| `railway logs` | logs du conteneur en production |
-
-**Piège serveur** : après une modification côté `server/`, le serveur de
-dev doit être **redémarré manuellement** — pas de hot-reload serveur avec
-`tsx server.ts`. Utiliser l'outil `preview_stop` puis `preview_start` (ou
-tuer le process sur le port et relancer `npm run dev`).
-
-**Piège SQL** : jamais de backtick littéral dans un commentaire SQL `-- ...`
-à l'intérieur d'un template `db.exec(\`...\`)` dans `server/db.ts` — casse
-la compilation TS avec une erreur obscure (TS1005). Texte brut uniquement
-dans ces commentaires.
-
-**Tester une fonctionnalité staff/élève sans casser une session en cours** :
-ne jamais se déconnecter d'une session active dont on ne peut pas
-récupérer les identifiants. Un incident réel de cette session : un compte
-coach de test créé pour vérifier l'isolation des données a fini par
-écraser (via un clic accidentel sur "Enregistrer" du profil pendant la
-navigation) le profil du fondateur en LOCAL (nom/avatar) — restauré
-manuellement, mais la photo de profil locale a été perdue. Méthode sûre
-depuis : créer un compte staff de test via un script `tsx` autonome
-(`createInvitedStaffAccount`, `server/auth/credentials.ts`) + authentifier
-via `curl` avec un fichier de cookies dédié (`curl -c cookies.txt -X POST
-.../api/auth/login ...`), jamais dans le même onglet de navigateur que la
-session réelle en cours — ainsi la session du navigateur (utilisée pour
-les vérifications visuelles) n'est jamais compromise. Toujours nettoyer le
-compte de test après usage (`DELETE FROM staff_accounts/sessions/badges
-WHERE id = ...`).
-
-**Inspection SQLite directe** : `sqlite3 data/horizon.db`, puis `.tables`,
-`.schema <table>`, `SELECT * FROM ... ;`. Table `student_accounts` pour
-retrouver le `user_id` d'un élève à partir de son email ; `staff_accounts`
-pour les comptes coach (colonne `permissions`, JSON ou `NULL` = tout
-accordé — voir §5/§6.6).
-
-**Vérifier un correctif serveur sans navigateur** : un script `tsx`
-autonome à la racine du projet (`npx tsx mon-script.ts`) peut importer
-directement `server/repositories.ts`/`server/db.ts`/`server/auth/*` et
-exécuter la même logique qu'une route contre la vraie base de dev — utile
-pour créer un compte de test, vérifier une migration, etc. Toujours
-nettoyer après usage (jamais de fichier de script laissé, jamais de
-données de test commitées).
-
-**Accès production Railway** : `railway status`/`railway logs` pour le
-statut et les journaux ; **aucun accès shell/DB direct au conteneur ou à
-son volume** (pas de commande `ssh`/`run` équivalente dans ce CLI Railway)
-— voir §0 pour la conséquence pratique la plus importante.
-
----
-
-## 3. Architecture
+## Architecture
 
 ```
-server.ts                     Point d'entrée : Express + Vite (dev) ou
-                               statique (prod) + helmet + trust proxy +
-                               tâches de nettoyage périodiques. Parseurs
-                               JSON à taille bornée : 16kb par défaut sur
-                               /api/auth, 2mb sur /api/auth/profile/avatar
-                               et /api/auth/announcements (uploads
-                               d'image), 8mb ailleurs. Upload vidéo (voir
-                               server/uploads.ts) NE PASSE PAS par ces
-                               parseurs JSON — multipart géré par multer.
-
+server.ts                 point d'entrée unique : Express + Vite (dev) ou dist/ statique (prod)
 server/
-  db.ts                        SQLite (better-sqlite3, WAL, foreign_keys
-                               ON). Migrations idempotentes (CREATE TABLE
-                               IF NOT EXISTS / PRAGMA table_info avant
-                               ALTER TABLE). DEFAULT_USER_ID = "user-local"
-                               (bureau staff PARTAGÉ). DATA_DIR exporté
-                               (utilisé aussi par uploads.ts).
-  repositories.ts               Accès aux données : `listCollection`,
-                               `replaceCollection` (contrôle de
-                               concurrence optimiste par version),
-                               `updateCollectionItem`, singletons (profil,
-                               plan de trading, annonces).
-  routes.ts                     Routes générales (`/api/state`,
-                               `/collections/:name`, `/profile`,
-                               `/quiz-results`, calendrier économique,
-                               données de marché, `/state/restore`).
-                               Contient `resolveCollectionUserId` (choisit
-                               bureau personnel vs partagé selon la
-                               collection, voir §5/§8), `backfillMissingBadges`
-                               (rattrapage badges manquants, staff ET
-                               élève), `syncFounderBadgeCatalog` (resynchronise
-                               les badges déjà stockés du fondateur avec le
-                               catalogue, voir §8), `ensurePersonalUserRow`
-                               (FK `users` pour un nouveau bureau
-                               personnel staff), `PERSONAL_STAFF_COLLECTIONS`.
-  uploads.ts                    NOUVEAU — vidéos de leçon téléversées.
-                               `POST /api/uploads/videos` (staff
-                               uniquement, multer, 2 Go max, mp4/webm/mov/
-                               mkv/ogv), `GET /api/uploads/videos/:filename`
-                               (toute session authentifiée, support
-                               `Range` HTTP pour la lecture/seek). Fichiers
-                               sous `DATA_DIR/uploads/videos/` (survit aux
-                               redéploiements, volume persistant).
-  schemas.ts                    Validation Zod de tout ce qui entre par
-                               l'API. `containsDangerousUrlScheme` (anti-XSS
-                               générique), `isSafeChartUrls`.
-  middleware/rateLimit.ts       Limiteur de débit générique.
+  db.ts                    connexion base (fichier local libSQL / Postgres / Turso), schéma SQL, migrations
+  repositories.ts          seul module qui exécute des requêtes SQL — accès aux données
+  routes.ts                routes /api/* (état applicatif, collections, profil)
+  schemas.ts               validation zod de toutes les entrées API
+  seed.ts                  amorçage d'une base vide + import d'un état complet (reprise localStorage)
+  economicCalendar.ts      données du calendrier macro
+  marketData.ts            données de marché (widget carte des marchés)
+  middleware/rateLimit.ts  limitation de débit par IP
   auth/
-    permissions.ts                NOUVEAU — `STAFF_PERMISSION_KEYS`
-                               (students, messaging, announcements, team,
-                               data), `hasStaffPermission` (fondateur
-                               toujours tout), `requirePermission`
-                               (middleware Express). Voir §5/§6.6.
-    routes.ts                    `authRouter` (login, 2FA, logout) +
-                               `staffRouter` (comptes staff — invitation
-                               gouvernée par la permission "team",
-                               révocation TOUJOURS `requireOwner` strict
-                               — asymétrie volontaire, voir §8 — 2FA,
-                               journal de sécurité, annonces gouvernées par
-                               "announcements", `PUT /staff/:id/permissions`
-                               strictement `requireOwner`).
-    credentials.ts                 `StaffAccount` porte maintenant
-                               `permissions: StaffPermissionKey[] | null`
-                               (`null` = tout accordé), `setStaffPermissions`.
-    studentRoutes.ts             Auth élève + `PUT /trading-plan` + export
-                               RGPD.
-    middleware.ts                  `AuthContext` porte `dataUserId`
-                               (bureau PARTAGÉ, historique) ET
-                               `personalDataUserId` (bureau PERSONNEL,
-                               nouveau) ET `permissions`. Voir §5/§8.
-    exportData.ts                 Export Article 20 (rate-limité).
-    totp.ts / twoFactor.ts         TOTP maison (RFC 6238/4226), anti-rejeu.
-    sessions.ts / studentSessions.ts   Sessions serveur, TTL absolu 90j +
-                               glissant 30j.
-    loginLockout.ts                Verrouillage de compte après échecs
-                               (indexé par email, pas IP — trade-off
-                               assumé).
-    studentCredentials.ts          Profil élève, jetons de reset.
-    password.ts                    Hachage scrypt, comparaison anti-timing.
-    securityEvents.ts               Journal de sécurité (purge RGPD 90j).
-  economicCalendar.ts / marketData.ts   Flux externes, cache, timeout.
-  seed.ts                        Amorçage initial (démo, `initialModules`
-                               vide — voir §0/§8).
+    routes.ts              routes /api/auth/* (setup, login, logout, change-password, 2FA)
+    credentials.ts         accès à staff_accounts — seul module à lire/écrire l'identité de connexion
+    sessions.ts             jetons de session (256 bits, cookie HttpOnly), création/validation/purge
+    middleware.ts           requireAuth et garde d'accès aux routes protégées
+    password.ts              hachage scrypt, comparaison à temps constant
+    loginLockout.ts          verrouillage progressif après tentatives échouées
+    securityEvents.ts        journal de sécurité (purge RGPD à 90 jours)
+    totp.ts / twoFactor.ts   génération/validation TOTP, codes de récupération 2FA
 
 src/
-  App.tsx                      Fichier central : `StudentAuthenticatedApp`
-                               et `AcademyApp`, quasi-dupliqués (deux
-                               mondes d'identité). Chaque instance a
-                               maintenant ses PROPRES handlers de programme
-                               (`handleSaveModule`/`handleDeleteModule`/
-                               `handleSaveLesson`/`handleDeleteLesson`,
-                               staff UNIQUEMENT — jamais côté élève, qui
-                               reste en lecture seule) et son propre effet
-                               `upsertWalletRiskAlerts` (voir §6.9).
-  types.ts                     Tous les types métier. `CourseLevel` =
-                               "Débutant" | "Intermédiaire" | "Confirmé"
-                               (PAS "Avancé", PAS "Masterclass" — renommé
-                               puis Masterclass supprimé cette session).
-                               `Lesson.theory?: string` (contenu théorique
-                               écrit, nouveau). `TradingAccount.maxInactivityDays`/
-                               `lastManualActivityDate` (nouveau, voir
-                               §6.8). `StudentProfile.permissions` (nouveau).
-  data/mockData.ts               Données de démo + catalogue FIXE des **26
-                               badges** (`initialTraderBadges`, total
-                               20 000 XP) — importé aussi côté SERVEUR
-                               (`server/routes.ts`). `initialModules` reste
-                               VIDE (le programme n'a jamais de contenu de
-                               démo, uniquement du vrai contenu créé par le
-                               fondateur, voir §0/§8).
+  App.tsx                  point d'entrée React : résout l'état d'auth (App), charge l'état (AuthenticatedApp), puis monte TraderApp — seul shell applicatif, pas de dualité coach/élève
+  types.ts                 source de vérité des formes de données (Trade, TradingAccount, TraderBadge, Setup, StudentProfile, etc.)
+  main.tsx                 montage React (StrictMode)
+  index.css                styles globaux (Tailwind v4)
+  data/mockData.ts         jeu de données d'amorçage, catalogue de badges par défaut
   hooks/
-    useAuth.ts                   État d'authentification, 2FA.
-    useServerSync.ts               `useSyncedState`, `useBootstrap` (staff),
-                               `useStudentBootstrap` (élève).
-    useNotificationSound.ts        Son d'alerte (Web Audio API).
-    usePersistentState.ts          `useState` + localStorage.
+    useAuth.ts              état d'authentification client (voir AuthStatus ci-dessus)
+    useServerSync.ts         bootstrap (GET /api/state), synchronisation différée vers le serveur
+    usePersistentState.ts    persistance locale générique
+    useNotificationSound.ts  son de notification
   lib/
-    api.ts                        `StaffPermissionKey`/`STAFF_PERMISSION_KEYS`
-                               (miroir client du catalogue serveur),
-                               `updateStaffPermissions`, `uploadLessonVideo`
-                               (XMLHttpRequest — seule API exposant une
-                               progression d'upload).
-    format.ts                     `formatCurrency` + `parsePriceInput`.
-    image.ts                      `resizeChartScreenshot`/`resizeAvatar`,
-                               décodage en cascade.
-    pendingChanges.ts               Registre des modifications hors ligne.
-    badges.ts                     `computeBadgeProgress` — recalcule la
-                               progression en direct (26 badges, dont
-                               plusieurs volontairement `trackable: false`
-                               — voir §8), ne touche jamais
-                               `unlocked`/`unlockedAt`.
-    walletStats.ts                `daysSinceLastTrade` (inactivité,
-                               fusionne dernier trade + date manuelle),
-                               `todayLocalISODate` (exporté).
-    walletAlerts.ts                NOUVEAU — `upsertWalletRiskAlerts`
-                               (alertes inactivité/drawdown quotidien/
-                               drawdown total, idempotent par palier).
-    planCompliance.ts               `checkPlanViolations`,
-                               `normalizeTradingPlans`.
-    performanceStats.ts             Calculs partagés, "PnL réalisé"-aware.
+    api.ts                   client typé de l'API
+    badges.ts                calcul de progression des badges
+    pendingChanges.ts        suivi des modifications non encore envoyées au serveur (mode hors ligne)
+    planCompliance.ts        vérification du respect du plan de trading
+    walletAlerts.ts / walletStats.ts   alertes et calculs sur les comptes de trading
+    performanceStats.ts      calculs de rentabilité
+    weeklySummary.ts         synthèse hebdomadaire
+    format.ts / image.ts / confirmDialog.tsx   utilitaires divers
   components/
-    Select.tsx                    `<select>` personnalisé partagé (chevron
-                               identique sur tous les navigateurs).
-    VideoAcademy.tsx               Module Cours. Éditeur complet
-                               (créer/modifier/supprimer module et leçon,
-                               staff uniquement — props `isAdmin`/
-                               `onSaveModule`/`onDeleteModule`/
-                               `onSaveLesson`/`onDeleteLesson`, tous
-                               optionnels et absents côté élève).
-                               `COURSE_LEVEL_ORDER` trie toujours l'affichage
-                               Débutant → Intermédiaire → Confirmé, PAS
-                               l'ordre de création. `MODULE_ICON_NAMES` (12
-                               icônes). Section Théorie affichée sous la
-                               vidéo si `lesson.theory` présent. Bouton
-                               "Téléverser" à côté du champ URL vidéo
-                               (barre de progression, `api.uploadLessonVideo`).
-    StaffAccountsModal.tsx          "Gérer l'équipe". Un bouton par
-                               autorisation sous chaque coach non-fondateur
-                               (visible seulement par le fondateur),
-                               active/désactive d'un clic.
-    WalletManagement.tsx             Portefeuilles. Filtre par onglet
-                               correctement scopé (bug corrigé cette
-                               session). Badge d'inactivité par compte
-                               (coloré selon la limite propre au compte si
-                               définie). Modale "Ajuster le Portefeuille"
-                               porte aussi la limite d'inactivité et la
-                               date de dernière activité manuelle.
-    UserProfileModal.tsx             Badges & Succès. `LEVEL_TITLES` (10
-                               niveaux, "Trader Débutant" → "Trader SMC
-                               Légende").
-    TradingJournal.tsx             Le plus gros fichier de composant.
-    StudentTracking.tsx             Fiches élèves (staff).
-    Sidebar.tsx                    Onglets masqués selon les autorisations
-                               du compte staff connecté (`hasPermission`
-                               local, voir §6.6) ET selon
-                               `hiddenSidebarItems` (réglage du fondateur,
-                               partagé).
-    AdminStudentView.tsx / Announcements.tsx / CoachMessaging.tsx /
-    PositionCalculatorModal.tsx / SecurityLogModal.tsx   Utilisent `Select`.
+    Sidebar.tsx, TopHeader.tsx, MainDashboard.tsx        navigation et tableau de bord principal
+    TradingJournal.tsx                                    journal d'exécution (chargé à la demande)
+    PerformanceDashboard.tsx, EquityCurveChart.tsx        analyse de rentabilité (chargés à la demande)
+    WalletManagement.tsx                                  portefeuille / comptes (chargé à la demande)
+    SetupManagement.tsx                                   gestion des setups (chargé à la demande)
+    MacroDashboard.tsx, MarketMapWidget.tsx, TradingSessionsWidget.tsx   calendrier macro et marché
+    MindsetJournalModal.tsx, TradingPlanEditorModal.tsx   mindset et plan de trading
+    PositionCalculatorModal.tsx, UserProfileModal.tsx, NotificationModal.tsx, ChangeOwnPasswordModal.tsx, TwoFactorSetupModal.tsx
+    PendingChangesBanner.tsx, SyncErrorBanner.tsx          bannières d'état de synchronisation
+    Select.tsx                                             utilitaire d'UI
+    auth/
+      AuthShell.tsx, LoginScreen.tsx, SetupScreen.tsx, ChangePasswordScreen.tsx, TwoFactorVerifyScreen.tsx
 ```
 
----
+### Navigation
 
-## 4. Le module Calculateurs
+Pas de routeur : `App.tsx` (dans `TraderApp`) tient un `activeTab` (union
+`TabType`, définie dans `components/Sidebar.tsx`) et rend la vue
+correspondante. Les vues d'onglet lourdes sont chargées à la demande via
+`React.lazy` (voir le bloc de commentaires en tête de `App.tsx`) ; les
+modales, elles, restent montées en permanence et pilotées par une prop
+`isOpen`, pour ne pas perdre leur état interne à chaque ouverture.
 
-`PositionCalculatorModal.tsx`. Affiche `€/$` sur certains champs pour
-coller à une maquette externe — exception volontaire à la règle "devise
-unique `$`" du reste de l'app. Champs de prix en saisie libre
-(`parsePriceInput`). Menus déroulants uniformisés (`Select`).
+### Persistance
 
----
+Le serveur est la source de vérité. Au démarrage authentifié, le client
+appelle `GET /api/state` et reçoit toutes les collections en un aller-retour.
+Chaque modification met l'interface à jour immédiatement, est envoyée au
+serveur après un court délai de regroupement, puis recopiée dans
+`localStorage`. Si le serveur est injoignable après une authentification déjà
+réussie, l'application démarre sur ce cache local et reste utilisable (voir
+`AuthStatus["offline"]` ci-dessus). Au tout premier lancement sur une base
+vide, un éventuel état `localStorage` d'une version antérieure sans serveur
+est importé automatiquement ; à défaut, la base est amorcée avec
+`src/data/mockData.ts`.
 
-## 5. Fonctionnalités terminées (les plus récentes en premier)
+### API
 
-- **Icônes de module élargies et corrigées** — 12 icônes disponibles (au
-  lieu de 6), chacune associée à une couleur propre ; les 8 modules déjà
-  créés en local ont été réassignés à l'icône la plus pertinente (ex.
-  Money Management → `Wallet`, Backtesting → `History`, Probabilité →
-  `Percent`).
-- **Niveau "Masterclass" supprimé** du `CourseLevel` — reste `Débutant` /
-  `Intermédiaire` / `Confirmé` (renommé depuis `Avancé` juste avant).
-- **Tri automatique des modules par niveau** (`COURSE_LEVEL_ORDER`,
-  `VideoAcademy.tsx`) — l'affichage suit toujours Débutant → Intermédiaire
-  → Confirmé, indépendamment de l'ordre de création.
-- **Téléversement direct de vidéo pour les leçons** (`server/uploads.ts`,
-  `src/lib/api.ts`) — en plus d'un lien externe, upload d'un fichier
-  (mp4/webm/mov/mkv/ogv, 2 Go max), hébergé sur le volume persistant,
-  lecture avec support `Range` HTTP (nécessaire pour avancer/reculer dans
-  une vidéo longue).
-- **Partie Théorie des leçons + éditeur de programme complet**
-  (`Lesson.theory`, `VideoAcademy.tsx`) — jusque-là, le Module Cours était
-  entièrement vide et sans AUCUNE interface de gestion. Le staff peut
-  désormais créer/modifier/supprimer modules et leçons (titre, niveau,
-  icône, durée, description courte, théorie) directement depuis l'app.
-- **8 modules de programme créés** (contenu, uniquement en local — voir
-  §0) : Analyse Technique, Trading Plan & Routine (Débutant) ; Psychologie
-  en Trading, Money Management, Règles Prop Firm & Challenges, Backtesting
-  & Journal de Trading (Intermédiaire) ; Probabilité en trading, Concepts
-  SMC Avancés (Confirmé).
-- **Renommage "Module vidéo" → "Module cours"** dans toute l'app.
-- **26 badges au total, 20 000 XP, niveau max 10** — 17 nouveaux badges
-  ajoutés à ce chantier (paliers de séries de discipline 14j/1mois/3mois/
-  6mois/1an, paliers "Trader Actif"/"Trader Discipliné"/"Analyste Rigoureux"/
-  "Maître du Risk 1%" à 30/50/100 trades), `rewardXP` de chaque badge
-  rééquilibré pour totaliser exactement 20 000, dates de déblocage
-  étalées et distinctes. `LEVEL_TITLES` (`UserProfileModal.tsx`) passé de
-  5 à 10 paliers.
-- **Système d'autorisations granulaires par coach** (`server/auth/permissions.ts`,
-  `StaffAccountsModal.tsx`) — 5 autorisations indépendantes (students,
-  messaging, announcements, team, data), activables/désactivables
-  individuellement par le fondateur pour chaque coach. Le fondateur a
-  TOUJOURS tout, jamais restreignable. La révocation d'un autre compte
-  staff reste `requireOwner` strict même avec la permission "team"
-  accordée (asymétrie volontaire, préserve un correctif de sécurité
-  antérieur — voir §8).
-- **Bureaux staff PERSONNELS** (`PERSONAL_STAFF_COLLECTIONS`,
-  `resolveCollectionUserId`, `AuthContext.personalDataUserId`) — jusque-là
-  tout compte staff (fondateur + coachs) partageait EXACTEMENT le même
-  bureau de données : un coach invité voyait déjà les trades/portefeuilles/
-  badges/profil du fondateur. Désormais séparés : trades, accounts,
-  badges, notifications, setups, profil (nom/avatar/bio/capital)
-  personnels par compte staff ; fiches élèves/programme/messagerie restent
-  PARTAGÉS (un élève garde un seul coach cohérent). `ensurePersonalUserRow`
-  sème un profil minimal cohérent pour un nouveau coach (jamais un objet
-  vide, jamais celui du fondateur).
-- **Alertes automatiques de risque portefeuille** (`src/lib/walletAlerts.ts`)
-  — paliers d'inactivité (relatifs à la limite propre au compte si
-  définie, sinon seuils génériques 3j/7j) et de drawdown quotidien/total
-  (80% = alerte, 100%+ = critique), idempotent par palier (jamais de
-  spam), sauf le drawdown quotidien qui se réinitialise chaque jour.
-- **Limite d'inactivité configurable par portefeuille** + **date de
-  dernière activité manuelle** (`TradingAccount.maxInactivityDays`/
-  `lastManualActivityDate`) — pour un compte tradé hors du journal (chez
-  le broker directement).
-- **Nombre de jours d'inactivité affiché par portefeuille** + **correctif
-  du filtre par onglet** (le compte sélectionné restait affiché hors de
-  son onglet — bug réel corrigé).
-- **Audit sécurité/bugs complet** (agents parallèles par zone) — aucune
-  faille exploitable trouvée sur l'auth/routes/frontend à l'époque du
-  passage ; un seul bug mineur corrigé (gestion d'erreur clipboard).
-- Fonctionnalités antérieures (déjà en production, stables) : rattrapage
-  badges/modules jamais initialisés (`backfillMissingBadges`), menus
-  déroulants uniformisés, saisie libre des prix, import CSV du Journal,
-  aperçu du Plan de trading, onglet "Suivi de performance" dans les fiches
-  élèves, acceptation de tous les formats d'image, captures d'écran
-  multiples par trade, RGPD complet (export Art. 20, effacement Art. 17),
-  2FA TOTP maison, module Annonces, alerte sonore, plans de trading
-  multiples, module Setups.
+| Méthode | Route | Rôle |
+|---|---|---|
+| GET | `/api/health` | sonde de vie |
+| GET | `/api/economic-calendar` | calendrier macro (public, non authentifié) |
+| GET | `/api/market-data` | cotations pour le widget marché (public, non authentifié) |
+| GET | `/api/auth/me` | état d'authentification (répond toujours 200) |
+| POST | `/api/auth/setup` | première installation, refusée si un compte existe déjà |
+| POST | `/api/auth/login` | connexion (mot de passe seul) |
+| POST | `/api/auth/login/2fa` | second facteur, si activé |
+| POST | `/api/auth/logout` | déconnexion |
+| POST | `/api/auth/change-password` | remplace son propre mot de passe |
+| GET | `/api/auth/2fa/status` | état de la 2FA du compte |
+| POST | `/api/auth/2fa/setup` | démarre la configuration 2FA (secret TOTP) |
+| POST | `/api/auth/2fa/enable` | confirme et active la 2FA |
+| POST | `/api/auth/2fa/disable` | désactive la 2FA |
+| POST | `/api/auth/2fa/recovery-codes/regenerate` | régénère les codes de récupération 2FA |
+| GET | `/api/state` | état complet de démarrage |
+| PUT | `/api/collections/:name` | remplace une collection (verrouillage optimiste par version) |
+| PUT | `/api/profile` | profil |
+| POST | `/api/state/seed` | amorce avec le jeu de démonstration |
+| POST | `/api/state/import` | reprend un état venu de `localStorage` (premier amorçage uniquement) |
+| POST | `/api/state/restore` | restaure une sauvegarde JSON exportée (à tout moment, hors premier amorçage) |
 
----
+Toutes les routes exigent une session valide, sauf `/api/health`,
+`/api/economic-calendar`, `/api/market-data`, `/api/auth/me`,
+`/api/auth/setup`, `/api/auth/login` (et son étape 2FA) et
+`/api/auth/logout`. Toutes les entrées sont validées par zod
+(`server/schemas.ts`). Limitation de débit par IP : `/api/auth/login` 10 par
+quart d'heure, `/api/auth/setup` 5 par quart d'heure.
 
-## 6. Flux détaillés
+## Décisions de fond à connaître
 
-### 6.1 Rattrapage et synchronisation des badges
+- **Mono-utilisateur.** Le produit s'appelait auparavant "Académie de
+  Trading" : coachs, élèves, cours vidéo, forum, messagerie, badges liés à la
+  progression dans des modules. Toute cette couche a été retirée sur demande
+  explicite pour recentrer le produit sur un usage personnel de trader
+  indépendant (voir `git log`, commits autour de "Transforme le projet en
+  template mono-utilisateur"). Chaque ligne en base porte déjà un `user_id` :
+  réintroduire plusieurs comptes serait additif au niveau du schéma, mais le
+  cloisonnement des données par utilisateur reste entièrement à faire côté
+  application.
+- **Mot de passe seul, pas d'email.** Simplification volontaire de
+  l'installation et de la connexion pour un usage personnel — pas de
+  récupération de mot de passe par email, la seule voie de secours est de
+  supprimer directement les identifiants en base (voir README, "Mot de passe
+  oublié").
+- **Abstraction multi-moteurs de base (`server/db.ts`).** Ajoutée pour
+  permettre le déploiement sur des hébergeurs à disque éphémère
+  (fonctions serverless type Vercel), qui ne peuvent pas garder un fichier
+  SQLite local entre les invocations. Le reste du serveur ne parle jamais
+  qu'à `repositories.ts`, qui ne parle jamais qu'à l'interface commune
+  `execute`/`transaction` de `db.ts` — ajouter un nouveau fournisseur de base
+  ne touche que ce fichier.
+- **Licence "usage personnel, pas de revente".** Le code est partagé
+  librement pour que d'autres traders indépendants puissent s'en servir comme
+  outil personnel, mais pas pour qu'il devienne la base d'un produit
+  commercial concurrent revendu par quelqu'un d'autre.
 
-`backfillMissingBadges(dataUserId, asFounder)` (`server/routes.ts`) — pas
-seulement pour une collection VIDE : ajoute individuellement chaque badge
-du catalogue (`initialTraderBadges`) manquant chez un bureau déjà peuplé
-(coach invité avant l'ajout de nouveaux badges, élève existant, etc.).
-Pour le fondateur (`asFounder`), id du catalogue tel quel + état copié tel
-quel (unlocked selon le catalogue). Pour un élève OU un coach non-fondateur,
-id préfixé `${dataUserId}-` + toujours reposé `unlocked: false`.
+## Déploiement
 
-`syncFounderBadgeCatalog(founderPersonalId)` (`server/routes.ts`) —
-distinct du précédent : resynchronise les CHAMPS (rewardXP, unlockedAt,
-titre, etc.) des badges DÉJÀ stockés du fondateur avec le catalogue actuel,
-à chaque chargement. Sans elle, changer un `rewardXP` dans `mockData.ts`
-resterait invisible sur un badge déjà persisté en base. Jamais appliqué à
-un coach ou un élève (leur `unlocked`/`unlockedAt` est une vraie
-progression personnelle, jamais réécrite depuis le catalogue).
+Résumé du README (`README.md`, section "Déployer pour un usage personnel") :
 
-### 6.2 Bureaux personnels vs partagé (staff)
+- L'application tourne sur n'importe quel hébergeur Node.js
+  (`npm run build && npm start`).
+- **Hébergeur à disque persistant** (Railway, Render, Fly.io, VPS, Docker
+  avec volume monté...) : rien à configurer, la base SQLite embarquée
+  fonctionne directement. Railway en particulier a un disque persistant par
+  défaut sur ses services ; une base Postgres managée en un clic reste
+  possible en pointant `POSTGRES_URL` vers la même valeur que le
+  `DATABASE_URL` que Railway fournit.
+- **Hébergeur serverless** (Vercel, Netlify, AWS Lambda...) : il faut une
+  base accessible en réseau, via `POSTGRES_URL` (Postgres, n'importe quel
+  fournisseur — natif de l'hébergeur ou service tiers comme Neon) ou
+  `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` (Turso). Sans l'une des deux,
+  l'app bascule sur un fichier SQLite local inutilisable sur ce type
+  d'hébergeur, d'où l'écran "Serveur injoignable" en cas de déploiement mal
+  configuré.
 
-`resolveCollectionUserId(auth, name)` (`server/routes.ts`) : pour une
-session staff, retourne `auth.personalDataUserId` si `name` ∈
-`PERSONAL_STAFF_COLLECTIONS` (trades, accounts, badges, notifications,
-setups), sinon `auth.dataUserId` (= `DEFAULT_USER_ID`, bureau partagé —
-enrolledStudents, modules, messages). Pour une session élève, toujours
-`auth.dataUserId` (un seul bureau). `personalDataUserId` = l'id du compte
-staff lui-même (`staff.id`) — coïncide avec `DEFAULT_USER_ID` UNIQUEMENT
-pour le fondateur (créé avec cet id historique via `/auth/setup`), jamais
-pour un coach invité (id aléatoire).
+Variables d'environnement principales : `PORT` (défaut 3000), `DATA_DIR`
+(défaut `./data`, ignoré si `POSTGRES_URL`/`TURSO_DATABASE_URL` défini),
+`POSTGRES_URL`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `NODE_ENV`. Voir
+`.env.example` pour la liste complète et `README.md` pour le détail
+pas-à-pas (dont un guide Railway).
 
-### 6.3 Autorisations par coach
+## Limites connues (voir README, "Limites connues")
 
-`hasStaffPermission(auth, key)` (`server/auth/permissions.ts`) :
-`auth.isOwner` court-circuite TOUJOURS à `true`, sinon
-`auth.permissions === null` (jamais restreint) → `true`, sinon
-`auth.permissions.includes(key)`. `requirePermission(key)` est un
-middleware Express posé route par route (voir `server/auth/routes.ts` :
-invitation staff → "team", fiches/vues élèves → "students", envoi de
-message coach → "messaging", publication d'annonces → "announcements",
-restauration de sauvegarde → "data" dans `server/routes.ts`). `PUT
-/staff/:id/permissions` reste `requireOwner` strict, jamais délégable via
-la permission "team" elle-même (éviterait qu'un coach s'auto-accorde des
-droits). Côté client, `Sidebar.tsx` masque les onglets correspondants si la
-permission est explicitement retirée (jamais si `permissions` est
-`undefined`/`null` — toujours "tout accordé" par défaut).
+- Le verrou de connexion ne protège pas les données déjà en cache
+  `localStorage` : un serveur qui devient injoignable après une
+  authentification déjà réussie laisse l'app redémarrer sur ce cache sans
+  écran de connexion (choix assumé, filet anti-perte de données). Un
+  navigateur n'ayant jamais authentifié voit en revanche un écran d'erreur
+  explicite (`server-error`), jamais l'application.
+- Un seul compte par instance ; la connexion se fait par mot de passe seul.
+  Le schéma est prêt pour du multi-comptes (chaque ligne a un `user_id`) mais
+  le cloisonnement des données par utilisateur n'est pas implémenté.
+- Les modifications faites hors ligne ne sont pas rejouées à la
+  reconnexion : elles restent dans le cache local, mais le rechargement
+  suivant reprend l'état du serveur.
+- Aucun test automatisé : le projet n'a pas de runner de tests.
 
-### 6.4 Théorie et éditeur du Module Cours
+## Ce qui n'existe plus (pour éviter de le réintroduire par réflexe)
 
-`Lesson.theory?: string` (paragraphes séparés par une ligne vide),
-affichée sous la vidéo dans la modale de lecture uniquement si présente.
-L'éditeur (`VideoAcademy.tsx`) n'apparaît QUE si `isAdmin` + les callbacks
-correspondants sont fournis — câblés uniquement sur l'instance staff de
-`App.tsx` (jamais côté élève). `handleSaveModule`/`handleSaveLesson`
-(`App.tsx`) font un upsert par id sur `modules`/`modules[i].lessons`.
-
-### 6.5 Téléversement de vidéo de leçon
-
-`POST /api/uploads/videos` (`server/uploads.ts`, staff uniquement, multer,
-`fileFilter` sur le mimetype, nom de fichier généré côté serveur —
-`path.basename` + horodatage + octets aléatoires, jamais le nom fourni par
-le client). Répond `{ url: "/api/uploads/videos/<nom>" }`, à stocker tel
-quel dans `Lesson.videoUrl`. `GET /api/uploads/videos/:filename` (toute
-session authentifiée) supporte les requêtes `Range` (206 Partial Content) —
-sans ça, un `<video>` ne peut ni avancer avant chargement complet, ni
-reprendre une lecture interrompue. `src/lib/api.ts#uploadLessonVideo` en
-`XMLHttpRequest` (pas `fetch`) pour exposer `upload.onprogress`.
-
-### 6.6 Tri des modules par niveau
-
-`COURSE_LEVEL_ORDER: Record<CourseLevel, number>` (`VideoAcademy.tsx`) —
-`filteredModules` est trié par ce rang (tri stable) juste avant l'affichage,
-indépendamment de l'ordre de `modules` en base (ordre de création, sans
-signification pédagogique).
-
-### 6.7 Alertes de risque portefeuille
-
-`upsertWalletRiskAlerts(notifications, accounts, trades)`
-(`src/lib/walletAlerts.ts`), appelée en effet React à chaque changement de
-`accounts`/`trades` (donc aussi à chaque ouverture de l'app) dans `App.tsx`
-(staff ET élève). Paliers d'inactivité calqués sur les seuils du badge
-d'affichage (`WalletManagement.tsx#inactivityStatus`) : ambre à 7j ou
-moins de la limite propre au compte (ou seuil générique 7j si pas de
-limite définie), rouge à 3j ou moins, "compte perdu" au-delà. Drawdown
-quotidien/total : ambre à 80% de la limite, critique à 100%+. Idempotent
-par palier (id déterministe), sauf le drawdown quotidien qui repart à zéro
-chaque jour (id daté).
-
-### 6.8 Saisie libre des prix
-
-`parsePriceInput(raw)` (`src/lib/format.ts`) : un seul séparateur présent
-(point OU virgule) est toujours la décimale ; les deux présents, celui qui
-apparaît EN DERNIER est la décimale.
-
-### 6.9 Menus déroulants uniformisés
-
-`Select` (`src/components/Select.tsx`) : `appearance-none` + un chevron
-`ChevronDown` constant, quel que soit le navigateur.
-
----
-
-## 7. Bugs connus / limitations
-
-**Aucun bug en cours de correction à la date de ce document.**
-
-**Écart connu, pas un bug applicatif (voir §0)** :
-- Les 8 modules du Module Cours créés pendant cette session (contenu +
-  niveaux + icônes) n'existent QUE dans la base de dev locale, jamais
-  publiés sur Railway — l'utilisateur doit les recréer lui-même en ligne,
-  ou se connecter dans un onglet piloté pour qu'on les publie en direct
-  (voir §0).
-
-**Limite de plateforme assumée (pas un bug applicatif)** :
-- Un format d'image qu'AUCUN navigateur ne sait afficher (HEIC réel sur
-  Chrome/Android) sera enregistré via le repli "fichier brut" mais peut ne
-  jamais s'afficher en aperçu sur ce navigateur.
-- Vidéo téléversée en `.mov`/`.mkv` : aucune conversion faite côté serveur,
-  la lecture peut échouer sur un navigateur qui ne les décode pas
-  nativement (mp4/webm sont fiables partout).
-
-**Non traités, restent de vrais arbitrages produit (pas des oublis)** :
-- Verrouillage de compte par email (pas par IP) —
-  `server/auth/loginLockout.ts` : protection anti-credential-stuffing
-  délibérée.
-- Fan-out de notifications à la publication d'une annonce, synchrone —
-  jugé hors scope à l'échelle actuelle du projet.
-- Score du quiz rapide de leçon (`activeLessonQuizModal`, `VideoAcademy.tsx`)
-  jamais persisté.
-- Certains badges restent volontairement `trackable: false` (progression
-  jamais calculée, uniquement débloqués par convention pour le fondateur) :
-  `badge-1`, `badge-21`, `badge-22`, `badge-23` (% de risque par trade —
-  seul signal disponible est le tag auto-déclaré "Sur-risque (>1%)", dont
-  l'ABSENCE ne prouve rien), `badge-3` (module Replay, retiré de l'app),
-  `badge-8` (cumul en "R", non suivi), `badge-9` (score d'examen, non
-  suivi). Documenté en détail dans `src/lib/badges.ts`.
-
-**Limitations connues, non des bugs** :
-- Le calendrier économique ne montre que "cette semaine" (flux
-  ForexFactory).
-- Pas de QR code pour la 2FA — secret + lien `otpauth://` cliquable.
-
----
-
-## 8. Décisions techniques importantes
-
-- **Bureau staff PARTAGÉ pour les fiches élèves/programme/messagerie,
-  PERSONNEL pour trades/comptes/badges/notifications/setups/profil** —
-  décision structurante de cette session (voir §5/§6.2). Ne jamais ajouter
-  une nouvelle collection à `PERSONAL_STAFF_COLLECTIONS` sans vérifier
-  qu'elle ne doit pas rester un référentiel partagé par nature (ex. un
-  futur "catalogue de setups partagés" devrait rester partagé, pas
-  personnel).
-- **Le fondateur (`isOwner`) a toujours absolument tout, jamais
-  restreignable, même par lui-même** — court-circuite `hasStaffPermission`
-  ET l'édition de `hiddenSidebarItems`. Ne jamais construire un chemin qui
-  permettrait de retirer une permission au fondateur.
-- **Révocation d'un compte staff (`DELETE /staff/:id`) reste `requireOwner`
-  strict**, même après l'introduction de la permission "team" (qui ne
-  gouverne que l'INVITATION) — préserve un correctif de sécurité antérieur
-  (un coach compromis pouvait auparavant purger toute l'équipe). Asymétrie
-  volontaire, documentée dans `server/auth/routes.ts`.
-- **Catalogue de 26 badges FIXE**, jamais édité via une UI —
-  `initialTraderBadges` (`src/data/mockData.ts`) fait foi. Total exact
-  20 000 XP, 10 niveaux. Toute modification de `rewardXP`/`unlockedAt`
-  DOIT passer par `syncFounderBadgeCatalog` pour atteindre les badges déjà
-  stockés du fondateur (voir §6.1) — sinon invisible.
-- **`initialModules` reste volontairement vide** — le Module Cours n'a
-  jamais de contenu de démo, uniquement du vrai contenu créé par le
-  fondateur via l'éditeur (`VideoAcademy.tsx`).
-- **`CourseLevel` = Débutant / Intermédiaire / Confirmé** (pas "Avancé",
-  pas "Masterclass" — renommages/suppressions sur demande explicite de
-  l'utilisateur cette session).
-- **Import cross-répertoire serveur ← client pour les données pures**
-  (`server/routes.ts` importe `src/data/mockData.ts`) — accepté
-  spécifiquement parce que ce fichier n'a aucune dépendance React/DOM. Ne
-  PAS généraliser à des fichiers avec de vraies dépendances client.
-- **`isRealizedDollarTrade`** comme seule source de vérité pour "ce trade
-  compte-t-il dans un total $ agrégé ?".
-- **`parsePriceInput`** comme seule source de vérité pour un prix saisi
-  librement.
-- **`Select` partagé** pour tout nouveau `<select>`.
-- **Vidéos de leçon sur disque (volume persistant), jamais en base64 en
-  base** — contrairement à l'avatar/pièce jointe d'annonce (petites images,
-  base64 dans le JSON). Une vidéo peut peser plusieurs centaines de Mo :
-  `multer` + stockage disque + streaming avec support `Range`, jamais de
-  buffer complet en mémoire ni en JSON.
-- **Aucune dépendance externe pour le TOTP** — implémentation maison
-  (RFC 6238/4226) sur `node:crypto` uniquement.
-- **Aucune IA nulle part dans le produit** — décision produit ferme,
-  répétée plusieurs fois.
-
----
-
-## 9. Historique de nommage (contexte)
-
-`SectionHeader` est réimplémenté localement dans chaque fichier qui en a
-besoin plutôt que factorisé en composant partagé — décision historique
-assumée.
-
-Le module "Annonces" a été nommé ainsi plutôt que "Académie" pour éviter
-une collision avec le module cours existant (`TabType: "academy"`).
-
-Le module cours a été renommé "Module vidéo" → **"Module cours"** cette
-session (sidebar, tuile du tableau de bord, en-tête de page) — le concept
-va désormais au-delà de la simple vidéo (Théorie écrite, upload de fichier).
-
-`CourseLevel` : `"Avancé"` → renommé `"Confirmé"`, puis `"Masterclass"`
-supprimé — les deux sur demande explicite, ne réintroduire aucun des deux
-noms sans nouvelle demande.
-
-`ThousandsInput.tsx` a existé puis a été **supprimé** une fois tous ses
-appelants migrés vers la saisie libre (`parsePriceInput`).
-
----
-
-## 10. Contexte de travail avec l'utilisateur
-
-Forexpaps est le fondateur de PropDesk, **non-technique**, délègue
-largement l'exécution du code. Il valide des décisions produit (nommage,
-droits d'accès, priorités, classification pédagogique des modules) mais
-pas des détails d'implémentation.
-
-**Workflow observé sur de très nombreux échanges, à reproduire** :
-1. L'utilisateur signale un bug ou demande une fonctionnalité en une
-   phrase, parfois avec une capture d'écran d'un élément précis de l'UI.
-2. Diagnostiquer en profondeur AVANT de proposer un correctif — plusieurs
-   fois cette session, l'implémentation évidente au premier abord cachait
-   un problème plus profond (ex. la demande "autorisations par coach" a
-   révélé que TOUS les comptes staff partageaient déjà le même bureau, un
-   problème plus large que juste ajouter des permissions).
-3. Pour une demande de fonctionnalité dont le PÉRIMÈTRE n'est pas évident
-   (quelles autorisations exactement ? quels niveaux ?), poser UNE
-   question via l'outil de choix multiple plutôt que de deviner — mais
-   dès que la portée est claire, exécuter directement sans re-demander
-   confirmation à chaque étape.
-4. Corriger directement, vérifier (`npm run lint` + `npm run build` + test
-   en navigateur EN LECTURE SEULE d'abord, écriture ensuite si nécessaire),
-   puis résumer clairement CE QUI A CHANGÉ, en français simple, souvent
-   avec un tableau récapitulatif.
-5. **Committer, pousser ET déployer sur Railway systématiquement après
-   chaque changement validé** — contrairement à des sessions antérieures
-   documentées plus haut dans l'historique du projet, cette session a vu
-   l'utilisateur attendre un commit+push+déploiement après QUASIMENT
-   CHAQUE tâche, sans avoir à le redemander explicitement à chaque fois.
-   Le déploiement Railway est en continuous deployment (push sur `main` =
-   déploiement automatique) — surveiller `railway status` jusqu'à
-   `● Online` (un flicker "Crashed" transitoire pendant la bascule de
-   conteneur est normal, pas un vrai échec).
-6. **Ne jamais prendre de risque avec les données réelles du fondateur**
-   pendant une vérification — voir l'incident documenté en §2 (profil
-   écrasé par un compte de test). Toujours privilégier une vérification en
-   LECTURE SEULE (`fetch` GET, `curl` avec un cookie jar séparé pour un
-   compte de test) avant toute écriture, et ne jamais partager le même
-   onglet de navigateur entre une session de test et la session réelle en
-   cours.
-
-**Test d'une fonctionnalité staff/élève sans casser une session réelle en
-cours** : voir §2 pour la méthode sûre (compte de test créé via script
-`tsx`, authentifié via `curl` avec cookie jar séparé, jamais dans le même
-onglet navigateur que la session active).
-
-**Sur la vérification** : toujours envisager que "ça marche en local" et
-"ça marche sur le vrai site en production" sont deux affirmations
-différentes (voir §0 : bases de données totalement séparées) — le dire
-explicitement à l'utilisateur à chaque fois qu'une vérification n'a pu
-être faite qu'en local.
-
----
-
-## 11. Prochaines tâches, dans l'ordre
-
-**Aucune tâche explicitement demandée n'est en attente à la date de cette
-mise à jour.** Le projet est stable, déployé, et le dernier commit est
-poussé. En l'absence de nouvelle demande précise :
-
-1. Si l'utilisateur revient sur les modules du Module Cours : lui rappeler
-   qu'ils n'existent qu'en local (§0) et proposer soit de les recréer avec
-   lui en direct sur le site (nécessite qu'il se connecte lui-même dans un
-   onglet piloté), soit de continuer à itérer en local en attendant qu'il
-   soit prêt à les publier lui-même.
-2. Idées de modules supplémentaires déjà évoquées mais non tranchées (à ne
-   proposer QUE si l'utilisateur redemande une suggestion) : Fondamentaux
-   des Marchés Financiers (Débutant, vrais prérequis avant Analyse
-   Technique), Masterclass Études de Cas & Stratégies Pro (aucun module
-   Masterclass n'existe — note : le niveau Masterclass a depuis été
-   SUPPRIMÉ du type `CourseLevel`, cette idée n'est donc plus applicable
-   telle quelle sans réintroduire le niveau), Fiscalité & Statut du
-   Trader.
-3. En l'absence de demande précise, un audit de sécurité/bugs complet
-   (méthode : agents parallèles en lecture seule par zone, résultats
-   compilés et priorisés, une seule vraie question de permission posée à
-   l'utilisateur si besoin, tout le reste corrigé directement) a déjà été
-   fait plusieurs fois dans l'historique de ce projet et est une action
-   que l'utilisateur redemande périodiquement — un bon réflexe si aucune
-   tâche spécifique n'est donnée.
-4. Les arbitrages produit non tranchés listés en §7 (verrouillage par
-   email, fan-out d'annonces, quiz de leçon non persisté, badges
-   `trackable: false`) : ne les traiter QUE si l'utilisateur les soulève,
-   ce sont des choix, pas des bugs oubliés.
-
----
-
-## 12. État à la reprise
-
-- Branche `main`, **working tree propre**, dernier commit **poussé ET
-  déployé** : `3f3c6d0`.
-- **Aucun fichier modifié non commité.**
-- **Écart connu et documenté (§0)** : 8 modules du Module Cours existent
-  uniquement dans la base de dev locale (`data/horizon.db`), jamais publiés
-  sur Railway — pas un bug, l'utilisateur en a été informé à chaque fois.
-- Aucun blocage technique connu. Le reste du projet est stable et déployé.
+Comptes coach/élève et leur double parcours applicatif, permissions/invites
+staff, modules cours et vidéos (leçons, upload vidéo, programme), Annonces,
+Messagerie coach, Forum, module "Signaux & Analyses", écran de consultation
+du journal de sécurité (le journal côté serveur existe toujours, juste sans
+UI pour le consulter), Mentions légales/CGU et le footer qui les affichait,
+connexion par email, `better-sqlite3`, hypothèse d'un déploiement Railway
+exclusif, catalogue de badges liés à la progression dans des cours, notions
+`isOwner`/permissions par coach/`enrolledStudents`.
