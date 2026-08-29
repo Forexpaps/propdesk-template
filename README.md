@@ -16,13 +16,21 @@ dans l'application.
 
 ## Démarrage en local
 
-Prérequis : [Node.js](https://nodejs.org) 20+ et npm.
+Fonctionne à l'identique sur **macOS et Windows** — aucune commande ni
+script propre à un système d'exploitation.
+
+Prérequis : [Node.js](https://nodejs.org) 20+ et npm (sur Windows,
+l'installeur officiel les fournit tous les deux).
 
 ```bash
 git clone https://github.com/Forexpaps/propdesk-template.git
 cd propdesk-template
 npm install
 ```
+
+Sur Windows, ces commandes fonctionnent aussi bien dans **PowerShell**,
+**l'invite de commandes (cmd)** que dans un terminal Git Bash — aucun
+terminal Unix n'est requis.
 
 Créer un `.env` à la racine (voir [.env.example](.env.example)) — un fichier
 vide suffit, toutes les variables ont un défaut utilisable.
@@ -248,10 +256,19 @@ Il n'y a pas de récupération par e-mail. La seule issue est de supprimer
 directement les identifiants en base, ce qui ramène l'écran d'installation au
 prochain chargement.
 
-En local (mode fichier) :
+En local (mode fichier), avec la CLI `sqlite3` si elle est installée
+(présente par défaut sur macOS, à installer séparément sur Windows) :
 
 ```bash
 sqlite3 data/horizon.db "delete from staff_accounts; delete from sessions;"
+```
+
+Sans cette CLI (notamment sur Windows) — un script `npx tsx` ponctuel
+fonctionne de façon identique sur macOS et Windows, en réutilisant la même
+librairie que le serveur (`@libsql/client`, déjà installée) :
+
+```bash
+npx tsx -e "import {createClient} from '@libsql/client'; (async () => { const db = createClient({url: 'file:data/horizon.db'}); await db.execute('DELETE FROM staff_accounts'); await db.execute('DELETE FROM sessions'); })();"
 ```
 
 Sur Postgres, quel que soit le fournisseur (souvent aussi accessible depuis
