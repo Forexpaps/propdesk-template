@@ -111,6 +111,19 @@ const SCHEMA_STATEMENTS = [
     payload  TEXT NOT NULL
   )`,
 
+  // Plans de trading. Vivaient auparavant dans le seul `localStorage` du
+  // navigateur : ni en base, ni dans `GET /api/state`, donc absents du fichier
+  // d'export « Exporter mes données » — vider le cache du navigateur suffisait
+  // à les perdre définitivement, alors que c'est du contenu écrit à la main.
+  // Les faire entrer ici les fait entrer dans la sauvegarde par la même
+  // occasion, sans code dédié (tout est piloté par `TABLES`).
+  `CREATE TABLE IF NOT EXISTS trading_plans (
+    id       TEXT PRIMARY KEY,
+    user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    payload  TEXT NOT NULL
+  )`,
+
   `CREATE TABLE IF NOT EXISTS trading_accounts (
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

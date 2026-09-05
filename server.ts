@@ -6,6 +6,7 @@ import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { api, apiErrorHandler } from "./server/routes";
 import { initDb } from "./server/db";
+import { sauvegarderBase } from "./server/backup";
 import { startSessionCleanup } from "./server/auth/sessions";
 import { startSecurityEventCleanup } from "./server/auth/securityEvents";
 import { startLockoutCleanup } from "./server/auth/loginLockout";
@@ -107,6 +108,11 @@ async function startServer() {
   // le client libSQL n'a pas de setup synchrone au chargement du module comme
   // le faisait better-sqlite3, il faut donc l'attendre explicitement ici.
   await initDb();
+
+  // Copie datée de la base, juste après l'ouverture et avant toute écriture —
+  // `data/` étant exclu de git, c'est la seule sauvegarde qui ne dépende pas
+  // d'un clic manuel sur « Exporter mes données ». Voir server/backup.ts.
+  sauvegarderBase();
 
   // Hygiène : retire les sessions expirées au démarrage puis toutes les heures.
   startSessionCleanup();

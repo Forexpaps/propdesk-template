@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Sidebar,
   TabType,
@@ -296,23 +296,6 @@ function TraderApp({
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
 
-  /**
-   * Plans de trading personnels du bureau staff — `localStorage` seul,
-   * jamais synchronisé au serveur (hors périmètre, voir le commentaire de
-   * `TradingPlanData` dans `src/types.ts`). Levé ici (plutôt que géré en
-   * interne par `TradingPlanEditorModal`) pour que `TradingJournal` puisse
-   * aussi lire la liste, son sélecteur "Plan de trading" en ayant besoin.
-   */
-  const [staffTradingPlan, setStaffTradingPlanState] = useState<TradingPlanData>(() => loadTradingPlan());
-  const setStaffTradingPlan = (next: TradingPlanData) => {
-    setStaffTradingPlanState(next);
-    try {
-      localStorage.setItem(getTradingPlanStorageKey(), JSON.stringify(next));
-    } catch {
-      // Quota dépassé ou navigation privée : rien à faire de plus ici.
-    }
-  };
-
   // Bandeau d'avertissement immédiat quand une sauvegarde échoue en
   // arrière-plan alors que l'app se croit en ligne — la donnée elle-même est
   // protégée par `markPending` dans `useSyncedState`, ce bandeau n'est qu'un
@@ -389,6 +372,52 @@ function TraderApp({
     syncEnabled,
     reportSyncError
   );
+
+  /**
+   * Plans de trading — désormais une collection serveur comme les autres.
+   *
+   * Ils vivaient auparavant dans le seul `localStorage` : absents de la base,
+   * donc absents de `GET /api/state`, donc absents du fichier « Exporter mes
+   * données ». Vider le cache du navigateur effaçait définitivement le seul
+   * contenu de l'app qu'aucune sauvegarde ne protégeait.
+   *
+   * Le serveur renvoyant `[]` (et non `undefined`) pour une collection vide,
+   * `seed()` ne suffit pas à récupérer d'anciens plans : d'où la reprise
+   * explicite ci-dessous, qui adopte le contenu de l'ancienne clé
+   * `localStorage` quand le serveur n'a encore rien. `normalizeTradingPlans`
+   * couvre au passage l'ancien format mono-plan (objet et non tableau).
+   */
+  const plansServeur = server?.tradingPlans;
+  // Lu une seule fois (initialiseur paresseux) : `localStorage` ne change pas
+  // sous nos pieds, et le relire à chaque rendu ferait un aller-retour disque
+  // inutile — en plus de produire un tableau neuf qui relancerait l'effet de
+  // reprise ci-dessous à chaque fois.
+  const [plansHerites] = useState<TradingPlanData>(() => normalizeTradingPlans(loadTradingPlan()));
+  const [staffTradingPlan, setStaffTradingPlan] = useSyncedState<TradingPlanData>(
+    "horizon_trading_plans",
+    plansServeur && plansServeur.length > 0
+      ? plansServeur
+      : plansHerites.length > 0
+      ? plansHerites
+      : seed(plansServeur, "horizon_trading_plans", EMPTY_TRADING_PLANS),
+    (v) => api.saveCollection("tradingPlans", v),
+    syncEnabled,
+    reportSyncError
+  );
+
+  /**
+   * Pousse une seule fois vers le serveur les plans repris de `localStorage` :
+   * `useSyncedState` n'envoie que sur modification, sans quoi des plans hérités
+   * resteraient affichés mais toujours pas sauvegardés.
+   */
+  const reprisePlansFaite = useRef(false);
+  useEffect(() => {
+    if (reprisePlansFaite.current || !syncEnabled) return;
+    if (plansServeur && plansServeur.length > 0) return;
+    if (plansHerites.length === 0) return;
+    reprisePlansFaite.current = true;
+    setStaffTradingPlan(plansHerites);
+  }, [syncEnabled, plansServeur, plansHerites, setStaffTradingPlan]);
 
   // Ébauche de trade poussée vers le Journal par le calculateur de position
   const [journalDraft, setJournalDraft] = useState<TradeDraft | null>(null);

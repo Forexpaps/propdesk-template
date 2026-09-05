@@ -5,6 +5,7 @@ import {
   AppNotification,
   TraderBadge,
   Setup,
+  TradingPlan,
 } from "../types";
 
 /** Collections synchronisées avec le serveur, dans les formes de src/types.ts. */
@@ -14,6 +15,7 @@ export interface ServerCollections {
   notifications: AppNotification[];
   badges: TraderBadge[];
   setups: Setup[];
+  tradingPlans: TradingPlan[];
 }
 
 export type CollectionName = keyof ServerCollections;
