@@ -25,6 +25,9 @@ const tooltipStyle = {
   contentStyle: { backgroundColor: "#0D1110", borderColor: "#1B2320", borderRadius: "10px", fontSize: "12px" },
   labelStyle: { color: "#ffffff" },
   itemStyle: { color: "#ffffff" },
+  // Sans ça, Recharts dessine par défaut un rectangle gris/blanc plein
+  // derrière toute la catégorie survolée (barres) — visible sur fond sombre.
+  cursor: { fill: "transparent" },
 };
 
 /** Micro-label en petites majuscules espacées, au-dessus d'une valeur. */
