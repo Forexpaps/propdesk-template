@@ -9,7 +9,7 @@ import { Trade, StudentProfile, EmotionState } from "../types";
  */
 
 /**
- * Les 6 états émotionnels saisissables dans le Journal de trading (chips
+ * Les 5 états émotionnels saisissables dans le Journal de trading (chips
  * `EmotionState`) — même ordre, mêmes libellés français (sans l'emoji).
  * Sert à préremplir le graphique « Impact Psychologique » avec toutes les
  * émotions possibles, pas seulement celles déjà taguées sur un trade.
@@ -20,7 +20,6 @@ const ALL_EMOTIONS: { id: EmotionState; label: string }[] = [
   { id: "Impulsive", label: "Impulsif" },
   { id: "Anxious", label: "Anxieux" },
   { id: "Calm", label: "Calme" },
-  { id: "Greedy", label: "Avarice" },
 ];
 
 interface CategoryStats {
@@ -142,7 +141,6 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
     Impulsive: { wins: 0, losses: 0, total: 0, pnl: 0 },
     Anxious: { wins: 0, losses: 0, total: 0, pnl: 0 },
     Calm: { wins: 0, losses: 0, total: 0, pnl: 0 },
-    Greedy: { wins: 0, losses: 0, total: 0, pnl: 0 },
   };
   trades.forEach((t) => {
     emotionStats[t.emotion].total += 1;
