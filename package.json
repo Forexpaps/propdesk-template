@@ -24,6 +24,10 @@
     "vite": "^6.2.3",
     "zod": "^4.4.3"
   },
+  "_comment_overrides": "express 4.22.2 (dernière 4.x) épingle qs@6.15.3 via body-parser, vulnérable à un déni de service (GHSA-4mjr-xmp4-gh2g). Le correctif est dans qs@6.16.0, que `npm audit fix` ne peut pas installer sans passer à express 5. Cet override le force sans changer de majeure — à retirer le jour où express 4.x embarque qs >= 6.16.",
+  "overrides": {
+    "qs": "^6.16.0"
+  },
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
