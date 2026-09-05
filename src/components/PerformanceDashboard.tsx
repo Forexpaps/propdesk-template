@@ -351,7 +351,11 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
                             >
                               {winRate !== null ? `${winRate}%` : "—"}
                             </span>
-                            <span className="text-[9px] text-slate-300/80 leading-none mt-0.5">
+                            <span
+                              className={`text-[9px] leading-none mt-0.5 ${
+                                winRate !== null ? "text-slate-950/80" : "text-slate-300/80"
+                              }`}
+                            >
                               {cell.tradesCount} trade{cell.tradesCount > 1 ? "s" : ""}
                             </span>
                           </>
