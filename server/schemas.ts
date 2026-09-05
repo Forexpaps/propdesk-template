@@ -30,7 +30,14 @@ const SAFE_MEDIA_URL_FIELDS = ["chartUrl", "avatar"] as const;
 const isSafeMediaUrl = (value: unknown): boolean =>
   value == null ||
   (typeof value === "string" &&
-    (value === "" || /^https:\/\//.test(value) || /^data:image\//.test(value)));
+    (value === "" ||
+      /^https:\/\//.test(value) ||
+      /^data:image\//.test(value) ||
+      // Capture servie par l'application elle-même (voir `trade_screenshots`).
+      // Motif volontairement strict — un identifiant, rien d'autre : accepter
+      // un chemin libre sous `/api/` ouvrirait la porte à des URLs pointant
+      // vers d'autres routes.
+      /^\/api\/screenshots\/shot-[A-Za-z0-9-]+$/.test(value)));
 
 /**
  * `Trade.chartUrls` (plusieurs captures d'écran labellisées — voir

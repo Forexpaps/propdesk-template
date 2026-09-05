@@ -166,6 +166,18 @@ export const api = {
   fetchMarketData: () =>
     request<{ quotes: MarketQuote[] }>("/api/market-data"),
 
+  /**
+   * Envoie une capture et renvoie l'URL qui la sert. Les images ne transitent
+   * plus dans le payload des trades : toute la collection partant en un seul
+   * envoi, un journal d'une vingtaine de trades illustrés dépassait la limite
+   * de 8 Mo du serveur et devenait impossible à enregistrer.
+   */
+  uploadScreenshot: (dataUrl: string) =>
+    request<{ id: string; url: string }>("/api/screenshots", {
+      method: "POST",
+      body: JSON.stringify({ dataUrl }),
+    }),
+
   importState: (state: {
     student?: StudentProfile;
     collections?: Partial<ServerCollections>;

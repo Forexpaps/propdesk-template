@@ -21,7 +21,7 @@ import { requireAuth, type AuthContext } from "./auth/middleware";
 import { createRateLimit } from "./middleware/rateLimit";
 import { getEconomicCalendar } from "./economicCalendar";
 import { getMarketData } from "./marketData";
-import { DEFAULT_USER_ID } from "./db";
+import { DEFAULT_USER_ID, db } from "./db";
 // Catalogue fixe des badges — données pures (aucune dépendance React/DOM),
 // voir le commentaire de `backfillMissingBadges` plus bas pour pourquoi le
 // serveur en a besoin.
@@ -414,6 +414,78 @@ api.post(
 
     await seedDemoData();
     res.json({ success: true });
+  })
+);
+
+/**
+ * Captures d'écran — servies et reçues une par une, hors de la collection
+ * `trades` (voir la table `trade_screenshots`, server/db.ts).
+ *
+ * L'envoi est plus permissif que les autres routes en volume (une capture pèse
+ * quelques centaines de ko) mais borné en nombre : c'est le total de la
+ * collection qui posait problème, jamais une image isolée.
+ */
+const screenshotUploadRateLimit = createRateLimit({
+  windowMs: 15 * 60_000,
+  max: 200,
+  message: "Trop d'envois de captures. Réessaie dans quelques minutes.",
+});
+
+/** Même borne que `resizeChartScreenshot` côté client, après réduction. */
+const MAX_SCREENSHOT_BYTES = 3 * 1024 * 1024;
+
+api.post(
+  "/screenshots",
+  screenshotUploadRateLimit,
+  wrap(async (req, res) => {
+    const dataUrl = (req.body as { dataUrl?: unknown })?.dataUrl;
+    if (typeof dataUrl !== "string" || !/^data:image\/[a-z0-9.+-]+;base64,/i.test(dataUrl)) {
+      res.status(400).json({ error: "Capture invalide : une image encodée en base64 est attendue." });
+      return;
+    }
+    if (dataUrl.length > MAX_SCREENSHOT_BYTES) {
+      res.status(413).json({ error: "Capture trop volumineuse." });
+      return;
+    }
+
+    const virgule = dataUrl.indexOf(",");
+    const mime = dataUrl.slice(5, virgule).replace(/;base64$/i, "");
+    const donnees = dataUrl.slice(virgule + 1);
+
+    const id = `shot-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    await db.execute({
+      sql: "INSERT INTO trade_screenshots (id, user_id, mime, data, created_at) VALUES (?, ?, ?, ?, ?)",
+      args: [id, req.auth!.dataUserId, mime, donnees, new Date().toISOString()],
+    });
+
+    res.json({ id, url: `/api/screenshots/${id}` });
+  })
+);
+
+api.get(
+  "/screenshots/:id",
+  wrap(async (req, res) => {
+    const result = await db.execute({
+      // Le filtre sur `user_id` n'est pas décoratif : sans lui, un identifiant
+      // deviné donnerait accès à la capture d'un autre bureau.
+      sql: "SELECT mime, data FROM trade_screenshots WHERE id = ? AND user_id = ?",
+      args: [req.params.id, req.auth!.dataUserId],
+    });
+    const row = result.rows[0] as unknown as { mime: string; data: string } | undefined;
+    if (!row) {
+      res.status(404).json({ error: "Capture introuvable." });
+      return;
+    }
+
+    const buffer = Buffer.from(row.data, "base64");
+    // Immuable : une capture n'est jamais modifiée, seulement remplacée par une
+    // autre portant un nouvel identifiant. Le navigateur peut donc la garder
+    // sans jamais revenir la redemander. `private` car elle est propre au
+    // bureau : aucun cache partagé ne doit la conserver.
+    res.setHeader("Content-Type", row.mime);
+    res.setHeader("Cache-Control", "private, max-age=31536000, immutable");
+    res.setHeader("Content-Length", String(buffer.length));
+    res.end(buffer);
   })
 );
 

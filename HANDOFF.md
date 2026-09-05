@@ -264,6 +264,17 @@ quart d'heure, `/api/auth/setup` 5 par quart d'heure.
   saisi depuis un autre appareil circulait en clair (pas de TLS en local).
   `HOST=0.0.0.0` reste possible pour un usage délibéré (consulter le journal
   depuis son téléphone), mais c'est un choix explicite, pas le défaut.
+- **Les captures d'écran ne vivent PAS dans la collection `trades`.** Elles y
+  étaient en base64 : la collection partant en un seul envoi à chaque
+  sauvegarde, un journal d'environ 23 trades illustrés dépassait la limite de
+  8 Mo du serveur et devenait impossible à enregistrer (HTTP 413, mesuré).
+  Elles vivent désormais dans `trade_screenshots`, servies une par une par
+  `GET /api/screenshots/:id` (filtrées par `user_id`, cache immuable), et un
+  trade n'en garde que l'URL. Le payload des trades est passé de 1405 Ko à
+  2 Ko pour les mêmes données. Ne pas y réintroduire d'images : la table n'a
+  volontairement pas de clé étrangère vers `trades` (l'id du trade n'existe pas
+  encore à l'envoi), les orphelines étant balayées au démarrage par
+  `purgeOrphanScreenshots`.
 - **Toute nouvelle collection synchronisée doit être déclarée à TROIS
   endroits**, sous peine de perte de données silencieuse : `TABLES`
   (`server/repositories.ts`), `LEGACY_KEYS.collections`

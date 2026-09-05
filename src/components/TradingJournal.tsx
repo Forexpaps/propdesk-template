@@ -38,6 +38,7 @@ import { resizeChartScreenshot } from "../lib/image";
 import { computeJournalSummary, tradeDurationMinutes } from "../lib/performanceStats";
 import { alertDialog, confirmDialog } from "../lib/confirmDialog";
 import { periodStart, sortTrades, PeriodPreset, SortKey, SortState } from "../lib/journalFilters";
+import { api } from "../lib/api";
 import { Select } from "./Select";
 
 /** Valeur du sélecteur de compte quand aucun n'est choisi. */
@@ -1030,7 +1031,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     setFormData((prev) => ({ ...prev, [field]: raw }));
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Géométrie pure, indépendante de l'instrument : recalculable sans risque.
@@ -1082,6 +1083,36 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     // vécu sur sa plateforme.
     const result: TradeResult = formData.result;
 
+    // Les captures encore encodées en base64 sont envoyées maintenant, et
+    // remplacées par l'URL qui les sert. Elles ne voyagent donc plus dans le
+    // payload de la collection `trades`, dont le poids total finissait par
+    // dépasser la limite du serveur (voir `server/db.ts`, trade_screenshots).
+    // Celles déjà sous forme d'URL (trade rouvert en édition) sont laissées
+    // telles quelles : les réenvoyer créerait un doublon à chaque ouverture.
+    const remplies: TradeScreenshot[] = [];
+    try {
+      for (const slot of formData.chartUrls) {
+        const url = slot.url.trim();
+        if (url === "") continue;
+        if (!url.startsWith("data:")) {
+          remplies.push(slot);
+          continue;
+        }
+        const { url: servie } = await api.uploadScreenshot(url);
+        remplies.push({ ...slot, url: servie });
+      }
+    } catch (err) {
+      // Rien n'est enregistré : mieux vaut un trade non sauvegardé qu'un trade
+      // sauvegardé amputé des captures que l'utilisateur croit avoir jointes.
+      await alertDialog(
+        `Les captures n'ont pas pu être envoyées : ${
+          (err as Error)?.message ?? "erreur inconnue"
+        }. Le trade n'a pas été enregistré.`,
+        { title: "Envoi impossible" }
+      );
+      return;
+    }
+
     const champs = {
       date: formData.date,
       time: formData.time,
@@ -1131,7 +1162,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       // Emplacements vides (aucune image choisie) filtrés — un emplacement
       // "Après" jamais rempli ne doit pas être persisté comme s'il portait
       // une vraie capture.
-      chartUrls: formData.chartUrls.filter((s) => s.url.trim() !== ""),
+      chartUrls: remplies,
     };
 
     if (editingTrade) {

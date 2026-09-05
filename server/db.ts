@@ -124,6 +124,28 @@ const SCHEMA_STATEMENTS = [
     payload  TEXT NOT NULL
   )`,
 
+  // Captures d'écran des trades, hors de la collection `trades`.
+  //
+  // Elles y vivaient en base64, à l'intérieur du payload : toute la collection
+  // partant en un seul envoi à chaque sauvegarde, un journal de ~23 trades
+  // illustrés dépassait la limite de 8 Mo du serveur et devenait impossible à
+  // enregistrer (HTTP 413). Accessoirement, modifier une simple note
+  // réexpédiait toutes les images de tous les trades.
+  //
+  // Elles sont désormais servies par `GET /api/screenshots/:id`, et un trade
+  // n'en garde que l'URL. Volontairement SANS clé étrangère vers `trades` :
+  // l'identifiant du trade n'existe pas encore au moment de l'envoi (il est
+  // attribué à l'enregistrement), et une capture orpheline est inoffensive —
+  // une purge périodique s'en charge (voir `purgeOrphanScreenshots`).
+  `CREATE TABLE IF NOT EXISTS trade_screenshots (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    mime       TEXT NOT NULL,
+    data       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_trade_screenshots_user ON trade_screenshots(user_id)`,
+
   `CREATE TABLE IF NOT EXISTS trading_accounts (
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -428,6 +450,121 @@ async function migrateAddLockCountColumn(): Promise<void> {
   await db.execute("ALTER TABLE login_lockouts ADD COLUMN lock_count INTEGER NOT NULL DEFAULT 0;");
 }
 
+/**
+ * Migration ponctuelle : sort les captures d'écran encodées en base64 du
+ * payload des trades vers `trade_screenshots`, et remplace chacune par l'URL
+ * qui la sert (`/api/screenshots/<id>`).
+ *
+ * Sans elle, les trades déjà illustrés continueraient de porter leurs images
+ * dans la collection — le mur des 8 Mo resterait exactement où il était pour
+ * les données existantes.
+ *
+ * Idempotente par construction : elle ne retient que les URLs commençant par
+ * `data:image/`, qui n'existent plus après un passage. Protégée en plus par un
+ * marqueur `meta`, pour ne pas relire tous les trades à chaque démarrage.
+ */
+const MIGRATION_SCREENSHOTS_KEY = "migrated_screenshots_v1";
+
+async function migrateScreenshotsOutOfTrades(): Promise<void> {
+  const already = await db.execute({
+    sql: "SELECT 1 FROM meta WHERE key = ?",
+    args: [MIGRATION_SCREENSHOTS_KEY],
+  });
+  if (already.rows.length > 0) return;
+
+  const trades = await db.execute("SELECT id, user_id, payload FROM trades");
+  let imagesDeplacees = 0;
+  let tradesTouches = 0;
+
+  for (const row of trades.rows) {
+    const tradeId = row.id as string;
+    const userId = row.user_id as string;
+    let payload: { chartUrls?: { id: string; label: string; url: string }[] };
+    try {
+      payload = JSON.parse(row.payload as string);
+    } catch {
+      // Payload illisible : on le laisse tel quel plutôt que de le perdre.
+      continue;
+    }
+
+    const captures = payload.chartUrls;
+    if (!Array.isArray(captures) || captures.length === 0) continue;
+
+    let modifie = false;
+    for (const capture of captures) {
+      if (typeof capture?.url !== "string" || !capture.url.startsWith("data:image/")) continue;
+
+      // `data:<mime>;base64,<données>` — on sépare pour pouvoir renvoyer plus
+      // tard le bon Content-Type sans réanalyser la chaîne à chaque requête.
+      const virgule = capture.url.indexOf(",");
+      const entete = capture.url.slice(5, virgule).replace(/;base64$/, "");
+      const donnees = capture.url.slice(virgule + 1);
+      if (!donnees) continue;
+
+      const id = `shot-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      await db.execute({
+        sql: "INSERT INTO trade_screenshots (id, user_id, mime, data, created_at) VALUES (?, ?, ?, ?, ?)",
+        args: [id, userId, entete || "image/webp", donnees, new Date().toISOString()],
+      });
+      capture.url = `/api/screenshots/${id}`;
+      imagesDeplacees += 1;
+      modifie = true;
+    }
+
+    if (modifie) {
+      await db.execute({
+        sql: "UPDATE trades SET payload = ? WHERE id = ?",
+        args: [JSON.stringify(payload), tradeId],
+      });
+      tradesTouches += 1;
+    }
+  }
+
+  await db.execute({
+    sql: "INSERT INTO meta (key, value) VALUES (?, ?)",
+    args: [MIGRATION_SCREENSHOTS_KEY, new Date().toISOString()],
+  });
+
+  if (imagesDeplacees > 0) {
+    console.log(
+      `[propdesk] ${imagesDeplacees} capture(s) sortie(s) du payload de ${tradesTouches} trade(s).`
+    );
+  }
+}
+
+/**
+ * Supprime les captures qu'aucun trade ne référence plus — une image envoyée
+ * puis abandonnée (formulaire fermé sans enregistrer), ou dont le trade a été
+ * supprimé depuis. Passée au démarrage : ce sont quelques lignes, et rien ne
+ * presse.
+ */
+export async function purgeOrphanScreenshots(): Promise<number> {
+  const [captures, trades] = await Promise.all([
+    db.execute("SELECT id FROM trade_screenshots"),
+    db.execute("SELECT payload FROM trades"),
+  ]);
+  if (captures.rows.length === 0) return 0;
+
+  // Un seul balayage des payloads : chercher chaque id dans chaque trade
+  // séparément serait quadratique.
+  const referencees = new Set<string>();
+  for (const row of trades.rows) {
+    const payload = row.payload as string;
+    for (const match of payload.matchAll(/\/api\/screenshots\/(shot-[A-Za-z0-9-]+)/g)) {
+      referencees.add(match[1]);
+    }
+  }
+
+  const orphelines = captures.rows.map((r) => r.id as string).filter((id) => !referencees.has(id));
+  for (const id of orphelines) {
+    await db.execute({ sql: "DELETE FROM trade_screenshots WHERE id = ?", args: [id] });
+  }
+  if (orphelines.length > 0) {
+    console.log(`[propdesk] ${orphelines.length} capture(s) orpheline(s) supprimée(s).`);
+  }
+  return orphelines.length;
+}
+
 let initialized = false;
 
 /**
@@ -456,6 +593,7 @@ export async function initDb(): Promise<void> {
   await migrateAddLockCountColumn();
   await migrateDropCoachSignals();
   await migrateDropForum();
+  await migrateScreenshotsOutOfTrades();
 }
 
 export async function getMeta(key: string): Promise<string | null> {

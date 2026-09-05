@@ -5,7 +5,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { api, apiErrorHandler } from "./server/routes";
-import { initDb } from "./server/db";
+import { initDb, purgeOrphanScreenshots } from "./server/db";
 import { sauvegarderBase } from "./server/backup";
 import { startSessionCleanup } from "./server/auth/sessions";
 import { startSecurityEventCleanup } from "./server/auth/securityEvents";
@@ -113,6 +113,12 @@ async function startServer() {
   // `data/` étant exclu de git, c'est la seule sauvegarde qui ne dépende pas
   // d'un clic manuel sur « Exporter mes données ». Voir server/backup.ts.
   sauvegarderBase();
+
+  // Captures qu'aucun trade ne référence plus (formulaire abandonné, trade
+  // supprimé depuis) — voir server/db.ts. Non bloquant pour le démarrage.
+  void purgeOrphanScreenshots().catch((err) =>
+    console.warn("[propdesk] Purge des captures orphelines impossible.", err)
+  );
 
   // Hygiène : retire les sessions expirées au démarrage puis toutes les heures.
   startSessionCleanup();
