@@ -61,9 +61,8 @@ export function createEmptyPlan(name = "Nouveau plan"): TradingPlan {
 export const EMPTY_TRADING_PLANS: TradingPlanData = [];
 
 /**
- * Même motif que `MindsetJournalModal.tsx` (`storageKey` prop) : côté
- * élève, namespacé par email pour qu'un poste partagé ne compare jamais les
- * trades d'un élève au plan d'un autre. Côté staff, clé partagée (bureau
+ * Namespacé par email côté élève pour qu'un poste partagé ne compare jamais
+ * les trades d'un élève au plan d'un autre. Côté staff, clé partagée (bureau
  * commun), comme avant.
  */
 export function getTradingPlanStorageKey(storageKey?: string): string {

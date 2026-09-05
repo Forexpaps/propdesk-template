@@ -12,7 +12,6 @@ import { MacroDashboard } from "./components/MacroDashboard";
 import { UserProfileModal } from "./components/UserProfileModal";
 import { PendingChangesBanner } from "./components/PendingChangesBanner";
 import { NotificationModal } from "./components/NotificationModal";
-import { MindsetJournalModal } from "./components/MindsetJournalModal";
 import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
 import { ConfirmDialogHost, confirmDialog } from "./lib/confirmDialog";
@@ -394,7 +393,6 @@ function TraderApp({
   // Ébauche de trade poussée vers le Journal par le calculateur de position
   const [journalDraft, setJournalDraft] = useState<TradeDraft | null>(null);
 
-  const [isMindsetModalOpen, setIsMindsetModalOpen] = useState<boolean>(false);
 
   // L'écriture dans localStorage est désormais assurée par usePersistentState.
 
@@ -696,7 +694,6 @@ function TraderApp({
         }}
         onLogout={handleLogout}
         onOpenTradingPlan={() => setIsTradingPlanOpen(true)}
-        onOpenMindset={() => setIsMindsetModalOpen(true)}
         canManageSidebar={true}
         onToggleSidebarItem={(key) => {
           // Forme fonctionnelle obligatoire : deux bascules dans le même lot de
@@ -855,12 +852,6 @@ function TraderApp({
         plans={staffTradingPlan}
         onChange={setStaffTradingPlan}
         setups={setups}
-      />
-
-      {/* Mindset & Tilt Radar Modal */}
-      <MindsetJournalModal
-        isOpen={isMindsetModalOpen}
-        onClose={() => setIsMindsetModalOpen(false)}
       />
 
       {/* Notifications Center Modal */}

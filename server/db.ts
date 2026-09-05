@@ -1,12 +1,10 @@
 import { createClient } from "@libsql/client";
-import { Pool } from "pg";
 import fs from "fs";
 import path from "path";
 
 /**
- * Forme minimale partagée par les deux moteurs possibles (libSQL et
- * Postgres) — c'est tout ce que `repositories.ts` et le reste du serveur
- * utilisent, jamais une API spécifique à l'un ou l'autre.
+ * Forme minimale exposée par le client — c'est tout ce que
+ * `repositories.ts` et le reste du serveur utilisent.
  */
 interface QueryResult {
   rows: Record<string, unknown>[];
@@ -25,103 +23,17 @@ interface DbClient {
 }
 
 /**
- * Connexion unique pour tout le serveur, trois modes choisis par les
- * variables d'environnement présentes — indépendamment de l'hébergeur,
- * qu'il s'agisse de Vercel, Railway, Render, Fly.io, un VPS ou autre :
- *  - `POSTGRES_URL` : base Postgres, **n'importe quel fournisseur**
- *    (Postgres natif d'un hébergeur, Neon, Supabase, une instance
- *    auto-hébergée...) — utile sur un hébergeur dont le système de
- *    fichiers n'est pas persistant (fonctions serverless) ;
- *  - `TURSO_DATABASE_URL` : base SQLite distante chez Turso,
- *    `TURSO_AUTH_TOKEN` pour l'authentification — alternative à Postgres,
- *    même cas d'usage ;
- *  - aucune des deux (dev local, et tout hébergeur à disque persistant,
- *    Postgres ou pas) : fichier local dans DATA_DIR (./data par défaut) via
- *    libSQL en mode `file:`, aucun compte externe requis.
- *
- * Le reste du serveur ne parle qu'aux repositories, jamais à ce module
- * directement — et les repositories n'appellent que `execute`/`transaction`
- * ci-dessus, jamais une méthode propre à un moteur ou un hébergeur en
- * particulier. Ajouter un nouveau fournisseur de base ne demande donc de
- * toucher que ce fichier.
+ * Connexion unique pour tout le serveur : toujours un fichier SQLite local
+ * dans DATA_DIR (./data par défaut) via libSQL en mode `file:` — application
+ * pensée pour tourner uniquement en local, sur cet ordinateur.
  */
 export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 
-const usingPostgres = Boolean(process.env.POSTGRES_URL);
-const usingTurso = !usingPostgres && Boolean(process.env.TURSO_DATABASE_URL);
-const usingLocalFile = !usingPostgres && !usingTurso;
-
-if (usingLocalFile) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-/**
- * `?` (convention SQLite/libSQL, utilisée dans tout le reste du serveur) →
- * `$1, $2, ...` (convention Postgres). Sûr ici : aucune requête de ce
- * serveur ne contient de `?` littéral dans une chaîne SQL.
- */
-function toPostgresPlaceholders(sql: string): string {
-  let index = 0;
-  return sql.replace(/\?/g, () => `$${++index}`);
-}
-
-function normalizeQuery(query: Query): { sql: string; args: unknown[] } {
-  return typeof query === "string" ? { sql: query, args: [] } : { sql: query.sql, args: query.args ?? [] };
-}
-
-/**
- * Adapte `pg` (Postgres) à la même interface `execute`/`transaction` que
- * libSQL, pour que `repositories.ts` et le reste du serveur n'aient jamais
- * besoin de savoir lequel des deux moteurs est actif.
- */
-function createPostgresClient(connectionString: string): DbClient {
-  const pool = new Pool({
-    connectionString,
-    // La plupart des fournisseurs gérés (Vercel Postgres, Neon...) exigent
-    // TLS mais présentent un certificat que Node ne valide pas par défaut ;
-    // `sslmode=disable` explicite dans l'URL (dev local sans TLS) reste
-    // respecté par `pg` indépendamment de cette option.
-    ssl: connectionString.includes("sslmode=disable") ? undefined : { rejectUnauthorized: false },
-  });
-
-  async function execute(query: Query): Promise<QueryResult> {
-    const { sql, args } = normalizeQuery(query);
-    const result = await pool.query(toPostgresPlaceholders(sql), args);
-    return { rows: result.rows, rowsAffected: result.rowCount ?? 0 };
-  }
-
-  async function transaction(): Promise<DbTransaction> {
-    const client = await pool.connect();
-    await client.query("BEGIN");
-    let released = false;
-    const releaseOnce = () => {
-      if (!released) {
-        released = true;
-        client.release();
-      }
-    };
-    return {
-      async execute(query: Query): Promise<QueryResult> {
-        const { sql, args } = normalizeQuery(query);
-        const result = await client.query(toPostgresPlaceholders(sql), args);
-        return { rows: result.rows, rowsAffected: result.rowCount ?? 0 };
-      },
-      async commit() {
-        await client.query("COMMIT");
-      },
-      async rollback() {
-        await client.query("ROLLBACK");
-      },
-      close: releaseOnce,
-    };
-  }
-
-  return { execute, transaction };
-}
+fs.mkdirSync(DATA_DIR, { recursive: true });
 
 /** libSQL renvoie déjà `rows`/`rowsAffected` — juste besoin d'adapter le type de retour de `transaction`. */
-function createLibsqlClient(url: string, authToken?: string): DbClient {
-  const client = createClient({ url, authToken });
+function createLibsqlClient(url: string): DbClient {
+  const client = createClient({ url });
   return {
     execute: (query: Query) => client.execute(query as never) as unknown as Promise<QueryResult>,
     transaction: async (mode: "write" | "read" = "write") => {
@@ -136,11 +48,7 @@ function createLibsqlClient(url: string, authToken?: string): DbClient {
   };
 }
 
-export const db: DbClient = usingPostgres
-  ? createPostgresClient(process.env.POSTGRES_URL!)
-  : usingTurso
-  ? createLibsqlClient(process.env.TURSO_DATABASE_URL!, process.env.TURSO_AUTH_TOKEN)
-  : createLibsqlClient(`file:${path.join(DATA_DIR, "horizon.db")}`);
+export const db: DbClient = createLibsqlClient(`file:${path.join(DATA_DIR, "horizon.db")}`);
 
 /**
  * Toutes les collections partagent la même forme : un identifiant stable,
@@ -151,9 +59,8 @@ export const db: DbClient = usingPostgres
  * requêter et indexer ; les autres collections ne sont jamais lues autrement
  * qu'en entier, leur payload suffit.
  *
- * Ces instructions sont écrites dans un sous-ensemble SQL commun à SQLite et
- * Postgres (types, `REFERENCES ... ON DELETE CASCADE`, `CREATE INDEX IF NOT
- * EXISTS` sont valables dans les deux) — aucune divergence nécessaire ici.
+ * Ces instructions sont écrites en SQLite (types, `REFERENCES ... ON DELETE
+ * CASCADE`, `CREATE INDEX IF NOT EXISTS`).
  */
 const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS meta (
@@ -344,10 +251,6 @@ const SCHEMA_STATEMENTS = [
  * lié 1:1 au bureau partagé par une clé étrangère qui interdirait tout second
  * compte).
  *
- * SQLite/libSQL uniquement — une base Postgres est toujours créée neuve avec
- * `staff_accounts` déjà dans sa forme finale (voir `SCHEMA_STATEMENTS`),
- * cette migration n'a donc jamais de raison de s'y exécuter.
- *
  * Le compte existant conserve exactement son `id` d'origine (celui qui était
  * `user_id` dans `user_credentials`, presque toujours `DEFAULT_USER_ID`) :
  * les sessions déjà émises restent donc valides, personne n'est déconnecté
@@ -474,10 +377,9 @@ async function migrateDropForum(): Promise<void> {
 
 /**
  * Ajoute `totp_secret`/`totp_enabled_at` à `staff_accounts` sur une base
- * SQLite/libSQL EXISTANTE créée avant l'introduction de la 2FA — le `CREATE
- * TABLE IF NOT EXISTS` plus haut ne les crée que sur une base neuve, où ces
- * colonnes existent donc déjà. SQLite/libSQL uniquement (voir
- * `migrateToStaffAccounts`) : une base Postgres neuve les a toujours.
+ * EXISTANTE créée avant l'introduction de la 2FA — le `CREATE TABLE IF NOT
+ * EXISTS` plus haut ne les crée que sur une base neuve, où ces colonnes
+ * existent donc déjà.
  */
 async function migrateAddTotpColumns(): Promise<void> {
   const columnsResult = await db.execute("PRAGMA table_info(staff_accounts)");
@@ -524,36 +426,21 @@ export async function initDb(): Promise<void> {
   if (initialized) return;
   initialized = true;
 
-  if (usingLocalFile) {
-    // Pertinent seulement en mode fichier local : une base distante (Turso
-    // ou Postgres) gère elle-même son mode de journalisation, et WAL n'a pas
-    // de sens sur une connexion réseau. Non bloquant si le moteur libSQL
-    // local le refuse pour une raison quelconque.
-    try {
-      await db.execute("PRAGMA journal_mode = WAL;");
-    } catch (err) {
-      console.warn("[propdesk] PRAGMA journal_mode = WAL ignoré.", err);
-    }
+  try {
+    await db.execute("PRAGMA journal_mode = WAL;");
+  } catch (err) {
+    console.warn("[propdesk] PRAGMA journal_mode = WAL ignoré.", err);
   }
 
-  if (!usingPostgres) {
-    // Postgres applique toujours les clés étrangères — pas de PRAGMA
-    // équivalent, et cette commande échouerait si on l'y envoyait.
-    await db.execute("PRAGMA foreign_keys = ON;");
-  }
+  await db.execute("PRAGMA foreign_keys = ON;");
 
   for (const statement of SCHEMA_STATEMENTS) {
     await db.execute(statement);
   }
 
-  if (!usingPostgres) {
-    // Migrations SQLite/libSQL uniquement — une base Postgres est toujours
-    // créée neuve, directement dans sa forme finale (voir les commentaires
-    // de chaque migration ci-dessus).
-    await migrateToStaffAccounts();
-    await migrateAddTotpColumns();
-    await migrateAddLockCountColumn();
-  }
+  await migrateToStaffAccounts();
+  await migrateAddTotpColumns();
+  await migrateAddLockCountColumn();
   await migrateDropCoachSignals();
   await migrateDropForum();
 }
