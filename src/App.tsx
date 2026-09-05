@@ -14,7 +14,7 @@ import { PendingChangesBanner } from "./components/PendingChangesBanner";
 import { NotificationModal } from "./components/NotificationModal";
 import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
-import { ConfirmDialogHost, confirmDialog } from "./lib/confirmDialog";
+import { ConfirmDialogHost, alertDialog, confirmDialog } from "./lib/confirmDialog";
 import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, getTradingPlanStorageKey, EMPTY_TRADING_PLANS, normalizeTradingPlans, renameSetupInPlans } from "./lib/planCompliance";
 import { upsertWalletRiskAlerts } from "./lib/walletAlerts";
 import { computeBadgeProgress } from "./lib/badges";
@@ -468,8 +468,9 @@ function TraderApp({
     // Hors ligne, le cache local est la SEULE copie des données : le vider
     // serait une perte sèche. On refuse plutôt que de détruire en silence.
     if (!syncEnabled) {
-      alert(
-        "Déconnexion impossible hors ligne : les modifications de cette session ne sont pas encore enregistrées sur le serveur. Reconnecte-toi au serveur avant de te déconnecter."
+      await alertDialog(
+        "Déconnexion impossible hors ligne : les modifications de cette session ne sont pas encore enregistrées sur le serveur. Reconnecte-toi au serveur avant de te déconnecter.",
+        { title: "Déconnexion impossible" }
       );
       return;
     }
@@ -483,8 +484,9 @@ function TraderApp({
     // `localStorage.clear()` plus bas, en toute confiance. Trouvé en audit.
     const pending = listPending();
     if (pending.length > 0) {
-      alert(
-        `Déconnexion impossible : ${describePending(pending).join(", ")} pas encore enregistré(e) sur le serveur. Réessaie dans quelques instants — si le problème persiste, recharge la page avant de te déconnecter.`
+      await alertDialog(
+        `Déconnexion impossible : ${describePending(pending).join(", ")} pas encore enregistré(e) sur le serveur. Réessaie dans quelques instants — si le problème persiste, recharge la page avant de te déconnecter.`,
+        { title: "Déconnexion impossible" }
       );
       return;
     }

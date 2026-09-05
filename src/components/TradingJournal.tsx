@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Plus,
   Search,
-  Filter,
   ArrowUpRight,
   ArrowDownRight,
   ArrowUp,
@@ -37,7 +36,7 @@ import {
 import { formatCurrency, formatDuration, parsePriceInput } from "../lib/format";
 import { resizeChartScreenshot } from "../lib/image";
 import { computeJournalSummary, tradeDurationMinutes } from "../lib/performanceStats";
-import { confirmDialog } from "../lib/confirmDialog";
+import { alertDialog, confirmDialog } from "../lib/confirmDialog";
 import { periodStart, sortTrades, PeriodPreset, SortKey, SortState } from "../lib/journalFilters";
 import { Select } from "./Select";
 
@@ -494,12 +493,12 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onerror = () => alert("Ce fichier n'a pas pu être lu.");
+    reader.onerror = () => void alertDialog("Ce fichier n'a pas pu être lu.", { title: "Import impossible" });
     reader.onload = () => {
       const text = String(reader.result ?? "");
       const rows = parseCsv(text);
       if (rows.length < 2) {
-        alert("Fichier CSV vide ou illisible.");
+        void alertDialog("Fichier CSV vide ou illisible.", { title: "Import impossible" });
         return;
       }
 
@@ -512,8 +511,9 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       ) as Record<(typeof CSV_IMPORT_COLUMNS)[number] | (typeof CSV_OPTIONAL_COLUMNS)[number], number>;
       const missing = CSV_IMPORT_COLUMNS.filter((col) => columnIndex[col] === -1);
       if (missing.length > 0) {
-        alert(
-          `Ce fichier ne ressemble pas à un export du Journal — colonnes manquantes : ${missing.join(", ")}.`
+        void alertDialog(
+          `Ce fichier ne ressemble pas à un export du Journal — colonnes manquantes : ${missing.join(", ")}.`,
+          { title: "Format non reconnu" }
         );
         return;
       }
@@ -663,7 +663,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           }`
         );
       }
-      alert(parts.join("\n\n"));
+      void alertDialog(parts.join("\n\n"), { title: "Import terminé" });
     };
     reader.readAsText(file, "utf-8");
   };
@@ -924,7 +924,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     // Garde-fou sur le décodage, pas sur le stockage : après réduction, la
     // taille du fichier d'origine n'a plus d'incidence.
     if (file.size > 20 * 1024 * 1024) {
-      alert("L'image choisie est trop volumineuse (max 20 Mo). Choisis-en une autre.");
+      void alertDialog("L'image choisie est trop volumineuse (max 20 Mo). Choisis-en une autre.", { title: "Capture trop lourde" });
       return;
     }
 
@@ -937,7 +937,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       }));
     } catch (err) {
       console.error("[propdesk] Redimensionnement de la capture d'écran échoué.", err);
-      alert("Cette image n'a pas pu être lue. Essaie un autre fichier (JPEG, PNG ou WebP).");
+      void alertDialog("Cette image n'a pas pu être lue. Essaie un autre fichier (JPEG, PNG ou WebP).", { title: "Image illisible" });
     } finally {
       setResizingSlotId(null);
     }
@@ -1037,7 +1037,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     // type `Trade` : plutôt que d'inventer une valeur, on bloque la saisie
     // d'un setup sans distance de stop définie, invalide dans tous les cas.
     if (risque === 0) {
-      alert("Le Stop Loss ne peut pas être égal au Prix d'Entrée — aucune distance de risque définie.");
+      void alertDialog("Le Stop Loss ne peut pas être égal au Prix d'Entrée — aucune distance de risque définie.", { title: "Saisie incomplète" });
       return;
     }
 
@@ -1047,11 +1047,11 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     // `formulaireVierge`) — sans elles, un trade partirait avec `result: ""`,
     // impossible à typer et invisible dans tous les filtres.
     if (!formData.result) {
-      alert("Choisis le résultat de ce trade (TP, SL, Breakeven ou Position ouverte).");
+      void alertDialog("Choisis le résultat de ce trade (TP, SL, Breakeven ou Position ouverte).", { title: "Saisie incomplète" });
       return;
     }
     if (!formData.emotion) {
-      alert("Choisis ton état émotionnel — c'est le cœur du registre, il ne peut pas être deviné.");
+      void alertDialog("Choisis ton état émotionnel — c'est le cœur du registre, il ne peut pas être deviné.", { title: "Saisie incomplète" });
       return;
     }
 

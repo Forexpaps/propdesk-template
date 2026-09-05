@@ -15,6 +15,12 @@ interface ConfirmOptions {
   cancelLabel?: string;
   /** Action destructive (suppression, révocation...) : bouton de confirmation en rouge. */
   danger?: boolean;
+  /**
+   * Simple information à accuser : un seul bouton, aucun choix à faire.
+   * Posé ici plutôt que dans un second composant, pour que `alertDialog` et
+   * `confirmDialog` partagent exactement la même apparence et la même file.
+   */
+  infoOnly?: boolean;
 }
 
 interface ConfirmRequest extends ConfirmOptions {
@@ -28,12 +34,29 @@ export function confirmDialog(message: string, options: ConfirmOptions = {}): Pr
   return new Promise((resolve) => {
     if (!listener) {
       // Host pas encore monté (ne devrait pas arriver) : repli sur le
-      // dialogue natif plutôt que de bloquer indéfiniment l'appelant.
+      // dialogue natif plutôt que de bloquer indéfiniment l'appelant. Une
+      // information passe par `alert` et non `confirm`, sans quoi elle
+      // proposerait un « Annuler » qui n'a aucun sens.
+      if (options.infoOnly) {
+        window.alert(message);
+        resolve(true);
+        return;
+      }
       resolve(window.confirm(message));
       return;
     }
     listener({ message, resolve, ...options });
   });
+}
+
+/**
+ * Remplace `window.alert()` : même modale, un seul bouton. Rend la main quand
+ * l'utilisateur a accusé réception, ce qui permet d'enchaîner sans empiler
+ * deux fenêtres — contrairement à `alert()`, qui bloque tout le thread et
+ * casse l'apparence de l'app avec une fenêtre système.
+ */
+export function alertDialog(message: string, options: Omit<ConfirmOptions, "infoOnly"> = {}): Promise<void> {
+  return confirmDialog(message, { ...options, infoOnly: true }).then(() => undefined);
 }
 
 export const ConfirmDialogHost: React.FC = () => {
@@ -59,13 +82,16 @@ export const ConfirmDialogHost: React.FC = () => {
         {request.title && <h3 className="text-base font-bold text-white mb-2">{request.title}</h3>}
         <p className="text-sm text-slate-300 whitespace-pre-line leading-relaxed">{request.message}</p>
         <div className="flex justify-end gap-2.5 mt-5">
-          <button
-            type="button"
-            onClick={() => close(false)}
-            className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#1B2320] hover:bg-[#232D29] text-slate-300 transition-colors"
-          >
-            {request.cancelLabel || "Annuler"}
-          </button>
+          {/* Une information ne se refuse pas : pas de bouton « Annuler ». */}
+          {!request.infoOnly && (
+            <button
+              type="button"
+              onClick={() => close(false)}
+              className="px-4 py-2 rounded-lg text-sm font-semibold bg-[#1B2320] hover:bg-[#232D29] text-slate-300 transition-colors"
+            >
+              {request.cancelLabel || "Annuler"}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => close(true)}
@@ -75,7 +101,7 @@ export const ConfirmDialogHost: React.FC = () => {
                 : "bg-[#00E676] hover:bg-[#00E676]/90 text-[#0D1110]"
             }`}
           >
-            {request.confirmLabel || "Confirmer"}
+            {request.confirmLabel || (request.infoOnly ? "OK" : "Confirmer")}
           </button>
         </div>
       </div>

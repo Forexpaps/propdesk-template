@@ -25,7 +25,7 @@ import {
 import { StudentProfile, TraderBadge } from "../types";
 import { resizeAvatar, AVATAR_SIZE } from "../lib/image";
 import { api } from "../lib/api";
-import { confirmDialog } from "../lib/confirmDialog";
+import { alertDialog, confirmDialog } from "../lib/confirmDialog";
 import { ChangeOwnPasswordModal } from "./ChangeOwnPasswordModal";
 import { TwoFactorSetupModal } from "./TwoFactorSetupModal";
 
@@ -266,7 +266,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     // Garde-fou sur le décodage, pas sur le stockage : après réduction, la
     // taille du fichier d'origine n'a plus d'incidence.
     if (file.size > 20 * 1024 * 1024) {
-      alert("L'image choisie est trop volumineuse (max 20 Mo). Veuillez en choisir une autre.");
+      void alertDialog("L'image choisie est trop volumineuse (max 20 Mo). Veuillez en choisir une autre.", { title: "Image trop lourde" });
       return;
     }
 
@@ -275,7 +275,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       setAvatar(await resizeAvatar(file));
     } catch (err) {
       console.error("[horizon] Redimensionnement de l'avatar échoué.", err);
-      alert("Cette image n'a pas pu être lue. Essayez un autre fichier (JPEG, PNG ou WebP).");
+      void alertDialog("Cette image n'a pas pu être lue. Essayez un autre fichier (JPEG, PNG ou WebP).", { title: "Image illisible" });
     } finally {
       setIsResizing(false);
     }
