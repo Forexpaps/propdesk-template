@@ -85,10 +85,13 @@ const EmptyState: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 const HEATMAP_DAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 /** `Date.getDay()` (0 = dimanche) → index dans `HEATMAP_DAYS`. */
 const JS_DAY_TO_HEATMAP_INDEX = [6, 0, 1, 2, 3, 4, 5];
-/** Un créneau par heure, 0h à 23h — précision maximale sur la journée. */
+/** Un créneau par tranche de 2h, 0h à 23h. */
 const HEATMAP_BLOCKS: { label: string; startHour: number; endHour: number }[] = Array.from(
-  { length: 24 },
-  (_, hour) => ({ label: `${hour}h`, startHour: hour, endHour: hour + 1 })
+  { length: 12 },
+  (_, i) => {
+    const startHour = i * 2;
+    return { label: `${startHour}-${startHour + 2}h`, startHour, endHour: startHour + 2 };
+  }
 );
 
 interface HeatmapCellStats {
@@ -99,7 +102,7 @@ interface HeatmapCellStats {
 }
 
 /**
- * Grille jour × créneau de 6h — win rate et nombre de trades par case.
+ * Grille jour × créneau de 2h — win rate et nombre de trades par case.
  * Calculée directement depuis `trades` (pas `performanceStats.ts` :
  * `dayChartData`/`hourChartData` existants agrègent chaque dimension
  * séparément, jamais croisée). Un trade sans heure (`time` absent, saisie
@@ -292,14 +295,14 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
         )}
       </Card>
 
-      {/* Heatmap — où tu gagnes : win rate croisé jour × heure (0h à 23h). */}
+      {/* Heatmap — où tu gagnes : win rate croisé jour × créneau de 2h. */}
       <Card className="p-5 space-y-4">
         <SectionHeader color="bg-violet-500">Heatmap — où tu gagnes</SectionHeader>
         {trades.length < 3 ? (
           <EmptyState>Ajoute au moins 3 trades pour révéler ton ADN de trader.</EmptyState>
         ) : (
           <div className="overflow-x-auto">
-            <div className="min-w-[1440px] grid grid-cols-[48px_repeat(24,1fr)] gap-1">
+            <div className="min-w-[840px] grid grid-cols-[48px_repeat(12,1fr)] gap-1.5">
               <div />
               {HEATMAP_BLOCKS.map((block) => (
                 <div key={block.label} className="text-center text-[10px] text-slate-500 font-mono pb-1">
