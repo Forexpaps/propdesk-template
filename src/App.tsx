@@ -395,20 +395,26 @@ function TraderApp({
   const [plansHerites] = useState<TradingPlanData>(() => normalizeTradingPlans(loadTradingPlan()));
   const [staffTradingPlan, setStaffTradingPlan] = useSyncedState<TradingPlanData>(
     "horizon_trading_plans",
-    plansServeur && plansServeur.length > 0
-      ? plansServeur
-      : plansHerites.length > 0
-      ? plansHerites
-      : seed(plansServeur, "horizon_trading_plans", EMPTY_TRADING_PLANS),
+    // Valeur initiale = ce que dit le SERVEUR, jamais les plans hérités.
+    //
+    // C'est le point délicat : `useSyncedState` ne pousse une valeur que si
+    // elle diffère (par identité) de celle chargée au démarrage. Semer
+    // l'initialisation avec `plansHerites` faisait donc que l'effet de reprise
+    // ci-dessous reposait exactement la même référence — considérée comme
+    // « rien de neuf », donc jamais envoyée. Les plans hérités s'affichaient
+    // alors normalement mais ne partaient jamais en base : ils disparaissaient
+    // au rechargement suivant et restaient absents de l'export. En partant du
+    // serveur, la reprise devient une vraie modification, qui part.
+    seed(plansServeur, "horizon_trading_plans", EMPTY_TRADING_PLANS),
     (v) => api.saveCollection("tradingPlans", v),
     syncEnabled,
     reportSyncError
   );
 
   /**
-   * Pousse une seule fois vers le serveur les plans repris de `localStorage` :
-   * `useSyncedState` n'envoie que sur modification, sans quoi des plans hérités
-   * resteraient affichés mais toujours pas sauvegardés.
+   * Reprise unique des plans laissés dans l'ancienne clé `localStorage`
+   * (avant leur passage en base). Volontairement une modification à part
+   * entière — voir le commentaire de la valeur initiale ci-dessus.
    */
   const reprisePlansFaite = useRef(false);
   useEffect(() => {
@@ -416,7 +422,9 @@ function TraderApp({
     if (plansServeur && plansServeur.length > 0) return;
     if (plansHerites.length === 0) return;
     reprisePlansFaite.current = true;
-    setStaffTradingPlan(plansHerites);
+    // Copie explicite : une nouvelle référence est ce qui distingue cette
+    // reprise d'un simple « déjà chargé » aux yeux de `useSyncedState`.
+    setStaffTradingPlan([...plansHerites]);
   }, [syncEnabled, plansServeur, plansHerites, setStaffTradingPlan]);
 
   // Ébauche de trade poussée vers le Journal par le calculateur de position
