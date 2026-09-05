@@ -876,6 +876,7 @@ function TraderApp({
             stopLoss: calc.stopLoss,
             takeProfit: calc.takeProfit,
             lotSize: calc.lotSize,
+            riskPercent: calc.riskPercent,
             notes: `Position dimensionnée avec le calculateur : risque ${formatCurrency(
               calc.riskAmount
             )} pour un R:R de ${calc.riskRewardRatio}.`,

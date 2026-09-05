@@ -36,6 +36,9 @@ export function computeBadgeProgress(badges: TraderBadge[], trades: Trade[]): Tr
  * voir `server/auth/routes.ts`) — jamais `badge-N` tel quel. On retrouve donc
  * le critère à appliquer par le SUFFIXE de l'id, pas par égalité stricte.
  */
+/** Seuil de risque des badges « Maître du Risk 1% », en pourcentage du capital. */
+const MAX_RISK_PERCENT = 1;
+
 const KNOWN_BADGE_IDS = [
   "badge-1", "badge-3", "badge-4", "badge-5",
   "badge-6", "badge-7", "badge-8",
@@ -189,13 +192,40 @@ function computeSingleBadgeProgress(
       };
     }
 
-    // badge-1, badge-21, badge-22, badge-23 (% de risque par trade — le tag
-    // "Sur-risque (>1%)" n'est qu'auto-déclaré, son absence ne prouve rien),
-    // badge-2 (Diplômé SMC Horizon, reposait sur le Module cours, retiré de
-    // l'app), badge-3 (module Replay, retiré de l'app — plus aucune source de
-    // données pour ce badge), badge-8 (cumul en "R"), badge-9 (score
-    // d'examen) : aucune donnée suivie aujourd'hui ne permet de les calculer
-    // honnêtement.
+    // Maître du Risk 1% et ses paliers — trades CONSÉCUTIFS dont le risque
+    // engagé est ≤ 1 %.
+    //
+    // Seuls les trades qui RENSEIGNENT `riskPercent` comptent : un trade qui
+    // l'omet ne prouve rien (il n'atteste ni un risque maîtrisé, ni un
+    // dépassement) et casse la série, plutôt que d'être compté comme conforme.
+    // C'est le même refus d'inventer une donnée que partout ailleurs ici — et
+    // la raison pour laquelle ces badges sont restés `trackable: false` tant
+    // que le champ n'existait pas.
+    case "badge-1":
+    case "badge-21":
+    case "badge-22":
+    case "badge-23": {
+      const targetByBadge: Record<string, number> = {
+        "badge-1": 15,
+        "badge-21": 30,
+        "badge-22": 50,
+        "badge-23": 100,
+      };
+      const target = targetByBadge[canonicalBadgeId(badgeId)];
+      const serie = computeRiskDisciplineStreak(trades);
+      return {
+        currentValue: serie,
+        targetValue: target,
+        progressPercentage: Math.min(100, Math.round((serie / target) * 100)),
+      };
+    }
+
+    // badge-8 (cumul en "R") reste hors de portée : le R d'un trade vaut son
+    // PnL divisé par le montant réellement risqué, en devise. `riskPercent`
+    // donne le pourcentage, pas le montant — le reconstituer demanderait le
+    // capital du compte au moment du trade, que rien ne conserve. Le déduire
+    // des seuls prix (sortie/entrée/stop) supposerait une sortie unique de
+    // toute la position, ce qui serait faux dès la première sortie partielle.
     default:
       return null;
   }
@@ -211,6 +241,29 @@ function computeSingleBadgeProgress(
  * C'est un choix assumé plutôt qu'une évidence — documenté ici pour ne pas
  * le redécouvrir en lisant seulement le code.
  */
+/**
+ * Nombre de trades CONSÉCUTIFS (en partant du plus récent) dont le risque
+ * engagé est renseigné et inférieur ou égal à 1 % du capital.
+ *
+ * Un trade sans `riskPercent` rompt la série au lieu d'être ignoré : la série
+ * doit attester d'une discipline observée, et sauter les trades non renseignés
+ * fabriquerait une série qui n'a jamais existé — un journal où le champ n'est
+ * jamais rempli afficherait alors une série parfaite.
+ *
+ * Contrairement à `computeDisciplineStreak`, on raisonne trade par trade et
+ * non jour par jour : le critère porte sur chaque position prise, pas sur une
+ * journée.
+ */
+export function computeRiskDisciplineStreak(trades: Trade[]): number {
+  // `trades` arrive du plus récent au plus ancien (App.tsx insère en tête).
+  let serie = 0;
+  for (const t of trades) {
+    if (typeof t.riskPercent !== "number" || t.riskPercent > MAX_RISK_PERCENT) break;
+    serie += 1;
+  }
+  return serie;
+}
+
 export function computeDisciplineStreak(trades: Trade[]): number {
   if (trades.length === 0) return 0;
 

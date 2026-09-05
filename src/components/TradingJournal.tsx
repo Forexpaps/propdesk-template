@@ -146,6 +146,7 @@ function formulaireVierge() {
     takeProfit: "",
     exitPrice: "",
     lotSize: "",
+    riskPercent: "",
     strategy: "",
     tradingPlanId: SANS_PLAN,
     result: "" as TradeResult | "",
@@ -236,7 +237,7 @@ const CSV_IMPORT_COLUMNS = [
  * version antérieure de l'export (ou saisi à la main dans un tableur) n'en a
  * pas, et refuser tout le fichier pour autant serait absurde.
  */
-const CSV_OPTIONAL_COLUMNS = ["ID", "Plan"] as const;
+const CSV_OPTIONAL_COLUMNS = ["ID", "Plan", "Risque %"] as const;
 
 const CSV_MARKET_CATEGORIES: readonly MarketCategory[] = ["Forex", "Crypto", "Indices", "Matières Premières"];
 const CSV_DIRECTIONS: readonly TradeDirection[] = ["LONG", "SHORT"];
@@ -416,6 +417,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       "Take Profit",
       "Prix Sortie",
       "Taille Lot",
+      "Risque %",
       "PnL",
       "Unite PnL",
       "Ratio RR",
@@ -441,6 +443,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       t.takeProfit,
       t.exitPrice || "",
       t.lotSize,
+      t.riskPercent ?? "",
       t.pnl,
       t.pnlUnit ?? "USD",
       t.riskRewardRatio,
@@ -578,6 +581,8 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         const takeProfit = parsePriceInput(get(row, "Take Profit"));
         const exitPriceRaw = get(row, "Prix Sortie");
         const lotSize = parsePriceInput(get(row, "Taille Lot"));
+        const risqueRaw = get(row, "Risque %");
+        const riskPercent = risqueRaw ? parsePriceInput(risqueRaw) : undefined;
         const pnl = parsePriceInput(get(row, "PnL"));
 
         const accountName = get(row, "Compte");
@@ -625,6 +630,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           takeProfit,
           exitPrice: exitPriceRaw ? parsePriceInput(exitPriceRaw) : undefined,
           lotSize,
+          riskPercent,
           pnl,
           pnlUnit,
           riskRewardRatio,
@@ -706,6 +712,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       // passage en édition.
       exitPrice: trade.exitPrice ? String(trade.exitPrice) : "",
       lotSize: String(trade.lotSize),
+      riskPercent: trade.riskPercent !== undefined ? String(trade.riskPercent) : "",
       strategy: trade.strategy,
       tradingPlanId: trade.tradingPlanId ?? SANS_PLAN,
       result: trade.result,
@@ -991,7 +998,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
    * convertie en point) et n'est convertie en nombre qu'à la soumission.
    */
   const handleDecimalChange = (
-    field: "lotSize" | "pnl",
+    field: "lotSize" | "pnl" | "riskPercent",
     raw: string,
     { allowNegative = false }: { allowNegative?: boolean } = {},
   ) => {
@@ -1109,6 +1116,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           ? undefined
           : parsePriceInput(formData.exitPrice),
       lotSize: Number(formData.lotSize),
+      // `undefined` et non 0 quand le champ est vide : 0 % se lirait comme
+      // « aucun risque engagé », ce qui n'existe pas, et compterait à tort
+      // dans les badges de gestion du risque.
+      riskPercent: formData.riskPercent.trim() === "" ? undefined : Number(formData.riskPercent),
       pnl,
       pnlUnit: formData.pnlUnit,
       riskRewardRatio: riskReward,
@@ -1762,6 +1773,25 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   />
                 </div>
 
+                {/* Volontairement SANS `required` : les trades saisis avant
+                    l'ajout de ce champ n'en ont pas, et forcer une valeur
+                    pousserait à en inventer une après coup. Les badges de
+                    gestion du risque ne comptent que les trades qui le
+                    renseignent. */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-400 mb-1">
+                    Risque engagé (%)
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={formData.riskPercent}
+                    onChange={(e) => handleDecimalChange("riskPercent", e.target.value)}
+                    placeholder="1"
+                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono placeholder-slate-600"
+                  />
+                </div>
+
                 {/* PnL net : toujours saisi à la main, dans l'unité de son
                     choix. Aucun calcul, aucune conversion — l'utilisateur
                     tape le chiffre qu'il lit sur sa propre plateforme. */}
@@ -2163,6 +2193,12 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
                 <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Taille de lot</div>
                 <div className="text-white font-mono">{selectedChartTrade.lotSize}</div>
+              </div>
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Risque engagé</div>
+                <div className="text-white font-mono">
+                  {selectedChartTrade.riskPercent !== undefined ? `${selectedChartTrade.riskPercent} %` : "—"}
+                </div>
               </div>
 
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">

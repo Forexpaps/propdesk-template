@@ -96,6 +96,16 @@ export interface Trade {
    */
   pnlPercentage?: number;
   riskRewardRatio: number;
+  /**
+   * Part du capital réellement engagée sur ce trade, en pourcentage (1 = 1 %).
+   *
+   * Optionnel, et destiné à le rester : les trades saisis avant l'ajout de ce
+   * champ n'en ont pas, et rien ne permet de le reconstituer après coup — le
+   * déduire du PnL supposerait que le stop a été touché exactement. Les badges
+   * de gestion du risque comptent donc les trades qui le RENSEIGNENT, jamais
+   * ceux qui l'omettent (voir `src/lib/badges.ts`).
+   */
+  riskPercent?: number;
   result: TradeResult;
   strategy: string; // e.g. "SMC Orderblock", "Breakout FVG", "Liquidity Sweep"
   emotion: EmotionState;
@@ -143,6 +153,8 @@ export interface TradeDraft {
   stopLoss?: number;
   takeProfit?: number;
   lotSize?: number;
+  /** Le calculateur de position le connaît déjà : autant le transmettre au Journal. */
+  riskPercent?: number;
   strategy?: string;
   tradingPlanId?: string;
   notes?: string;

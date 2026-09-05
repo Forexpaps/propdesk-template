@@ -14,6 +14,8 @@ interface PositionCalculatorModalProps {
     takeProfit: number;
     lotSize: number;
     riskAmount: number;
+    /** % du capital engagé, tel que saisi ici — repris tel quel par le Journal. */
+    riskPercent: number;
     riskRewardRatio: number;
   }) => void;
 }
@@ -179,6 +181,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
         takeProfit: target1Num,
         lotSize: parseFloat(lots1.toFixed(3)),
         riskAmount: riskAmount1,
+        riskPercent: riskPercentNum,
         riskRewardRatio: parseFloat(rr1.toFixed(2)),
       });
     }

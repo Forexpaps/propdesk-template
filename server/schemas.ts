@@ -75,6 +75,19 @@ const isValidInitialBalance = (value: unknown): boolean =>
   value == null || (typeof value === "number" && value > 0);
 
 /**
+ * `Trade.riskPercent` — part du capital engagée, en pourcentage.
+ *
+ * Absent est légitime (les trades antérieurs à ce champ n'en ont pas, et le
+ * formulaire ne l'impose pas). Présent, il doit être un nombre strictement
+ * positif : 0 % se lirait comme « aucun risque engagé », ce qui n'existe pas,
+ * et fausserait les badges de gestion du risque qui comptent les trades sous
+ * 1 %. Borné à 100 % pour écarter une saisie manifestement erronée (un montant
+ * en devise tapé dans le champ pourcentage, par exemple).
+ */
+const isValidRiskPercent = (value: unknown): boolean =>
+  value == null || (typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 100);
+
+/**
  * Détecte un schéma d'URL dangereux (`javascript:`, `vbscript:`,
  * `data:text/html`) n'importe où dans un item de collection, quel que soit
  * le nom du champ ou sa profondeur d'imbrication.
@@ -139,6 +152,9 @@ const collectionItem = z
   })
   .refine((item) => !containsDangerousUrlScheme(item), {
     message: "URL invalide : les schémas javascript:/vbscript:/data:text/html sont interdits.",
+  })
+  .refine((item) => isValidRiskPercent((item as Record<string, unknown>).riskPercent), {
+    message: "Le risque engagé doit être un pourcentage entre 0 (exclu) et 100.",
   });
 
 export const collectionPayloadSchema = z
