@@ -19,6 +19,8 @@ dans l'application.
 Fonctionne à l'identique sur **macOS et Windows** — aucune commande ni
 script propre à un système d'exploitation.
 
+### Première installation (une seule fois)
+
 Prérequis : [Node.js](https://nodejs.org) 20+ et npm (sur Windows,
 l'installeur officiel les fournit tous les deux).
 
@@ -35,17 +37,47 @@ terminal Unix n'est requis.
 Créer un `.env` à la racine (voir [.env.example](.env.example)) — un fichier
 vide suffit, toutes les variables ont un défaut utilisable.
 
+### Relancer le projet soi-même (à chaque fois, une fois déjà installé)
+
+Une fois `npm install` fait une première fois, plus besoin de le refaire —
+`node_modules` reste sur le disque. Pour retravailler dessus ou simplement
+l'utiliser :
+
+1. Ouvrir un terminal (macOS : app **Terminal** ou **iTerm** ; Windows :
+   **PowerShell**, l'invite de commandes, ou le terminal intégré de
+   l'éditeur utilisé).
+2. Se placer dans le dossier du projet :
+   ```bash
+   cd chemin/vers/le/dossier-du-projet
+   ```
+3. Démarrer le serveur :
+   ```bash
+   npm run dev
+   ```
+4. Ouvrir **http://localhost:3000** dans un navigateur.
+5. Pour arrêter le serveur : retourner dans le terminal et appuyer sur
+   **Ctrl+C**.
+
+Si un message d'erreur mentionne un module introuvable (ex. après avoir
+récupéré le projet sur une nouvelle machine, ou après une mise à jour du
+code), relancer `npm install` une fois avant `npm run dev`.
+
+Autres commandes disponibles, à lancer de la même façon :
+
 ```bash
-npm run dev     # http://localhost:3000
+npm run dev     # http://localhost:3000 — développement, avec rechargement à chaud côté client
 npm run lint    # vérification TypeScript (strict)
 npm run build   # bundle client + serveur dans dist/
-npm start       # sert le build de production
+npm start       # sert le build de production (après npm run build)
 ```
 
 Au premier accès à `http://localhost:3000`, l'application affiche un écran
 d'installation : choisissez uniquement votre mot de passe (10 caractères
 minimum) — pas d'adresse e-mail, pas de nom, pas de photo. Le profil part
 vide, à compléter plus tard si vous le souhaitez depuis Profil & Options.
+Aux accès suivants, l'application se souvient de la session et affiche
+directement le tableau de bord (ou l'écran de connexion si la session a
+expiré ou a été fermée).
 
 ## Déployer pour un usage personnel
 
