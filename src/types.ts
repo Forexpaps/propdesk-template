@@ -1,6 +1,6 @@
 export type TradeDirection = "LONG" | "SHORT";
 export type TradeResult = "WIN" | "LOSS" | "BREAKEVEN" | "OPEN";
-export type EmotionState = "Disciplined" | "FOMO" | "Impulsive" | "Anxious" | "Calm" | "Greedy";
+export type EmotionState = "Disciplined" | "FOMO" | "Impulsive" | "Anxious" | "Calm";
 export type MarketCategory = "Forex" | "Crypto" | "Indices" | "Matières Premières";
 /**
  * Erreurs d'exécution récurrentes, taguées librement par l'élève sur un

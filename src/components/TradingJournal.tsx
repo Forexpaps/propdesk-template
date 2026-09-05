@@ -180,7 +180,7 @@ const CSV_IMPORT_COLUMNS = [
 const CSV_MARKET_CATEGORIES: readonly MarketCategory[] = ["Forex", "Crypto", "Indices", "Matières Premières"];
 const CSV_DIRECTIONS: readonly TradeDirection[] = ["LONG", "SHORT"];
 const CSV_RESULTS: readonly TradeResult[] = ["WIN", "LOSS", "BREAKEVEN", "OPEN"];
-const CSV_EMOTIONS: readonly EmotionState[] = ["Disciplined", "FOMO", "Impulsive", "Anxious", "Calm", "Greedy"];
+const CSV_EMOTIONS: readonly EmotionState[] = ["Disciplined", "FOMO", "Impulsive", "Anxious", "Calm"];
 const CSV_PNL_UNITS: readonly PnlUnit[] = ["USD", "PERCENT"];
 
 /** Normalise un en-tête pour la correspondance : espaces superflus et casse ignorés. */
@@ -722,8 +722,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30">🤯 Anxieux</span>;
       case "Calm":
         return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">🎯 Calme</span>;
-      case "Greedy":
-        return <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-yellow-500/10 text-yellow-400 border border-yellow-500/30">💰 Avarice</span>;
       default:
         return <span className="text-[11px] text-slate-400">{emotion}</span>;
     }
@@ -1600,14 +1598,13 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">État Émotionnel Lors du Trade</label>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                   {[
                     { id: "Disciplined", label: "🧘 Discipliné" },
                     { id: "FOMO", label: "🚀 FOMO" },
                     { id: "Impulsive", label: "⚡ Impulsif" },
                     { id: "Anxious", label: "🤯 Anxieux" },
                     { id: "Calm", label: "🎯 Calme" },
-                    { id: "Greedy", label: "💰 Avarice" },
                   ].map((item) => (
                     <button
                       key={item.id}
