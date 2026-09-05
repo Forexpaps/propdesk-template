@@ -33,19 +33,14 @@ export const initialTraderBadges: TraderBadge[] = [
     unit: "trades",
     rewardXP: 300,
   },
-  {
-    id: "badge-3",
-    title: "Prop Firm Challenge Ready",
-    description: "Atteindre 10% de profit virtuel en backtest sans jamais dépasser 10% de Drawdown Max.",
-    iconName: "Zap",
-    category: "PROPFIRM",
-    unlocked: false,
-    progressPercentage: 0,
-    currentValue: 10,
-    targetValue: 10,
-    unit: "% profit",
-    rewardXP: 450,
-  },
+  // `badge-3` (« Prop Firm Challenge Ready ») retiré : son critère portait sur
+  // un profit « en backtest », module qui n'existe plus dans l'application —
+  // il serait donc resté à 0 % indéfiniment, comme `badge-2` (Diplômé SMC) et
+  // `badge-9` (Examen SMC), tous deux liés aux modules cours/examen supprimés.
+  // Il pourrait revenir un jour sur des données réelles (profit et drawdown du
+  // compte, tous deux déjà calculés par `computePerformanceStats`), mais cela
+  // demanderait de passer le portefeuille à `computeBadgeProgress`, qui ne
+  // reçoit aujourd'hui que les trades.
   {
     id: "badge-4",
     title: "Trader Discipliné (Zero FOMO)",

@@ -158,6 +158,12 @@ async function backfillMissingBadges(dataUserId: string): Promise<void> {
  * convention du catalogue. Les resynchroniser écraserait la progression déjà
  * acquise d'un compte (le fondateur actuel en a plusieurs) à chaque
  * changement du catalogue.
+ *
+ * Les badges ABSENTS du catalogue sont en revanche retirés. Sans cette purge,
+ * un badge supprimé de `mockData.ts` survivait indéfiniment dans les bases
+ * existantes : c'est ainsi que « Diplômé SMC Horizon » et « Examen SMC 80+ »
+ * y traînaient encore bien après le retrait des modules cours et examen,
+ * bloqués à 0 % et impossibles à faire disparaître depuis l'interface.
  */
 async function syncBadgeCatalog(dataUserId: string): Promise<void> {
   const existing = await listCollection<{
@@ -168,16 +174,26 @@ async function syncBadgeCatalog(dataUserId: string): Promise<void> {
   }>("badges", dataUserId);
   const byId = new Map(initialTraderBadges.map((def) => [def.id, def]));
 
-  let changed = false;
-  const next = existing.map((badge) => {
-    const def = byId.get(badge.id);
-    if (!def) return badge;
-    const synced = { ...def, unlocked: badge.unlocked, unlockedAt: badge.unlockedAt };
-    if (JSON.stringify(synced) === JSON.stringify(badge)) return badge;
-    changed = true;
-    return synced;
-  });
+  // Une base vide est amorcée ailleurs (`backfillMissingBadges`) : purger ici
+  // reviendrait à effacer la collection avant qu'elle n'ait été peuplée.
+  if (existing.length === 0) return;
 
+  const retires = existing.filter((badge) => !byId.has(badge.id));
+
+  let changed = retires.length > 0;
+  const next = existing
+    .filter((badge) => byId.has(badge.id))
+    .map((badge) => {
+      const def = byId.get(badge.id)!;
+      const synced = { ...def, unlocked: badge.unlocked, unlockedAt: badge.unlockedAt };
+      if (JSON.stringify(synced) === JSON.stringify(badge)) return badge;
+      changed = true;
+      return synced;
+    });
+
+  if (retires.length > 0) {
+    console.log(`[propdesk] Badges retirés du catalogue : ${retires.map((b) => b.id).join(", ")}`);
+  }
   if (changed) await replaceCollection("badges", next, dataUserId);
 }
 
