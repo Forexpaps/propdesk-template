@@ -266,7 +266,7 @@ const MISTAKE_OPTIONS: TradeMistake[] = [
   "Revenge trading",
   "FOMO / Chasing",
   "Pas de plan de trade",
-  "Sur-trading",
+  "Over-trading",
 ];
 
 /**

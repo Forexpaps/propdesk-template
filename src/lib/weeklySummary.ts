@@ -12,7 +12,7 @@ const MISTAKE_PHRASES: Record<TradeMistake, string> = {
   "Revenge trading": "le revenge trading après une perte",
   "FOMO / Chasing": "le FOMO (entrées après un mouvement déjà lancé)",
   "Pas de plan de trade": "le respect d'un plan de trade défini à l'avance",
-  "Sur-trading": "la fréquence de prise de position (sur-trading)",
+  "Over-trading": "la fréquence de prise de position (over-trading)",
 };
 
 const SESSIONS_TARGET = 5;

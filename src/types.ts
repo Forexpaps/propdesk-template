@@ -17,7 +17,7 @@ export type TradeMistake =
   | "Revenge trading"
   | "FOMO / Chasing"
   | "Pas de plan de trade"
-  | "Sur-trading";
+  | "Over-trading";
 /**
  * Unité du champ `Trade.pnl`. Choisie librement par qui saisit le trade,
  * jamais déduite ni convertie — voir le commentaire de `Trade.pnl`.
