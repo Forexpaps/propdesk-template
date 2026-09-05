@@ -5,6 +5,9 @@ import {
   Filter,
   ArrowUpRight,
   ArrowDownRight,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
   Trash2,
   Zap,
   Tag,
@@ -34,6 +37,8 @@ import {
 import { formatCurrency, parsePriceInput } from "../lib/format";
 import { resizeChartScreenshot } from "../lib/image";
 import { computeJournalSummary } from "../lib/performanceStats";
+import { confirmDialog } from "../lib/confirmDialog";
+import { periodStart, sortTrades, PeriodPreset, SortKey, SortState } from "../lib/journalFilters";
 import { Select } from "./Select";
 
 /** Valeur du sélecteur de compte quand aucun n'est choisi. */
@@ -280,11 +285,22 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   setups = [],
   plans = [],
 }) => {
-  const [searchPair, setSearchPair] = useState("");
+  // Nommé `searchQuery` et non `searchPair` : la recherche couvre la paire, la
+  // stratégie, les notes et le nom du compte.
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedMarket, setSelectedMarket] = useState<string>("Tous");
   const [selectedResult, setSelectedResult] = useState<string>("Tous");
   const [selectedEmotion, setSelectedEmotion] = useState<string>("Tous");
   const [selectedAccount, setSelectedAccount] = useState<string>(TOUS_COMPTES);
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodPreset>("all");
+
+  /**
+   * Colonne de tri, ou `null` pour l'ordre naturel de la collection : les trades
+   * les plus récemment SAISIS en tête (App.tsx insère en tête). Ce n'est pas un
+   * tri par date — c'est « ce que je viens d'écrire est en haut » — d'où le fait
+   * que ce soit l'état par défaut et non un tri sur `date`.
+   */
+  const [sort, setSort] = useState<SortState | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   /**
@@ -646,6 +662,21 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     setEditingTrade(null);
   };
 
+  /**
+   * La suppression d'un trade est immédiate et irréversible : `handleDeleteTrade`
+   * (App.tsx) retire l'entrée de la collection, qui part ensuite au serveur — ni
+   * corbeille, ni annulation. Le bouton vivant dans une ligne de tableau, un clic
+   * mal placé détruisait une saisie sans le moindre garde-fou, alors que
+   * supprimer un plan de trading ou un compte demande déjà confirmation.
+   */
+  const demanderSuppression = async (trade: Trade) => {
+    const ok = await confirmDialog(
+      `Supprimer le trade ${trade.pair} du ${trade.date} ? Cette action est irréversible.`,
+      { title: "Supprimer ce trade", confirmLabel: "Supprimer", danger: true }
+    );
+    if (ok) onDeleteTrade(trade.id);
+  };
+
   // Applique une ébauche venue du calculateur / de l'analyseur de setup, puis ouvre le formulaire.
   // Seules les clés fournies écrasent les valeurs par défaut ci-dessus.
   useEffect(() => {
@@ -673,14 +704,22 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     onPrefillConsumed?.();
   }, [prefillDraft, onPrefillConsumed]);
 
-  // Calculate Summary Statistics — partagé avec l'export PDF, voir
-  // src/lib/performanceStats.ts.
-  const { totalTrades, winTrades, lossTrades, breakevenTrades, winRate, totalPnL, profitFactor, avgRR, disciplineEmoPercent } =
-    computeJournalSummary(trades);
+  // Terme normalisé UNE fois, et non à chaque trade × chaque champ.
+  const terme = searchQuery.trim().toLowerCase();
+
+  // Borne de période calculée une fois par rendu, hors du prédicat : appeler
+  // `new Date()` par trade serait inutile et non déterministe au passage de
+  // minuit.
+  const debutPeriode = periodStart(selectedPeriod);
 
   // Filtering
   const filteredTrades = trades.filter((t) => {
-    const matchesPair = t.pair.toLowerCase().includes(searchPair.toLowerCase()) || t.strategy.toLowerCase().includes(searchPair.toLowerCase());
+    // Terme vide court-circuité : évite quatre `.includes("")` par trade.
+    const matchesTerme =
+      terme === "" ||
+      [t.pair, t.strategy, t.notes ?? "", nomDuCompte(t.accountId) ?? ""].some((champ) =>
+        champ.toLowerCase().includes(terme)
+      );
     const matchesMarket = selectedMarket === "Tous" || t.marketCategory === selectedMarket;
     const matchesResult = selectedResult === "Tous" || t.result === selectedResult;
     const matchesEmotion = selectedEmotion === "Tous" || t.emotion === selectedEmotion;
@@ -692,8 +731,84 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       (selectedAccount === NON_RATTACHES
         ? nomDuCompte(t.accountId) === null
         : t.accountId === selectedAccount);
-    return matchesPair && matchesMarket && matchesResult && matchesEmotion && matchesAccount;
+    // Fenêtre appliquée à la date d'ENTRÉE : un trade ouvert le 30 mars et
+    // clôturé le 2 avril compte pour mars. Même convention que
+    // `computePnlByPeriod`. Une date illisible est exclue plutôt que comptée
+    // au hasard.
+    const dateEntree = new Date(`${t.date}T00:00:00`);
+    const matchesPeriode =
+      !debutPeriode || (!Number.isNaN(dateEntree.getTime()) && dateEntree >= debutPeriode);
+    return matchesTerme && matchesMarket && matchesResult && matchesEmotion && matchesAccount && matchesPeriode;
   });
+
+  // Statistiques sur l'ENSEMBLE FILTRÉ, pas sur tous les trades : des cartes
+  // qui continuent d'afficher les chiffres du portefeuille entier pendant
+  // qu'on filtre sur un compte ou sur un mois ne répondent à aucune question
+  // réelle. Sur `filteredTrades` et jamais `sortedTrades` : l'ordre d'affichage
+  // n'a évidemment aucun effet sur une moyenne, et lui passer le tableau trié
+  // laisserait croire le contraire au prochain lecteur.
+  const { totalTrades, winTrades, lossTrades, breakevenTrades, winRate, totalPnL, profitFactor, avgRR, disciplineEmoPercent } =
+    computeJournalSummary(filteredTrades);
+
+  const sortedTrades = sortTrades(filteredTrades, sort);
+
+  // Pilote l'indicateur « N trades filtrés sur M » et le bouton de remise à
+  // zéro : sans repère visible, un filtre oublié fausse durablement la lecture
+  // des cartes ci-dessus.
+  const filtresActifs =
+    terme !== "" ||
+    selectedMarket !== "Tous" ||
+    selectedResult !== "Tous" ||
+    selectedEmotion !== "Tous" ||
+    selectedAccount !== TOUS_COMPTES ||
+    selectedPeriod !== "all";
+
+  const reinitialiserFiltres = () => {
+    setSearchQuery("");
+    setSelectedMarket("Tous");
+    setSelectedResult("Tous");
+    setSelectedEmotion("Tous");
+    setSelectedAccount(TOUS_COMPTES);
+    setSelectedPeriod("all");
+  };
+
+  /**
+   * Cycle à trois temps : décroissant → croissant → retour à l'ordre naturel.
+   * Sans ce troisième temps, on ne peut plus jamais revenir à la vue par défaut
+   * (les plus récemment saisis en tête) sans recharger la page.
+   */
+  const basculerTri = (key: SortKey) =>
+    setSort((prev) =>
+      prev?.key !== key ? { key, dir: "desc" } : prev.dir === "desc" ? { key, dir: "asc" } : null
+    );
+
+  /**
+   * En-tête de colonne triable. Le libellé est un vrai `<button>` (et non un
+   * `onClick` sur le `<th>`) pour rester atteignable au clavier, et `aria-sort`
+   * annonce l'état courant aux lecteurs d'écran.
+   */
+  const renderThTri = (key: SortKey, label: string, alignRight = false) => {
+    const actif = sort?.key === key;
+    const Icone = !actif ? ArrowUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
+    return (
+      <th
+        className={`py-3.5 px-4 ${alignRight ? "text-right" : ""}`}
+        aria-sort={!actif ? "none" : sort.dir === "asc" ? "ascending" : "descending"}
+      >
+        <button
+          type="button"
+          onClick={() => basculerTri(key)}
+          className={`inline-flex items-center gap-1 hover:text-[#00E676] transition-colors ${
+            alignRight ? "justify-end" : ""
+          } ${actif ? "text-[#00E676]" : ""}`}
+          title={`Trier par ${label}`}
+        >
+          {label}
+          <Icone className={`w-3 h-3 ${actif ? "" : "opacity-30"}`} />
+        </button>
+      </th>
+    );
+  };
 
   const getResultLabel = (result: TradeResult): string => {
     switch (result) {
@@ -1004,7 +1119,17 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       </div>
 
       {/* Metric Cards Bar */}
-      <SectionHeader>Performance</SectionHeader>
+      {/* Les cartes ci-dessous portent sur l'ensemble filtré : sans ce rappel,
+          un filtre laissé actif fait croire à une chute (ou à un bond) du PnL. */}
+      <SectionHeader>
+        Performance
+        {filtresActifs && (
+          <span className="ml-2 text-[11px] font-semibold text-amber-400">
+            · {filteredTrades.length} trade{filteredTrades.length > 1 ? "s" : ""} filtré
+            {filteredTrades.length > 1 ? "s" : ""} sur {trades.length}
+          </span>
+        )}
+      </SectionHeader>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1">
           <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Taux de Réussite</div>
@@ -1049,9 +1174,9 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            value={searchPair}
-            onChange={(e) => setSearchPair(e.target.value)}
-            placeholder="Paire ou stratégie (ex: EUR/USD)..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Paire, stratégie, note ou compte..."
             className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg pl-9 pr-4 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-500"
           />
         </div>
@@ -1096,6 +1221,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             <option value="WIN">Gagnants (WIN)</option>
             <option value="LOSS">Perdants (LOSS)</option>
             <option value="BREAKEVEN">Breakeven</option>
+            <option value="OPEN">Positions ouvertes</option>
           </Select>
 
           <Select
@@ -1110,6 +1236,29 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             <option value="Anxious">Anxieux</option>
             <option value="Calm">Calme</option>
           </Select>
+
+          <Select
+            value={selectedPeriod}
+            onChange={(e) => setSelectedPeriod(e.target.value as PeriodPreset)}
+            className="bg-[#0D1110] border border-[#1B2320] rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="all">Période : tout</option>
+            <option value="month">Ce mois</option>
+            <option value="quarter">Ce trimestre</option>
+            <option value="year">Cette année</option>
+          </Select>
+
+          {filtresActifs && (
+            <button
+              type="button"
+              onClick={reinitialiserFiltres}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#0D1110] border border-[#1B2320] text-xs text-slate-400 hover:text-[#00E676] hover:border-[#00E676]/40 transition-colors"
+              title="Réinitialiser tous les filtres"
+            >
+              <X className="w-3.5 h-3.5" />
+              Réinitialiser
+            </button>
+          )}
         </div>
       </div>
 
@@ -1120,14 +1269,14 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           <table className="w-full text-left text-xs text-slate-300">
             <thead className="bg-[#0D1110]/80 text-slate-400 font-semibold border-b border-[#1B2320]">
               <tr>
-                <th className="py-3.5 px-4">Entrée / Sortie</th>
+                {renderThTri("date", "Entrée / Sortie")}
                 <th className="py-3.5 px-4">Actif / Paire</th>
                 <th className="py-3.5 px-4">Compte</th>
                 <th className="py-3.5 px-4">Direction</th>
                 <th className="py-3.5 px-4">Entrée → TP / SL</th>
                 <th className="py-3.5 px-4">Stratégie & Émotion</th>
-                <th className="py-3.5 px-4">R:R</th>
-                <th className="py-3.5 px-4 text-right">PnL Net</th>
+                {renderThTri("rr", "R:R")}
+                {renderThTri("pnl", "PnL Net", true)}
                 <th className="py-3.5 px-4 text-center">Actions</th>
               </tr>
             </thead>
@@ -1139,7 +1288,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredTrades.map((trade) => (
+                sortedTrades.map((trade) => (
                   <tr key={trade.id} className="hover:bg-[#151D1A]/80 transition-colors">
                     {/* Horodatage d'entrée puis de sortie. Sans date de sortie,
                         la position est considérée encore ouverte. */}
@@ -1276,7 +1425,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                         {/* Delete trade */}
                         {!readOnly && (
                           <button
-                            onClick={() => onDeleteTrade(trade.id)}
+                            onClick={() => void demanderSuppression(trade)}
                             className="p-1.5 rounded-lg bg-[#1B2320] text-slate-400 hover:text-rose-400 hover:bg-[#232D29]"
                             title="Supprimer la saisie"
                           >
