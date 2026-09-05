@@ -124,10 +124,11 @@ src/
   lib/
     api.ts                   client typé de l'API
     badges.ts                calcul de progression des badges
+    journalFilters.ts        tri des colonnes et fenêtres de période du Journal (logique pure)
     pendingChanges.ts        suivi des modifications non encore envoyées au serveur (mode hors ligne)
     planCompliance.ts        vérification du respect du plan de trading
     walletAlerts.ts / walletStats.ts   alertes et calculs sur les comptes de trading
-    performanceStats.ts      calculs de rentabilité
+    performanceStats.ts      calculs de rentabilité, durée des trades, capture de la cible, ventilation par plan
     weeklySummary.ts         synthèse hebdomadaire
     format.ts / image.ts / confirmDialog.tsx   utilitaires divers
   components/
@@ -228,6 +229,33 @@ quart d'heure, `/api/auth/setup` 5 par quart d'heure.
   `computeBadgeProgress`) ; les badges qui reposent sur une donnée non suivie
   (modules cours, examen, % de risque déclaratif...) restent `trackable:
   false` et affichent "Suivi pas encore disponible pour ce badge".
+- **Le formulaire du Journal ne pré-remplit plus rien.** Il proposait un trade
+  EUR/USD complet (entrée 1.085, SL 1.083, TP 1.091, lot 1, 14h30, émotion
+  « Discipliné ») : un champ non écrasé partait en base comme une vraie saisie,
+  et l'émotion par défaut faisait monter toute seule la discipline émotionnelle
+  — la statistique même qu'on cherche à mesurer. Seuls restent la date du jour
+  (bornée) et les trois `<Select>` marché / sens / unité. `result` et `emotion`
+  sont typés `| ""` **côté formulaire uniquement** (`Trade` reste strict) et
+  `handleFormSubmit` refuse d'enregistrer tant que les deux ne sont pas choisis.
+  Ne pas « rétablir des valeurs par défaut pratiques » : c'est le bug d'origine.
+- **Les statistiques du Journal portent sur l'ensemble FILTRÉ**
+  (`computeJournalSummary(filteredTrades)`), jamais sur `sortedTrades` — l'ordre
+  d'affichage ne change aucune moyenne. `MainDashboard.tsx` et le rapport PDF
+  continuent, eux, de calculer sur tous les trades : c'est voulu, les deux vues
+  peuvent donc afficher des chiffres différents (d'où l'indicateur « N trades
+  filtrés sur M » dans le Journal).
+- **`exitPrice` absent ou nul = « pas de prix de sortie ».** `parsePriceInput("")`
+  vaut 0, qui s'écrivait en base comme une cotation à zéro — impossible sur tous
+  les marchés du Journal. Le champ n'est plus persisté sur une position ouverte
+  ni quand il est laissé vide, et `tradeExitRatios` écarte les 0 hérités des
+  saisies antérieures.
+- **« Capture de la cible », pas « efficacité de sortie ».** Sans MFE (plus haut
+  atteint en position), on ne peut pas mesurer ce que le marché a offert —
+  seulement la part de l'objectif planifié réellement encaissée. Le nom de la
+  métrique reflète ce qu'elle mesure vraiment. Gagnants et perdants sont agrégés
+  séparément, regroupés par `result` (choisi explicitement par l'utilisateur) et
+  **jamais** par le signe du ratio : un WIN à capture négative est une
+  incohérence de saisie qu'il faut laisser voir, pas reclasser en douce.
 
 ## Lancement
 
