@@ -40,6 +40,14 @@ const LABELS: Record<string, string> = {
   // périmé au rechargement suivant, sans jamais passer par
   // `PendingChangesBanner`.
   horizon_setups: "Setups",
+  // Même piège que `horizon_setups` juste au-dessus, et pour la même raison :
+  // les plans de trading sont devenus une collection synchronisée (ils
+  // vivaient avant en localStorage seul). Sans cette entrée, `markPending`
+  // les ignorait — une modification de plan qui échoue à partir (coupure
+  // réseau, conflit de version) n'était ni signalée par
+  // `PendingChangesBanner`, ni retenue par le garde-fou de déconnexion, et
+  // repartait écrasée par l'état serveur périmé au rechargement suivant.
+  horizon_trading_plans: "Plans de trading",
 };
 
 /** Clé `localStorage` → collection serveur. Absent pour profil. */

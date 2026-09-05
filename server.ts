@@ -158,8 +158,34 @@ async function startServer() {
     });
   }
 
-  httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`Serveur Académie Horizon démarré sur http://localhost:${PORT}`);
+  /**
+   * Interface d'écoute — `127.0.0.1` par défaut, c'est-à-dire cet ordinateur
+   * et lui seul.
+   *
+   * Le serveur écoutait auparavant sur `0.0.0.0`, donc sur TOUTES les
+   * interfaces réseau : sur un Wi-Fi partagé (café, coworking, hôtel,
+   * colocation), n'importe qui sur le même réseau atteignait le journal à
+   * `http://<ip-de-la-machine>:3000`. Et comme rien n'est chiffré en local
+   * (pas de TLS, cookie de session sans `secure` — ce qui est correct pour
+   * localhost), un mot de passe saisi depuis un autre appareil circulait en
+   * clair sur ce réseau. Hérité de l'époque où l'app était pensée pour être
+   * déployée derrière un proxy ; sans objet depuis qu'elle ne tourne plus
+   * qu'en local.
+   *
+   * `HOST=0.0.0.0` reste possible pour un usage délibéré (consulter le
+   * journal depuis son téléphone sur son propre réseau), mais c'est désormais
+   * un choix explicite et non le défaut.
+   */
+  const HOST = process.env.HOST || "127.0.0.1";
+
+  httpServer.listen(PORT, HOST, () => {
+    console.log(`Serveur PropDesk démarré sur http://localhost:${PORT}`);
+    if (HOST !== "127.0.0.1" && HOST !== "localhost") {
+      console.warn(
+        `⚠️  Le serveur écoute sur ${HOST} : il est joignable par les autres appareils du réseau, ` +
+          "sans chiffrement. À n'utiliser que sur un réseau de confiance."
+      );
+    }
   });
 }
 

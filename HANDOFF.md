@@ -257,6 +257,22 @@ quart d'heure, `/api/auth/setup` 5 par quart d'heure.
   **jamais** par le signe du ratio : un WIN à capture négative est une
   incohérence de saisie qu'il faut laisser voir, pas reclasser en douce.
 
+- **Le serveur n'écoute que sur `127.0.0.1`.** Il écoutait sur `0.0.0.0`
+  (toutes les interfaces réseau), héritage de l'époque où l'app était pensée
+  pour un déploiement derrière un proxy : sur un Wi-Fi partagé, n'importe qui
+  atteignait le journal à `http://<ip-de-la-machine>:3000`, et un mot de passe
+  saisi depuis un autre appareil circulait en clair (pas de TLS en local).
+  `HOST=0.0.0.0` reste possible pour un usage délibéré (consulter le journal
+  depuis son téléphone), mais c'est un choix explicite, pas le défaut.
+- **Toute nouvelle collection synchronisée doit être déclarée à TROIS
+  endroits**, sous peine de perte de données silencieuse : `TABLES`
+  (`server/repositories.ts`), `LEGACY_KEYS.collections`
+  (`src/hooks/useServerSync.ts`, sinon pas de cache hors ligne) et `LABELS`
+  (`src/lib/pendingChanges.ts`). Ce dernier est le plus traître :
+  `markPending` ignore en silence toute clé absente de `LABELS`, donc une
+  écriture échouée n'est ni signalée, ni retenue à la déconnexion, et repart
+  écrasée par l'état serveur au rechargement suivant.
+
 ## Lancement
 
 Application pensée pour tourner **uniquement en local**, sur cet ordinateur :
