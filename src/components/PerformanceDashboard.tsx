@@ -12,14 +12,30 @@ import {
   CartesianGrid,
 } from "recharts";
 import { LineChart, AlertTriangle, RotateCcw } from "lucide-react";
-import { Trade, StudentProfile } from "../types";
-import { formatCurrency } from "../lib/format";
-import { computePerformanceStats, computePnlByPeriod, isRealizedDollarTrade } from "../lib/performanceStats";
+import { Trade, StudentProfile, TradingPlanData } from "../types";
+import { formatCurrency, formatDuration } from "../lib/format";
+import {
+  computePerformanceStats,
+  computePnlByPeriod,
+  computeDurationStats,
+  computeExitEfficiency,
+  computePlanDetail,
+  isRealizedDollarTrade,
+} from "../lib/performanceStats";
 
 interface PerformanceDashboardProps {
   student: StudentProfile;
   trades: Trade[];
+  /** Plans de trading, pour la ventilation « Détail par plan ». Optionnel : la vue reste utilisable sans aucun plan défini. */
+  plans?: TradingPlanData;
 }
+
+/**
+ * En dessous de ce nombre de trades comptés, les ratios de sortie affichent
+ * « pas assez de données » plutôt qu'un pourcentage : sur deux ou trois trades,
+ * une moyenne de capture ne mesure rien mais se lit comme un verdict.
+ */
+const MIN_ECHANTILLON_SORTIE = 5;
 
 const tooltipStyle = {
   contentStyle: { backgroundColor: "#0D1110", borderColor: "#1B2320", borderRadius: "10px", fontSize: "12px" },
@@ -135,10 +151,13 @@ function computeHeatmap(trades: Trade[]): HeatmapCellStats[][] {
   return grid;
 }
 
-export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ student, trades }) => {
+export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ student, trades, plans = [] }) => {
   const stats = computePerformanceStats(student, trades);
   const heatmap = useMemo(() => computeHeatmap(trades), [trades]);
   const pnlByPeriod = useMemo(() => computePnlByPeriod(trades), [trades]);
+  const duration = useMemo(() => computeDurationStats(trades), [trades]);
+  const exit = useMemo(() => computeExitEfficiency(trades), [trades]);
+  const planDetail = useMemo(() => computePlanDetail(trades, plans), [trades, plans]);
   const {
     equityData,
     totalTrades,
@@ -267,6 +286,67 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
             />
           );
         })}
+      </div>
+
+      {/* Exécution : ce que disent les prix de sortie et les horodatages déjà
+          saisis, jusqu'ici jamais exploités. Chaque carte affiche la taille de
+          son échantillon — sur un journal qui démarre, mieux vaut « pas assez
+          de données » qu'un pourcentage tiré de deux trades. */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard
+          label="Durée Moyenne"
+          value={duration.avgMinutes === null ? "—" : formatDuration(duration.avgMinutes)}
+          valueClassName="text-blue-400"
+          secondary={
+            duration.countedTrades === 0
+              ? "Aucune sortie horodatée"
+              : `${duration.countedTrades} trade${duration.countedTrades > 1 ? "s" : ""}${
+                  duration.skippedTrades > 0 ? ` · ${duration.skippedTrades} sans horaire` : ""
+                }`
+          }
+        />
+        <StatCard
+          label="Capture du TP"
+          value={
+            exit.captureMoyenneWins === null || exit.winsComptes < MIN_ECHANTILLON_SORTIE
+              ? "—"
+              : `${Math.round(exit.captureMoyenneWins * 100)}%`
+          }
+          valueClassName={
+            exit.captureMoyenneWins !== null && exit.captureMoyenneWins >= 0.9
+              ? "text-[#00E676]"
+              : "text-amber-400"
+          }
+          secondary={
+            exit.winsComptes < MIN_ECHANTILLON_SORTIE
+              ? `Pas assez de données (${exit.winsComptes}/${MIN_ECHANTILLON_SORTIE})`
+              : `sur ${exit.winsComptes} gagnant${exit.winsComptes > 1 ? "s" : ""}`
+          }
+        />
+        <StatCard
+          label="Perte vs SL"
+          value={
+            exit.risqueMoyenLosses === null || exit.lossesComptes < MIN_ECHANTILLON_SORTIE
+              ? "—"
+              : `${Math.round(exit.risqueMoyenLosses * 100)}%`
+          }
+          valueClassName={
+            exit.risqueMoyenLosses !== null && exit.risqueMoyenLosses > 1
+              ? "text-rose-400"
+              : "text-[#00E676]"
+          }
+          secondary={
+            exit.lossesComptes < MIN_ECHANTILLON_SORTIE
+              ? `Pas assez de données (${exit.lossesComptes}/${MIN_ECHANTILLON_SORTIE})`
+              : `sur ${exit.lossesComptes} perdant${exit.lossesComptes > 1 ? "s" : ""}`
+          }
+        />
+        <StatCard
+          label="Sorties Avant TP"
+          value={exit.winsComptes === 0 ? "—" : `${exit.winsSortisAvantTp} / ${exit.winsComptes}`}
+          valueClassName="text-amber-400"
+          secondary="gagnants coupés avant la cible"
+        />
       </div>
 
       {/* Courbe de capital — pleine largeur */}
@@ -517,6 +597,64 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
                     >
                       {row.pnl >= 0 ? "+" : ""}
                       {formatCurrency(row.pnl)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* Détail par plan de trading — même forme que « Détail par Actif ».
+          « Hors plan » couvre les trades sans plan choisi ET ceux dont le plan
+          a été supprimé depuis. À noter : l'import CSV n'attribue aucun plan
+          (la colonne n'existe ni à l'export ni à l'import), donc tout trade
+          importé se retrouve ici. */}
+      <Card className="p-5 space-y-4">
+        <SectionHeader color="bg-indigo-500">Détail par Plan de Trading</SectionHeader>
+        {planDetail.length === 0 ? (
+          <EmptyState>
+            Rattache tes trades à un plan de trading pour comparer leurs performances.
+          </EmptyState>
+        ) : (
+          <div className="overflow-x-auto -mx-1">
+            <table className="w-full text-sm min-w-[480px]">
+              <thead>
+                <tr className="border-b border-[#1B2320]">
+                  <th className="text-left px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Plan</th>
+                  <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Trades</th>
+                  <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Win Rate</th>
+                  <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">PnL Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {planDetail.map((row) => (
+                  <tr key={row.planId ?? "__hors_plan__"} className="border-b border-[#1B2320] last:border-b-0">
+                    <td className={`px-3 py-3 font-bold ${row.planId === null ? "text-slate-500 italic" : "text-white"}`}>
+                      {row.planName}
+                    </td>
+                    <td className="px-3 py-3 text-right text-slate-300 font-mono">{row.tradesCount}</td>
+                    {/* Un plan sans aucun trade afficherait « 0% » en rouge, ce
+                        qui se lirait comme un mauvais résultat au lieu d'une
+                        absence de données. */}
+                    <td
+                      className={`px-3 py-3 text-right font-mono font-bold ${
+                        row.tradesCount === 0
+                          ? "text-slate-600"
+                          : row.winRate >= 50
+                          ? "text-[#00E676]"
+                          : "text-rose-400"
+                      }`}
+                    >
+                      {row.tradesCount === 0 ? "—" : `${row.winRate}%`}
+                    </td>
+                    <td
+                      className={`px-3 py-3 text-right font-mono font-bold ${
+                        row.tradesCount === 0 ? "text-slate-600" : row.pnl >= 0 ? "text-[#00E676]" : "text-rose-400"
+                      }`}
+                    >
+                      {row.tradesCount === 0 ? "—" : `${row.pnl >= 0 ? "+" : ""}${formatCurrency(row.pnl)}`}
                     </td>
                   </tr>
                 ))}

@@ -34,9 +34,9 @@ import {
   TradingPlan,
   TradeScreenshot,
 } from "../types";
-import { formatCurrency, parsePriceInput } from "../lib/format";
+import { formatCurrency, formatDuration, parsePriceInput } from "../lib/format";
 import { resizeChartScreenshot } from "../lib/image";
-import { computeJournalSummary } from "../lib/performanceStats";
+import { computeJournalSummary, tradeDurationMinutes } from "../lib/performanceStats";
 import { confirmDialog } from "../lib/confirmDialog";
 import { periodStart, sortTrades, PeriodPreset, SortKey, SortState } from "../lib/journalFilters";
 import { Select } from "./Select";
@@ -1346,6 +1346,19 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                           Position ouverte
                         </div>
                       )}
+                      {/* Durée de détention, seulement quand les deux
+                          horodatages sont complets — jamais reconstituée à
+                          partir d'une heure manquante (voir
+                          `tradeDurationMinutes`). Affichée ici plutôt que dans
+                          une 10e colonne : le tableau est déjà large. */}
+                      {(() => {
+                        const duree = tradeDurationMinutes(trade);
+                        return duree === null ? null : (
+                          <div className="text-[10px] text-slate-500 font-mono pl-4">
+                            ⏱ {formatDuration(duree)}
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Pair & Category */}
@@ -2079,6 +2092,15 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   {selectedChartTrade.exitDate
                     ? `${selectedChartTrade.exitDate} ${selectedChartTrade.exitTime ?? ""}`
                     : "Position ouverte"}
+                </div>
+              </div>
+              <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Durée</div>
+                <div className="text-white font-mono">
+                  {(() => {
+                    const duree = tradeDurationMinutes(selectedChartTrade);
+                    return duree === null ? "—" : formatDuration(duree);
+                  })()}
                 </div>
               </div>
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">

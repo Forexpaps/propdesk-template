@@ -803,6 +803,7 @@ function TraderApp({
             <PerformanceDashboard
               student={displayStudent}
               trades={trades}
+              plans={staffTradingPlan}
             />
           )}
 
