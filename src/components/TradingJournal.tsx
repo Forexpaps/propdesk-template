@@ -232,6 +232,13 @@ const CSV_IMPORT_COLUMNS = [
   "Notes",
 ] as const;
 
+/**
+ * Colonnes reconnues à l'import mais NON exigées : un fichier produit par une
+ * version antérieure de l'export (ou saisi à la main dans un tableur) n'en a
+ * pas, et refuser tout le fichier pour autant serait absurde.
+ */
+const CSV_OPTIONAL_COLUMNS = ["ID", "Plan"] as const;
+
 const CSV_MARKET_CATEGORIES: readonly MarketCategory[] = ["Forex", "Crypto", "Indices", "Matières Premières"];
 const CSV_DIRECTIONS: readonly TradeDirection[] = ["LONG", "SHORT"];
 const CSV_RESULTS: readonly TradeResult[] = ["WIN", "LOSS", "BREAKEVEN", "OPEN"];
@@ -415,6 +422,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       "Ratio RR",
       "Resultat",
       "Strategie",
+      "Plan",
       "Emotion",
       "Erreurs",
       "Notes"
@@ -439,6 +447,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       t.riskRewardRatio,
       t.result,
       csvCell(t.strategy),
+      // Le plan est exporté par son NOM et non son id : un id ne veut rien dire
+      // dans un tableur, et c'est le nom que l'import retrouve (même logique
+      // que la colonne Compte juste au-dessus).
+      csvCell(nomDuPlan(t.tradingPlanId) ?? "Hors plan"),
       t.emotion,
       csvCell((t.mistakes || []).join("; ")),
       csvCell(t.notes || "")
@@ -462,11 +474,19 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
    * tolérer un fichier réordonné ou complété à la main dans Excel/Sheets.
    *
    * Chaque ligne valide devient un NOUVEAU trade (`onAddTrade`) — jamais une
-   * mise à jour. La colonne "ID" de l'export, si présente, est ignorée :
-   * réimporter son propre export ajoute donc des doublons plutôt que de les
-   * fusionner. Une ligne dont un champ obligatoire est manquant ou invalide
+   * mise à jour. La colonne "ID", quand elle est présente, sert uniquement à
+   * ÉCARTER les lignes déjà dans le Journal : réimporter son propre export ne
+   * duplique donc plus rien, et n'ajoute que ce qui manque. Les colonnes "ID"
+   * et "Plan" restent facultatives (`CSV_OPTIONAL_COLUMNS`), un fichier
+   * antérieur ou saisi à la main passant toujours.
+   *
+   * Une ligne dont un champ obligatoire est manquant ou invalide
    * (marché/direction/résultat hors des valeurs connues) est ignorée et
    * comptée à part, jamais bloquante pour le reste du fichier.
+   *
+   * Ce qui ne transite toujours PAS par le CSV : les captures d'écran (des
+   * images en base64 dans un tableur n'auraient aucun sens) — elles restent
+   * dans la sauvegarde JSON, qui est le format de restauration complet.
    */
   const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -485,8 +505,11 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
       const header = rows[0].map(normalizeHeader);
       const columnIndex = Object.fromEntries(
-        CSV_IMPORT_COLUMNS.map((col) => [col, header.indexOf(normalizeHeader(col))])
-      ) as Record<(typeof CSV_IMPORT_COLUMNS)[number], number>;
+        [...CSV_IMPORT_COLUMNS, ...CSV_OPTIONAL_COLUMNS].map((col) => [
+          col,
+          header.indexOf(normalizeHeader(col)),
+        ])
+      ) as Record<(typeof CSV_IMPORT_COLUMNS)[number] | (typeof CSV_OPTIONAL_COLUMNS)[number], number>;
       const missing = CSV_IMPORT_COLUMNS.filter((col) => columnIndex[col] === -1);
       if (missing.length > 0) {
         alert(
@@ -495,10 +518,18 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         return;
       }
 
-      const get = (row: string[], col: (typeof CSV_IMPORT_COLUMNS)[number]) =>
-        (row[columnIndex[col]] ?? "").trim();
+      const get = (
+        row: string[],
+        col: (typeof CSV_IMPORT_COLUMNS)[number] | (typeof CSV_OPTIONAL_COLUMNS)[number]
+      ) => (columnIndex[col] === -1 ? "" : (row[columnIndex[col]] ?? "").trim());
+
+      // Identifiants déjà présents dans le Journal : une ligne qui en porte un
+      // est un trade déjà importé, pas un nouveau. Sans ce garde-fou,
+      // réimporter son propre export dupliquait tout le journal en silence.
+      const idsExistants = new Set(trades.map((t) => t.id));
 
       let imported = 0;
+      let ignoresDoublons = 0;
       const errors: string[] = [];
       // Distinct de `errors` : la ligne EST importée (contrairement à une
       // ligne ignorée), seul son R:R est forcé à 0 faute de distance de
@@ -509,6 +540,15 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
       rows.slice(1).forEach((row, idx) => {
         const ligne = idx + 2; // +2 : 1-indexé + ligne d'en-tête
+
+        // Doublon : ce trade est déjà dans le Journal. Compté à part et non
+        // signalé comme une erreur — réimporter un export complet pour n'en
+        // récupérer que les nouvelles lignes est un usage légitime.
+        const idCsv = get(row, "ID");
+        if (idCsv && idsExistants.has(idCsv)) {
+          ignoresDoublons++;
+          return;
+        }
 
         const pair = get(row, "Paire");
         const date = get(row, "Date Entree");
@@ -546,6 +586,15 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             ? accounts.find((a) => a.name === accountName)?.id
             : undefined;
 
+        // Plan retrouvé par son nom, comme le compte. Un nom inconnu (plan
+        // supprimé, ou fichier venu d'ailleurs) laisse le trade hors plan
+        // plutôt que d'inventer un rattachement.
+        const planName = get(row, "Plan");
+        const tradingPlanId =
+          planName && planName !== "Hors plan"
+            ? plans.find((p) => p.name === planName)?.id
+            : undefined;
+
         const mistakesRaw = get(row, "Erreurs");
         const mistakes = mistakesRaw
           ? (mistakesRaw
@@ -567,6 +616,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           exitDate: get(row, "Date Sortie") || undefined,
           exitTime: get(row, "Heure Sortie") || undefined,
           accountId,
+          tradingPlanId,
           pair,
           marketCategory,
           direction,
@@ -588,6 +638,13 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       });
 
       const parts = [`${imported} trade${imported > 1 ? "s" : ""} importé${imported > 1 ? "s" : ""}.`];
+      if (ignoresDoublons > 0) {
+        parts.push(
+          `${ignoresDoublons} déjà présent${ignoresDoublons > 1 ? "s" : ""} dans le Journal, ignoré${
+            ignoresDoublons > 1 ? "s" : ""
+          }.`
+        );
+      }
       if (errors.length > 0) {
         const affichees = errors.slice(0, 10);
         const reste = errors.length - affichees.length;
