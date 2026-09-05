@@ -344,7 +344,11 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
                             {/* `null` seulement si aucun trade WIN/LOSS dans la
                                 case (uniquement des BE/OPEN) : pas de taux à
                                 afficher plutôt qu'un "null%" littéral. */}
-                            <span className="text-[11px] font-bold text-white leading-none">
+                            <span
+                              className={`text-[11px] font-bold leading-none ${
+                                winRate !== null ? "text-slate-950" : "text-white"
+                              }`}
+                            >
                               {winRate !== null ? `${winRate}%` : "—"}
                             </span>
                             <span className="text-[9px] text-slate-300/80 leading-none mt-0.5">
