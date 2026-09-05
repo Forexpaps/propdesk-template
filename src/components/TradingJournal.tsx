@@ -108,6 +108,56 @@ function isDefaultScreenshotLabel(label: string): boolean {
 }
 
 /**
+ * Valeurs de départ d'une création — recalculées à chaque ouverture (la date du
+ * jour et les ids d'emplacements de capture en dépendent), d'où une fonction et
+ * non une constante.
+ *
+ * **Tout part vide, volontairement.** Ce formulaire proposait auparavant un
+ * trade EUR/USD complet (entrée 1.085, SL 1.083, TP 1.091, lot 1, 14h30) : un
+ * champ non écrasé se retrouvait journalisé comme une vraie saisie, et l'heure
+ * inventée alimentait la heatmap horaire de Rentabilité. Un journal ne vaut que
+ * par l'exactitude de ce qu'on y écrit — mieux vaut un champ à remplir qu'un
+ * chiffre plausible et faux.
+ *
+ * `result` et `emotion` partent eux aussi sans valeur, d'où leur type élargi à
+ * `| ""` : c'est propre au FORMULAIRE, `Trade.result`/`Trade.emotion` restent
+ * stricts et `handleFormSubmit` refuse d'enregistrer tant que les deux ne sont
+ * pas choisis. « Discipliné » par défaut faisait monter tout seul le score de
+ * discipline émotionnelle (voir `computeJournalSummary`), c'est-à-dire
+ * exactement la statistique qu'on cherche à mesurer honnêtement.
+ *
+ * Restent pré-remplis : la date du jour (bornée à aujourd'hui, non falsifiable)
+ * et les trois `<Select>` marché / sens / unité de PnL, qui doivent porter une
+ * valeur et dont le choix est neutre.
+ */
+function formulaireVierge() {
+  return {
+    date: new Date().toISOString().split("T")[0],
+    time: "",
+    exitDate: "",
+    exitTime: "",
+    accountId: SANS_COMPTE,
+    pnl: "",
+    pnlUnit: "USD" as PnlUnit,
+    pair: "",
+    marketCategory: "Forex" as MarketCategory,
+    direction: "LONG" as TradeDirection,
+    entryPrice: "",
+    stopLoss: "",
+    takeProfit: "",
+    exitPrice: "",
+    lotSize: "",
+    strategy: "",
+    tradingPlanId: SANS_PLAN,
+    result: "" as TradeResult | "",
+    emotion: "" as EmotionState | "",
+    mistakes: [] as TradeMistake[],
+    notes: "",
+    chartUrls: toScreenshotSlots(null),
+  };
+}
+
+/**
  * Parseur CSV minimal, miroir exact de `csvCell` côté export : guillemets
  * doublés pour échapper un guillemet interne, cellules entre guillemets
  * pouvant contenir des virgules ou des sauts de ligne. Volontairement
@@ -561,59 +611,8 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     reader.readAsText(file, "utf-8");
   };
 
-  // New Trade Form state
-  const [formData, setFormData] = useState({
-    date: new Date().toISOString().split("T")[0],
-    time: "14:30",
-    exitDate: new Date().toISOString().split("T")[0],
-    exitTime: "16:00",
-    accountId: SANS_COMPTE,
-    pnl: "0",
-    pnlUnit: "USD" as PnlUnit,
-    pair: "EUR/USD",
-    marketCategory: "Forex" as MarketCategory,
-    direction: "LONG" as TradeDirection,
-    entryPrice: "1.0850",
-    stopLoss: "1.0830",
-    takeProfit: "1.0910",
-    exitPrice: "1.0910",
-    lotSize: "1",
-    strategy: "",
-    tradingPlanId: SANS_PLAN,
-    result: "OPEN" as TradeResult,
-    emotion: "Disciplined" as EmotionState,
-    mistakes: [] as TradeMistake[],
-    notes: "Validation FVG H1 + Chasse de liquidité.",
-    chartUrls: toScreenshotSlots({
-      chartUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=800",
-    }),
-  });
-
-  /** Valeurs par défaut d'une création. Recalculées à chaque ouverture. */
-  const formulaireVierge = () => ({
-    date: new Date().toISOString().split("T")[0],
-    time: "14:30",
-    exitDate: new Date().toISOString().split("T")[0],
-    exitTime: "16:00",
-    accountId: SANS_COMPTE,
-    pnl: "0",
-    pnlUnit: "USD" as PnlUnit,
-    pair: "EUR/USD",
-    marketCategory: "Forex" as MarketCategory,
-    direction: "LONG" as TradeDirection,
-    entryPrice: "1.085",
-    stopLoss: "1.083",
-    takeProfit: "1.091",
-    exitPrice: "1.091",
-    lotSize: "1",
-    strategy: "",
-    tradingPlanId: SANS_PLAN,
-    result: "OPEN" as TradeResult,
-    emotion: "Disciplined" as EmotionState,
-    mistakes: [] as TradeMistake[],
-    notes: "",
-    chartUrls: toScreenshotSlots(null),
-  });
+  // New Trade Form state — initialiseur paresseux (référence, pas appel).
+  const [formData, setFormData] = useState(formulaireVierge);
 
   const ouvrirCreation = () => {
     setEditingTrade(null);
@@ -644,7 +643,11 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       entryPrice: String(trade.entryPrice),
       stopLoss: String(trade.stopLoss),
       takeProfit: String(trade.takeProfit),
-      exitPrice: String(trade.exitPrice ?? 0),
+      // `?? 0` remplacé par une garde de véracité : `undefined` comme `0`
+      // signifient « pas de prix de sortie » (voir handleFormSubmit), et un
+      // "0" réaffiché dans le champ se réenregistrait tel quel au moindre
+      // passage en édition.
+      exitPrice: trade.exitPrice ? String(trade.exitPrice) : "",
       lotSize: String(trade.lotSize),
       strategy: trade.strategy,
       tradingPlanId: trade.tradingPlanId ?? SANS_PLAN,
@@ -781,6 +784,9 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     setSort((prev) =>
       prev?.key !== key ? { key, dir: "desc" } : prev.dir === "desc" ? { key, dir: "asc" } : null
     );
+
+  /** Pilote la désactivation des trois champs de sortie du formulaire. */
+  const positionOuverte = formData.result === "OPEN";
 
   /**
    * En-tête de colonne triable. Le libellé est un vrai `<button>` (et non un
@@ -978,6 +984,20 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       return;
     }
 
+    // Résultat et émotion sont des chips, pas des `<input>` : aucune
+    // validation HTML `required` ne s'y applique, d'où ces deux gardes. Elles
+    // sont la contrepartie d'un formulaire qui ne pré-remplit plus rien (voir
+    // `formulaireVierge`) — sans elles, un trade partirait avec `result: ""`,
+    // impossible à typer et invisible dans tous les filtres.
+    if (!formData.result) {
+      alert("Choisis le résultat de ce trade (TP, SL, Breakeven ou Position ouverte).");
+      return;
+    }
+    if (!formData.emotion) {
+      alert("Choisis ton état émotionnel — c'est le cœur du registre, il ne peut pas être deviné.");
+      return;
+    }
+
     const riskReward = Number((gain / risque).toFixed(1));
 
     // Le PnL vient du champ, jamais d'un recalcul ni d'une conversion.
@@ -1001,12 +1021,11 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     const champs = {
       date: formData.date,
       time: formData.time,
-      // `formulaireVierge()` pré-remplit exitDate/exitTime avec aujourd'hui
-      // 16:00 (pratique pour un trade déjà clôturé) — mais rien n'invite
-      // l'utilisateur à les vider spécifiquement pour "⏳ Position ouverte",
-      // qui s'affichait alors comme clôturée dans le tableau (seul indicateur
-      // visuel : la présence d'`exitDate`, voir plus bas). Une position
-      // ouverte n'a par définition aucune date de sortie. Trouvé en audit.
+      // Une position ouverte n'a par définition aucune sortie : ni date, ni
+      // heure, ni prix (voir `exitPrice` plus bas, longtemps oublié ici). Les
+      // trois champs correspondants sont désormais aussi désactivés dans le
+      // formulaire quand "⏳ Position ouverte" est choisi, pour que la règle
+      // se voie au lieu de s'appliquer en silence.
       exitDate: result === "OPEN" ? undefined : formData.exitDate || undefined,
       exitTime: result === "OPEN" ? undefined : formData.exitTime || undefined,
       // `undefined` et non chaîne vide : le champ est optionnel, une chaîne
@@ -1022,7 +1041,16 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       entryPrice: parsePriceInput(formData.entryPrice),
       stopLoss: parsePriceInput(formData.stopLoss),
       takeProfit: parsePriceInput(formData.takeProfit),
-      exitPrice: parsePriceInput(formData.exitPrice),
+      // Symétrique d'`exitDate`/`exitTime` ci-dessus. Le champ vide compte
+      // autant que la position ouverte : `parsePriceInput("")` vaut 0, qui
+      // s'écrivait jusqu'ici en base comme une vraie cotation à zéro —
+      // impossible sur tous les marchés du Journal. Même convention que
+      // l'affichage du tableau et de l'aperçu, qui traitent déjà 0 comme
+      // « non renseigné ».
+      exitPrice:
+        result === "OPEN" || formData.exitPrice.trim() === ""
+          ? undefined
+          : parsePriceInput(formData.exitPrice),
       lotSize: Number(formData.lotSize),
       pnl,
       pnlUnit: formData.pnlUnit,
@@ -1492,14 +1520,21 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   />
                 </div>
 
+                {/* Désactivés sur une position ouverte : ce qui y serait saisi
+                    serait de toute façon écarté à l'enregistrement (voir
+                    `handleFormSubmit`). Mieux vaut le montrer que le faire en
+                    silence. */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Date de sortie</label>
                   <input
                     type="date"
                     value={formData.exitDate}
                     min={formData.date}
+                    disabled={positionOuverte}
                     onChange={(e) => setFormData({ ...formData, exitDate: e.target.value })}
-                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
+                    className={`w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white ${
+                      positionOuverte ? "opacity-40 cursor-not-allowed" : ""
+                    }`}
                   />
                 </div>
 
@@ -1508,11 +1543,20 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <input
                     type="time"
                     value={formData.exitTime}
+                    disabled={positionOuverte}
                     onChange={(e) => setFormData({ ...formData, exitTime: e.target.value })}
-                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white"
+                    className={`w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white ${
+                      positionOuverte ? "opacity-40 cursor-not-allowed" : ""
+                    }`}
                   />
                 </div>
               </div>
+
+              {positionOuverte && (
+                <p className="text-[10px] text-slate-500 -mt-2">
+                  Position ouverte : la sortie (date, heure, prix) reste vide tant que le trade n'est pas clôturé.
+                </p>
+              )}
 
               {/* Compte de rattachement. Volontairement **sans** `required` :
                   un trade peut légitimement n'appartenir à aucun portefeuille
@@ -1628,8 +1672,11 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     type="text"
                     inputMode="decimal"
                     value={formData.exitPrice}
+                    disabled={positionOuverte}
                     onChange={(e) => handlePriceChange("exitPrice", e.target.value)}
-                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
+                    className={`w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono ${
+                      positionOuverte ? "opacity-40 cursor-not-allowed" : ""
+                    }`}
                   />
                 </div>
 
