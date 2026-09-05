@@ -8,10 +8,12 @@ Document de reprise, à lire avant de toucher au code. Écrit pour quelqu'un
 - Branche : `main`.
 - `origin` pointe désormais vers un dépôt **privé** dédié à l'usage personnel
   (`journal-de-trading`), plus vers l'ancien dépôt public `propdesk-template`.
-- Dernier commit : `4ea8923` — "Repasse la heatmap de rentabilité en
-  créneaux de 2h".
-- Pas de tests automatisés dans le projet (`npm run lint` = `tsc --noEmit`
-  est la seule vérification statique disponible).
+- Dernier commit : `d7049c7 — "Sort les captures d'écran de la collection des trades"`.
+- **Tests : `npm test` (vitest, 76 tests)** sur les calculs purs — soldes,
+  statistiques du Journal, durées, capture de la cible, badges, tri et
+  fenêtres de période, filet anti-perte `pendingChanges`. `npm run lint`
+  (`tsc --noEmit`) reste la vérification de typage. Les composants React ne
+  sont pas testés : la logique testable en a été extraite vers `src/lib/`.
 
 ## Qu'est-ce que PropDesk, aujourd'hui
 
