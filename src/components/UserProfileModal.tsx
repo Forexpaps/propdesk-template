@@ -209,6 +209,24 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     }
   };
 
+  /**
+   * Noms de collections tels que renvoyés par l'API (`trades`, `tradingPlans`)
+   * → libellés de l'interface. Un nom inconnu est laissé tel quel plutôt que
+   * masqué : mieux vaut un mot technique qu'une collection passée sous silence.
+   */
+  const nommerCollections = (noms: string[]): string => {
+    const LIBELLES: Record<string, string> = {
+      student: "profil",
+      trades: "journal de trading",
+      accounts: "portefeuilles",
+      setups: "setups",
+      tradingPlans: "plans de trading",
+      badges: "badges",
+      notifications: "notifications",
+    };
+    return noms.map((n) => LIBELLES[n] ?? n).join(", ");
+  };
+
   const handleImportBackupFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     // Sans réinitialiser la valeur, resélectionner le même fichier après une
@@ -236,11 +254,31 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
         student: parsed.student ?? undefined,
         collections: parsed.collections ?? undefined,
       });
+
+      // `skipped` était ignoré : le serveur écarte en silence toute collection
+      // qu'il juge invalide (voir `writeCollectionForAuth`), et l'écran
+      // annonçait malgré tout « Restauration terminée ». Un fichier dont rien
+      // n'était repris affichait donc un succès — impossible de comprendre
+      // pourquoi les données n'avaient pas bougé.
+      if (result.imported.length === 0) {
+        setBackupStatus({
+          kind: "error",
+          message:
+            "Aucune donnée n'a pu être reprise de ce fichier" +
+            (result.skipped.length > 0 ? ` (rejeté : ${nommerCollections(result.skipped)})` : "") +
+            ". Vérifie qu'il s'agit bien d'un export PropDesk complet.",
+        });
+        return;
+      }
+
+      const detail = `Repris : ${nommerCollections(result.imported)}.`;
+      const rejet =
+        result.skipped.length > 0 ? ` Non repris : ${nommerCollections(result.skipped)}.` : "";
       setBackupStatus({
-        kind: "success",
-        message: `Restauration terminée (${result.imported.length} élément(s)). Rechargement de la page…`,
+        kind: result.skipped.length > 0 ? "error" : "success",
+        message: `${detail}${rejet} Rechargement de la page…`,
       });
-      setTimeout(() => window.location.reload(), 1200);
+      setTimeout(() => window.location.reload(), result.skipped.length > 0 ? 4000 : 1200);
     } catch {
       setBackupStatus({
         kind: "error",
