@@ -37,6 +37,7 @@ import {
 } from "../types";
 import { TabType, SidebarItemKey } from "./Sidebar";
 import { computeDisciplineStreak } from "../lib/badges";
+import { buildCumulativePnlSeries, buildSparklinePath } from "../lib/sparkline";
 import { computeWeeklySummary } from "../lib/weeklySummary";
 import { computeJournalSummary, computePnlByPeriod, isRealizedDollarTrade } from "../lib/performanceStats";
 import { TradingSessionsWidget } from "./TradingSessionsWidget";
@@ -125,6 +126,10 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   const { avgRR, profitFactor } = computeJournalSummary(trades);
   const pnlByPeriod = computePnlByPeriod(trades);
 
+  // Tracé réel de la carte « PnL cumulé » — `null` sous deux trades, la carte
+  // ne rend alors aucune courbe (voir `src/lib/sparkline.ts`).
+  const sparklinePath = buildSparklinePath(buildCumulativePnlSeries(trades), 80, 30);
+
   const firstName = student.name.split(" ")[0] || "Yoann";
 
   return (
@@ -166,18 +171,25 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
               {isPnLPositive ? "+" : ""}
               {formatCurrency(totalPnL)}
             </div>
-            {/* Sparkline SVG */}
-            <div className="w-20 h-8">
-              <svg className="w-full h-full overflow-visible" viewBox="0 0 80 30">
-                <path
-                  d="M 0 25 Q 20 28, 40 15 T 80 5"
-                  fill="none"
-                  stroke="#00E676"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
+            {/* Courbe réelle du PnL cumulé. Ce tracé était auparavant codé en
+                dur : toujours vert, toujours montant, même en perte. Sa couleur
+                suit désormais `isPnLPositive`, celle du nombre juste à côté —
+                un chiffre rouge au-dessus d'une ligne verte serait une autre
+                façon de mentir. Rien n'est rendu sous deux trades. */}
+            {sparklinePath && (
+              <div className="w-20 h-8" aria-hidden="true">
+                <svg className="w-full h-full overflow-visible" viewBox="0 0 80 30" preserveAspectRatio="none">
+                  <path
+                    d={sparklinePath}
+                    fill="none"
+                    stroke={isPnLPositive ? "#00E676" : "#fb7185"}
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+            )}
           </div>
         </div>
 

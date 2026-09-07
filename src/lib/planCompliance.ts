@@ -279,7 +279,10 @@ export function buildPlanAlertNotification(trade: Trade, reasons: string[]): App
  * Les entrées excédentaires (les plus anciennes, en fin de liste — les plus
  * récentes sont toujours insérées en tête) sont abandonnées silencieusement.
  */
-const MAX_STUDENT_NOTIFICATIONS = 300;
+/** Plafond de rétention du centre d'alertes — au-delà, les plus anciennes sont retirées.
+ *  Exporté pour être ANNONCÉ à l'écran : une notification qui disparaît sans explication
+ *  ressemble à un bug. */
+export const MAX_STUDENT_NOTIFICATIONS = 300;
 
 /**
  * Upsert idempotent : ajoute/remplace la notification déterministe de ce
