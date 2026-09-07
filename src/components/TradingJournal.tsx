@@ -37,6 +37,7 @@ import { formatCurrency, formatDuration, parsePriceInput } from "../lib/format";
 import { resizeChartScreenshot } from "../lib/image";
 import { computeJournalSummary, tradeDurationMinutes } from "../lib/performanceStats";
 import { alertDialog, confirmDialog } from "../lib/confirmDialog";
+import { appliquerDraft } from "../lib/tradeDraft";
 import { periodStart, sortTrades, PeriodPreset, SortKey, SortState } from "../lib/journalFilters";
 import { api } from "../lib/api";
 import { Select } from "./Select";
@@ -806,14 +807,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       // d'écran, tags d'erreur), l'annuler, puis appliquer une ébauche du
       // calculateur conservait silencieusement tous ces champs — absents de
       // `TradeDraft` — sur le nouveau trade créé depuis l'ébauche.
-      const next = formulaireVierge();
-      (Object.keys(prefillDraft) as (keyof TradeDraft)[]).forEach((key) => {
-        const value = prefillDraft[key];
-        if (value !== undefined) {
-          (next as Record<string, unknown>)[key] = value;
-        }
-      });
-      return next;
+      // Voir `appliquerDraft` : la conversion des nombres de l'ébauche en
+      // chaînes n'est pas cosmétique, c'est elle qui rend l'enregistrement
+      // possible.
+      return appliquerDraft(formulaireVierge(), prefillDraft);
     });
     // Une ébauche est toujours une création : sans cela, elle viendrait écraser
     // un trade en cours d'édition resté ouvert.
@@ -1079,6 +1076,31 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   ) => {
     if (!/^[\d.,]*$/.test(raw)) return;
     setFormData((prev) => ({ ...prev, [field]: raw }));
+  };
+
+  /**
+   * Enveloppe l'enregistrement pour qu'aucune panne ne reste MUETTE.
+   *
+   * `handleFormSubmit` est asynchrone : une exception inattendue partait en
+   * rejet non capturé, visible seulement dans la console du navigateur. Le
+   * formulaire restait ouvert, le trade n'était pas enregistré, et rien à
+   * l'écran ne le disait — c'est exactement ce qui s'est produit avec le
+   * chemin « Appliquer au Journal » (voir `appliquerDraft`) : une saisie
+   * complète disparaissait sans un mot. Un bug reste possible ; le perdre en
+   * silence, non.
+   */
+  const handleFormSubmitSafe = async (e: React.FormEvent) => {
+    try {
+      await handleFormSubmit(e);
+    } catch (err) {
+      console.error("[propdesk] Enregistrement du trade impossible.", err);
+      await alertDialog(
+        `Le trade n'a pas pu être enregistré : ${
+          (err as Error)?.message ?? "erreur inconnue"
+        }. Rien n'a été perdu, le formulaire reste ouvert — réessaie, et signale ce message si cela se reproduit.`,
+        { title: "Enregistrement impossible" }
+      );
+    }
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
@@ -1668,7 +1690,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleFormSubmit} className="space-y-4">
+            <form onSubmit={handleFormSubmitSafe} className="space-y-4">
               {/* Horodatage : entrée obligatoire, sortie laissée vide tant que
                   la position est ouverte. */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
