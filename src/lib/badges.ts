@@ -255,9 +255,31 @@ function computeSingleBadgeProgress(
  * journée.
  */
 export function computeRiskDisciplineStreak(trades: Trade[]): number {
-  // `trades` arrive du plus récent au plus ancien (App.tsx insère en tête).
+  // Trié ici, jamais supposé trié. Cette fonction se fiait à l'ordre du
+  // tableau (« App.tsx insère en tête »), ce qui n'est vrai que pour une
+  // saisie manuelle : un import CSV empile dans l'ordre du fichier, une
+  // édition de date laisse le trade à sa place, et un rechargement rend
+  // l'ordre de la base (`position`). Dans ces cas la série se calculait à
+  // partir d'un trade qui n'était pas le plus récent. `computeDisciplineStreak`
+  // juste en dessous triait déjà ses jours : les deux séries suivent
+  // désormais la même règle.
+  //
+  // Départage à date égale par l'heure quand elle est connue ; à défaut,
+  // l'ordre d'origine est conservé (tri stable) — inventer un ordre
+  // intra-journalier serait pire que garder celui de la saisie.
+  const parDateDesc = trades
+    .map((t, index) => ({ t, index }))
+    .sort((a, b) => {
+      if (a.t.date !== b.t.date) return a.t.date < b.t.date ? 1 : -1;
+      const heureA = a.t.time ?? "";
+      const heureB = b.t.time ?? "";
+      if (heureA !== heureB) return heureA < heureB ? 1 : -1;
+      return a.index - b.index;
+    })
+    .map((e) => e.t);
+
   let serie = 0;
-  for (const t of trades) {
+  for (const t of parDateDesc) {
     if (typeof t.riskPercent !== "number" || t.riskPercent > MAX_RISK_PERCENT) break;
     serie += 1;
   }

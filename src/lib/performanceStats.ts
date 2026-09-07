@@ -160,7 +160,7 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
 
   // 3. Performance par Émotion
   //
-  // Préremplit les 6 émotions saisissables dans le Journal (`ALL_EMOTIONS`),
+  // Préremplit les 5 émotions saisissables dans le Journal (`ALL_EMOTIONS`),
   // même celles jamais taguées — sinon un élève qui n'a par exemple jamais
   // trade "Anxieux" ne verrait jamais cette barre, alors que c'est justement
   // l'information utile (« je n'ai jamais (encore) tradé anxieux »).
@@ -172,10 +172,20 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
     Calm: { wins: 0, losses: 0, total: 0, pnl: 0 },
   };
   trades.forEach((t) => {
-    emotionStats[t.emotion].total += 1;
-    if (t.result === "WIN") emotionStats[t.emotion].wins += 1;
-    if (t.result === "LOSS") emotionStats[t.emotion].losses += 1;
-    if (isRealizedDollarTrade(t)) emotionStats[t.emotion].pnl += t.pnl;
+    // Émotion inconnue du catalogue (trade restauré d'une sauvegarde éditée à
+    // la main, ou écrit par une version antérieure) : elle est IGNORÉE, jamais
+    // rangée dans une case voisine. Sans cette garde, `emotionStats[t.emotion]`
+    // valait `undefined` et l'écran Rentabilité entier plantait sur un
+    // « Cannot read properties of undefined » — une seule ligne douteuse
+    // rendait toute l'analyse inaccessible. Toutes les autres ventilations de
+    // ce fichier (setup, actif, jour, session) créent leur case à la volée ;
+    // celle-ci était la seule à supposer la clé présente.
+    const stats = emotionStats[t.emotion];
+    if (!stats) return;
+    stats.total += 1;
+    if (t.result === "WIN") stats.wins += 1;
+    if (t.result === "LOSS") stats.losses += 1;
+    if (isRealizedDollarTrade(t)) stats.pnl += t.pnl;
   });
 
   const emotionChartData = ALL_EMOTIONS.map(({ id, label }) => ({

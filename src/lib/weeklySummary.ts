@@ -95,9 +95,14 @@ export function computeWeeklySummary(trades: Trade[]): string {
   const sessionLabel = sessionsThisWeek === 1 ? "session travaillée" : "sessions travaillées";
   const base = `Semaine ${weekNumber} · ${sessionsThisWeek} ${sessionLabel} sur ${SESSIONS_TARGET}.`;
 
-  if (!weakness) {
+  // Un tag absent du catalogue (trade restauré d'une sauvegarde éditée à la
+  // main, ou écrit par une version antérieure) n'a pas de formulation : la
+  // phrase retombe sur « aucun point faible » plutôt que d'afficher
+  // « Ton point faible du moment : undefined. » à l'utilisateur.
+  const phrase = weakness ? MISTAKE_PHRASES[weakness] : undefined;
+  if (!phrase) {
     return `${base} Aucun point faible identifié pour l'instant.`;
   }
 
-  return `${base} Ton point faible du moment : ${MISTAKE_PHRASES[weakness]}.`;
+  return `${base} Ton point faible du moment : ${phrase}.`;
 }
