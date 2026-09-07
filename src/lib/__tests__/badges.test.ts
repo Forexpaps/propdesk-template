@@ -77,9 +77,19 @@ describe("computeBadgeProgress — badges de gestion du risque", () => {
     expect(b.currentValue).toBe(0);
   });
 
-  it("laisse « Cumul de Performance +10R » non suivable, faute du risque en devise", () => {
-    const [b] = computeBadgeProgress([badge("badge-8")], [trade({ riskPercent: 1 })]);
-    expect(b.trackable).toBe(false);
+  it("suit « Cumul de Performance +10R » sans avoir besoin du risque en devise", () => {
+    // Ce test figeait auparavant l'inverse : le badge était déclaré non
+    // suivable au motif qu'il fallait le montant risqué en devise, donc le
+    // capital du compte au moment du trade. C'est vrai de la voie monétaire —
+    // mais le R se mesure sur les seuls prix, la taille de lot et la valeur du
+    // point s'annulant dans le rapport (voir `tradeRealizedR`). Le test
+    // verrouillait donc une limitation qui n'en était pas une.
+    const [b] = computeBadgeProgress(
+      [badge("badge-8")],
+      [trade({ direction: "LONG", entryPrice: 100, stopLoss: 90, takeProfit: 130, exitPrice: 130, result: "WIN" })]
+    );
+    expect(b.trackable).toBe(true);
+    expect(b.currentValue).toBe(3);
   });
 
   it("retrouve le critère d'un badge dont l'id est préfixé par l'utilisateur", () => {

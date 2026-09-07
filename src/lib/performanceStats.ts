@@ -741,6 +741,37 @@ export function tradeExitRatios(t: Trade): ExitRatios | null {
   return { capture: mouvement / cible, risqueConsomme: -mouvement / risque };
 }
 
+/**
+ * Résultat d'un trade exprimé en multiples du risque initialement engagé
+ * (« R »), ou `null` quand il n'est pas mesurable.
+ *
+ * **Le multiplicateur de l'instrument, la taille de lot et le capital
+ * s'annulent**, ce qui rend ce calcul possible sans aucune de ces données :
+ *
+ *     PnL          = déplacement × lot × valeur du point
+ *     risque engagé = |entrée − stop| × lot × valeur du point
+ *     R = PnL / risque engagé = déplacement / |entrée − stop|
+ *
+ * C'est pourquoi le R se mesure ici sur les seuls PRIX, sans avoir besoin du
+ * capital du compte au moment du trade — que rien ne conserve. Passer par le
+ * PnL en devise aurait exigé ce capital, et n'était donc pas faisable.
+ *
+ * Deux limites, à énoncer et non à masquer :
+ * - le R est GÉOMÉTRIQUE : il ignore frais, spread et swap que le PnL saisi
+ *   peut inclure. Un trade à −1,04 R sorti sous son stop reflète un vrai
+ *   glissement, pas une erreur de calcul ;
+ * - un trade sans prix de sortie renseigné (ou encore ouvert) n'est pas
+ *   mesurable et n'est jamais compté comme un 0.
+ *
+ * Délègue à `tradeExitRatios` pour que la géométrie n'existe qu'à UN endroit :
+ * `risqueConsomme` vaut `-déplacement / risque`, donc son opposé est
+ * exactement le R réalisé.
+ */
+export function tradeRealizedR(t: Trade): number | null {
+  const ratios = tradeExitRatios(t);
+  return ratios === null ? null : -ratios.risqueConsomme;
+}
+
 export interface ExitEfficiencyStats {
   /** Capture moyenne de la cible sur les GAGNANTS. 0.7 = « en moyenne tu encaisses 70 % de ton TP ». */
   captureMoyenneWins: number | null;

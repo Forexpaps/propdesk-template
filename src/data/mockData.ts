@@ -96,12 +96,17 @@ export const initialTraderBadges: TraderBadge[] = [
   {
     id: "badge-8",
     title: "Cumul de Performance +10R",
-    description: "Générer un total cumulé de au moins +10.0R de bénéfices sur le journal de trading.",
+    description:
+      "Générer un total cumulé d'au moins +10.0R sur le journal. Le R de chaque trade est mesuré sur tes prix (sortie − entrée, rapporté à la distance entrée − stop) : un trade sans prix de sortie n'est pas comptabilisé, et les frais ne sont pas déduits.",
     iconName: "TrendingUp",
     category: "PERFORMANCE",
     unlocked: false,
     progressPercentage: 0,
-    currentValue: 10.0,
+    // 0 et non 10 : cette valeur du catalogue est recopiée en base par
+    // `syncBadgeCatalog`, et `computeBadgeProgress` la remplace à l'affichage.
+    // Laisser 10 ici affichait un badge déjà complet si le calcul venait à
+    // manquer — exactement le genre de faux positif qu'on ne veut pas.
+    currentValue: 0,
     targetValue: 10.0,
     unit: "R",
     rewardXP: 650,

@@ -1,4 +1,5 @@
 import { Trade, TraderBadge } from "../types";
+import { tradeRealizedR } from "./performanceStats";
 
 /**
  * Calcule la progression EN DIRECT de chaque badge depuis les données réelles
@@ -220,12 +221,33 @@ function computeSingleBadgeProgress(
       };
     }
 
-    // badge-8 (cumul en "R") reste hors de portée : le R d'un trade vaut son
-    // PnL divisé par le montant réellement risqué, en devise. `riskPercent`
-    // donne le pourcentage, pas le montant — le reconstituer demanderait le
-    // capital du compte au moment du trade, que rien ne conserve. Le déduire
-    // des seuls prix (sortie/entrée/stop) supposerait une sortie unique de
-    // toute la position, ce qui serait faux dès la première sortie partielle.
+    // Cumul de Performance +10R — somme des R réalisés du journal.
+    //
+    // Ce badge était marqué « suivi pas encore disponible », au motif que le R
+    // exigeait le montant risqué en devise, donc le capital du compte au
+    // moment du trade, que rien ne conserve. C'est vrai de la voie monétaire,
+    // et faux de la voie géométrique : dans `PnL / risque engagé`, la taille
+    // de lot et la valeur du point s'annulent, et il reste
+    // `déplacement / |entrée − stop|` — voir `tradeRealizedR`. L'application
+    // faisait DÉJÀ exactement cette arithmétique pour « Capture du TP » et
+    // « Perte vs SL » : la refuser ici seulement était incohérent.
+    //
+    // L'autre motif invoqué — « supposerait une sortie unique de toute la
+    // position » — ne tient pas non plus : un `Trade` ne porte qu'UN
+    // `exitPrice`, la sortie unique n'est pas une hypothèse du calcul, c'est
+    // le modèle de données lui-même.
+    case "badge-8": {
+      const { cumul } = computeCumulativeR(trades);
+      const target = 10;
+      return {
+        currentValue: Number(cumul.toFixed(1)),
+        targetValue: target,
+        // Un cumul négatif reste une barre à 0 % : la progression ne recule
+        // pas en dessous de rien, et un pourcentage négatif ne s'affiche pas.
+        progressPercentage: Math.max(0, Math.min(100, Math.round((cumul / target) * 100))),
+      };
+    }
+
     default:
       return null;
   }
@@ -308,4 +330,31 @@ export function computeDisciplineStreak(trades: Trade[]): number {
   }
 
   return streak;
+}
+
+/**
+ * Cumul des R réalisés du journal, et ce qui en a été écarté.
+ *
+ * Un trade non mesurable (position ouverte, prix de sortie non renseigné,
+ * niveaux incohérents) est COMPTÉ À PART, jamais traité comme un 0 R : un
+ * trade dont on ignore le résultat n'est pas un trade nul.
+ */
+export function computeCumulativeR(trades: Trade[]): {
+  cumul: number;
+  tradesMesures: number;
+  tradesNonMesurables: number;
+} {
+  let cumul = 0;
+  let mesures = 0;
+  let nonMesurables = 0;
+  for (const t of trades) {
+    const r = tradeRealizedR(t);
+    if (r === null) {
+      nonMesurables += 1;
+      continue;
+    }
+    cumul += r;
+    mesures += 1;
+  }
+  return { cumul, tradesMesures: mesures, tradesNonMesurables: nonMesurables };
 }
