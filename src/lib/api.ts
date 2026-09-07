@@ -6,6 +6,7 @@ import {
   TraderBadge,
   Setup,
   TradingPlan,
+  WeeklyReview,
 } from "../types";
 
 /** Collections synchronisées avec le serveur, dans les formes de src/types.ts. */
@@ -16,6 +17,7 @@ export interface ServerCollections {
   badges: TraderBadge[];
   setups: Setup[];
   tradingPlans: TradingPlan[];
+  weeklyReviews: WeeklyReview[];
 }
 
 export type CollectionName = keyof ServerCollections;

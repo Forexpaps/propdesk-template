@@ -1,4 +1,5 @@
 import { Trade, TradeMistake } from "../types";
+import { startOfWeek } from "./performanceStats";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -45,9 +46,15 @@ function mostFrequentMistake(trades: Trade[]): TradeMistake | null {
  * sur 5. Ton point faible du moment : ...") — recalculée à chaque appel
  * depuis les vrais trades de l'élève, jamais stockée.
  *
- * "Semaine 1" part de la date du tout premier trade jamais journalisé, pas
- * d'une valeur arbitraire : le suivi hebdomadaire démarre quand l'élève
- * démarre réellement, pas avant.
+ * "Semaine 1" est la semaine CALENDAIRE du tout premier trade journalisé : le
+ * suivi démarre quand l'élève démarre réellement, mais les semaines suivantes
+ * se comptent de lundi à dimanche.
+ *
+ * Cette fenêtre était auparavant ancrée sur la DATE du premier trade, donc
+ * décalée de N jours : « Semaine 12 » et « la semaine dernière » de la
+ * comparaison de périodes désignaient deux fenêtres différentes, côte à côte
+ * sur le même écran. Changement visible et volontaire — voir `startOfWeek`,
+ * seule définition de semaine de l'application.
  */
 export function computeWeeklySummary(trades: Trade[]): string {
   if (trades.length === 0) {
@@ -58,18 +65,27 @@ export function computeWeeklySummary(trades: Trade[]): string {
     (earliest, t) => (t.date < earliest ? t.date : earliest),
     trades[0].date
   );
-  const firstDate = parseDate(firstTradeDate);
-  const today = new Date(new Date().toDateString());
+  const premiereSemaine = startOfWeek(parseDate(firstTradeDate));
+  const semaineCourante = startOfWeek(new Date());
 
-  const daysSinceFirst = Math.max(0, Math.floor((today.getTime() - firstDate.getTime()) / MS_PER_DAY));
-  const weekNumber = Math.floor(daysSinceFirst / 7) + 1;
+  // Division sur des lundis à minuit : le nombre de jours qui les sépare est
+  // toujours un multiple de 7 en temps civil, mais pas en millisecondes (un
+  // changement d'heure en retire ou en ajoute 3 600 000). D'où l'arrondi.
+  const semainesEcoulees = Math.max(
+    0,
+    Math.round((semaineCourante.getTime() - premiereSemaine.getTime()) / (7 * MS_PER_DAY))
+  );
+  const weekNumber = semainesEcoulees + 1;
 
-  const weekStart = new Date(firstDate.getTime() + (weekNumber - 1) * 7 * MS_PER_DAY);
-  const weekEnd = new Date(weekStart.getTime() + 6 * MS_PER_DAY);
+  const weekEnd = new Date(
+    semaineCourante.getFullYear(),
+    semaineCourante.getMonth(),
+    semaineCourante.getDate() + 7
+  );
 
   const tradesThisWeek = trades.filter((t) => {
     const d = parseDate(t.date);
-    return d >= weekStart && d <= weekEnd;
+    return d >= semaineCourante && d < weekEnd;
   });
 
   const sessionsThisWeek = new Set(tradesThisWeek.map((t) => t.date)).size;

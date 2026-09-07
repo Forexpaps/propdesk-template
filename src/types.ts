@@ -325,3 +325,63 @@ export interface AppNotification {
 }
 
 // (Module Forum retiré — voir HANDOFF.md pour l'historique.)
+
+// ---------------------------------------------------------------------------
+// Revue hebdomadaire
+// ---------------------------------------------------------------------------
+
+/**
+ * Objectif que le trader se fixe pour la semaine SUIVANTE. Volontairement
+ * TYPÉ et non en texte libre : le journal doit pouvoir dire tout seul s'il a
+ * été tenu, et un objectif écrit en français ne se vérifie pas sans modèle de
+ * langage — l'audit IA a justement été retiré de ce projet sur décision
+ * documentée. Chaque type se vérifie sur des données DÉJÀ saisies, sans
+ * demander la moindre saisie supplémentaire.
+ *
+ * Le texte libre garde toute sa place dans la revue (« ce qui a marché »,
+ * « ce qui n'a pas marché ») : il porte le POURQUOI, que l'application ne
+ * calculera jamais. Il n'est simplement pas ce qu'on vérifie.
+ */
+export type ObjectifHebdoType =
+  | "max_trades_par_jour"
+  | "max_trades_semaine"
+  | "aucun_trade_en_emotion"
+  | "risque_max_par_trade"
+  | "aucune_erreur_taguee"
+  | "min_jours_traves"
+  | "aucun_trade_hors_plan";
+
+export interface ObjectifHebdo {
+  type: ObjectifHebdoType;
+  /** Seuil. Ignoré par les types qui n'en prennent pas (ex. `aucune_erreur_taguee`). */
+  valeur: number;
+  /**
+   * Lundi (YYYY-MM-DD) de la semaine sur laquelle l'objectif sera jugé.
+   *
+   * **Stockée, jamais recalculée.** Si la définition de « semaine » changeait
+   * un jour, une revue ancienne doit rester jugée sur la fenêtre qui lui avait
+   * été annoncée au moment où le trader s'est engagé.
+   */
+  cibleWeekStart: string;
+}
+
+/**
+ * Bilan écrit d'une semaine. `id` est déterministe (`revue-<lundi>`) : une
+ * seconde écriture sur la même semaine mets à jour la revue existante au lieu
+ * de créer un doublon.
+ *
+ * **Le verdict de l'objectif n'est PAS stocké ici** : il se recalcule depuis
+ * les trades à chaque affichage. Le figer en ferait un cache faux dès qu'un
+ * trade de la semaine visée est corrigé — même raisonnement que « `result`
+ * n'est jamais déduit du signe du PnL ».
+ */
+export interface WeeklyReview {
+  id: string;
+  /** Lundi (YYYY-MM-DD) de la semaine relue. */
+  weekStart: string;
+  ceQuiAMarche: string;
+  ceQuiNaPasMarche: string;
+  objectif: ObjectifHebdo | null;
+  createdAt: string;
+  updatedAt: string;
+}

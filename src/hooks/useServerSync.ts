@@ -17,6 +17,7 @@ const LEGACY_KEYS = {
     // serveur dans le cache local : un démarrage à froid sans réseau les
     // affichait vides, alors qu'ils existaient bien en base.
     tradingPlans: "horizon_trading_plans",
+    weeklyReviews: "horizon_weekly_reviews",
   },
 } as const;
 

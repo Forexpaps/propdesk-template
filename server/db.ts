@@ -124,6 +124,17 @@ const SCHEMA_STATEMENTS = [
     payload  TEXT NOT NULL
   )`,
 
+  // Revues hebdomadaires : ce que le trader a écrit sur sa semaine, et
+  // l'objectif typé qu'il s'est fixé pour la suivante. Le VERDICT de cet
+  // objectif n'est pas stocké — il se recalcule depuis les trades (voir
+  // `src/lib/weeklyReview.ts`).
+  `CREATE TABLE IF NOT EXISTS weekly_reviews (
+    id       TEXT PRIMARY KEY,
+    user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    payload  TEXT NOT NULL
+  )`,
+
   // Captures d'écran des trades, hors de la collection `trades`.
   //
   // Elles y vivaient en base64, à l'intérieur du payload : toute la collection

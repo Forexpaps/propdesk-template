@@ -8,10 +8,11 @@ Document de reprise, à lire avant de toucher au code. Écrit pour quelqu'un
 - Branche : `main`.
 - `origin` pointe désormais vers un dépôt **privé** dédié à l'usage personnel
   (`journal-de-trading`), plus vers l'ancien dépôt public `propdesk-template`.
-- Dernier commit : `d7049c7 — "Sort les captures d'écran de la collection des trades"`.
-- **Tests : `npm test` (vitest, 76 tests)** sur les calculs purs — soldes,
+- Dernier commit : `de6df10 — "Chiffre ce que coûtent les entorses au plan, règle par règle"`.
+- **Tests : `npm test` (vitest, 167 tests)** sur les calculs purs — soldes,
   statistiques du Journal, durées, capture de la cible, badges, tri et
-  fenêtres de période, filet anti-perte `pendingChanges`. `npm run lint`
+  fenêtres de période, filet anti-perte `pendingChanges`, conformité au plan,
+  comparaison de périodes, revue hebdomadaire, sparkline. `npm run lint`
   (`tsc --noEmit`) reste la vérification de typage. Les composants React ne
   sont pas testés : la logique testable en a été extraite vers `src/lib/`.
 
@@ -204,6 +205,28 @@ quart d'heure, `/api/auth/setup` 5 par quart d'heure.
 
 ## Décisions de fond à connaître
 
+- **Rien de ce qui se recalcule n'est stocké.** Le verdict d'un objectif
+  hebdomadaire (`src/lib/weeklyReview.ts`), les violations de plan agrégées
+  (`computePlanComplianceSummary`) et les comparaisons de périodes
+  (`src/lib/periodComparison.ts`) sont TOUS recalculés depuis les trades à
+  chaque affichage. Les figer en ferait des caches faux dès qu'un trade est
+  corrigé ou qu'un plan est édité — même famille de raisonnement que
+  « `result` n'est jamais déduit du signe du PnL ». Conséquence assumée et
+  annoncée à l'écran : un trade d'il y a six mois est jugé avec les règles
+  d'aujourd'hui.
+- **Un objectif hebdomadaire est TYPÉ, jamais du texte libre.** Le journal
+  doit pouvoir dire seul s'il a été tenu, et aucune IA n'est utilisée ici. Le
+  catalogue (`OBJECTIF_CATALOGUE`) ne contient que ce qui se vérifie sur des
+  données déjà saisies. Le texte libre de la revue (« ce qui a marché ») garde
+  toute sa place : il porte le pourquoi, pas ce qu'on vérifie.
+- **Le verdict d'un objectif a TROIS états**, et le troisième
+  (`non_verifiable`) est le plus important : sans lui, « aucun trade en
+  émotion » serait déclaré atteint sur une semaine sans le moindre trade, et
+  l'application récompenserait le fait de ne pas trader.
+- **Seuil d'échantillon unique : 5.** Partout où une moyenne pourrait se lire
+  comme un verdict (ratios de sortie, win rate par setup, comparaison de
+  périodes), en dessous de 5 trades la valeur reste AFFICHÉE mais en gris —
+  c'est le verdict qu'on suspend, pas la donnée.
 - **Mono-utilisateur.** Le produit s'appelait auparavant "Académie de
   Trading" : coachs, élèves, cours vidéo, forum, messagerie, badges liés à la
   progression dans des modules. Toute cette couche a été retirée sur demande
@@ -277,14 +300,24 @@ quart d'heure, `/api/auth/setup` 5 par quart d'heure.
   volontairement pas de clé étrangère vers `trades` (l'id du trade n'existe pas
   encore à l'envoi), les orphelines étant balayées au démarrage par
   `purgeOrphanScreenshots`.
-- **Toute nouvelle collection synchronisée doit être déclarée à TROIS
-  endroits**, sous peine de perte de données silencieuse : `TABLES`
-  (`server/repositories.ts`), `LEGACY_KEYS.collections`
-  (`src/hooks/useServerSync.ts`, sinon pas de cache hors ligne) et `LABELS`
-  (`src/lib/pendingChanges.ts`). Ce dernier est le plus traître :
-  `markPending` ignore en silence toute clé absente de `LABELS`, donc une
-  écriture échouée n'est ni signalée, ni retenue à la déconnexion, et repart
-  écrasée par l'état serveur au rechargement suivant.
+- **Toute nouvelle collection synchronisée doit être déclarée à SIX
+  endroits**, sous peine de perte de données silencieuse :
+  1. `SCHEMA_STATEMENTS` (`server/db.ts`) — la table ;
+  2. `CollectionName` + `TABLES` (`server/repositories.ts`) — tout le reste du
+     serveur (routes, export, sauvegarde) est piloté par `TABLES` ;
+  3. `ServerCollections` (`src/lib/api.ts`) ;
+  4. `LEGACY_KEYS.collections` (`src/hooks/useServerSync.ts`) — sinon pas de
+     cache hors ligne ;
+  5. `LABELS` **et** `COLLECTION_BY_KEY` (`src/lib/pendingChanges.ts`) ;
+  6. `useSyncedState` (`src/App.tsx`).
+
+  Ce document annonçait TROIS endroits, et cet oubli a coûté deux pertes de
+  données silencieuses de suite sur les plans de trading. `markPending` ignore
+  en silence toute clé absente de `LABELS` ; et une clé présente dans `LABELS`
+  mais absente de `COLLECTION_BY_KEY` est comptée comme envoyée par
+  `replayPending` puis retirée du registre, sans jamais partir. Un test de
+  garde (`src/lib/__tests__/pendingChanges.test.ts`) échoue désormais si les
+  deux tables divergent — mais il ne couvre que le point 5.
 
 ## Lancement
 

@@ -35,15 +35,16 @@ import {
   StudentProfile,
   Trade,
   TradingPlanData,
+  WeeklyReview,
 } from "../types";
 import { TabType, SidebarItemKey } from "./Sidebar";
 import { computeDisciplineStreak } from "../lib/badges";
 import { buildCumulativePnlSeries, buildSparklinePath } from "../lib/sparkline";
-import { computeWeeklySummary } from "../lib/weeklySummary";
 import { computePlanComplianceSummary } from "../lib/planCompliance";
 import { computeJournalSummary, computePnlByPeriod, isRealizedDollarTrade } from "../lib/performanceStats";
 import { TradingSessionsWidget } from "./TradingSessionsWidget";
 import { PeriodComparisonCard } from "./PeriodComparisonCard";
+import { WeeklyReviewBanner } from "./WeeklyReviewBanner";
 
 /**
  * En-tête de section — barre verticale colorée + titre, motif repris tel
@@ -64,6 +65,10 @@ interface MainDashboardProps {
   trades: Trade[];
   /** Plans de trading — alimentent la ligne « Respect du plan » de la comparaison de périodes. Optionnel : l'écran reste complet sans aucun plan. */
   plans?: TradingPlanData;
+  /** Revues hebdomadaires déjà écrites — pilotent le bandeau d'accueil. */
+  weeklyReviews?: WeeklyReview[];
+  /** Ouvre la modale de revue sur la semaine donnée (lundi ISO). */
+  onOpenWeeklyReview: (semaine: string) => void;
   setActiveTab: (tab: TabType) => void;
 }
 
@@ -71,6 +76,8 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   student,
   trades,
   plans = [],
+  weeklyReviews = [],
+  onOpenWeeklyReview,
   setActiveTab,
 }) => {
   // Calculate Metrics
@@ -152,9 +159,12 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
           Bonjour {firstName}.
         </h1>
-        <p className="text-slate-400 text-xs sm:text-sm">
-          {computeWeeklySummary(trades)}
-        </p>
+        <WeeklyReviewBanner
+          trades={trades}
+          plans={plans}
+          reviews={weeklyReviews}
+          onOpenReview={onOpenWeeklyReview}
+        />
       </div>
 
       {/* 2. Top KPI Stat Cards */}

@@ -10,7 +10,8 @@ export type CollectionName =
   | "notifications"
   | "badges"
   | "setups"
-  | "tradingPlans";
+  | "tradingPlans"
+  | "weeklyReviews";
 
 const TABLES: Record<CollectionName, string> = {
   trades: "trades",
@@ -19,6 +20,7 @@ const TABLES: Record<CollectionName, string> = {
   badges: "badges",
   setups: "setups",
   tradingPlans: "trading_plans",
+  weeklyReviews: "weekly_reviews",
 };
 
 /** Objet de collection : on n'exige qu'un identifiant stable. */

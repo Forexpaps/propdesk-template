@@ -11,6 +11,7 @@ import { PositionCalculatorModal } from "./components/PositionCalculatorModal";
 import { MacroDashboard } from "./components/MacroDashboard";
 import { UserProfileModal } from "./components/UserProfileModal";
 import { PendingChangesBanner } from "./components/PendingChangesBanner";
+import { WeeklyReviewModal } from "./components/WeeklyReviewModal";
 import { NotificationModal } from "./components/NotificationModal";
 import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
@@ -18,6 +19,7 @@ import { ConfirmDialogHost, alertDialog, confirmDialog } from "./lib/confirmDial
 // `loadTradingPlan` n'a plus qu'un seul rôle : lire l'ANCIENNE clé localStorage
 // pour la reprise ponctuelle des plans hérités (`plansHerites`). Tout le reste
 // de l'app passe par la collection serveur `staffTradingPlan`.
+import { EMPTY_WEEKLY_REVIEWS } from "./lib/weeklyReview";
 import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, planAlertId, EMPTY_TRADING_PLANS, normalizeTradingPlans, renameSetupInPlans } from "./lib/planCompliance";
 import { upsertWalletRiskAlerts } from "./lib/walletAlerts";
 import { computeBadgeProgress } from "./lib/badges";
@@ -39,6 +41,7 @@ import {
   TraderBadge,
   TradeDraft,
   TradingPlanData,
+  WeeklyReview,
   Setup,
 } from "./types";
 import { isTabType, type TabType as SidebarTabType } from "./components/Sidebar";
@@ -429,6 +432,34 @@ function TraderApp({
     // reprise d'un simple « déjà chargé » aux yeux de `useSyncedState`.
     setStaffTradingPlan([...plansHerites]);
   }, [syncEnabled, plansServeur, plansHerites, setStaffTradingPlan]);
+
+  /**
+   * Revues hebdomadaires — collection serveur comme les autres, donc incluse
+   * d'office dans l'export et la sauvegarde automatique (tout est piloté par
+   * `TABLES` côté serveur). Ce sont des textes écrits à la main : les laisser
+   * en `localStorage` seul aurait répété l'erreur des plans de trading.
+   */
+  const [weeklyReviews, setWeeklyReviews] = useSyncedState<WeeklyReview[]>(
+    "horizon_weekly_reviews",
+    seed(server?.weeklyReviews, "horizon_weekly_reviews", EMPTY_WEEKLY_REVIEWS),
+    (v) => api.saveCollection("weeklyReviews", v),
+    syncEnabled,
+    reportSyncError
+  );
+
+  /**
+   * Enregistre (ou remplace) la revue d'une semaine. L'id étant déterministe,
+   * réécrire la même semaine met à jour l'entrée existante — jamais un doublon.
+   */
+  /** Semaine (lundi ISO) ouverte dans la modale de revue, ou `null` si fermée. */
+  const [revueOuverte, setRevueOuverte] = useState<string | null>(null);
+
+  const handleSaveWeeklyReview = (review: WeeklyReview) => {
+    setWeeklyReviews((prev) => {
+      const autres = prev.filter((r) => r.weekStart !== review.weekStart);
+      return [review, ...autres].sort((a, b) => (a.weekStart < b.weekStart ? 1 : -1));
+    });
+  };
 
   // Ébauche de trade poussée vers le Journal par le calculateur de position
   const [journalDraft, setJournalDraft] = useState<TradeDraft | null>(null);
@@ -829,6 +860,8 @@ function TraderApp({
               student={displayStudent}
               trades={trades}
               plans={staffTradingPlan}
+              weeklyReviews={weeklyReviews}
+              onOpenWeeklyReview={(semaine) => setRevueOuverte(semaine)}
               setActiveTab={setActiveTab}
             />
           )}
@@ -924,6 +957,24 @@ function TraderApp({
         onChange={setStaffTradingPlan}
         setups={setups}
       />
+
+      {/* Revue hebdomadaire — écriture ponctuelle, donc une modale et pas un
+          onglet (voir `WeeklyReviewModal`). */}
+      {/* Montée seulement à l'ouverture, et remontée à chaque semaine
+          différente : `semaineInitiale` n'est lu qu'au montage, un composant
+          gardé en vie rouvrirait toujours sur la première semaine demandée. */}
+      {revueOuverte !== null && (
+      <WeeklyReviewModal
+        key={revueOuverte}
+        isOpen
+        onClose={() => setRevueOuverte(null)}
+        trades={trades}
+        plans={staffTradingPlan}
+        reviews={weeklyReviews}
+        onSave={handleSaveWeeklyReview}
+        semaineInitiale={revueOuverte}
+      />
+      )}
 
       {/* Notifications Center Modal */}
       <NotificationModal

@@ -48,6 +48,7 @@ const LABELS: Record<string, string> = {
   // `PendingChangesBanner`, ni retenue par le garde-fou de déconnexion, et
   // repartait écrasée par l'état serveur périmé au rechargement suivant.
   horizon_trading_plans: "Plans de trading",
+  horizon_weekly_reviews: "Revues hebdomadaires",
 };
 
 /**
@@ -68,6 +69,7 @@ const COLLECTION_BY_KEY: Record<string, CollectionName> = {
   horizon_badges: "badges",
   horizon_setups: "setups",
   horizon_trading_plans: "tradingPlans",
+  horizon_weekly_reviews: "weeklyReviews",
 };
 
 /**
