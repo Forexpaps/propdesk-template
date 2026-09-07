@@ -54,7 +54,12 @@ function winRateOf(s: CategoryStats): number {
 
 export interface PerformanceStats {
   equityData: { date: string; capital: number; pnl: number }[];
-  strategyChartData: { strategy: string; winRate: number; pnl: number; tradesCount: number }[];
+  /**
+   * Détail par setup, trié par PnL décroissant, « Non renseigné » en dernier.
+   * `renseigne: false` marque les trades sans stratégie saisie — comptés à part,
+   * jamais fondus dans un setup existant.
+   */
+  setupDetailData: { setup: string; tradesCount: number; winRate: number; pnl: number; renseigne: boolean }[];
   emotionChartData: { emotion: string; winRate: number; pnl: number; tradesCount: number }[];
   totalTrades: number;
   wins: number;
@@ -116,24 +121,42 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   // Trades en $ ET clôturés uniquement : seuls ceux-ci entrent dans les totaux monétaires.
   const tradesEnDollars = trades.filter(isRealizedDollarTrade);
 
-  // 2. Performance par Stratégie
-  const strategyStats: Record<string, CategoryStats> = {};
+  // 2. Détail par setup — « lequel de mes setups gagne vraiment ? », la
+  // question centrale d'un journal de trading.
+  //
+  // Remplace un `strategyChartData` qui était calculé depuis toujours et
+  // n'était rendu NULLE PART. Forme calquée sur `assetDetailData` : un setup a
+  // un nom long et trois nombres, un tableau se lit mieux qu'un graphique.
+  const SETUP_NON_RENSEIGNE = "Non renseigné";
+  const setupStats: Record<string, CategoryStats> = {};
   trades.forEach((t) => {
-    if (!strategyStats[t.strategy]) {
-      strategyStats[t.strategy] = { wins: 0, losses: 0, total: 0, pnl: 0 };
-    }
-    strategyStats[t.strategy].total += 1;
-    if (t.result === "WIN") strategyStats[t.strategy].wins += 1;
-    if (t.result === "LOSS") strategyStats[t.strategy].losses += 1;
-    if (isRealizedDollarTrade(t)) strategyStats[t.strategy].pnl += t.pnl;
+    // Un setup vide n'est pas fondu dans un autre ni écarté : il forme sa
+    // propre ligne. Le masquer laisserait croire que tous les trades sont
+    // rattachés à une stratégie identifiée.
+    const cle = t.strategy.trim() || SETUP_NON_RENSEIGNE;
+    if (!setupStats[cle]) setupStats[cle] = { wins: 0, losses: 0, total: 0, pnl: 0 };
+    setupStats[cle].total += 1;
+    if (t.result === "WIN") setupStats[cle].wins += 1;
+    if (t.result === "LOSS") setupStats[cle].losses += 1;
+    if (isRealizedDollarTrade(t)) setupStats[cle].pnl += t.pnl;
   });
 
-  const strategyChartData = Object.keys(strategyStats).map((strat) => ({
-    strategy: strat,
-    winRate: winRateOf(strategyStats[strat]),
-    pnl: strategyStats[strat].pnl,
-    tradesCount: strategyStats[strat].total,
-  }));
+  const setupDetailData = Object.keys(setupStats)
+    .map((setup) => ({
+      setup,
+      tradesCount: setupStats[setup].total,
+      winRate: winRateOf(setupStats[setup]),
+      pnl: setupStats[setup].pnl,
+      renseigne: setup !== SETUP_NON_RENSEIGNE,
+    }))
+    // Trié par PnL décroissant, « Non renseigné » épinglé en dernier quel que
+    // soit son résultat — ce n'est pas un setup, il ne concourt pas au
+    // classement (même règle que « Hors plan » dans `computePlanDetail`).
+    .sort((a, b) => {
+      if (!a.renseigne) return 1;
+      if (!b.renseigne) return -1;
+      return b.pnl - a.pnl;
+    });
 
   // 3. Performance par Émotion
   //
@@ -423,7 +446,7 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
 
   return {
     equityData,
-    strategyChartData,
+    setupDetailData,
     emotionChartData,
     totalTrades,
     wins,

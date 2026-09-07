@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  computePerformanceStats,
   computeJournalSummary,
   tradeDurationMinutes,
   computeDurationStats,
@@ -218,5 +219,62 @@ describe("computePlanDetail", () => {
   it("inclut les plans sans aucun trade, ce qui est une information en soi", () => {
     const lignes = computePlanDetail([], plans);
     expect(lignes.find((l) => l.planId === "p2")!.tradesCount).toBe(0);
+  });
+});
+
+describe("setupDetailData", () => {
+  const student = { startingCapital: 10000, currentCapital: 10000, joinedDate: "2026-01-01" } as never;
+
+  it("ventile par setup et trie par PnL décroissant", () => {
+    const trades = [
+      trade({ id: "1", strategy: "OPR", pnl: 100, result: "WIN" }),
+      trade({ id: "2", strategy: "OPR", pnl: -30, result: "LOSS" }),
+      trade({ id: "3", strategy: "Scalp", pnl: 200, result: "WIN" }),
+    ];
+    const r = computePerformanceStats(student, trades).setupDetailData;
+    expect(r.map((x) => x.setup)).toEqual(["Scalp", "OPR"]);
+    const opr = r.find((x) => x.setup === "OPR")!;
+    expect(opr.tradesCount).toBe(2);
+    expect(opr.winRate).toBe(50);
+    expect(opr.pnl).toBe(70);
+  });
+
+  it("range les trades sans setup dans une ligne à part, épinglée en dernier", () => {
+    // Les fondre dans un setup existant ou les écarter laisserait croire que
+    // tous les trades sont rattachés à une stratégie identifiée.
+    const trades = [
+      trade({ id: "1", strategy: "", pnl: 999, result: "WIN" }),
+      trade({ id: "2", strategy: "OPR", pnl: 10, result: "WIN" }),
+    ];
+    const r = computePerformanceStats(student, trades).setupDetailData;
+    expect(r[r.length - 1].setup).toBe("Non renseigné");
+    expect(r[r.length - 1].renseigne).toBe(false);
+    expect(r[0].setup).toBe("OPR");
+  });
+
+  it("traite un setup fait uniquement d'espaces comme non renseigné", () => {
+    const r = computePerformanceStats(student, [trade({ strategy: "   " })]).setupDetailData;
+    expect(r[0].setup).toBe("Non renseigné");
+  });
+
+  it("compte un trade en % dans tradesCount mais pas dans le PnL", () => {
+    const trades = [
+      trade({ id: "1", strategy: "OPR", pnl: 50, result: "WIN" }),
+      trade({ id: "2", strategy: "OPR", pnl: 7, pnlUnit: "PERCENT", result: "WIN" }),
+    ];
+    const opr = computePerformanceStats(student, trades).setupDetailData[0];
+    expect(opr.tradesCount).toBe(2);
+    expect(opr.pnl).toBe(50);
+  });
+
+  it("exclut BREAKEVEN et OPEN du win rate", () => {
+    const trades = [
+      trade({ id: "1", strategy: "OPR", result: "WIN" }),
+      trade({ id: "2", strategy: "OPR", result: "BREAKEVEN" }),
+      trade({ id: "3", strategy: "OPR", result: "OPEN" }),
+    ];
+    const opr = computePerformanceStats(student, trades).setupDetailData[0];
+    expect(opr.winRate).toBe(100);
+    expect(opr.tradesCount).toBe(3);
   });
 });

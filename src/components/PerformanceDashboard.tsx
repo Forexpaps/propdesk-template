@@ -37,6 +37,12 @@ interface PerformanceDashboardProps {
  */
 const MIN_ECHANTILLON_SORTIE = 5;
 
+/**
+ * Même seuil, même raison : sous ce nombre de trades, un win rate par setup ne
+ * mesure rien mais se lit comme un verdict. Un seul chiffre dans toute l'app.
+ */
+const MIN_ECHANTILLON_SETUP = 5;
+
 const tooltipStyle = {
   contentStyle: { backgroundColor: "#0D1110", borderColor: "#1B2320", borderRadius: "10px", fontSize: "12px" },
   labelStyle: { color: "#ffffff" },
@@ -158,6 +164,7 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
   const duration = useMemo(() => computeDurationStats(trades), [trades]);
   const exit = useMemo(() => computeExitEfficiency(trades), [trades]);
   const planDetail = useMemo(() => computePlanDetail(trades, plans), [trades, plans]);
+
   const {
     equityData,
     totalTrades,
@@ -181,9 +188,27 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
     marketChartData,
     emotionChartData,
     assetDetailData,
+    setupDetailData,
     bestWinStreak,
     worstLossStreak,
   } = stats;
+  /**
+   * La phrase que l'application ne disait jamais : quel setup rapporte, lequel
+   * coûte. Rendue seulement si DEUX setups au moins franchissent le seuil —
+   * désigner un « meilleur » sans point de comparaison n'apprend rien, et le
+   * faire sur trois trades serait un verdict déguisé.
+   */
+  const verdictSetups = useMemo(() => {
+    const fiables = setupDetailData.filter(
+      (r) => r.renseigne && r.tradesCount >= MIN_ECHANTILLON_SETUP
+    );
+    if (fiables.length < 2) return null;
+    const meilleur = fiables[0];
+    const pire = fiables[fiables.length - 1];
+    const decrire = (r: typeof meilleur) =>
+      `${r.setup} (${r.pnl >= 0 ? "+" : ""}${formatCurrency(r.pnl)}, ${r.tradesCount} trades, ${r.winRate} %)`;
+    return `Ton setup le plus rentable : ${decrire(meilleur)}. Le plus coûteux : ${decrire(pire)}.`;
+  }, [setupDetailData]);
 
   // Une carte par dimension, toutes affichées en même temps — plus de pilules
   // à cliquer pour comparer deux répartitions entre elles.
@@ -560,6 +585,68 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
           ))}
         </div>
       </div>
+
+      {/* Détail par setup — placé AVANT « Détail par Actif » : « lequel de mes
+          setups gagne vraiment ? » est la question la plus actionnable d'un
+          journal, et cette ventilation était calculée depuis toujours sans
+          jamais être affichée. */}
+      <Card className="p-5 space-y-4">
+        <SectionHeader color="bg-[#00E676]">Détail par Setup</SectionHeader>
+        {setupDetailData.length === 0 ? (
+          <EmptyState>Renseigne le setup de tes trades pour voir lesquels fonctionnent.</EmptyState>
+        ) : (
+          <>
+            {verdictSetups && (
+              <p className="text-xs text-slate-400 leading-relaxed">{verdictSetups}</p>
+            )}
+            <div className="overflow-x-auto -mx-1">
+              <table className="w-full text-sm min-w-[480px]">
+                <thead>
+                  <tr className="border-b border-[#1B2320]">
+                    <th className="text-left px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Setup</th>
+                    <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Trades</th>
+                    <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Win Rate</th>
+                    <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">PnL Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {setupDetailData.map((row) => {
+                    // Sous le seuil, la donnée reste AFFICHÉE mais en gris : c'est
+                    // le verdict qu'on suspend, pas l'information. Un win rate de
+                    // 100 % sur 2 trades ne dit rien, le peindre en vert le
+                    // ferait passer pour un résultat.
+                    const assezDeTrades = row.tradesCount >= MIN_ECHANTILLON_SETUP;
+                    return (
+                      <tr key={row.setup} className="border-b border-[#1B2320] last:border-b-0">
+                        <td className={`px-3 py-3 font-bold ${row.renseigne ? "text-white" : "text-slate-500 italic"}`}>
+                          {row.setup}
+                        </td>
+                        <td className="px-3 py-3 text-right text-slate-300 font-mono">{row.tradesCount}</td>
+                        <td
+                          className={`px-3 py-3 text-right font-mono font-bold ${
+                            !assezDeTrades ? "text-slate-500" : row.winRate >= 50 ? "text-[#00E676]" : "text-rose-400"
+                          }`}
+                          title={assezDeTrades ? undefined : `Moins de ${MIN_ECHANTILLON_SETUP} trades — trop peu pour conclure.`}
+                        >
+                          {row.winRate}%
+                        </td>
+                        <td
+                          className={`px-3 py-3 text-right font-mono font-bold ${
+                            row.pnl >= 0 ? "text-[#00E676]" : "text-rose-400"
+                          }`}
+                        >
+                          {row.pnl >= 0 ? "+" : ""}
+                          {formatCurrency(row.pnl)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </Card>
 
       {/* Détail par actif — tableau exhaustif (tous les actifs, pas les 8
           premiers de "Où es-tu le meilleur ?"), trié par PnL décroissant. */}
