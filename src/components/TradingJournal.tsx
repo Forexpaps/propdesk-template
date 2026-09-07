@@ -252,6 +252,22 @@ function normalizeHeader(h: string): string {
 }
 
 /**
+ * Lit une cellule numérique d'un CSV : le nombre, ou `null` si la cellule ne
+ * représente pas un nombre. Cellule vide = 0, comme `parsePriceInput`.
+ *
+ * Indispensable parce que `parsePriceInput` renvoie `NaN` sur du texte
+ * (`Number("n/a")`), et qu'un `NaN` importé dans `pnl` contaminait ensuite
+ * TOUTES les sommes du logiciel : PnL cumulé, capital, courbe d'équité,
+ * profit factor et solde des portefeuilles affichaient « $NaN », sans que rien
+ * ne désigne la ligne fautive. Une ligne illisible doit être refusée à
+ * l'entrée et nommée, jamais absorbée.
+ */
+function nombreCsv(raw: string): number | null {
+  const valeur = parsePriceInput(raw);
+  return Number.isFinite(valeur) ? valeur : null;
+}
+
+/**
  * Captures réellement présentes d'un trade, pour l'affichage en lecture
  * seule (aperçu complet) — contrairement à `toScreenshotSlots`, ne force PAS
  * les 3 emplacements par défaut : un emplacement jamais rempli ne doit rien
@@ -459,14 +475,28 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       csvCell(t.notes || "")
     ]);
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+
+    // `Blob` + `createObjectURL`, jamais `encodeURI("data:text/csv,...")`.
+    // `encodeURI` n'échappe PAS le croisillon : la première note contenant un
+    // « # » (« setup #3 », « #NAS100 ») transformait tout ce qui suivait en
+    // fragment d'URL, et le fichier téléchargé s'arrêtait net à cet endroit —
+    // sans le moindre message. Le reste du journal disparaissait de l'export.
+    // Une URL `data:` plafonne aussi en longueur selon le navigateur, ce qu'un
+    // Blob ignore. Même mécanique que l'export de sauvegarde JSON
+    // (`UserProfileModal`), qui utilisait déjà un Blob.
+    //
+    // BOM UTF-8 en tête : sans lui, Excel sous Windows lit le fichier en
+    // ANSI et affiche « Matières Premières » en « MatiÃ¨res PremiÃ¨res ».
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", url);
     link.setAttribute("download", `Horizon_Journal_Trades_${new Date().toISOString().split("T")[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const importFileInputRef = useRef<HTMLInputElement>(null);
@@ -577,14 +607,34 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         const emotion = CSV_EMOTIONS.find((em) => em === get(row, "Emotion")) ?? "Disciplined";
         const pnlUnit = CSV_PNL_UNITS.find((u) => u === get(row, "Unite PnL")) ?? "USD";
 
-        const entryPrice = parsePriceInput(get(row, "Prix Entree"));
-        const stopLoss = parsePriceInput(get(row, "Stop Loss"));
-        const takeProfit = parsePriceInput(get(row, "Take Profit"));
+        // Chaque cellule numérique est validée AVANT d'entrer dans le
+        // journal : une seule valeur illisible suffisait à rendre tous les
+        // totaux de l'application « NaN » (voir `nombreCsv`).
         const exitPriceRaw = get(row, "Prix Sortie");
-        const lotSize = parsePriceInput(get(row, "Taille Lot"));
         const risqueRaw = get(row, "Risque %");
-        const riskPercent = risqueRaw ? parsePriceInput(risqueRaw) : undefined;
-        const pnl = parsePriceInput(get(row, "PnL"));
+        const champsNumeriques: [string, string, boolean][] = [
+          ["Prix Entree", get(row, "Prix Entree"), true],
+          ["Stop Loss", get(row, "Stop Loss"), true],
+          ["Take Profit", get(row, "Take Profit"), true],
+          ["Taille Lot", get(row, "Taille Lot"), true],
+          ["PnL", get(row, "PnL"), true],
+          ["Prix Sortie", exitPriceRaw, false],
+          ["Risque %", risqueRaw, false],
+        ];
+        const illisible = champsNumeriques.find(
+          ([, brut, obligatoire]) => (obligatoire || brut !== "") && nombreCsv(brut) === null
+        );
+        if (illisible) {
+          errors.push(`Ligne ${ligne} : "${illisible[0]}" n'est pas un nombre ("${illisible[1]}").`);
+          return;
+        }
+
+        const entryPrice = nombreCsv(get(row, "Prix Entree"))!;
+        const stopLoss = nombreCsv(get(row, "Stop Loss"))!;
+        const takeProfit = nombreCsv(get(row, "Take Profit"))!;
+        const lotSize = nombreCsv(get(row, "Taille Lot"))!;
+        const riskPercent = risqueRaw ? nombreCsv(risqueRaw)! : undefined;
+        const pnl = nombreCsv(get(row, "PnL"))!;
 
         const accountName = get(row, "Compte");
         const accountId =
@@ -629,7 +679,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           entryPrice,
           stopLoss,
           takeProfit,
-          exitPrice: exitPriceRaw ? parsePriceInput(exitPriceRaw) : undefined,
+          exitPrice: exitPriceRaw ? nombreCsv(exitPriceRaw)! : undefined,
           lotSize,
           riskPercent,
           pnl,
@@ -1146,11 +1196,24 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         result === "OPEN" || formData.exitPrice.trim() === ""
           ? undefined
           : parsePriceInput(formData.exitPrice),
-      lotSize: Number(formData.lotSize),
+      // `parsePriceInput` et non `Number` : ce champ accepte le texte libre
+      // (`handleDecimalChange`), et `Number(".")` vaut NaN — un seul point
+      // tapé par erreur enregistrait une taille de lot NaN, qui se propageait
+      // ensuite dans tous les affichages du trade.
+      lotSize: parsePriceInput(formData.lotSize),
       // `undefined` et non 0 quand le champ est vide : 0 % se lirait comme
       // « aucun risque engagé », ce qui n'existe pas, et compterait à tort
       // dans les badges de gestion du risque.
-      riskPercent: formData.riskPercent.trim() === "" ? undefined : Number(formData.riskPercent),
+      // Même piège que `lotSize` ci-dessus, avec une conséquence en plus : un
+      // `riskPercent` NaN désactivait SILENCIEUSEMENT la règle de risque du
+      // plan de trading (`NaN > seuil` est toujours faux), donc aucune alerte.
+      // Une valeur non exploitable ou nulle vaut « non renseigné ».
+      riskPercent: (() => {
+        const saisi = formData.riskPercent.trim();
+        if (saisi === "") return undefined;
+        const valeur = parsePriceInput(saisi);
+        return Number.isFinite(valeur) && valeur > 0 ? valeur : undefined;
+      })(),
       pnl,
       pnlUnit: formData.pnlUnit,
       riskRewardRatio: riskReward,
