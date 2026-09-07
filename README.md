@@ -125,7 +125,18 @@ serveur) sont importées automatiquement. À défaut, la base est amorcée avec
 `src/data/mockData.ts`.
 
 La base vit dans un fichier local (`DATA_DIR`, `./data` par défaut, hors du
-dépôt). `server/db.ts` gère la connexion.
+dépôt). `server/db.ts` gère la connexion. Une copie de la base est faite
+automatiquement au démarrage du serveur (`server/backup.ts`, 20 copies
+conservées).
+
+**Sauvegarde manuelle** — « Profil › Données & Sauvegarde › Exporter mes
+données » écrit un fichier JSON contenant le profil, toutes les collections
+(trades, portefeuilles, setups, plans de trading, revues hebdomadaires,
+badges, notifications) **et les captures d'écran**, avec leur identifiant
+d'origine. C'est ce dernier point qui rend le fichier réellement complet : les
+captures vivent dans leur propre table, hors de la collection `trades`, et
+n'étaient donc pas exportées — une sauvegarde restaurée sur une machine neuve
+rendait tous les trades avec des images cassées.
 
 ### API
 
@@ -142,9 +153,18 @@ dépôt). `server/db.ts` gère la connexion.
 | PUT | `/api/profile` | profil |
 | POST | `/api/state/seed` | amorce avec le jeu de démonstration |
 | POST | `/api/state/import` | reprend un état venu de `localStorage` |
+| POST | `/api/state/restore` | restaure une sauvegarde JSON exportée |
+| POST | `/api/screenshots` | envoie une capture d'écran de trade |
+| GET | `/api/screenshots/:id` | sert une capture |
+| GET | `/api/backup/screenshots` | toutes les captures, pour l'export de sauvegarde |
+| POST | `/api/backup/screenshots` | réinsère des captures en conservant leur identifiant |
+| GET | `/api/economic-calendar` | calendrier économique (public) |
+| GET | `/api/market-data` | cotations de marché (public) |
 
 Toutes les routes exigent une session valide, **sauf** `/api/health`,
-`/api/auth/me`, `/api/auth/setup`, `/api/auth/login` et `/api/auth/logout`.
+`/api/auth/me`, `/api/auth/setup`, `/api/auth/login`, `/api/auth/logout`,
+`/api/economic-calendar` et `/api/market-data` (données publiques identiques
+pour tout visiteur).
 Toutes les entrées sont validées (zod).
 
 Limitations de débit par IP : `/api/auth/login` 10 par quart d'heure,
@@ -192,6 +212,16 @@ npx tsx -e "import {createClient} from '@libsql/client'; (async () => { const db
 
 Vos données ne sont pas touchées : seuls les comptes sont à recréer.
 
+## Tests
+
+`npm test` (vitest) couvre les calculs purs de `src/lib/` : soldes de
+portefeuille, statistiques du journal, conformité au plan de trading,
+comparaison de périodes, revue hebdomadaire, filtres et tri, filet anti-perte
+`pendingChanges`, et le comportement face à des données aberrantes (émotion
+hors catalogue, valeur non numérique importée d'un CSV). `npm run lint`
+(`tsc --noEmit`) vérifie le typage. Les composants React ne sont pas testés :
+la logique testable en a été extraite vers `src/lib/`.
+
 ## Limites connues
 
 - **Le verrou ne protège pas les données déjà en cache.** Si le serveur
@@ -210,7 +240,11 @@ Vos données ne sont pas touchées : seuls les comptes sont à recréer.
   comptes multiples sera additif — mais le cloisonnement des données par
   utilisateur reste à faire. La connexion se fait par mot de passe seul
   (aucune identification par email), cohérent avec ce modèle mono-compte.
-- **Les modifications faites hors ligne ne sont pas rejouées** à la reconnexion.
-  Elles restent dans le cache local, mais le rechargement suivant reprend l'état
-  du serveur.
-- **Aucun test automatisé** : le projet n'a pas encore de runner.
+- **Une modification faite hors ligne n'est jamais rejouée toute seule.** Elle
+  est retenue dans un registre local (`src/lib/pendingChanges.ts`) et un
+  bandeau la propose explicitement à la reconnexion : c'est l'utilisateur qui
+  tranche entre l'envoyer ou l'abandonner. Rien n'est renvoyé automatiquement,
+  parce qu'une collection est remplacée en bloc et non fusionnée ligne à ligne.
+- **Les captures d'écran ne transitent pas par l'export CSV** du journal (ce
+  format n'a pas de place pour des images) — seule la sauvegarde JSON les
+  emporte.

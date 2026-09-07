@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { StudentProfile, TraderBadge } from "../types";
 import { resizeAvatar, AVATAR_SIZE } from "../lib/image";
-import { api } from "../lib/api";
+import { api, type BackupScreenshot } from "../lib/api";
 import { alertDialog, confirmDialog } from "../lib/confirmDialog";
 import { ChangeOwnPasswordModal } from "./ChangeOwnPasswordModal";
 import { TwoFactorSetupModal } from "./TwoFactorSetupModal";
@@ -116,6 +116,37 @@ const AVATAR_PRESETS = [
   "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=250",
 ];
 
+/**
+ * Découpe les captures en lots d'environ 3 Mo de données base64.
+ *
+ * Le serveur refuse un corps de plus de 8 Mo (`express.json({ limit: "8mb" })`)
+ * et une sauvegarde bien illustrée le dépasse largement : tout envoyer d'un
+ * bloc ferait échouer la restauration des images entière. La marge est large,
+ * l'enveloppe JSON et l'encodage pesant en plus des données elles-mêmes.
+ *
+ * Une capture isolée plus grosse que le seuil part quand même, seule dans son
+ * lot : à elle de passer ou d'être rejetée, plutôt que d'être écartée ici.
+ */
+const TAILLE_LOT_CAPTURES = 3 * 1024 * 1024;
+
+function decouperEnLots(captures: BackupScreenshot[]): BackupScreenshot[][] {
+  const lots: BackupScreenshot[][] = [];
+  let courant: BackupScreenshot[] = [];
+  let poids = 0;
+  for (const capture of captures) {
+    const taille = capture?.data?.length ?? 0;
+    if (courant.length > 0 && poids + taille > TAILLE_LOT_CAPTURES) {
+      lots.push(courant);
+      courant = [];
+      poids = 0;
+    }
+    courant.push(capture);
+    poids += taille;
+  }
+  if (courant.length > 0) lots.push(courant);
+  return lots;
+}
+
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   isOpen,
   onClose,
@@ -194,7 +225,14 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     setBackupStatus({ kind: "busy", message: "Export en cours…" });
     try {
       const state = await api.fetchState();
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      // Les captures d'écran vivent hors des collections (table
+      // `trade_screenshots`) : `fetchState` ne les contient pas, et l'export
+      // n'emportait donc AUCUNE image. Restaurée sur une base neuve, la
+      // sauvegarde rendait tous les trades avec des vignettes cassées, sans
+      // aucun message. Elles sont désormais jointes au fichier avec leur
+      // identifiant d'origine — celui vers lequel pointe chaque `chartUrls`.
+      const { screenshots } = await api.fetchScreenshotsForBackup();
+      const blob = new Blob([JSON.stringify({ ...state, screenshots }, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -223,6 +261,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       tradingPlans: "plans de trading",
       badges: "badges",
       notifications: "notifications",
+      weeklyReviews: "revues hebdomadaires",
     };
     return noms.map((n) => LIBELLES[n] ?? n).join(", ");
   };
@@ -250,6 +289,20 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
     try {
       const text = await file.text();
       const parsed = JSON.parse(text);
+
+      // Les captures d'abord : les trades restaurés juste après pointent
+      // dessus par `chartUrls`. Envoyées par lots — le serveur refuse un corps
+      // de plus de 8 Mo, et une seule sauvegarde bien illustrée le dépasse.
+      // Une sauvegarde antérieure à ce correctif n'a pas de champ
+      // `screenshots` : la restauration se poursuit normalement, seules ses
+      // images resteront manquantes (elles n'ont jamais été exportées).
+      const captures: BackupScreenshot[] = Array.isArray(parsed.screenshots) ? parsed.screenshots : [];
+      let capturesReprises = 0;
+      for (const lot of decouperEnLots(captures)) {
+        const r = await api.restoreScreenshots(lot);
+        capturesReprises += r.importees;
+      }
+
       const result = await api.restoreState({
         student: parsed.student ?? undefined,
         collections: parsed.collections ?? undefined,
@@ -272,11 +325,19 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
       }
 
       const detail = `Repris : ${nommerCollections(result.imported)}.`;
+      const images =
+        capturesReprises > 0
+          ? ` ${capturesReprises} capture${capturesReprises > 1 ? "s" : ""} d'écran restaurée${
+              capturesReprises > 1 ? "s" : ""
+            }.`
+          : captures.length > 0
+          ? " Aucune capture d'écran n'a pu être reprise."
+          : "";
       const rejet =
         result.skipped.length > 0 ? ` Non repris : ${nommerCollections(result.skipped)}.` : "";
       setBackupStatus({
         kind: result.skipped.length > 0 ? "error" : "success",
-        message: `${detail}${rejet} Rechargement de la page…`,
+        message: `${detail}${images}${rejet} Rechargement de la page…`,
       });
       setTimeout(() => window.location.reload(), result.skipped.length > 0 ? 4000 : 1200);
     } catch {

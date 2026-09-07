@@ -8,11 +8,12 @@ Document de reprise, à lire avant de toucher au code. Écrit pour quelqu'un
 - Branche : `main`.
 - `origin` pointe désormais vers un dépôt **privé** dédié à l'usage personnel
   (`journal-de-trading`), plus vers l'ancien dépôt public `propdesk-template`.
-- Dernier commit : `de6df10 — "Chiffre ce que coûtent les entorses au plan, règle par règle"`.
-- **Tests : `npm test` (vitest, 167 tests)** sur les calculs purs — soldes,
+- Dernier commit : `b4b7b4c — "Referme la boucle : une revue hebdo dont l'objectif se vérifie tout seul"`.
+- **Tests : `npm test` (vitest, 177 tests)** sur les calculs purs — soldes,
   statistiques du Journal, durées, capture de la cible, badges, tri et
   fenêtres de période, filet anti-perte `pendingChanges`, conformité au plan,
-  comparaison de périodes, revue hebdomadaire, sparkline. `npm run lint`
+  comparaison de périodes, revue hebdomadaire, sparkline, et résistance aux
+  données aberrantes (émotion hors catalogue, nombre illisible). `npm run lint`
   (`tsc --noEmit`) reste la vérification de typage. Les composants React ne
   sont pas testés : la logique testable en a été extraite vers `src/lib/`.
 
@@ -300,6 +301,15 @@ quart d'heure, `/api/auth/setup` 5 par quart d'heure.
   volontairement pas de clé étrangère vers `trades` (l'id du trade n'existe pas
   encore à l'envoi), les orphelines étant balayées au démarrage par
   `purgeOrphanScreenshots`.
+- **La sauvegarde JSON n'est PAS `GET /api/state`.** Les captures d'écran
+  vivent dans `trade_screenshots`, hors des collections : elles ne sont donc
+  pas dans `/api/state`, et l'export les a longtemps oubliées — une sauvegarde
+  restaurée sur une base neuve rendait tous les trades avec des images
+  cassées, sans aucun avertissement. L'export appelle désormais aussi
+  `GET /api/backup/screenshots`, et la restauration les réinsère par lots
+  (limite de corps de 8 Mo) en CONSERVANT leur identifiant : les `chartUrls`
+  des trades pointent dessus. Toute donnée future stockée hors des collections
+  devra faire la même chose, sous peine du même trou.
 - **Toute nouvelle collection synchronisée doit être déclarée à SIX
   endroits**, sous peine de perte de données silencieuse :
   1. `SCHEMA_STATEMENTS` (`server/db.ts`) — la table ;

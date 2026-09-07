@@ -22,6 +22,18 @@ export interface ServerCollections {
 
 export type CollectionName = keyof ServerCollections;
 
+/**
+ * Une capture telle qu'elle voyage dans le fichier de sauvegarde : l'image
+ * elle-même (base64) ET son identifiant d'origine, sans lequel les
+ * `chartUrls` des trades restaurés ne pointeraient plus sur rien.
+ */
+export interface BackupScreenshot {
+  id: string;
+  mime: string;
+  data: string;
+  createdAt: string;
+}
+
 /** Événement du calendrier économique — voir `server/economicCalendar.ts`. */
 export interface EconomicCalendarEvent {
   id: string;
@@ -178,6 +190,25 @@ export const api = {
     request<{ id: string; url: string }>("/api/screenshots", {
       method: "POST",
       body: JSON.stringify({ dataUrl }),
+    }),
+
+  /**
+   * Captures d'écran du bureau, pour la SAUVEGARDE uniquement — jamais au
+   * démarrage : c'est précisément pour alléger le payload de bootstrap
+   * qu'elles ont été sorties de la collection `trades`.
+   */
+  fetchScreenshotsForBackup: () =>
+    request<{ screenshots: BackupScreenshot[] }>("/api/backup/screenshots"),
+
+  /**
+   * Réinsère un lot de captures en conservant leur identifiant — les trades
+   * restaurés pointent dessus. Envoyé par lots pour rester sous la limite de
+   * corps de 8 Mo du serveur.
+   */
+  restoreScreenshots: (screenshots: BackupScreenshot[]) =>
+    request<{ success: true; importees: number; ignorees: number }>("/api/backup/screenshots", {
+      method: "POST",
+      body: JSON.stringify({ screenshots }),
     }),
 
   importState: (state: {

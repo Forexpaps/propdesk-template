@@ -489,6 +489,97 @@ api.get(
   })
 );
 
+/**
+ * Captures d'écran incluses dans la SAUVEGARDE, et elles seules.
+ *
+ * Les captures vivent hors de la collection `trades` (table
+ * `trade_screenshots`) pour que le payload des trades reste léger — c'était le
+ * but du déplacement. Mais `GET /api/state`, qui alimente « Exporter mes
+ * données », ne parcourt que `COLLECTION_NAMES` : les images n'y figuraient
+ * donc PAS. Un export restauré sur une base neuve rendait tous les trades avec
+ * des images cassées, sans le moindre avertissement — la sauvegarde ne
+ * sauvegardait pas tout ce que l'utilisateur croyait.
+ *
+ * D'où ces deux routes dédiées, appelées uniquement par l'export/restauration
+ * et jamais au démarrage : le payload de bootstrap reste inchangé.
+ */
+api.get(
+  "/backup/screenshots",
+  wrap(async (req, res) => {
+    const result = await db.execute({
+      sql: "SELECT id, mime, data, created_at FROM trade_screenshots WHERE user_id = ? ORDER BY created_at ASC",
+      args: [req.auth!.dataUserId],
+    });
+    const screenshots = (result.rows as unknown as {
+      id: string;
+      mime: string;
+      data: string;
+      created_at: string;
+    }[]).map((r) => ({ id: r.id, mime: r.mime, data: r.data, createdAt: r.created_at }));
+    res.json({ screenshots });
+  })
+);
+
+/** Même borne que l'envoi unitaire, appliquée à chaque image du lot. */
+const MAX_SCREENSHOT_DATA_LENGTH = MAX_SCREENSHOT_BYTES;
+
+/**
+ * Réinsère des captures en CONSERVANT leur identifiant : les trades restaurés
+ * pointent sur `/api/screenshots/<id>`, un id régénéré casserait chaque lien.
+ *
+ * Le client envoie par lots pour rester sous la limite de corps de 8 Mo.
+ * Idempotent : réimporter la même sauvegarde deux fois ne duplique rien.
+ */
+api.post(
+  "/backup/screenshots",
+  screenshotUploadRateLimit,
+  wrap(async (req, res) => {
+    const lot = (req.body as { screenshots?: unknown })?.screenshots;
+    if (!Array.isArray(lot)) {
+      res.status(400).json({ error: "Lot de captures invalide." });
+      return;
+    }
+
+    let importees = 0;
+    let ignorees = 0;
+    for (const brut of lot) {
+      const item = brut as { id?: unknown; mime?: unknown; data?: unknown; createdAt?: unknown };
+      const idOk = typeof item.id === "string" && /^[A-Za-z0-9_-]{1,120}$/.test(item.id);
+      const mimeOk = typeof item.mime === "string" && /^image\/[a-z0-9.+-]{1,40}$/i.test(item.mime);
+      const dataOk =
+        typeof item.data === "string" &&
+        item.data.length > 0 &&
+        item.data.length <= MAX_SCREENSHOT_DATA_LENGTH &&
+        /^[A-Za-z0-9+/=\s]+$/.test(item.data);
+      if (!idOk || !mimeOk || !dataOk) {
+        ignorees += 1;
+        continue;
+      }
+
+      // `WHERE user_id = ?` sur la branche de mise à jour : `id` est une clé
+      // primaire GLOBALE, sans cette condition un identifiant choisi dans le
+      // fichier restauré pourrait écraser la capture d'un autre bureau.
+      await db.execute({
+        sql: `INSERT INTO trade_screenshots (id, user_id, mime, data, created_at)
+              VALUES (?, ?, ?, ?, ?)
+              ON CONFLICT(id) DO UPDATE SET mime = excluded.mime, data = excluded.data
+              WHERE trade_screenshots.user_id = ?`,
+        args: [
+          item.id as string,
+          req.auth!.dataUserId,
+          item.mime as string,
+          item.data as string,
+          typeof item.createdAt === "string" ? item.createdAt : new Date().toISOString(),
+          req.auth!.dataUserId,
+        ],
+      });
+      importees += 1;
+    }
+
+    res.json({ success: true, importees, ignorees });
+  })
+);
+
 const stateRestoreRateLimit = createRateLimit({
   windowMs: 15 * 60_000,
   max: 5,
