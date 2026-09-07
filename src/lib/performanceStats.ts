@@ -548,8 +548,16 @@ export interface PnlByPeriod {
   year: PeriodPnl;
 }
 
-/** Lundi 00:00 de la semaine calendaire contenant `date` (ISO, jamais un décalage glissant de 7 jours). */
-function startOfWeek(date: Date): Date {
+/**
+ * Lundi 00:00 de la semaine calendaire contenant `date` (ISO, jamais un
+ * décalage glissant de 7 jours).
+ *
+ * Exportée : `periodComparison.ts` et `weeklySummary.ts` doivent découper les
+ * semaines EXACTEMENT comme `computePnlByPeriod` le fait ici. Une seconde
+ * définition ferait désigner deux fenêtres différentes par « la semaine
+ * dernière » et « Semaine N » sur le même écran.
+ */
+export function startOfWeek(date: Date): Date {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const day = d.getDay(); // 0 = dimanche
   const diffToMonday = day === 0 ? -6 : 1 - day;

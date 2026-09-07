@@ -41,6 +41,7 @@ import { buildCumulativePnlSeries, buildSparklinePath } from "../lib/sparkline";
 import { computeWeeklySummary } from "../lib/weeklySummary";
 import { computeJournalSummary, computePnlByPeriod, isRealizedDollarTrade } from "../lib/performanceStats";
 import { TradingSessionsWidget } from "./TradingSessionsWidget";
+import { PeriodComparisonCard } from "./PeriodComparisonCard";
 
 /**
  * En-tête de section — barre verticale colorée + titre, motif repris tel
@@ -235,6 +236,11 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 2ter. Progression période sur période — placée juste sous les KPI
+          cumulés : « est-ce que je m'améliore ? » est la question de l'écran
+          d'arrivée, et aucune autre partie de l'application n'y répond. */}
+      <PeriodComparisonCard trades={trades} />
 
       {/* PnL par période — jour / semaine / mois / année en cours */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
