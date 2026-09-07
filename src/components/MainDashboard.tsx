@@ -34,11 +34,13 @@ import { formatCurrency } from "../lib/format";
 import {
   StudentProfile,
   Trade,
+  TradingPlanData,
 } from "../types";
 import { TabType, SidebarItemKey } from "./Sidebar";
 import { computeDisciplineStreak } from "../lib/badges";
 import { buildCumulativePnlSeries, buildSparklinePath } from "../lib/sparkline";
 import { computeWeeklySummary } from "../lib/weeklySummary";
+import { computePlanComplianceSummary } from "../lib/planCompliance";
 import { computeJournalSummary, computePnlByPeriod, isRealizedDollarTrade } from "../lib/performanceStats";
 import { TradingSessionsWidget } from "./TradingSessionsWidget";
 import { PeriodComparisonCard } from "./PeriodComparisonCard";
@@ -60,12 +62,15 @@ const SectionHeader: React.FC<{ children: React.ReactNode; color?: string }> = (
 interface MainDashboardProps {
   student: StudentProfile;
   trades: Trade[];
+  /** Plans de trading — alimentent la ligne « Respect du plan » de la comparaison de périodes. Optionnel : l'écran reste complet sans aucun plan. */
+  plans?: TradingPlanData;
   setActiveTab: (tab: TabType) => void;
 }
 
 export const MainDashboard: React.FC<MainDashboardProps> = ({
   student,
   trades,
+  plans = [],
   setActiveTab,
 }) => {
   // Calculate Metrics
@@ -130,6 +135,13 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   // Tracé réel de la carte « PnL cumulé » — `null` sous deux trades, la carte
   // ne rend alors aucune courbe (voir `src/lib/sparkline.ts`).
   const sparklinePath = buildSparklinePath(buildCumulativePnlSeries(trades), 80, 30);
+
+  // Une seule évaluation de conformité pour tout l'écran — `PeriodComparisonCard`
+  // la découpe ensuite par période plutôt que de rejuger les trades deux fois.
+  const violationsParTrade = React.useMemo(
+    () => computePlanComplianceSummary(trades, plans, student.startingCapital).violationsParTrade,
+    [trades, plans, student.startingCapital]
+  );
 
   const firstName = student.name.split(" ")[0] || "Yoann";
 
@@ -240,7 +252,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
       {/* 2ter. Progression période sur période — placée juste sous les KPI
           cumulés : « est-ce que je m'améliore ? » est la question de l'écran
           d'arrivée, et aucune autre partie de l'application n'y répond. */}
-      <PeriodComparisonCard trades={trades} />
+      <PeriodComparisonCard trades={trades} violationsParTrade={violationsParTrade} />
 
       {/* PnL par période — jour / semaine / mois / année en cours */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

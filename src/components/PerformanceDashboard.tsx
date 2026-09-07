@@ -22,6 +22,7 @@ import {
   computePlanDetail,
   isRealizedDollarTrade,
 } from "../lib/performanceStats";
+import { computePlanComplianceSummary } from "../lib/planCompliance";
 
 interface PerformanceDashboardProps {
   student: StudentProfile;
@@ -164,6 +165,13 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
   const duration = useMemo(() => computeDurationStats(trades), [trades]);
   const exit = useMemo(() => computeExitEfficiency(trades), [trades]);
   const planDetail = useMemo(() => computePlanDetail(trades, plans), [trades, plans]);
+  // Réévalué à chaque rendu depuis les plans ACTUELS — jamais lu d'un cache
+  // persisté, qui serait faux dès qu'un plan est édité (voir
+  // `computePlanComplianceSummary`).
+  const compliance = useMemo(
+    () => computePlanComplianceSummary(trades, plans, student.startingCapital),
+    [trades, plans, student.startingCapital]
+  );
 
   const {
     equityData,
@@ -748,6 +756,138 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
               </tbody>
             </table>
           </div>
+        )}
+      </Card>
+
+      {/* Respect du plan — ce que coûtent les entorses, par règle.
+          Volontairement SANS graphique : huit règles au plus, trois chiffres
+          chacune, le tableau porte tout. Calculé sur l'intégralité du journal
+          (cet écran n'a aucun filtre de période — en introduire un ici seul
+          créerait deux notions de « période » sur la même page). */}
+      <Card className="p-5 space-y-4">
+        <div>
+          <SectionHeader color="bg-rose-500">Respect du plan</SectionHeader>
+          <p className="text-xs text-slate-500 mt-1">
+            Tout le journal, évalué avec tes règles <span className="text-slate-400">actuelles</span> — un plan
+            modifié rejuge les trades passés.
+          </p>
+        </div>
+
+        {compliance.tradesEvalues === 0 ? (
+          <EmptyState>
+            Rattache tes trades à un plan de trading pour mesurer ce que coûtent les écarts.
+          </EmptyState>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <MicroLabel>Trades évalués</MicroLabel>
+                <div className="text-xl font-black font-mono text-white">{compliance.tradesEvalues}</div>
+              </div>
+              <div className="space-y-1">
+                <MicroLabel>En infraction</MicroLabel>
+                <div
+                  className={`text-xl font-black font-mono ${
+                    compliance.tradesEnInfraction > 0 ? "text-rose-400" : "text-[#00E676]"
+                  }`}
+                >
+                  {compliance.tradesEnInfraction}
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  {Math.round((compliance.tradesEnInfraction / compliance.tradesEvalues) * 100)}% des trades
+                  évalués
+                </p>
+              </div>
+              <div className="space-y-1">
+                <MicroLabel>PnL de ces trades</MicroLabel>
+                <div
+                  className={`text-xl font-black font-mono ${
+                    compliance.pnlTotalEnInfraction >= 0 ? "text-[#00E676]" : "text-rose-400"
+                  }`}
+                >
+                  {compliance.pnlTotalEnInfraction >= 0 ? "+" : ""}
+                  {formatCurrency(compliance.pnlTotalEnInfraction)}
+                </div>
+                {/* « PnL » et non « coût » : une entorse rentable existe, et la
+                    renommer en perte serait mentir. */}
+                <p className="text-[10px] text-slate-500">chaque trade compté une seule fois</p>
+              </div>
+            </div>
+
+            {compliance.parRegle.length === 0 ? (
+              <p className="text-sm text-[#00E676] font-medium">
+                Aucune entorse sur les {compliance.tradesEvalues} trades rattachés à un plan.
+              </p>
+            ) : (
+              <div className="overflow-x-auto -mx-1">
+                <table className="w-full text-sm min-w-[480px]">
+                  <thead>
+                    <tr className="border-b border-[#1B2320]">
+                      <th className="text-left px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Règle enfreinte</th>
+                      <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Trades</th>
+                      <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">PnL Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {compliance.parRegle.map((row) => (
+                      <tr key={row.code} className="border-b border-[#1B2320] last:border-b-0">
+                        <td className="px-3 py-3 font-bold text-white">
+                          {row.label}
+                          {row.tradesNonChiffrables > 0 && (
+                            <span className="block text-[10px] font-normal text-slate-500">
+                              dont {row.tradesNonChiffrables} au PnL non chiffrable (position ouverte ou %)
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right text-slate-300 font-mono">{row.occurrences}</td>
+                        <td
+                          className={`px-3 py-3 text-right font-mono font-bold ${
+                            row.pnl >= 0 ? "text-[#00E676]" : "text-rose-400"
+                          }`}
+                        >
+                          {row.pnl >= 0 ? "+" : ""}
+                          {formatCurrency(row.pnl)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Recoupement annoncé plutôt que dissimulé : un trade qui enfreint
+                trois règles verse son PnL entier aux trois lignes. La somme des
+                lignes n'est donc pas le total ci-dessus, et les deux sont
+                justes. */}
+            {compliance.parRegle.length > 1 && (
+              <p className="text-[10px] text-slate-500">
+                Un même trade peut enfreindre plusieurs règles : il apparaît alors sur chaque ligne, et la
+                somme des lignes dépasse le total ci-dessus.
+              </p>
+            )}
+
+            {/* Exclusions comptées et nommées — jamais fondues dans les
+                conformes. */}
+            {(compliance.tradesNonEvalues > 0 || compliance.tradesRisqueNonVerifiable > 0) && (
+              <div className="pt-1 border-t border-[#1B2320] space-y-1">
+                {compliance.tradesNonEvalues > 0 && (
+                  <p className="text-[10px] text-slate-500">
+                    {compliance.tradesNonEvalues} trade{compliance.tradesNonEvalues > 1 ? "s" : ""} sans plan
+                    rattaché (ou dont le plan a été supprimé) — non évalué
+                    {compliance.tradesNonEvalues > 1 ? "s" : ""}, ni conforme{compliance.tradesNonEvalues > 1 ? "s" : ""} ni fautif
+                    {compliance.tradesNonEvalues > 1 ? "s" : ""}.
+                  </p>
+                )}
+                {compliance.tradesRisqueNonVerifiable > 0 && (
+                  <p className="text-[10px] text-slate-500">
+                    {compliance.tradesRisqueNonVerifiable} trade
+                    {compliance.tradesRisqueNonVerifiable > 1 ? "s" : ""} sans risque saisi : la règle de risque
+                    maximal n'a pas pu être vérifiée.
+                  </p>
+                )}
+              </div>
+            )}
+          </>
         )}
       </Card>
 

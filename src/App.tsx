@@ -18,7 +18,7 @@ import { ConfirmDialogHost, alertDialog, confirmDialog } from "./lib/confirmDial
 // `loadTradingPlan` n'a plus qu'un seul rôle : lire l'ANCIENNE clé localStorage
 // pour la reprise ponctuelle des plans hérités (`plansHerites`). Tout le reste
 // de l'app passe par la collection serveur `staffTradingPlan`.
-import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, EMPTY_TRADING_PLANS, normalizeTradingPlans, renameSetupInPlans } from "./lib/planCompliance";
+import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, planAlertId, EMPTY_TRADING_PLANS, normalizeTradingPlans, renameSetupInPlans } from "./lib/planCompliance";
 import { upsertWalletRiskAlerts } from "./lib/walletAlerts";
 import { computeBadgeProgress } from "./lib/badges";
 import { listPending, describePending } from "./lib/pendingChanges";
@@ -708,15 +708,23 @@ function TraderApp({
    * `storageKey`.
    */
   const applyPlanCompliance = (trade: Trade, allTrades: Trade[]) => {
-    if (!trade.tradingPlanId) return;
     // Les plans sont une collection SERVEUR depuis leur migration. Ce code
     // lisait encore `loadTradingPlan()`, c'est-à-dire l'ancienne clé
     // `localStorage` « horizon_trading_plan » (singulier) : aucun plan créé
     // depuis n'y figurait plus, `plan` était donc toujours `undefined` et le
     // contrôle du plan ne levait plus JAMAIS la moindre violation — une
     // fonctionnalité entière morte en silence.
-    const plan = plansRef.current.find((p) => p.id === trade.tradingPlanId);
-    if (!plan) return;
+    const plan = trade.tradingPlanId
+      ? plansRef.current.find((p) => p.id === trade.tradingPlanId)
+      : undefined;
+    // Trade détaché de son plan, ou plan supprimé depuis : on RETIRE l'alerte
+    // au lieu de sortir sans rien faire. Sortir laissait traîner une alerte
+    // qui accuse le trade d'enfreindre une règle ne s'appliquant plus à lui —
+    // et rien d'autre dans l'application ne la nettoyait jamais.
+    if (!plan) {
+      setNotifications((prev) => upsertPlanAlert(prev, trade, []));
+      return;
+    }
     const sameDayTrades = allTrades.filter((t) => t.date === trade.date);
     // `displayStudent.startingCapital`, pas `student.startingCapital` : ce
     // dernier n'est plus jamais tenu à jour depuis que le capital affiché
@@ -731,6 +739,10 @@ function TraderApp({
     const next = tradesRef.current.filter((t) => t.id !== id);
     tradesRef.current = next;
     setTrades(next);
+    // Un trade supprimé ne peut plus enfreindre quoi que ce soit : son alerte
+    // n'a plus d'objet, et le centre d'alertes la gardait indéfiniment (elle
+    // ne pointait même plus vers une ligne du journal).
+    setNotifications((prev) => prev.filter((n) => n.id !== planAlertId(id)));
   };
 
   return (
@@ -816,6 +828,7 @@ function TraderApp({
             <MainDashboard
               student={displayStudent}
               trades={trades}
+              plans={staffTradingPlan}
               setActiveTab={setActiveTab}
             />
           )}
