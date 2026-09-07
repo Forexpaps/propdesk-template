@@ -50,14 +50,40 @@ const LABELS: Record<string, string> = {
   horizon_trading_plans: "Plans de trading",
 };
 
-/** Clé `localStorage` → collection serveur. Absent pour profil. */
+/**
+ * Clé `localStorage` → collection serveur. Absent pour le profil, traité à part
+ * dans `pushOne`.
+ *
+ * **Toute clé de `LABELS` doit avoir une entrée ici** (hors profil) — un test le
+ * vérifie. Les plans de trading y manquaient : `markPending` les retenait bien,
+ * mais `pushOne` ne trouvait aucune collection et sortait sans lever, si bien
+ * que `replayPending` les comptait comme envoyés puis les retirait du registre.
+ * Une modification de plan faite hors ligne disparaissait donc en silence,
+ * exactement le trou que `LABELS` devait fermer, déplacé d'un cran.
+ */
 const COLLECTION_BY_KEY: Record<string, CollectionName> = {
   horizon_trades: "trades",
   horizon_accounts: "accounts",
   horizon_notifications: "notifications",
   horizon_badges: "badges",
   horizon_setups: "setups",
+  horizon_trading_plans: "tradingPlans",
 };
+
+/**
+ * Clés suivies par `LABELS` qui n'ont aucune collection serveur associée —
+ * `horizon_student` excepté, traité à part dans `pushOne`.
+ *
+ * **Doit toujours renvoyer un tableau vide**, ce qu'un test vérifie. Exposée
+ * uniquement pour ça : déclarer une collection dans `LABELS` en oubliant
+ * `COLLECTION_BY_KEY` a déjà coûté une perte de données silencieuse, et ce
+ * genre d'oubli se reproduit à chaque nouvelle collection.
+ */
+export function clesSansCollectionServeur(): string[] {
+  return Object.keys(LABELS).filter(
+    (cle) => cle !== "horizon_student" && !(cle in COLLECTION_BY_KEY)
+  );
+}
 
 function read(): string[] {
   try {
@@ -170,7 +196,13 @@ async function pushOne(localKey: string): Promise<void> {
   }
 
   const collection = COLLECTION_BY_KEY[localKey];
-  if (!collection) return;
+  // Lever, et non retourner : une clé connue de `LABELS` mais absente de
+  // `COLLECTION_BY_KEY` doit échouer bruyamment (la modification reste alors en
+  // attente et le bandeau la repropose) plutôt que d'être comptée comme envoyée
+  // puis effacée.
+  if (!collection) {
+    throw new Error(`Aucune collection serveur pour « ${LABELS[localKey] ?? localKey} ».`);
+  }
 
   // Une collection doit être un tableau : un cache corrompu ferait échouer la
   // validation serveur avec un message obscur, autant s'arrêter ici.

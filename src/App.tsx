@@ -15,7 +15,10 @@ import { NotificationModal } from "./components/NotificationModal";
 import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
 import { ConfirmDialogHost, alertDialog, confirmDialog } from "./lib/confirmDialog";
-import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, getTradingPlanStorageKey, EMPTY_TRADING_PLANS, normalizeTradingPlans, renameSetupInPlans } from "./lib/planCompliance";
+// `loadTradingPlan` n'a plus qu'un seul rôle : lire l'ANCIENNE clé localStorage
+// pour la reprise ponctuelle des plans hérités (`plansHerites`). Tout le reste
+// de l'app passe par la collection serveur `staffTradingPlan`.
+import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, EMPTY_TRADING_PLANS, normalizeTradingPlans, renameSetupInPlans } from "./lib/planCompliance";
 import { upsertWalletRiskAlerts } from "./lib/walletAlerts";
 import { computeBadgeProgress } from "./lib/badges";
 import { listPending, describePending } from "./lib/pendingChanges";
@@ -660,6 +663,15 @@ function TraderApp({
     tradesRef.current = trades;
   }, [trades]);
 
+  // Même miroir, même raison, pour les plans : `applyPlanCompliance` est appelé
+  // depuis `handleAddTrade`/`handleUpdateTrade`, qui peuvent s'exécuter deux
+  // fois dans un même lot de rendu (import CSV) et liraient sinon une closure
+  // figée.
+  const plansRef = React.useRef(staffTradingPlan);
+  React.useEffect(() => {
+    plansRef.current = staffTradingPlan;
+  }, [staffTradingPlan]);
+
   // Voir le commentaire équivalent dans `StudentAuthenticatedApp` — mêmes
   // alertes de risque portefeuille, pour les comptes du coach lui-même.
   React.useEffect(() => {
@@ -697,8 +709,13 @@ function TraderApp({
    */
   const applyPlanCompliance = (trade: Trade, allTrades: Trade[]) => {
     if (!trade.tradingPlanId) return;
-    const plans = loadTradingPlan();
-    const plan = plans.find((p) => p.id === trade.tradingPlanId);
+    // Les plans sont une collection SERVEUR depuis leur migration. Ce code
+    // lisait encore `loadTradingPlan()`, c'est-à-dire l'ancienne clé
+    // `localStorage` « horizon_trading_plan » (singulier) : aucun plan créé
+    // depuis n'y figurait plus, `plan` était donc toujours `undefined` et le
+    // contrôle du plan ne levait plus JAMAIS la moindre violation — une
+    // fonctionnalité entière morte en silence.
+    const plan = plansRef.current.find((p) => p.id === trade.tradingPlanId);
     if (!plan) return;
     const sameDayTrades = allTrades.filter((t) => t.date === trade.date);
     // `displayStudent.startingCapital`, pas `student.startingCapital` : ce

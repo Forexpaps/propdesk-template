@@ -1,5 +1,5 @@
 import { AppNotification, Trade, TradingPlan, TradingPlanData } from "../types";
-import { FOREX_SESSIONS, isSessionActive } from "../components/TopHeader";
+import { FOREX_SESSIONS, isSessionActive } from "./sessions";
 import { isRealizedDollarTrade } from "./performanceStats";
 
 /** Exportée pour `src/lib/pendingChanges.ts`, qui doit reconnaître une clé de plan namespacée par email sans connaître ce préfixe en dur. */
@@ -218,6 +218,33 @@ export function checkPlanViolations(
 
   if (plan.riskPerTradePercent.trim() && trade.mistakes?.includes("Sur-risque (>1%)")) {
     reasons.push("risque auto-déclaré au-delà du plan");
+  }
+
+  // Comparaison NUMÉRIQUE du risque réellement saisi au seuil du plan — la
+  // seule règle qui MESURE au lieu de demander à l'utilisateur de reconnaître
+  // sa faute. Volontairement distincte du tag auto-déclaré juste au-dessus :
+  // les deux répondent à deux questions différentes (« ce que j'ai mesuré » vs
+  // « ce que j'ai reconnu »), et les voir se déclencher ensemble est informatif.
+  //
+  // `riskPerTradePercent` est une chaîne libre : « 1 » se compare, « 1 à 2 » ou
+  // « 1% » non. Même convention que `maxTradesPerDay` plus haut — une règle
+  // dont le seuil n'est pas un nombre ne s'applique pas, plutôt que de deviner
+  // un seuil que l'utilisateur n'a pas écrit.
+  //
+  // `riskPercent` absent → AUCUNE violation : l'absence n'est pas une faute
+  // (même parti pris que `tradesSansHeure` ailleurs).
+  const risqueMax = Number(plan.riskPerTradePercent);
+  if (
+    plan.riskPerTradePercent.trim() &&
+    Number.isFinite(risqueMax) &&
+    risqueMax > 0 &&
+    typeof trade.riskPercent === "number" &&
+    // Epsilon : le calculateur de position produit un `0.9999999996` pour un
+    // risque de 1 %. Sans cette tolérance, une saisie parfaitement conforme
+    // déclencherait une alerte.
+    trade.riskPercent - risqueMax > 1e-9
+  ) {
+    reasons.push(`risque engagé ${trade.riskPercent}% au-delà du plan (${risqueMax}%)`);
   }
 
   return reasons;

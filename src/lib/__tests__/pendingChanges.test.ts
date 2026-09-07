@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { markPending, listPending, clearPending, describePending } from "../pendingChanges";
+import {
+  markPending,
+  listPending,
+  clearPending,
+  describePending,
+  clesSansCollectionServeur,
+} from "../pendingChanges";
 
 /**
  * `markPending` est le filet qui empêche une modification non synchronisée de
@@ -71,5 +77,18 @@ describe("markPending", () => {
 
   it("laisse passer une clé sans libellé plutôt que de l'effacer de l'affichage", () => {
     expect(describePending(["inconnue"])).toEqual(["inconnue"]);
+  });
+});
+
+describe("cohérence LABELS / COLLECTION_BY_KEY", () => {
+  /**
+   * Garde structurelle. Déclarer une collection dans `LABELS` en oubliant
+   * `COLLECTION_BY_KEY` fait que `markPending` la retient, mais que le rejeu ne
+   * l'envoie jamais tout en la comptant comme envoyée : la modification hors
+   * ligne disparaît sans un mot. C'est arrivé aux plans de trading. Ce test
+   * échoue désormais à la première collection ajoutée à moitié.
+   */
+  it("toute clé suivie a une collection serveur associée", () => {
+    expect(clesSansCollectionServeur()).toEqual([]);
   });
 });
