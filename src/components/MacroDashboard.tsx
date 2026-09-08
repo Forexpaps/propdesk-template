@@ -3,7 +3,7 @@ import { Loader2, Zap } from "lucide-react";
 import { api, EconomicCalendarEvent, MarketQuote } from "../lib/api";
 import { MarketMapWidget } from "./MarketMapWidget";
 import { usePersistentState } from "../hooks/usePersistentState";
-import { BROWSER_TIMEZONE } from "../lib/timezone";
+import { BROWSER_OFFSET_MINUTES } from "../lib/timezone";
 
 const CURRENCY_FLAGS: Record<string, string> = {
   USD: "🇺🇸",
@@ -182,9 +182,9 @@ function computeRiskSentiment(quotes: MarketQuote[]): number {
 
 export const MacroDashboard: React.FC = () => {
   const [now, setNow] = useState(() => new Date());
-  const [viewerTimeZone, setViewerTimeZone] = usePersistentState<string>(
-    "horizon_viewer_timezone",
-    BROWSER_TIMEZONE
+  const [viewerOffsetMinutes, setViewerOffsetMinutes] = usePersistentState<number>(
+    "horizon_viewer_gmt_offset_minutes",
+    BROWSER_OFFSET_MINUTES
   );
   const [quotes, setQuotes] = useState<MarketQuote[] | null>(null);
   const [marketError, setMarketError] = useState<string | null>(null);
@@ -380,8 +380,8 @@ export const MacroDashboard: React.FC = () => {
         now={now}
         vix={quotes?.find((q) => q.symbol === "^VIX")}
         nextHighImpact={nextHighImpact}
-        viewerTimeZone={viewerTimeZone}
-        onChangeViewerTimeZone={setViewerTimeZone}
+        viewerOffsetMinutes={viewerOffsetMinutes}
+        onChangeViewerOffsetMinutes={setViewerOffsetMinutes}
       />
 
       {/* Sentiment de risque */}
