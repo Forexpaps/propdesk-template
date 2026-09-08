@@ -39,3 +39,30 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #00E676;
 }
+
+/* Défilement automatique du bandeau ticker (module Macro) — contenu dupliqué
+ * une fois dans le JSX pour boucler sans à-coup, la moitié du parcours (-50%)
+ * correspond donc exactement à un tour complet. Pause au survol pour lire une
+ * valeur tranquillement. */
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-ticker {
+  animation: ticker-scroll 40s linear infinite;
+}
+
+.animate-ticker:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ticker {
+    animation: none;
+  }
+}
