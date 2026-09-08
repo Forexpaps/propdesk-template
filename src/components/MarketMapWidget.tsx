@@ -27,7 +27,7 @@ const CITIES: {
   { name: "Sydney", timeZone: "Australia/Sydney", session: "Sydney", top: "68%", left: "90%", trackColor: "bg-amber-500" },
 ];
 
-const HOUR_TICKS = [0, 3, 6, 9, 12, 15, 18, 21, 24];
+const HOUR_TICKS = Array.from({ length: 25 }, (_, h) => h);
 
 function formatCityTime(date: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("fr-FR", { timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).format(
