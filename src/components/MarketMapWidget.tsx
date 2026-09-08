@@ -3,7 +3,7 @@ import { Globe2 } from "lucide-react";
 import { FOREX_SESSIONS, isSessionActive, isForexMarketClosed } from "./TopHeader";
 import { MarketQuote } from "../lib/api";
 import { Select } from "./Select";
-import { GMT_OFFSET_OPTIONS, formatTimeAtOffset } from "../lib/timezone";
+import { getTimezoneOffsetMinutes, timezoneOptions } from "../lib/timezone";
 
 /**
  * Position en pourcentage dans la zone "carte" (pas une vraie projection
@@ -58,9 +58,9 @@ interface MarketMapWidgetProps {
   now: Date;
   vix?: MarketQuote;
   nextHighImpact: NextHighImpactEvent | null;
-  /** Décalage GMT choisi par le visiteur (en minutes) — cadre l'axe de la frise et l'heure de la prochaine annonce. */
-  viewerOffsetMinutes: number;
-  onChangeViewerOffsetMinutes: (offsetMinutes: number) => void;
+  /** Fuseau IANA choisi par le visiteur — cadre l'axe de la frise et l'heure de la prochaine annonce. */
+  viewerTimeZone: string;
+  onChangeViewerTimeZone: (timeZone: string) => void;
 }
 
 /** Ramène une heure UTC (0-24, peut être décimale) dans l'axe local d'un fuseau donné. */
@@ -77,22 +77,24 @@ function toLocalHour(utcHour: number, offsetMinutes: number): number {
  * nouvelle source réseau.
  *
  * La frise et l'heure de la prochaine annonce sont cadrées sur
- * `viewerOffsetMinutes` (décalage GMT choisi par l'utilisateur, pas déduit
- * du système) : l'ouverture/fermeture des sessions reste calculée en UTC
- * (source unique, `FOREX_SESSIONS`), seul l'axe affiché tourne selon ce
- * décalage.
+ * `viewerTimeZone` (fuseau choisi par l'utilisateur, pas déduit du système) :
+ * l'ouverture/fermeture des sessions reste calculée en UTC (source unique,
+ * `FOREX_SESSIONS`), seul l'axe affiché tourne selon le décalage de ce
+ * fuseau à l'instant `now` — recalculé à chaque rendu via `Intl`, donc
+ * heure d'été/hiver gérée automatiquement, au jour près.
  */
 export const MarketMapWidget: React.FC<MarketMapWidgetProps> = ({
   now,
   vix,
   nextHighImpact,
-  viewerOffsetMinutes,
-  onChangeViewerOffsetMinutes,
+  viewerTimeZone,
+  onChangeViewerTimeZone,
 }) => {
   const marketClosed = isForexMarketClosed(now);
   const hourUTC = now.getUTCHours();
   const minuteUTC = now.getUTCMinutes();
-  const localNowHour = toLocalHour(hourUTC + minuteUTC / 60, viewerOffsetMinutes);
+  const offsetMinutes = getTimezoneOffsetMinutes(now, viewerTimeZone);
+  const localNowHour = toLocalHour(hourUTC + minuteUTC / 60, offsetMinutes);
   const nowPercent = (localNowHour / 24) * 100;
 
   const openCities = CITIES.filter((city) => {
@@ -120,13 +122,13 @@ export const MarketMapWidget: React.FC<MarketMapWidgetProps> = ({
         </span>
         <div className="ml-auto flex items-center gap-1.5">
           <Select
-            value={viewerOffsetMinutes}
-            onChange={(e) => onChangeViewerOffsetMinutes(Number(e.target.value))}
+            value={viewerTimeZone}
+            onChange={(e) => onChangeViewerTimeZone(e.target.value)}
             className="bg-[#0D1110] border border-[#1B2320] rounded-lg pl-2.5 py-1.5 text-xs text-slate-300 font-mono"
-            aria-label="Fuseau horaire affiché (décalage GMT)"
+            aria-label="Fuseau horaire affiché"
           >
-            {GMT_OFFSET_OPTIONS.map((tz) => (
-              <option key={tz.minutes} value={tz.minutes}>
+            {timezoneOptions(now, viewerTimeZone).map((tz) => (
+              <option key={tz.id} value={tz.id}>
                 {tz.label}
               </option>
             ))}
@@ -177,8 +179,8 @@ export const MarketMapWidget: React.FC<MarketMapWidgetProps> = ({
           const def = FOREX_SESSIONS.find((s) => s.name === city.session);
           const localDef = def
             ? {
-                startUTC: toLocalHour(def.startUTC, viewerOffsetMinutes),
-                endUTC: toLocalHour(def.endUTC, viewerOffsetMinutes),
+                startUTC: toLocalHour(def.startUTC, offsetMinutes),
+                endUTC: toLocalHour(def.endUTC, offsetMinutes),
               }
             : null;
           const segments = localDef ? sessionSegments(localDef) : [];
@@ -238,7 +240,7 @@ export const MarketMapWidget: React.FC<MarketMapWidgetProps> = ({
               </div>
               <div className="text-xs text-amber-400 font-mono mt-0.5">
                 {DAY_ABBR[nextHighImpact.eventTime.getDay()]}{" "}
-                {formatTimeAtOffset(nextHighImpact.eventTime, viewerOffsetMinutes)}
+                {formatCityTime(nextHighImpact.eventTime, viewerTimeZone)}
               </div>
             </>
           ) : (
