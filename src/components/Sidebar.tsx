@@ -10,7 +10,10 @@ import {
   EyeOff,
   Settings2,
   Check,
+<<<<<<< HEAD
   Brain,
+=======
+>>>>>>> origin/main
   Calendar,
   LogOut,
   ClipboardList,
@@ -66,7 +69,10 @@ export const SIDEBAR_TOGGLEABLE_KEYS = [
   "journal",
   "wallets",
   "analytics",
+<<<<<<< HEAD
   "mindset",
+=======
+>>>>>>> origin/main
   "calendar",
   "tradingPlan",
   "setups",
@@ -86,7 +92,10 @@ export const SIDEBAR_ITEM_TABS: Record<SidebarItemKey, TabType | null> = {
   journal: "journal",
   wallets: "wallets",
   analytics: "analytics",
+<<<<<<< HEAD
   mindset: null,
+=======
+>>>>>>> origin/main
   calendar: "macro",
   tradingPlan: null,
   setups: "setups",
@@ -126,8 +135,11 @@ interface SidebarProps {
    */
   onLogout?: () => void;
   onOpenTradingPlan?: () => void;
+<<<<<<< HEAD
   // Section OUTILS : chaque entrée ouvre une modale.
   onOpenMindset?: () => void;
+=======
+>>>>>>> origin/main
   /** Masque ou réaffiche une entrée. Réservé au compte fondateur. */
   onToggleSidebarItem?: (key: SidebarItemKey) => void;
   /**
@@ -152,7 +164,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenProfileModal,
   onLogout,
   onOpenTradingPlan,
+<<<<<<< HEAD
   onOpenMindset,
+=======
+>>>>>>> origin/main
   onToggleSidebarItem,
   canManageSidebar = false,
 }) => {
@@ -195,7 +210,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { key: "calendar", id: "macro", label: "Macro", icon: Calendar },
     { key: "setups", id: "setups", label: "Setups", icon: Target },
     { key: "tradingPlan", id: null, label: "Plan de trading", icon: ClipboardList, onOpen: onOpenTradingPlan },
+<<<<<<< HEAD
     { key: "mindset", id: null, label: "Mindset", icon: Brain, onOpen: onOpenMindset },
+=======
+>>>>>>> origin/main
   ];
 
   /**
@@ -318,6 +336,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         // Les entrées-modales n'ont pas d'onglet : jamais actives.
         const isActive = item.id !== null && activeTab === item.id;
         // Une entrée-modale (id null) sans callback fourni par le parent ne
+<<<<<<< HEAD
         // peut rien ouvrir — cas de `AdminStudentView.tsx` (Vue Complète en
         // lecture seule), qui ne branche jamais `onOpenTradingPlan`/
         // `onOpenMindset` : ces outils vivent en `localStorage` sur
@@ -327,6 +346,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         // visible (juste un survol), ce qui ressemblait à un bug plutôt qu'à
         // une limite connue — désormais visuellement désactivé, avec
         // l'explication en infobulle.
+=======
+        // peut rien ouvrir — visuellement désactivée, avec l'explication en
+        // infobulle.
+>>>>>>> origin/main
         const isUnavailableModalEntry = item.id === null && !item.onOpen;
         return (
           <button
@@ -500,7 +523,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-bold text-white truncate">{student.name}</span>
                     </div>
+<<<<<<< HEAD
                     <p className="text-[10px] text-slate-400 truncate">{student.level}</p>
+=======
+>>>>>>> origin/main
                   </div>
                 </div>
 

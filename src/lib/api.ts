@@ -5,6 +5,11 @@ import {
   AppNotification,
   TraderBadge,
   Setup,
+<<<<<<< HEAD
+=======
+  TradingPlan,
+  WeeklyReview,
+>>>>>>> origin/main
 } from "../types";
 
 /** Collections synchronisées avec le serveur, dans les formes de src/types.ts. */
@@ -14,10 +19,30 @@ export interface ServerCollections {
   notifications: AppNotification[];
   badges: TraderBadge[];
   setups: Setup[];
+<<<<<<< HEAD
+=======
+  tradingPlans: TradingPlan[];
+  weeklyReviews: WeeklyReview[];
+>>>>>>> origin/main
 }
 
 export type CollectionName = keyof ServerCollections;
 
+<<<<<<< HEAD
+=======
+/**
+ * Une capture telle qu'elle voyage dans le fichier de sauvegarde : l'image
+ * elle-même (base64) ET son identifiant d'origine, sans lequel les
+ * `chartUrls` des trades restaurés ne pointeraient plus sur rien.
+ */
+export interface BackupScreenshot {
+  id: string;
+  mime: string;
+  data: string;
+  createdAt: string;
+}
+
+>>>>>>> origin/main
 /** Événement du calendrier économique — voir `server/economicCalendar.ts`. */
 export interface EconomicCalendarEvent {
   id: string;
@@ -164,6 +189,40 @@ export const api = {
   fetchMarketData: () =>
     request<{ quotes: MarketQuote[] }>("/api/market-data"),
 
+<<<<<<< HEAD
+=======
+  /**
+   * Envoie une capture et renvoie l'URL qui la sert. Les images ne transitent
+   * plus dans le payload des trades : toute la collection partant en un seul
+   * envoi, un journal d'une vingtaine de trades illustrés dépassait la limite
+   * de 8 Mo du serveur et devenait impossible à enregistrer.
+   */
+  uploadScreenshot: (dataUrl: string) =>
+    request<{ id: string; url: string }>("/api/screenshots", {
+      method: "POST",
+      body: JSON.stringify({ dataUrl }),
+    }),
+
+  /**
+   * Captures d'écran du bureau, pour la SAUVEGARDE uniquement — jamais au
+   * démarrage : c'est précisément pour alléger le payload de bootstrap
+   * qu'elles ont été sorties de la collection `trades`.
+   */
+  fetchScreenshotsForBackup: () =>
+    request<{ screenshots: BackupScreenshot[] }>("/api/backup/screenshots"),
+
+  /**
+   * Réinsère un lot de captures en conservant leur identifiant — les trades
+   * restaurés pointent dessus. Envoyé par lots pour rester sous la limite de
+   * corps de 8 Mo du serveur.
+   */
+  restoreScreenshots: (screenshots: BackupScreenshot[]) =>
+    request<{ success: true; importees: number; ignorees: number }>("/api/backup/screenshots", {
+      method: "POST",
+      body: JSON.stringify({ screenshots }),
+    }),
+
+>>>>>>> origin/main
   importState: (state: {
     student?: StudentProfile;
     collections?: Partial<ServerCollections>;

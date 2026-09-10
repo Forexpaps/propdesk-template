@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Sidebar,
   TabType,
@@ -11,12 +11,25 @@ import { PositionCalculatorModal } from "./components/PositionCalculatorModal";
 import { MacroDashboard } from "./components/MacroDashboard";
 import { UserProfileModal } from "./components/UserProfileModal";
 import { PendingChangesBanner } from "./components/PendingChangesBanner";
+<<<<<<< HEAD
 import { NotificationModal } from "./components/NotificationModal";
 import { MindsetJournalModal } from "./components/MindsetJournalModal";
 import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
 import { SyncErrorBanner } from "./components/SyncErrorBanner";
 import { ConfirmDialogHost, confirmDialog } from "./lib/confirmDialog";
 import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, getTradingPlanStorageKey, EMPTY_TRADING_PLANS, normalizeTradingPlans, renameSetupInPlans } from "./lib/planCompliance";
+=======
+import { WeeklyReviewModal } from "./components/WeeklyReviewModal";
+import { NotificationModal } from "./components/NotificationModal";
+import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
+import { SyncErrorBanner } from "./components/SyncErrorBanner";
+import { ConfirmDialogHost, alertDialog, confirmDialog } from "./lib/confirmDialog";
+// `loadTradingPlan` n'a plus qu'un seul rôle : lire l'ANCIENNE clé localStorage
+// pour la reprise ponctuelle des plans hérités (`plansHerites`). Tout le reste
+// de l'app passe par la collection serveur `staffTradingPlan`.
+import { EMPTY_WEEKLY_REVIEWS } from "./lib/weeklyReview";
+import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, planAlertId, EMPTY_TRADING_PLANS, normalizeTradingPlans, renameSetupInPlans } from "./lib/planCompliance";
+>>>>>>> origin/main
 import { upsertWalletRiskAlerts } from "./lib/walletAlerts";
 import { computeBadgeProgress } from "./lib/badges";
 import { listPending, describePending } from "./lib/pendingChanges";
@@ -37,6 +50,10 @@ import {
   TraderBadge,
   TradeDraft,
   TradingPlanData,
+<<<<<<< HEAD
+=======
+  WeeklyReview,
+>>>>>>> origin/main
   Setup,
 } from "./types";
 import { isTabType, type TabType as SidebarTabType } from "./components/Sidebar";
@@ -297,6 +314,7 @@ function TraderApp({
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
 
+<<<<<<< HEAD
   /**
    * Plans de trading personnels du bureau staff — `localStorage` seul,
    * jamais synchronisé au serveur (hors périmètre, voir le commentaire de
@@ -314,6 +332,8 @@ function TraderApp({
     }
   };
 
+=======
+>>>>>>> origin/main
   // Bandeau d'avertissement immédiat quand une sauvegarde échoue en
   // arrière-plan alors que l'app se croit en ligne — la donnée elle-même est
   // protégée par `markPending` dans `useSyncedState`, ce bandeau n'est qu'un
@@ -391,10 +411,98 @@ function TraderApp({
     reportSyncError
   );
 
+<<<<<<< HEAD
   // Ébauche de trade poussée vers le Journal par le calculateur de position
   const [journalDraft, setJournalDraft] = useState<TradeDraft | null>(null);
 
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState<boolean>(false);
+=======
+  /**
+   * Plans de trading — désormais une collection serveur comme les autres.
+   *
+   * Ils vivaient auparavant dans le seul `localStorage` : absents de la base,
+   * donc absents de `GET /api/state`, donc absents du fichier « Exporter mes
+   * données ». Vider le cache du navigateur effaçait définitivement le seul
+   * contenu de l'app qu'aucune sauvegarde ne protégeait.
+   *
+   * Le serveur renvoyant `[]` (et non `undefined`) pour une collection vide,
+   * `seed()` ne suffit pas à récupérer d'anciens plans : d'où la reprise
+   * explicite ci-dessous, qui adopte le contenu de l'ancienne clé
+   * `localStorage` quand le serveur n'a encore rien. `normalizeTradingPlans`
+   * couvre au passage l'ancien format mono-plan (objet et non tableau).
+   */
+  const plansServeur = server?.tradingPlans;
+  // Lu une seule fois (initialiseur paresseux) : `localStorage` ne change pas
+  // sous nos pieds, et le relire à chaque rendu ferait un aller-retour disque
+  // inutile — en plus de produire un tableau neuf qui relancerait l'effet de
+  // reprise ci-dessous à chaque fois.
+  const [plansHerites] = useState<TradingPlanData>(() => normalizeTradingPlans(loadTradingPlan()));
+  const [staffTradingPlan, setStaffTradingPlan] = useSyncedState<TradingPlanData>(
+    "horizon_trading_plans",
+    // Valeur initiale = ce que dit le SERVEUR, jamais les plans hérités.
+    //
+    // C'est le point délicat : `useSyncedState` ne pousse une valeur que si
+    // elle diffère (par identité) de celle chargée au démarrage. Semer
+    // l'initialisation avec `plansHerites` faisait donc que l'effet de reprise
+    // ci-dessous reposait exactement la même référence — considérée comme
+    // « rien de neuf », donc jamais envoyée. Les plans hérités s'affichaient
+    // alors normalement mais ne partaient jamais en base : ils disparaissaient
+    // au rechargement suivant et restaient absents de l'export. En partant du
+    // serveur, la reprise devient une vraie modification, qui part.
+    seed(plansServeur, "horizon_trading_plans", EMPTY_TRADING_PLANS),
+    (v) => api.saveCollection("tradingPlans", v),
+    syncEnabled,
+    reportSyncError
+  );
+
+  /**
+   * Reprise unique des plans laissés dans l'ancienne clé `localStorage`
+   * (avant leur passage en base). Volontairement une modification à part
+   * entière — voir le commentaire de la valeur initiale ci-dessus.
+   */
+  const reprisePlansFaite = useRef(false);
+  useEffect(() => {
+    if (reprisePlansFaite.current || !syncEnabled) return;
+    if (plansServeur && plansServeur.length > 0) return;
+    if (plansHerites.length === 0) return;
+    reprisePlansFaite.current = true;
+    // Copie explicite : une nouvelle référence est ce qui distingue cette
+    // reprise d'un simple « déjà chargé » aux yeux de `useSyncedState`.
+    setStaffTradingPlan([...plansHerites]);
+  }, [syncEnabled, plansServeur, plansHerites, setStaffTradingPlan]);
+
+  /**
+   * Revues hebdomadaires — collection serveur comme les autres, donc incluse
+   * d'office dans l'export et la sauvegarde automatique (tout est piloté par
+   * `TABLES` côté serveur). Ce sont des textes écrits à la main : les laisser
+   * en `localStorage` seul aurait répété l'erreur des plans de trading.
+   */
+  const [weeklyReviews, setWeeklyReviews] = useSyncedState<WeeklyReview[]>(
+    "horizon_weekly_reviews",
+    seed(server?.weeklyReviews, "horizon_weekly_reviews", EMPTY_WEEKLY_REVIEWS),
+    (v) => api.saveCollection("weeklyReviews", v),
+    syncEnabled,
+    reportSyncError
+  );
+
+  /**
+   * Enregistre (ou remplace) la revue d'une semaine. L'id étant déterministe,
+   * réécrire la même semaine met à jour l'entrée existante — jamais un doublon.
+   */
+  /** Semaine (lundi ISO) ouverte dans la modale de revue, ou `null` si fermée. */
+  const [revueOuverte, setRevueOuverte] = useState<string | null>(null);
+
+  const handleSaveWeeklyReview = (review: WeeklyReview) => {
+    setWeeklyReviews((prev) => {
+      const autres = prev.filter((r) => r.weekStart !== review.weekStart);
+      return [review, ...autres].sort((a, b) => (a.weekStart < b.weekStart ? 1 : -1));
+    });
+  };
+
+  // Ébauche de trade poussée vers le Journal par le calculateur de position
+  const [journalDraft, setJournalDraft] = useState<TradeDraft | null>(null);
+
+>>>>>>> origin/main
 
   // L'écriture dans localStorage est désormais assurée par usePersistentState.
 
@@ -441,8 +549,14 @@ function TraderApp({
     // Hors ligne, le cache local est la SEULE copie des données : le vider
     // serait une perte sèche. On refuse plutôt que de détruire en silence.
     if (!syncEnabled) {
+<<<<<<< HEAD
       alert(
         "Déconnexion impossible hors ligne : les modifications de cette session ne sont pas encore enregistrées sur le serveur. Reconnecte-toi au serveur avant de te déconnecter."
+=======
+      await alertDialog(
+        "Déconnexion impossible hors ligne : les modifications de cette session ne sont pas encore enregistrées sur le serveur. Reconnecte-toi au serveur avant de te déconnecter.",
+        { title: "Déconnexion impossible" }
+>>>>>>> origin/main
       );
       return;
     }
@@ -456,8 +570,14 @@ function TraderApp({
     // `localStorage.clear()` plus bas, en toute confiance. Trouvé en audit.
     const pending = listPending();
     if (pending.length > 0) {
+<<<<<<< HEAD
       alert(
         `Déconnexion impossible : ${describePending(pending).join(", ")} pas encore enregistré(e) sur le serveur. Réessaie dans quelques instants — si le problème persiste, recharge la page avant de te déconnecter.`
+=======
+      await alertDialog(
+        `Déconnexion impossible : ${describePending(pending).join(", ")} pas encore enregistré(e) sur le serveur. Réessaie dans quelques instants — si le problème persiste, recharge la page avant de te déconnecter.`,
+        { title: "Déconnexion impossible" }
+>>>>>>> origin/main
       );
       return;
     }
@@ -623,6 +743,18 @@ function TraderApp({
     tradesRef.current = trades;
   }, [trades]);
 
+<<<<<<< HEAD
+=======
+  // Même miroir, même raison, pour les plans : `applyPlanCompliance` est appelé
+  // depuis `handleAddTrade`/`handleUpdateTrade`, qui peuvent s'exécuter deux
+  // fois dans un même lot de rendu (import CSV) et liraient sinon une closure
+  // figée.
+  const plansRef = React.useRef(staffTradingPlan);
+  React.useEffect(() => {
+    plansRef.current = staffTradingPlan;
+  }, [staffTradingPlan]);
+
+>>>>>>> origin/main
   // Voir le commentaire équivalent dans `StudentAuthenticatedApp` — mêmes
   // alertes de risque portefeuille, pour les comptes du coach lui-même.
   React.useEffect(() => {
@@ -659,10 +791,30 @@ function TraderApp({
    * `storageKey`.
    */
   const applyPlanCompliance = (trade: Trade, allTrades: Trade[]) => {
+<<<<<<< HEAD
     if (!trade.tradingPlanId) return;
     const plans = loadTradingPlan();
     const plan = plans.find((p) => p.id === trade.tradingPlanId);
     if (!plan) return;
+=======
+    // Les plans sont une collection SERVEUR depuis leur migration. Ce code
+    // lisait encore `loadTradingPlan()`, c'est-à-dire l'ancienne clé
+    // `localStorage` « horizon_trading_plan » (singulier) : aucun plan créé
+    // depuis n'y figurait plus, `plan` était donc toujours `undefined` et le
+    // contrôle du plan ne levait plus JAMAIS la moindre violation — une
+    // fonctionnalité entière morte en silence.
+    const plan = trade.tradingPlanId
+      ? plansRef.current.find((p) => p.id === trade.tradingPlanId)
+      : undefined;
+    // Trade détaché de son plan, ou plan supprimé depuis : on RETIRE l'alerte
+    // au lieu de sortir sans rien faire. Sortir laissait traîner une alerte
+    // qui accuse le trade d'enfreindre une règle ne s'appliquant plus à lui —
+    // et rien d'autre dans l'application ne la nettoyait jamais.
+    if (!plan) {
+      setNotifications((prev) => upsertPlanAlert(prev, trade, []));
+      return;
+    }
+>>>>>>> origin/main
     const sameDayTrades = allTrades.filter((t) => t.date === trade.date);
     // `displayStudent.startingCapital`, pas `student.startingCapital` : ce
     // dernier n'est plus jamais tenu à jour depuis que le capital affiché
@@ -677,6 +829,13 @@ function TraderApp({
     const next = tradesRef.current.filter((t) => t.id !== id);
     tradesRef.current = next;
     setTrades(next);
+<<<<<<< HEAD
+=======
+    // Un trade supprimé ne peut plus enfreindre quoi que ce soit : son alerte
+    // n'a plus d'objet, et le centre d'alertes la gardait indéfiniment (elle
+    // ne pointait même plus vers une ligne du journal).
+    setNotifications((prev) => prev.filter((n) => n.id !== planAlertId(id)));
+>>>>>>> origin/main
   };
 
   return (
@@ -696,7 +855,10 @@ function TraderApp({
         }}
         onLogout={handleLogout}
         onOpenTradingPlan={() => setIsTradingPlanOpen(true)}
+<<<<<<< HEAD
         onOpenMindset={() => setIsMindsetModalOpen(true)}
+=======
+>>>>>>> origin/main
         canManageSidebar={true}
         onToggleSidebarItem={(key) => {
           // Forme fonctionnelle obligatoire : deux bascules dans le même lot de
@@ -763,6 +925,12 @@ function TraderApp({
             <MainDashboard
               student={displayStudent}
               trades={trades}
+<<<<<<< HEAD
+=======
+              plans={staffTradingPlan}
+              weeklyReviews={weeklyReviews}
+              onOpenWeeklyReview={(semaine) => setRevueOuverte(semaine)}
+>>>>>>> origin/main
               setActiveTab={setActiveTab}
             />
           )}
@@ -806,6 +974,10 @@ function TraderApp({
             <PerformanceDashboard
               student={displayStudent}
               trades={trades}
+<<<<<<< HEAD
+=======
+              plans={staffTradingPlan}
+>>>>>>> origin/main
             />
           )}
 
@@ -839,6 +1011,10 @@ function TraderApp({
             stopLoss: calc.stopLoss,
             takeProfit: calc.takeProfit,
             lotSize: calc.lotSize,
+<<<<<<< HEAD
+=======
+            riskPercent: calc.riskPercent,
+>>>>>>> origin/main
             notes: `Position dimensionnée avec le calculateur : risque ${formatCurrency(
               calc.riskAmount
             )} pour un R:R de ${calc.riskRewardRatio}.`,
@@ -857,11 +1033,30 @@ function TraderApp({
         setups={setups}
       />
 
+<<<<<<< HEAD
       {/* Mindset & Tilt Radar Modal */}
       <MindsetJournalModal
         isOpen={isMindsetModalOpen}
         onClose={() => setIsMindsetModalOpen(false)}
+=======
+      {/* Revue hebdomadaire — écriture ponctuelle, donc une modale et pas un
+          onglet (voir `WeeklyReviewModal`). */}
+      {/* Montée seulement à l'ouverture, et remontée à chaque semaine
+          différente : `semaineInitiale` n'est lu qu'au montage, un composant
+          gardé en vie rouvrirait toujours sur la première semaine demandée. */}
+      {revueOuverte !== null && (
+      <WeeklyReviewModal
+        key={revueOuverte}
+        isOpen
+        onClose={() => setRevueOuverte(null)}
+        trades={trades}
+        plans={staffTradingPlan}
+        reviews={weeklyReviews}
+        onSave={handleSaveWeeklyReview}
+        semaineInitiale={revueOuverte}
+>>>>>>> origin/main
       />
+      )}
 
       {/* Notifications Center Modal */}
       <NotificationModal

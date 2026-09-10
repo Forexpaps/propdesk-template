@@ -40,17 +40,64 @@ const LABELS: Record<string, string> = {
   // périmé au rechargement suivant, sans jamais passer par
   // `PendingChangesBanner`.
   horizon_setups: "Setups",
+<<<<<<< HEAD
 };
 
 /** Clé `localStorage` → collection serveur. Absent pour profil. */
+=======
+  // Même piège que `horizon_setups` juste au-dessus, et pour la même raison :
+  // les plans de trading sont devenus une collection synchronisée (ils
+  // vivaient avant en localStorage seul). Sans cette entrée, `markPending`
+  // les ignorait — une modification de plan qui échoue à partir (coupure
+  // réseau, conflit de version) n'était ni signalée par
+  // `PendingChangesBanner`, ni retenue par le garde-fou de déconnexion, et
+  // repartait écrasée par l'état serveur périmé au rechargement suivant.
+  horizon_trading_plans: "Plans de trading",
+  horizon_weekly_reviews: "Revues hebdomadaires",
+};
+
+/**
+ * Clé `localStorage` → collection serveur. Absent pour le profil, traité à part
+ * dans `pushOne`.
+ *
+ * **Toute clé de `LABELS` doit avoir une entrée ici** (hors profil) — un test le
+ * vérifie. Les plans de trading y manquaient : `markPending` les retenait bien,
+ * mais `pushOne` ne trouvait aucune collection et sortait sans lever, si bien
+ * que `replayPending` les comptait comme envoyés puis les retirait du registre.
+ * Une modification de plan faite hors ligne disparaissait donc en silence,
+ * exactement le trou que `LABELS` devait fermer, déplacé d'un cran.
+ */
+>>>>>>> origin/main
 const COLLECTION_BY_KEY: Record<string, CollectionName> = {
   horizon_trades: "trades",
   horizon_accounts: "accounts",
   horizon_notifications: "notifications",
   horizon_badges: "badges",
   horizon_setups: "setups",
+<<<<<<< HEAD
 };
 
+=======
+  horizon_trading_plans: "tradingPlans",
+  horizon_weekly_reviews: "weeklyReviews",
+};
+
+/**
+ * Clés suivies par `LABELS` qui n'ont aucune collection serveur associée —
+ * `horizon_student` excepté, traité à part dans `pushOne`.
+ *
+ * **Doit toujours renvoyer un tableau vide**, ce qu'un test vérifie. Exposée
+ * uniquement pour ça : déclarer une collection dans `LABELS` en oubliant
+ * `COLLECTION_BY_KEY` a déjà coûté une perte de données silencieuse, et ce
+ * genre d'oubli se reproduit à chaque nouvelle collection.
+ */
+export function clesSansCollectionServeur(): string[] {
+  return Object.keys(LABELS).filter(
+    (cle) => cle !== "horizon_student" && !(cle in COLLECTION_BY_KEY)
+  );
+}
+
+>>>>>>> origin/main
 function read(): string[] {
   try {
     const raw = localStorage.getItem(PENDING_KEY);
@@ -162,7 +209,17 @@ async function pushOne(localKey: string): Promise<void> {
   }
 
   const collection = COLLECTION_BY_KEY[localKey];
+<<<<<<< HEAD
   if (!collection) return;
+=======
+  // Lever, et non retourner : une clé connue de `LABELS` mais absente de
+  // `COLLECTION_BY_KEY` doit échouer bruyamment (la modification reste alors en
+  // attente et le bandeau la repropose) plutôt que d'être comptée comme envoyée
+  // puis effacée.
+  if (!collection) {
+    throw new Error(`Aucune collection serveur pour « ${LABELS[localKey] ?? localKey} ».`);
+  }
+>>>>>>> origin/main
 
   // Une collection doit être un tableau : un cache corrompu ferait échouer la
   // validation serveur avec un message obscur, autant s'arrêter ici.

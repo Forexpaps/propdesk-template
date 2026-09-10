@@ -2,6 +2,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Loader2, Zap } from "lucide-react";
 import { api, EconomicCalendarEvent, MarketQuote } from "../lib/api";
 import { MarketMapWidget } from "./MarketMapWidget";
+<<<<<<< HEAD
+=======
+import { usePersistentState } from "../hooks/usePersistentState";
+import { BROWSER_TIMEZONE } from "../lib/timezone";
+>>>>>>> origin/main
 
 const CURRENCY_FLAGS: Record<string, string> = {
   USD: "🇺🇸",
@@ -180,6 +185,13 @@ function computeRiskSentiment(quotes: MarketQuote[]): number {
 
 export const MacroDashboard: React.FC = () => {
   const [now, setNow] = useState(() => new Date());
+<<<<<<< HEAD
+=======
+  const [viewerTimeZone, setViewerTimeZone] = usePersistentState<string>(
+    "horizon_viewer_timezone",
+    BROWSER_TIMEZONE
+  );
+>>>>>>> origin/main
   const [quotes, setQuotes] = useState<MarketQuote[] | null>(null);
   const [marketError, setMarketError] = useState<string | null>(null);
   const [lastMarketUpdate, setLastMarketUpdate] = useState<Date | null>(null);
@@ -322,6 +334,7 @@ export const MacroDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-12 font-sans text-slate-100">
+<<<<<<< HEAD
       {/* Bandeau ticker */}
       <div className="overflow-x-auto -mx-4 sm:-mx-8 px-4 sm:px-8">
         <div className="flex items-center gap-6 whitespace-nowrap text-xs font-mono py-2 border-b border-[#1B2320]">
@@ -333,6 +346,24 @@ export const MacroDashboard: React.FC = () => {
                 {q.changePercent >= 0 ? "▲" : "▼"} {Math.abs(q.changePercent).toFixed(2)}%
               </span>
             </span>
+=======
+      {/* Bandeau ticker — défile automatiquement de droite à gauche, contenu
+          dupliqué pour une boucle continue sans saut (voir .animate-ticker, index.css) */}
+      <div className="overflow-hidden -mx-4 sm:-mx-8 px-4 sm:px-8 border-b border-[#1B2320]">
+        <div className="flex items-center gap-6 whitespace-nowrap text-xs font-mono py-2 w-max animate-ticker">
+          {[0, 1].map((copy) => (
+            <div key={copy} className="flex items-center gap-6 shrink-0" aria-hidden={copy === 1}>
+              {quotes?.map((q) => (
+                <span key={q.symbol} className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-slate-400">{q.label}</span>
+                  <span className="text-white font-bold">{formatPrice(q.price)}</span>
+                  <span className={q.changePercent >= 0 ? "text-[#00E676]" : "text-rose-400"}>
+                    {q.changePercent >= 0 ? "▲" : "▼"} {Math.abs(q.changePercent).toFixed(2)}%
+                  </span>
+                </span>
+              ))}
+            </div>
+>>>>>>> origin/main
           ))}
         </div>
       </div>
@@ -365,7 +396,17 @@ export const MacroDashboard: React.FC = () => {
       )}
 
       {/* Carte des marchés */}
+<<<<<<< HEAD
       <MarketMapWidget now={now} vix={quotes?.find((q) => q.symbol === "^VIX")} nextHighImpact={nextHighImpact} />
+=======
+      <MarketMapWidget
+        now={now}
+        vix={quotes?.find((q) => q.symbol === "^VIX")}
+        nextHighImpact={nextHighImpact}
+        viewerTimeZone={viewerTimeZone}
+        onChangeViewerTimeZone={setViewerTimeZone}
+      />
+>>>>>>> origin/main
 
       {/* Sentiment de risque */}
       <div className="bg-[#111615] border border-[#1B2320] rounded-xl p-5 space-y-3">

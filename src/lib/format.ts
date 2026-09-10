@@ -55,6 +55,26 @@ export function formatCurrency(amount: number): string {
 }
 
 /**
+<<<<<<< HEAD
+=======
+ * Durée de détention lisible : « 45 min », « 2h15 », « 3j 4h ».
+ *
+ * On change d'unité plutôt que d'empiler les minutes : « 4320 minutes » ne dit
+ * rien à personne, « 3j » se lit d'un coup d'œil. Les minutes ne sont affichées
+ * qu'en dessous de 24 h, au-delà elles ne servent plus à décider quoi que ce
+ * soit sur un swing.
+ */
+export function formatDuration(minutes: number): string {
+  const total = Math.round(minutes);
+  if (total < 60) return `${total} min`;
+  const heures = Math.floor(total / 60);
+  const reste = total % 60;
+  if (heures < 24) return reste === 0 ? `${heures}h` : `${heures}h${String(reste).padStart(2, "0")}`;
+  return `${Math.floor(heures / 24)}j ${heures % 24}h`;
+}
+
+/**
+>>>>>>> origin/main
  * Convertit en nombre un prix/montant saisi librement, point et virgule à
  * l'emplacement choisi par qui tape (Journal de trading, Calculateurs) —
  * demande explicite du fondateur : un coach ou un élève doit pouvoir taper

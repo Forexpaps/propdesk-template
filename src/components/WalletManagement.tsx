@@ -26,6 +26,10 @@ import {
   totalDrawdownPercent as computeTotalDrawdownPercent,
   daysSinceLastTrade as computeDaysSinceLastTrade,
 } from "../lib/walletStats";
+<<<<<<< HEAD
+=======
+import { alertDialog } from "../lib/confirmDialog";
+>>>>>>> origin/main
 import { Select } from "./Select";
 
 /**
@@ -225,7 +229,11 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
     // dépendent (progression vers l'objectif de profit notamment, div/0 ou
     // signe inversé) — on refuse plutôt que de créer un compte inexploitable.
     if (!(parsedBalance > 0)) {
+<<<<<<< HEAD
       alert("Le capital initial doit être un nombre supérieur à 0.");
+=======
+      void alertDialog("Le capital initial doit être un nombre supérieur à 0.", { title: "Valeur invalide" });
+>>>>>>> origin/main
       return;
     }
     // `parseFloat(...) || défaut` seul ne protège pas contre une valeur
@@ -306,7 +314,11 @@ export const WalletManagement: React.FC<WalletManagementProps> = ({
     // bloque toute la confirmation plutôt que d'ignorer silencieusement ce
     // seul champ et d'enregistrer les autres.
     if (!(Number.isFinite(newBal) && newBal > 0)) {
+<<<<<<< HEAD
       alert("Le solde doit être un nombre supérieur à 0.");
+=======
+      void alertDialog("Le solde doit être un nombre supérieur à 0.", { title: "Valeur invalide" });
+>>>>>>> origin/main
       return;
     }
     onUpdateAccountBalance(balanceEditAccount.id, newBal);

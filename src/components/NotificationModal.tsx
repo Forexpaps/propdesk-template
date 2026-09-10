@@ -1,5 +1,9 @@
 import React, { useState } from "react";
 import { Bell, CheckCheck, Trash2, Zap, ArrowRight, ShieldAlert, Sparkles, Volume2, VolumeX, X, AlertCircle } from "lucide-react";
+<<<<<<< HEAD
+=======
+import { MAX_STUDENT_NOTIFICATIONS } from "../lib/planCompliance";
+>>>>>>> origin/main
 import { AppNotification } from "../types";
 import { usePersistentState } from "../hooks/usePersistentState";
 
@@ -11,7 +15,6 @@ interface NotificationModalProps {
   onMarkAllAsRead: () => void;
   onClearAll: () => void;
   onNavigateToTab?: (tab: string) => void;
-  onAddTestNotification?: () => void;
 }
 
 export const NotificationModal: React.FC<NotificationModalProps> = ({
@@ -22,7 +25,6 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
   onMarkAllAsRead,
   onClearAll,
   onNavigateToTab,
-  onAddTestNotification,
 }) => {
   const [filter, setFilter] = useState<"all" | "unread" | "risk">("all");
   const [soundEnabled, setSoundEnabled] = usePersistentState<boolean>(
@@ -147,15 +149,6 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
               <CheckCheck className="w-3.5 h-3.5" /> Tout marquer comme lu
             </button>
 
-            {onAddTestNotification && (
-              <button
-                onClick={onAddTestNotification}
-                className="text-[#00E676] hover:text-[#69F0AE] font-medium flex items-center gap-1 hover:underline"
-              >
-                <Zap className="w-3.5 h-3.5" /> Simuler alerte live
-              </button>
-            )}
-
             <button
               onClick={onClearAll}
               className="text-rose-400 hover:text-rose-300 font-medium flex items-center gap-1 hover:underline"
@@ -214,10 +207,24 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
           )}
         </div>
 
+<<<<<<< HEAD
         {/* Footer info */}
         <div className="p-3 bg-[#0D1110] border-t border-[#1B2320] text-[11px] text-slate-400 flex items-center justify-between">
           <span>PropDesk Push Server: <strong className="text-[#00E676] font-mono">Connecté (Live)</strong></span>
           <span className="font-mono text-[10px] text-slate-500">v2.4.0</span>
+=======
+        {/* Pied de page. Annonçait « PropDesk Push Server: Connecté (Live) ·
+            v2.4.0 » — il n'existe aucun serveur push, et ce numéro de version
+            ne correspondait à rien. Remplacé par le seul fait vérifiable utile
+            ici : la rétention, qui explique pourquoi d'anciennes alertes
+            finissent par disparaître. */}
+        <div className="p-3 bg-[#0D1110] border-t border-[#1B2320] text-[11px] text-slate-400">
+          <span>
+            {notifications.length} alerte{notifications.length > 1 ? "s" : ""} conservée
+            {notifications.length > 1 ? "s" : ""} · les plus anciennes sont retirées au-delà de{" "}
+            <span className="font-mono text-slate-300">{MAX_STUDENT_NOTIFICATIONS}</span>
+          </span>
+>>>>>>> origin/main
         </div>
       </div>
     </div>

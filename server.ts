@@ -5,7 +5,12 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { api, apiErrorHandler } from "./server/routes";
+<<<<<<< HEAD
 import { initDb } from "./server/db";
+=======
+import { initDb, purgeOrphanScreenshots } from "./server/db";
+import { sauvegarderBase } from "./server/backup";
+>>>>>>> origin/main
 import { startSessionCleanup } from "./server/auth/sessions";
 import { startSecurityEventCleanup } from "./server/auth/securityEvents";
 import { startLockoutCleanup } from "./server/auth/loginLockout";
@@ -108,6 +113,20 @@ async function startServer() {
   // le faisait better-sqlite3, il faut donc l'attendre explicitement ici.
   await initDb();
 
+<<<<<<< HEAD
+=======
+  // Copie datée de la base, juste après l'ouverture et avant toute écriture —
+  // `data/` étant exclu de git, c'est la seule sauvegarde qui ne dépende pas
+  // d'un clic manuel sur « Exporter mes données ». Voir server/backup.ts.
+  sauvegarderBase();
+
+  // Captures qu'aucun trade ne référence plus (formulaire abandonné, trade
+  // supprimé depuis) — voir server/db.ts. Non bloquant pour le démarrage.
+  void purgeOrphanScreenshots().catch((err) =>
+    console.warn("[propdesk] Purge des captures orphelines impossible.", err)
+  );
+
+>>>>>>> origin/main
   // Hygiène : retire les sessions expirées au démarrage puis toutes les heures.
   startSessionCleanup();
   // Journal de sécurité : purge RGPD à 90 jours (IP = donnée personnelle).
@@ -152,8 +171,39 @@ async function startServer() {
     });
   }
 
+<<<<<<< HEAD
   httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`Serveur Académie Horizon démarré sur http://localhost:${PORT}`);
+=======
+  /**
+   * Interface d'écoute — `127.0.0.1` par défaut, c'est-à-dire cet ordinateur
+   * et lui seul.
+   *
+   * Le serveur écoutait auparavant sur `0.0.0.0`, donc sur TOUTES les
+   * interfaces réseau : sur un Wi-Fi partagé (café, coworking, hôtel,
+   * colocation), n'importe qui sur le même réseau atteignait le journal à
+   * `http://<ip-de-la-machine>:3000`. Et comme rien n'est chiffré en local
+   * (pas de TLS, cookie de session sans `secure` — ce qui est correct pour
+   * localhost), un mot de passe saisi depuis un autre appareil circulait en
+   * clair sur ce réseau. Hérité de l'époque où l'app était pensée pour être
+   * déployée derrière un proxy ; sans objet depuis qu'elle ne tourne plus
+   * qu'en local.
+   *
+   * `HOST=0.0.0.0` reste possible pour un usage délibéré (consulter le
+   * journal depuis son téléphone sur son propre réseau), mais c'est désormais
+   * un choix explicite et non le défaut.
+   */
+  const HOST = process.env.HOST || "127.0.0.1";
+
+  httpServer.listen(PORT, HOST, () => {
+    console.log(`Serveur PropDesk démarré sur http://localhost:${PORT}`);
+    if (HOST !== "127.0.0.1" && HOST !== "localhost") {
+      console.warn(
+        `⚠️  Le serveur écoute sur ${HOST} : il est joignable par les autres appareils du réseau, ` +
+          "sans chiffrement. À n'utiliser que sur un réseau de confiance."
+      );
+    }
+>>>>>>> origin/main
   });
 }
 

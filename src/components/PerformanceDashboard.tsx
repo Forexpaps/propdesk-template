@@ -12,13 +12,28 @@ import {
   CartesianGrid,
 } from "recharts";
 import { LineChart, AlertTriangle, RotateCcw } from "lucide-react";
+<<<<<<< HEAD
 import { Trade, StudentProfile } from "../types";
 import { formatCurrency } from "../lib/format";
 import { computePerformanceStats, computePnlByPeriod, isRealizedDollarTrade } from "../lib/performanceStats";
+=======
+import { Trade, StudentProfile, TradingPlanData } from "../types";
+import { formatCurrency, formatDuration } from "../lib/format";
+import {
+  computePerformanceStats,
+  computePnlByPeriod,
+  computeDurationStats,
+  computeExitEfficiency,
+  computePlanDetail,
+  isRealizedDollarTrade,
+} from "../lib/performanceStats";
+import { computePlanComplianceSummary } from "../lib/planCompliance";
+>>>>>>> origin/main
 
 interface PerformanceDashboardProps {
   student: StudentProfile;
   trades: Trade[];
+<<<<<<< HEAD
 }
 
 const tooltipStyle = {
@@ -30,6 +45,34 @@ const tooltipStyle = {
   cursor: { fill: "transparent" },
 };
 
+=======
+  /** Plans de trading, pour la ventilation « Détail par plan ». Optionnel : la vue reste utilisable sans aucun plan défini. */
+  plans?: TradingPlanData;
+}
+
+/**
+ * En dessous de ce nombre de trades comptés, les ratios de sortie affichent
+ * « pas assez de données » plutôt qu'un pourcentage : sur deux ou trois trades,
+ * une moyenne de capture ne mesure rien mais se lit comme un verdict.
+ */
+const MIN_ECHANTILLON_SORTIE = 5;
+
+/**
+ * Même seuil, même raison : sous ce nombre de trades, un win rate par setup ne
+ * mesure rien mais se lit comme un verdict. Un seul chiffre dans toute l'app.
+ */
+const MIN_ECHANTILLON_SETUP = 5;
+
+const tooltipStyle = {
+  contentStyle: { backgroundColor: "#0D1110", borderColor: "#1B2320", borderRadius: "10px", fontSize: "12px" },
+  labelStyle: { color: "#ffffff" },
+  itemStyle: { color: "#ffffff" },
+  // Sans ça, Recharts dessine par défaut un rectangle gris/blanc plein
+  // derrière toute la catégorie survolée (barres) — visible sur fond sombre.
+  cursor: { fill: "transparent" },
+};
+
+>>>>>>> origin/main
 /** Micro-label en petites majuscules espacées, au-dessus d'une valeur. */
 const MicroLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">{children}</span>
@@ -135,10 +178,28 @@ function computeHeatmap(trades: Trade[]): HeatmapCellStats[][] {
   return grid;
 }
 
+<<<<<<< HEAD
 export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ student, trades }) => {
   const stats = computePerformanceStats(student, trades);
   const heatmap = useMemo(() => computeHeatmap(trades), [trades]);
   const pnlByPeriod = useMemo(() => computePnlByPeriod(trades), [trades]);
+=======
+export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ student, trades, plans = [] }) => {
+  const stats = computePerformanceStats(student, trades);
+  const heatmap = useMemo(() => computeHeatmap(trades), [trades]);
+  const pnlByPeriod = useMemo(() => computePnlByPeriod(trades), [trades]);
+  const duration = useMemo(() => computeDurationStats(trades), [trades]);
+  const exit = useMemo(() => computeExitEfficiency(trades), [trades]);
+  const planDetail = useMemo(() => computePlanDetail(trades, plans), [trades, plans]);
+  // Réévalué à chaque rendu depuis les plans ACTUELS — jamais lu d'un cache
+  // persisté, qui serait faux dès qu'un plan est édité (voir
+  // `computePlanComplianceSummary`).
+  const compliance = useMemo(
+    () => computePlanComplianceSummary(trades, plans, student.startingCapital),
+    [trades, plans, student.startingCapital]
+  );
+
+>>>>>>> origin/main
   const {
     equityData,
     totalTrades,
@@ -162,9 +223,33 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
     marketChartData,
     emotionChartData,
     assetDetailData,
+<<<<<<< HEAD
     bestWinStreak,
     worstLossStreak,
   } = stats;
+=======
+    setupDetailData,
+    bestWinStreak,
+    worstLossStreak,
+  } = stats;
+  /**
+   * La phrase que l'application ne disait jamais : quel setup rapporte, lequel
+   * coûte. Rendue seulement si DEUX setups au moins franchissent le seuil —
+   * désigner un « meilleur » sans point de comparaison n'apprend rien, et le
+   * faire sur trois trades serait un verdict déguisé.
+   */
+  const verdictSetups = useMemo(() => {
+    const fiables = setupDetailData.filter(
+      (r) => r.renseigne && r.tradesCount >= MIN_ECHANTILLON_SETUP
+    );
+    if (fiables.length < 2) return null;
+    const meilleur = fiables[0];
+    const pire = fiables[fiables.length - 1];
+    const decrire = (r: typeof meilleur) =>
+      `${r.setup} (${r.pnl >= 0 ? "+" : ""}${formatCurrency(r.pnl)}, ${r.tradesCount} trades, ${r.winRate} %)`;
+    return `Ton setup le plus rentable : ${decrire(meilleur)}. Le plus coûteux : ${decrire(pire)}.`;
+  }, [setupDetailData]);
+>>>>>>> origin/main
 
   // Une carte par dimension, toutes affichées en même temps — plus de pilules
   // à cliquer pour comparer deux répartitions entre elles.
@@ -269,6 +354,70 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
         })}
       </div>
 
+<<<<<<< HEAD
+=======
+      {/* Exécution : ce que disent les prix de sortie et les horodatages déjà
+          saisis, jusqu'ici jamais exploités. Chaque carte affiche la taille de
+          son échantillon — sur un journal qui démarre, mieux vaut « pas assez
+          de données » qu'un pourcentage tiré de deux trades. */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard
+          label="Durée Moyenne"
+          value={duration.avgMinutes === null ? "—" : formatDuration(duration.avgMinutes)}
+          valueClassName="text-blue-400"
+          secondary={
+            duration.countedTrades === 0
+              ? "Aucune sortie horodatée"
+              : `${duration.countedTrades} trade${duration.countedTrades > 1 ? "s" : ""}${
+                  duration.skippedTrades > 0 ? ` · ${duration.skippedTrades} sans horaire` : ""
+                }`
+          }
+        />
+        <StatCard
+          label="Capture du TP"
+          value={
+            exit.captureMoyenneWins === null || exit.winsComptes < MIN_ECHANTILLON_SORTIE
+              ? "—"
+              : `${Math.round(exit.captureMoyenneWins * 100)}%`
+          }
+          valueClassName={
+            exit.captureMoyenneWins !== null && exit.captureMoyenneWins >= 0.9
+              ? "text-[#00E676]"
+              : "text-amber-400"
+          }
+          secondary={
+            exit.winsComptes < MIN_ECHANTILLON_SORTIE
+              ? `Pas assez de données (${exit.winsComptes}/${MIN_ECHANTILLON_SORTIE})`
+              : `sur ${exit.winsComptes} gagnant${exit.winsComptes > 1 ? "s" : ""}`
+          }
+        />
+        <StatCard
+          label="Perte vs SL"
+          value={
+            exit.risqueMoyenLosses === null || exit.lossesComptes < MIN_ECHANTILLON_SORTIE
+              ? "—"
+              : `${Math.round(exit.risqueMoyenLosses * 100)}%`
+          }
+          valueClassName={
+            exit.risqueMoyenLosses !== null && exit.risqueMoyenLosses > 1
+              ? "text-rose-400"
+              : "text-[#00E676]"
+          }
+          secondary={
+            exit.lossesComptes < MIN_ECHANTILLON_SORTIE
+              ? `Pas assez de données (${exit.lossesComptes}/${MIN_ECHANTILLON_SORTIE})`
+              : `sur ${exit.lossesComptes} perdant${exit.lossesComptes > 1 ? "s" : ""}`
+          }
+        />
+        <StatCard
+          label="Sorties Avant TP"
+          value={exit.winsComptes === 0 ? "—" : `${exit.winsSortisAvantTp} / ${exit.winsComptes}`}
+          valueClassName="text-amber-400"
+          secondary="gagnants coupés avant la cible"
+        />
+      </div>
+
+>>>>>>> origin/main
       {/* Courbe de capital — pleine largeur */}
       <Card className="p-5 space-y-4">
         <SectionHeader color="bg-[#00E676]">Courbe de capital</SectionHeader>
@@ -397,6 +546,7 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
             </div>
           )}
         </Card>
+<<<<<<< HEAD
 
         <Card className="p-5 space-y-4">
           <SectionHeader color="bg-purple-500">Psychologie</SectionHeader>
@@ -543,6 +693,406 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
         </Card>
       </div>
 
+=======
+
+        <Card className="p-5 space-y-4">
+          <SectionHeader color="bg-purple-500">Psychologie</SectionHeader>
+          {trades.length === 0 ? (
+            <EmptyState>
+              Win rate quand l'émotion est forte vs faible. Tague ton état émotionnel sur chaque trade
+              dans le Journal.
+            </EmptyState>
+          ) : (
+            <div className="h-56 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={emotionChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
+                  <XAxis dataKey="emotion" stroke="#475569" fontSize={10} interval={0} angle={-15} textAnchor="end" />
+                  <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
+                  <Tooltip
+                    {...tooltipStyle}
+                    formatter={(value: any, _name: any, props: any) => [
+                      `${formatCurrency(Number(value))} (${props?.payload?.tradesCount ?? 0} trade${
+                        (props?.payload?.tradesCount ?? 0) > 1 ? "s" : ""
+                      })`,
+                      "PnL",
+                    ]}
+                  />
+                  <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
+                    {emotionChartData.map((entry, index) => (
+                      <Cell key={`cell-emotion-${index}`} fill={entry.tradesCount === 0 ? "#475569" : entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* Où es-tu le meilleur ? — une carte par dimension, toutes visibles en
+          même temps : plus besoin de naviguer entre des pilules pour
+          comparer deux répartitions, chacune a sa propre section. */}
+      <div className="space-y-4">
+        <SectionHeader color="bg-amber-500">Où es-tu le meilleur ?</SectionHeader>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {bestWhereDimensions.map((dim) => (
+            <Card key={dim.label} className="p-5 space-y-4">
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wide">{dim.label}</h4>
+              {dim.data.length === 0 ? (
+                <EmptyState>Pas assez de données.</EmptyState>
+              ) : (
+                <div className="h-56 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dim.data}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
+                      <XAxis
+                        dataKey="key"
+                        stroke="#475569"
+                        fontSize={11}
+                        interval={0}
+                        angle={dim.data.length > 6 ? -15 : 0}
+                        textAnchor={dim.data.length > 6 ? "end" : "middle"}
+                      />
+                      <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
+                      <Tooltip
+                        {...tooltipStyle}
+                        formatter={(value: any, _name: any, props: any) => [
+                          `${formatCurrency(Number(value))} (${props?.payload?.tradesCount ?? 0} trade${
+                            (props?.payload?.tradesCount ?? 0) > 1 ? "s" : ""
+                          })`,
+                          "PnL",
+                        ]}
+                      />
+                      <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
+                        {dim.data.map((entry, index) => (
+                          <Cell key={`cell-${dim.label}-${index}`} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Détail par setup — placé AVANT « Détail par Actif » : « lequel de mes
+          setups gagne vraiment ? » est la question la plus actionnable d'un
+          journal, et cette ventilation était calculée depuis toujours sans
+          jamais être affichée. */}
+      <Card className="p-5 space-y-4">
+        <SectionHeader color="bg-[#00E676]">Détail par Setup</SectionHeader>
+        {setupDetailData.length === 0 ? (
+          <EmptyState>Renseigne le setup de tes trades pour voir lesquels fonctionnent.</EmptyState>
+        ) : (
+          <>
+            {verdictSetups && (
+              <p className="text-xs text-slate-400 leading-relaxed">{verdictSetups}</p>
+            )}
+            <div className="overflow-x-auto -mx-1">
+              <table className="w-full text-sm min-w-[480px]">
+                <thead>
+                  <tr className="border-b border-[#1B2320]">
+                    <th className="text-left px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Setup</th>
+                    <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Trades</th>
+                    <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Win Rate</th>
+                    <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">PnL Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {setupDetailData.map((row) => {
+                    // Sous le seuil, la donnée reste AFFICHÉE mais en gris : c'est
+                    // le verdict qu'on suspend, pas l'information. Un win rate de
+                    // 100 % sur 2 trades ne dit rien, le peindre en vert le
+                    // ferait passer pour un résultat.
+                    const assezDeTrades = row.tradesCount >= MIN_ECHANTILLON_SETUP;
+                    return (
+                      <tr key={row.setup} className="border-b border-[#1B2320] last:border-b-0">
+                        <td className={`px-3 py-3 font-bold ${row.renseigne ? "text-white" : "text-slate-500 italic"}`}>
+                          {row.setup}
+                        </td>
+                        <td className="px-3 py-3 text-right text-slate-300 font-mono">{row.tradesCount}</td>
+                        <td
+                          className={`px-3 py-3 text-right font-mono font-bold ${
+                            !assezDeTrades ? "text-slate-500" : row.winRate >= 50 ? "text-[#00E676]" : "text-rose-400"
+                          }`}
+                          title={assezDeTrades ? undefined : `Moins de ${MIN_ECHANTILLON_SETUP} trades — trop peu pour conclure.`}
+                        >
+                          {row.winRate}%
+                        </td>
+                        <td
+                          className={`px-3 py-3 text-right font-mono font-bold ${
+                            row.pnl >= 0 ? "text-[#00E676]" : "text-rose-400"
+                          }`}
+                        >
+                          {row.pnl >= 0 ? "+" : ""}
+                          {formatCurrency(row.pnl)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </Card>
+
+      {/* Détail par actif — tableau exhaustif (tous les actifs, pas les 8
+          premiers de "Où es-tu le meilleur ?"), trié par PnL décroissant. */}
+      <Card className="p-5 space-y-4">
+        <SectionHeader color="bg-[#00E676]">Détail par Actif</SectionHeader>
+        {assetDetailData.length === 0 ? (
+          <EmptyState>Ajoute des trades pour voir le détail par actif.</EmptyState>
+        ) : (
+          <div className="overflow-x-auto -mx-1">
+            <table className="w-full text-sm min-w-[480px]">
+              <thead>
+                <tr className="border-b border-[#1B2320]">
+                  <th className="text-left px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Actif</th>
+                  <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Trades</th>
+                  <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Win Rate</th>
+                  <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">PnL Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assetDetailData.map((row) => (
+                  <tr key={row.asset} className="border-b border-[#1B2320] last:border-b-0">
+                    <td className="px-3 py-3 font-bold text-white">{row.asset}</td>
+                    <td className="px-3 py-3 text-right text-slate-300 font-mono">{row.tradesCount}</td>
+                    <td
+                      className={`px-3 py-3 text-right font-mono font-bold ${
+                        row.winRate >= 50 ? "text-[#00E676]" : "text-rose-400"
+                      }`}
+                    >
+                      {row.winRate}%
+                    </td>
+                    <td
+                      className={`px-3 py-3 text-right font-mono font-bold ${
+                        row.pnl >= 0 ? "text-[#00E676]" : "text-rose-400"
+                      }`}
+                    >
+                      {row.pnl >= 0 ? "+" : ""}
+                      {formatCurrency(row.pnl)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* Détail par plan de trading — même forme que « Détail par Actif ».
+          « Hors plan » couvre les trades sans plan choisi ET ceux dont le plan
+          a été supprimé depuis. À noter : l'import CSV n'attribue aucun plan
+          (la colonne n'existe ni à l'export ni à l'import), donc tout trade
+          importé se retrouve ici. */}
+      <Card className="p-5 space-y-4">
+        <SectionHeader color="bg-indigo-500">Détail par Plan de Trading</SectionHeader>
+        {planDetail.length === 0 ? (
+          <EmptyState>
+            Rattache tes trades à un plan de trading pour comparer leurs performances.
+          </EmptyState>
+        ) : (
+          <div className="overflow-x-auto -mx-1">
+            <table className="w-full text-sm min-w-[480px]">
+              <thead>
+                <tr className="border-b border-[#1B2320]">
+                  <th className="text-left px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Plan</th>
+                  <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Trades</th>
+                  <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Win Rate</th>
+                  <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">PnL Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {planDetail.map((row) => (
+                  <tr key={row.planId ?? "__hors_plan__"} className="border-b border-[#1B2320] last:border-b-0">
+                    <td className={`px-3 py-3 font-bold ${row.planId === null ? "text-slate-500 italic" : "text-white"}`}>
+                      {row.planName}
+                    </td>
+                    <td className="px-3 py-3 text-right text-slate-300 font-mono">{row.tradesCount}</td>
+                    {/* Un plan sans aucun trade afficherait « 0% » en rouge, ce
+                        qui se lirait comme un mauvais résultat au lieu d'une
+                        absence de données. */}
+                    <td
+                      className={`px-3 py-3 text-right font-mono font-bold ${
+                        row.tradesCount === 0
+                          ? "text-slate-600"
+                          : row.winRate >= 50
+                          ? "text-[#00E676]"
+                          : "text-rose-400"
+                      }`}
+                    >
+                      {row.tradesCount === 0 ? "—" : `${row.winRate}%`}
+                    </td>
+                    <td
+                      className={`px-3 py-3 text-right font-mono font-bold ${
+                        row.tradesCount === 0 ? "text-slate-600" : row.pnl >= 0 ? "text-[#00E676]" : "text-rose-400"
+                      }`}
+                    >
+                      {row.tradesCount === 0 ? "—" : `${row.pnl >= 0 ? "+" : ""}${formatCurrency(row.pnl)}`}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      {/* Respect du plan — ce que coûtent les entorses, par règle.
+          Volontairement SANS graphique : huit règles au plus, trois chiffres
+          chacune, le tableau porte tout. Calculé sur l'intégralité du journal
+          (cet écran n'a aucun filtre de période — en introduire un ici seul
+          créerait deux notions de « période » sur la même page). */}
+      <Card className="p-5 space-y-4">
+        <div>
+          <SectionHeader color="bg-rose-500">Respect du plan</SectionHeader>
+          <p className="text-xs text-slate-500 mt-1">
+            Tout le journal, évalué avec tes règles <span className="text-slate-400">actuelles</span> — un plan
+            modifié rejuge les trades passés.
+          </p>
+        </div>
+
+        {compliance.tradesEvalues === 0 ? (
+          <EmptyState>
+            Rattache tes trades à un plan de trading pour mesurer ce que coûtent les écarts.
+          </EmptyState>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <MicroLabel>Trades évalués</MicroLabel>
+                <div className="text-xl font-black font-mono text-white">{compliance.tradesEvalues}</div>
+              </div>
+              <div className="space-y-1">
+                <MicroLabel>En infraction</MicroLabel>
+                <div
+                  className={`text-xl font-black font-mono ${
+                    compliance.tradesEnInfraction > 0 ? "text-rose-400" : "text-[#00E676]"
+                  }`}
+                >
+                  {compliance.tradesEnInfraction}
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  {Math.round((compliance.tradesEnInfraction / compliance.tradesEvalues) * 100)}% des trades
+                  évalués
+                </p>
+              </div>
+              <div className="space-y-1">
+                <MicroLabel>PnL de ces trades</MicroLabel>
+                <div
+                  className={`text-xl font-black font-mono ${
+                    compliance.pnlTotalEnInfraction >= 0 ? "text-[#00E676]" : "text-rose-400"
+                  }`}
+                >
+                  {compliance.pnlTotalEnInfraction >= 0 ? "+" : ""}
+                  {formatCurrency(compliance.pnlTotalEnInfraction)}
+                </div>
+                {/* « PnL » et non « coût » : une entorse rentable existe, et la
+                    renommer en perte serait mentir. */}
+                <p className="text-[10px] text-slate-500">chaque trade compté une seule fois</p>
+              </div>
+            </div>
+
+            {compliance.parRegle.length === 0 ? (
+              <p className="text-sm text-[#00E676] font-medium">
+                Aucune entorse sur les {compliance.tradesEvalues} trades rattachés à un plan.
+              </p>
+            ) : (
+              <div className="overflow-x-auto -mx-1">
+                <table className="w-full text-sm min-w-[480px]">
+                  <thead>
+                    <tr className="border-b border-[#1B2320]">
+                      <th className="text-left px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Règle enfreinte</th>
+                      <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Trades</th>
+                      <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">PnL Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {compliance.parRegle.map((row) => (
+                      <tr key={row.code} className="border-b border-[#1B2320] last:border-b-0">
+                        <td className="px-3 py-3 font-bold text-white">
+                          {row.label}
+                          {row.tradesNonChiffrables > 0 && (
+                            <span className="block text-[10px] font-normal text-slate-500">
+                              dont {row.tradesNonChiffrables} au PnL non chiffrable (position ouverte ou %)
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right text-slate-300 font-mono">{row.occurrences}</td>
+                        <td
+                          className={`px-3 py-3 text-right font-mono font-bold ${
+                            row.pnl >= 0 ? "text-[#00E676]" : "text-rose-400"
+                          }`}
+                        >
+                          {row.pnl >= 0 ? "+" : ""}
+                          {formatCurrency(row.pnl)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Recoupement annoncé plutôt que dissimulé : un trade qui enfreint
+                trois règles verse son PnL entier aux trois lignes. La somme des
+                lignes n'est donc pas le total ci-dessus, et les deux sont
+                justes. */}
+            {compliance.parRegle.length > 1 && (
+              <p className="text-[10px] text-slate-500">
+                Un même trade peut enfreindre plusieurs règles : il apparaît alors sur chaque ligne, et la
+                somme des lignes dépasse le total ci-dessus.
+              </p>
+            )}
+
+            {/* Exclusions comptées et nommées — jamais fondues dans les
+                conformes. */}
+            {(compliance.tradesNonEvalues > 0 || compliance.tradesRisqueNonVerifiable > 0) && (
+              <div className="pt-1 border-t border-[#1B2320] space-y-1">
+                {compliance.tradesNonEvalues > 0 && (
+                  <p className="text-[10px] text-slate-500">
+                    {compliance.tradesNonEvalues} trade{compliance.tradesNonEvalues > 1 ? "s" : ""} sans plan
+                    rattaché (ou dont le plan a été supprimé) — non évalué
+                    {compliance.tradesNonEvalues > 1 ? "s" : ""}, ni conforme{compliance.tradesNonEvalues > 1 ? "s" : ""} ni fautif
+                    {compliance.tradesNonEvalues > 1 ? "s" : ""}.
+                  </p>
+                )}
+                {compliance.tradesRisqueNonVerifiable > 0 && (
+                  <p className="text-[10px] text-slate-500">
+                    {compliance.tradesRisqueNonVerifiable} trade
+                    {compliance.tradesRisqueNonVerifiable > 1 ? "s" : ""} sans risque saisi : la règle de risque
+                    maximal n'a pas pu être vérifiée.
+                  </p>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </Card>
+
+      {/* Meilleure / Pire série — plus longue suite de trades gagnants ou
+          perdants consécutifs. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <Card className="p-5 space-y-1">
+          <MicroLabel>Meilleure Série</MicroLabel>
+          <div className="text-2xl font-black font-mono text-[#00E676]">
+            {bestWinStreak} win{bestWinStreak > 1 ? "s" : ""}
+          </div>
+        </Card>
+        <Card className="p-5 space-y-1">
+          <MicroLabel>Pire Série</MicroLabel>
+          <div className="text-2xl font-black font-mono text-rose-400">
+            {worstLossStreak} loss{worstLossStreak > 1 ? "es" : ""}
+          </div>
+        </Card>
+      </div>
+
+>>>>>>> origin/main
       {/* Erreurs les plus fréquentes — conservé de l'ancienne version, pas dans
           la maquette de référence mais donnée réelle utile, jamais affichée
           ailleurs dans l'app. */}

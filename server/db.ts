@@ -1,12 +1,20 @@
 import { createClient } from "@libsql/client";
+<<<<<<< HEAD
 import { Pool } from "pg";
+=======
+>>>>>>> origin/main
 import fs from "fs";
 import path from "path";
 
 /**
+<<<<<<< HEAD
  * Forme minimale partagée par les deux moteurs possibles (libSQL et
  * Postgres) — c'est tout ce que `repositories.ts` et le reste du serveur
  * utilisent, jamais une API spécifique à l'un ou l'autre.
+=======
+ * Forme minimale exposée par le client — c'est tout ce que
+ * `repositories.ts` et le reste du serveur utilisent.
+>>>>>>> origin/main
  */
 interface QueryResult {
   rows: Record<string, unknown>[];
@@ -23,6 +31,16 @@ interface DbClient {
   execute(query: Query): Promise<QueryResult>;
   transaction(mode?: "write" | "read"): Promise<DbTransaction>;
 }
+<<<<<<< HEAD
+=======
+
+/**
+ * Connexion unique pour tout le serveur : toujours un fichier SQLite local
+ * dans DATA_DIR (./data par défaut) via libSQL en mode `file:` — application
+ * pensée pour tourner uniquement en local, sur cet ordinateur.
+ */
+export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
+>>>>>>> origin/main
 
 /**
  * Connexion unique pour tout le serveur, trois modes choisis par les
@@ -47,6 +65,7 @@ interface DbClient {
  */
 export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
 
+<<<<<<< HEAD
 const usingPostgres = Boolean(process.env.POSTGRES_URL);
 const usingTurso = !usingPostgres && Boolean(process.env.TURSO_DATABASE_URL);
 const usingLocalFile = !usingPostgres && !usingTurso;
@@ -141,6 +160,26 @@ export const db: DbClient = usingPostgres
   : usingTurso
   ? createLibsqlClient(process.env.TURSO_DATABASE_URL!, process.env.TURSO_AUTH_TOKEN)
   : createLibsqlClient(`file:${path.join(DATA_DIR, "horizon.db")}`);
+=======
+/** libSQL renvoie déjà `rows`/`rowsAffected` — juste besoin d'adapter le type de retour de `transaction`. */
+function createLibsqlClient(url: string): DbClient {
+  const client = createClient({ url });
+  return {
+    execute: (query: Query) => client.execute(query as never) as unknown as Promise<QueryResult>,
+    transaction: async (mode: "write" | "read" = "write") => {
+      const tx = await client.transaction(mode);
+      return {
+        execute: (query: Query) => tx.execute(query as never) as unknown as Promise<QueryResult>,
+        commit: () => tx.commit(),
+        rollback: () => tx.rollback(),
+        close: () => tx.close(),
+      };
+    },
+  };
+}
+
+export const db: DbClient = createLibsqlClient(`file:${path.join(DATA_DIR, "horizon.db")}`);
+>>>>>>> origin/main
 
 /**
  * Toutes les collections partagent la même forme : un identifiant stable,
@@ -151,9 +190,14 @@ export const db: DbClient = usingPostgres
  * requêter et indexer ; les autres collections ne sont jamais lues autrement
  * qu'en entier, leur payload suffit.
  *
+<<<<<<< HEAD
  * Ces instructions sont écrites dans un sous-ensemble SQL commun à SQLite et
  * Postgres (types, `REFERENCES ... ON DELETE CASCADE`, `CREATE INDEX IF NOT
  * EXISTS` sont valables dans les deux) — aucune divergence nécessaire ici.
+=======
+ * Ces instructions sont écrites en SQLite (types, `REFERENCES ... ON DELETE
+ * CASCADE`, `CREATE INDEX IF NOT EXISTS`).
+>>>>>>> origin/main
  */
 const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS meta (
@@ -204,13 +248,186 @@ const SCHEMA_STATEMENTS = [
     payload  TEXT NOT NULL
   )`,
 
+<<<<<<< HEAD
   `CREATE TABLE IF NOT EXISTS trading_accounts (
+=======
+  // Plans de trading. Vivaient auparavant dans le seul `localStorage` du
+  // navigateur : ni en base, ni dans `GET /api/state`, donc absents du fichier
+  // d'export « Exporter mes données » — vider le cache du navigateur suffisait
+  // à les perdre définitivement, alors que c'est du contenu écrit à la main.
+  // Les faire entrer ici les fait entrer dans la sauvegarde par la même
+  // occasion, sans code dédié (tout est piloté par `TABLES`).
+  `CREATE TABLE IF NOT EXISTS trading_plans (
+>>>>>>> origin/main
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     position INTEGER NOT NULL,
     payload  TEXT NOT NULL
   )`,
 
+<<<<<<< HEAD
+  `CREATE TABLE IF NOT EXISTS notifications (
+=======
+  // Revues hebdomadaires : ce que le trader a écrit sur sa semaine, et
+  // l'objectif typé qu'il s'est fixé pour la suivante. Le VERDICT de cet
+  // objectif n'est pas stocké — il se recalcule depuis les trades (voir
+  // `src/lib/weeklyReview.ts`).
+  `CREATE TABLE IF NOT EXISTS weekly_reviews (
+>>>>>>> origin/main
+    id       TEXT PRIMARY KEY,
+    user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    payload  TEXT NOT NULL
+  )`,
+
+<<<<<<< HEAD
+  `CREATE TABLE IF NOT EXISTS badges (
+=======
+  // Captures d'écran des trades, hors de la collection `trades`.
+  //
+  // Elles y vivaient en base64, à l'intérieur du payload : toute la collection
+  // partant en un seul envoi à chaque sauvegarde, un journal de ~23 trades
+  // illustrés dépassait la limite de 8 Mo du serveur et devenait impossible à
+  // enregistrer (HTTP 413). Accessoirement, modifier une simple note
+  // réexpédiait toutes les images de tous les trades.
+  //
+  // Elles sont désormais servies par `GET /api/screenshots/:id`, et un trade
+  // n'en garde que l'URL. Volontairement SANS clé étrangère vers `trades` :
+  // l'identifiant du trade n'existe pas encore au moment de l'envoi (il est
+  // attribué à l'enregistrement), et une capture orpheline est inoffensive —
+  // une purge périodique s'en charge (voir `purgeOrphanScreenshots`).
+  `CREATE TABLE IF NOT EXISTS trade_screenshots (
+    id         TEXT PRIMARY KEY,
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    mime       TEXT NOT NULL,
+    data       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_trade_screenshots_user ON trade_screenshots(user_id)`,
+
+  `CREATE TABLE IF NOT EXISTS trading_accounts (
+>>>>>>> origin/main
+    id       TEXT PRIMARY KEY,
+    user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    payload  TEXT NOT NULL
+  )`,
+
+<<<<<<< HEAD
+  // Comptes staff : identité de connexion, DÉCOUPLÉE du bureau partagé.
+  //
+  // Plusieurs coachs peuvent avoir chacun leur propre email et mot de passe,
+  // tout en travaillant sur les MÊMES données (le bureau "users" reste
+  // singulier). C'est pourquoi il n'y a PAS de clé étrangère vers users(id) :
+  // un compte staff n'est pas "propriétaire" d'un bureau, il y accède.
+  //
+  // Aucun champ ici n'atteint jamais le client via /api/state : GET /api/state
+  // ne renvoie que le payload de "users", jamais cette table.
+  `CREATE TABLE IF NOT EXISTS staff_accounts (
+    id                   TEXT PRIMARY KEY,
+    name                 TEXT NOT NULL,
+    email                TEXT NOT NULL,
+    email_lower          TEXT NOT NULL UNIQUE,
+    password_hash        TEXT NOT NULL,
+    -- Vrai tant qu'un mot de passe temporaire d'invitation n'a pas été
+    -- remplacé par l'intéressé. Jamais vrai pour le premier compte (créé via
+    -- /auth/setup, qui choisit son propre mot de passe).
+    must_change_password INTEGER NOT NULL DEFAULT 0,
+    -- 2FA (TOTP), voir server/auth/twoFactor.ts. totp_secret : présent dès
+    -- qu'un compte a démarré une configuration, même non encore confirmée
+    -- (voir startTotpSetup) — totp_enabled_at NULL est ce qui distingue "en
+    -- cours de configuration" de "activé".
+    totp_secret           TEXT,
+    totp_enabled_at        TEXT,
+    -- Anti-rejeu : dernier pas de temps TOTP (30s) accepte pour ce compte.
+    -- Un code deja utilise pour ce pas (ou un pas anterieur) est refuse meme
+    -- s'il correspond encore dans la fenetre de tolerance de findMatchingTotpStep,
+    -- voir server/auth/twoFactor.ts.
+    totp_last_used_step   INTEGER,
+    created_at           TEXT NOT NULL,
+    updated_at           TEXT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_staff_accounts_email ON staff_accounts(email_lower)`,
+
+  // Codes de récupération 2FA à usage unique, un hash SHA-256 par code (pas
+  // de sel : chaque code est déjà un secret aléatoire de forte entropie,
+  // même raisonnement que sessions.ts). used_at NULL = encore valide.
+  `CREATE TABLE IF NOT EXISTS staff_recovery_codes (
+    id         TEXT PRIMARY KEY,
+    staff_id   TEXT NOT NULL REFERENCES staff_accounts(id) ON DELETE CASCADE,
+    code_hash  TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    used_at    TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_staff_recovery_codes_staff ON staff_recovery_codes(staff_id)`,
+
+  // Défi 2FA en attente entre "mot de passe vérifié" et "session créée" —
+  // voir POST /auth/login puis POST /auth/login/2fa. Jeton à usage unique,
+  // courte durée de vie (5 min, voir twoFactor.ts), empreinte SHA-256 en
+  // base comme les sessions (server/auth/sessions.ts).
+  `CREATE TABLE IF NOT EXISTS staff_2fa_challenges (
+    token_hash TEXT PRIMARY KEY,
+    staff_id   TEXT NOT NULL REFERENCES staff_accounts(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+  )`,
+
+  // Sessions actives. La colonne id est le SHA-256 du jeton, jamais le jeton
+  // lui-même : le fichier de base vit en clair sur le disque (et dans le WAL, et
+  // dans les sauvegardes), une fuite ne doit pas permettre de rejouer les
+  // sessions.
+  //
+  // Les dates sont en ISO 8601 UTC : la comparaison lexicographique vaut alors
+  // comparaison chronologique, ce dont dépend le filtre sur expires_at.
+  `CREATE TABLE IF NOT EXISTS sessions (
+    id           TEXT PRIMARY KEY,
+    user_id      TEXT NOT NULL REFERENCES staff_accounts(id) ON DELETE CASCADE,
+    created_at   TEXT NOT NULL,
+    expires_at   TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    user_agent   TEXT
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions(user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)`,
+
+  // Journal de sécurité. Purge à 90 jours (les IP sont des données
+  // personnelles), jamais de mot de passe ni de jeton de session stocké ici.
+  // Pas de FK vers staff_accounts : un événement doit rester lisible même
+  // après révocation du compte concerné.
+  `CREATE TABLE IF NOT EXISTS security_events (
+    id            TEXT PRIMARY KEY,
+    created_at    TEXT NOT NULL,
+    event_type    TEXT NOT NULL,
+    severity      TEXT NOT NULL,          -- 'info' | 'warning' | 'critical'
+    account_kind  TEXT,                   -- 'staff' | 'student' | NULL
+    account_email TEXT,
+    ip_address    TEXT,
+    detail        TEXT NOT NULL DEFAULT ''
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_security_events_email   ON security_events(account_email)`,
+
+  // État opérationnel du verrouillage de compte, PAR (monde, email) — une
+  // seule ligne par compte, écrasée à chaque tentative de connexion.
+  // Distinct du journal ci-dessus (durée de vie et fréquence d'accès très
+  // différentes) : voir server/auth/loginLockout.ts.
+  `CREATE TABLE IF NOT EXISTS login_lockouts (
+    kind               TEXT NOT NULL,     -- 'staff' | 'student'
+    email_lower        TEXT NOT NULL,
+    failed_count       INTEGER NOT NULL DEFAULT 0,
+    window_started_at  TEXT NOT NULL,
+    locked_until       TEXT,
+    updated_at         TEXT NOT NULL,
+    -- Nombre de verrouillages déjà subis par ce compte — voir lockDurationFor
+    -- (loginLockout.ts) : chaque nouveau verrouillage allonge le suivant
+    -- (15 min, 1h, 4h, 24h), au lieu d'un verrouillage à durée fixe
+    -- indéfiniment répétable toutes les 15 minutes.
+    lock_count         INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (kind, email_lower)
+  )`,
+];
+
+=======
   `CREATE TABLE IF NOT EXISTS notifications (
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -338,16 +555,20 @@ const SCHEMA_STATEMENTS = [
   )`,
 ];
 
+>>>>>>> origin/main
 /**
  * Migration ponctuelle : sépare l'identité de connexion (désormais
  * `staff_accounts`) de l'ancien modèle à un seul compte (`user_credentials`,
  * lié 1:1 au bureau partagé par une clé étrangère qui interdirait tout second
  * compte).
  *
+<<<<<<< HEAD
  * SQLite/libSQL uniquement — une base Postgres est toujours créée neuve avec
  * `staff_accounts` déjà dans sa forme finale (voir `SCHEMA_STATEMENTS`),
  * cette migration n'a donc jamais de raison de s'y exécuter.
  *
+=======
+>>>>>>> origin/main
  * Le compte existant conserve exactement son `id` d'origine (celui qui était
  * `user_id` dans `user_credentials`, presque toujours `DEFAULT_USER_ID`) :
  * les sessions déjà émises restent donc valides, personne n'est déconnecté
@@ -474,10 +695,16 @@ async function migrateDropForum(): Promise<void> {
 
 /**
  * Ajoute `totp_secret`/`totp_enabled_at` à `staff_accounts` sur une base
+<<<<<<< HEAD
  * SQLite/libSQL EXISTANTE créée avant l'introduction de la 2FA — le `CREATE
  * TABLE IF NOT EXISTS` plus haut ne les crée que sur une base neuve, où ces
  * colonnes existent donc déjà. SQLite/libSQL uniquement (voir
  * `migrateToStaffAccounts`) : une base Postgres neuve les a toujours.
+=======
+ * EXISTANTE créée avant l'introduction de la 2FA — le `CREATE TABLE IF NOT
+ * EXISTS` plus haut ne les crée que sur une base neuve, où ces colonnes
+ * existent donc déjà.
+>>>>>>> origin/main
  */
 async function migrateAddTotpColumns(): Promise<void> {
   const columnsResult = await db.execute("PRAGMA table_info(staff_accounts)");
@@ -513,6 +740,124 @@ async function migrateAddLockCountColumn(): Promise<void> {
   await db.execute("ALTER TABLE login_lockouts ADD COLUMN lock_count INTEGER NOT NULL DEFAULT 0;");
 }
 
+<<<<<<< HEAD
+=======
+/**
+ * Migration ponctuelle : sort les captures d'écran encodées en base64 du
+ * payload des trades vers `trade_screenshots`, et remplace chacune par l'URL
+ * qui la sert (`/api/screenshots/<id>`).
+ *
+ * Sans elle, les trades déjà illustrés continueraient de porter leurs images
+ * dans la collection — le mur des 8 Mo resterait exactement où il était pour
+ * les données existantes.
+ *
+ * Idempotente par construction : elle ne retient que les URLs commençant par
+ * `data:image/`, qui n'existent plus après un passage. Protégée en plus par un
+ * marqueur `meta`, pour ne pas relire tous les trades à chaque démarrage.
+ */
+const MIGRATION_SCREENSHOTS_KEY = "migrated_screenshots_v1";
+
+async function migrateScreenshotsOutOfTrades(): Promise<void> {
+  const already = await db.execute({
+    sql: "SELECT 1 FROM meta WHERE key = ?",
+    args: [MIGRATION_SCREENSHOTS_KEY],
+  });
+  if (already.rows.length > 0) return;
+
+  const trades = await db.execute("SELECT id, user_id, payload FROM trades");
+  let imagesDeplacees = 0;
+  let tradesTouches = 0;
+
+  for (const row of trades.rows) {
+    const tradeId = row.id as string;
+    const userId = row.user_id as string;
+    let payload: { chartUrls?: { id: string; label: string; url: string }[] };
+    try {
+      payload = JSON.parse(row.payload as string);
+    } catch {
+      // Payload illisible : on le laisse tel quel plutôt que de le perdre.
+      continue;
+    }
+
+    const captures = payload.chartUrls;
+    if (!Array.isArray(captures) || captures.length === 0) continue;
+
+    let modifie = false;
+    for (const capture of captures) {
+      if (typeof capture?.url !== "string" || !capture.url.startsWith("data:image/")) continue;
+
+      // `data:<mime>;base64,<données>` — on sépare pour pouvoir renvoyer plus
+      // tard le bon Content-Type sans réanalyser la chaîne à chaque requête.
+      const virgule = capture.url.indexOf(",");
+      const entete = capture.url.slice(5, virgule).replace(/;base64$/, "");
+      const donnees = capture.url.slice(virgule + 1);
+      if (!donnees) continue;
+
+      const id = `shot-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      await db.execute({
+        sql: "INSERT INTO trade_screenshots (id, user_id, mime, data, created_at) VALUES (?, ?, ?, ?, ?)",
+        args: [id, userId, entete || "image/webp", donnees, new Date().toISOString()],
+      });
+      capture.url = `/api/screenshots/${id}`;
+      imagesDeplacees += 1;
+      modifie = true;
+    }
+
+    if (modifie) {
+      await db.execute({
+        sql: "UPDATE trades SET payload = ? WHERE id = ?",
+        args: [JSON.stringify(payload), tradeId],
+      });
+      tradesTouches += 1;
+    }
+  }
+
+  await db.execute({
+    sql: "INSERT INTO meta (key, value) VALUES (?, ?)",
+    args: [MIGRATION_SCREENSHOTS_KEY, new Date().toISOString()],
+  });
+
+  if (imagesDeplacees > 0) {
+    console.log(
+      `[propdesk] ${imagesDeplacees} capture(s) sortie(s) du payload de ${tradesTouches} trade(s).`
+    );
+  }
+}
+
+/**
+ * Supprime les captures qu'aucun trade ne référence plus — une image envoyée
+ * puis abandonnée (formulaire fermé sans enregistrer), ou dont le trade a été
+ * supprimé depuis. Passée au démarrage : ce sont quelques lignes, et rien ne
+ * presse.
+ */
+export async function purgeOrphanScreenshots(): Promise<number> {
+  const [captures, trades] = await Promise.all([
+    db.execute("SELECT id FROM trade_screenshots"),
+    db.execute("SELECT payload FROM trades"),
+  ]);
+  if (captures.rows.length === 0) return 0;
+
+  // Un seul balayage des payloads : chercher chaque id dans chaque trade
+  // séparément serait quadratique.
+  const referencees = new Set<string>();
+  for (const row of trades.rows) {
+    const payload = row.payload as string;
+    for (const match of payload.matchAll(/\/api\/screenshots\/(shot-[A-Za-z0-9-]+)/g)) {
+      referencees.add(match[1]);
+    }
+  }
+
+  const orphelines = captures.rows.map((r) => r.id as string).filter((id) => !referencees.has(id));
+  for (const id of orphelines) {
+    await db.execute({ sql: "DELETE FROM trade_screenshots WHERE id = ?", args: [id] });
+  }
+  if (orphelines.length > 0) {
+    console.log(`[propdesk] ${orphelines.length} capture(s) orpheline(s) supprimée(s).`);
+  }
+  return orphelines.length;
+}
+
+>>>>>>> origin/main
 let initialized = false;
 
 /**
@@ -524,6 +869,7 @@ export async function initDb(): Promise<void> {
   if (initialized) return;
   initialized = true;
 
+<<<<<<< HEAD
   if (usingLocalFile) {
     // Pertinent seulement en mode fichier local : une base distante (Turso
     // ou Postgres) gère elle-même son mode de journalisation, et WAL n'a pas
@@ -541,11 +887,21 @@ export async function initDb(): Promise<void> {
     // équivalent, et cette commande échouerait si on l'y envoyait.
     await db.execute("PRAGMA foreign_keys = ON;");
   }
+=======
+  try {
+    await db.execute("PRAGMA journal_mode = WAL;");
+  } catch (err) {
+    console.warn("[propdesk] PRAGMA journal_mode = WAL ignoré.", err);
+  }
+
+  await db.execute("PRAGMA foreign_keys = ON;");
+>>>>>>> origin/main
 
   for (const statement of SCHEMA_STATEMENTS) {
     await db.execute(statement);
   }
 
+<<<<<<< HEAD
   if (!usingPostgres) {
     // Migrations SQLite/libSQL uniquement — une base Postgres est toujours
     // créée neuve, directement dans sa forme finale (voir les commentaires
@@ -556,6 +912,14 @@ export async function initDb(): Promise<void> {
   }
   await migrateDropCoachSignals();
   await migrateDropForum();
+=======
+  await migrateToStaffAccounts();
+  await migrateAddTotpColumns();
+  await migrateAddLockCountColumn();
+  await migrateDropCoachSignals();
+  await migrateDropForum();
+  await migrateScreenshotsOutOfTrades();
+>>>>>>> origin/main
 }
 
 export async function getMeta(key: string): Promise<string | null> {

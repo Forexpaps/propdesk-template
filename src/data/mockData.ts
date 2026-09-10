@@ -33,6 +33,7 @@ export const initialTraderBadges: TraderBadge[] = [
     unit: "trades",
     rewardXP: 300,
   },
+<<<<<<< HEAD
   {
     id: "badge-3",
     title: "Prop Firm Challenge Ready",
@@ -46,6 +47,16 @@ export const initialTraderBadges: TraderBadge[] = [
     unit: "% profit",
     rewardXP: 450,
   },
+=======
+  // `badge-3` (« Prop Firm Challenge Ready ») retiré : son critère portait sur
+  // un profit « en backtest », module qui n'existe plus dans l'application —
+  // il serait donc resté à 0 % indéfiniment, comme `badge-2` (Diplômé SMC) et
+  // `badge-9` (Examen SMC), tous deux liés aux modules cours/examen supprimés.
+  // Il pourrait revenir un jour sur des données réelles (profit et drawdown du
+  // compte, tous deux déjà calculés par `computePerformanceStats`), mais cela
+  // demanderait de passer le portefeuille à `computeBadgeProgress`, qui ne
+  // reçoit aujourd'hui que les trades.
+>>>>>>> origin/main
   {
     id: "badge-4",
     title: "Trader Discipliné (Zero FOMO)",
@@ -101,12 +112,21 @@ export const initialTraderBadges: TraderBadge[] = [
   {
     id: "badge-8",
     title: "Cumul de Performance +10R",
-    description: "Générer un total cumulé de au moins +10.0R de bénéfices sur le journal de trading.",
+    description:
+      "Générer un total cumulé d'au moins +10.0R sur le journal. Le R de chaque trade est mesuré sur tes prix (sortie − entrée, rapporté à la distance entrée − stop) : un trade sans prix de sortie n'est pas comptabilisé, et les frais ne sont pas déduits.",
     iconName: "TrendingUp",
     category: "PERFORMANCE",
     unlocked: false,
     progressPercentage: 0,
+<<<<<<< HEAD
     currentValue: 10.0,
+=======
+    // 0 et non 10 : cette valeur du catalogue est recopiée en base par
+    // `syncBadgeCatalog`, et `computeBadgeProgress` la remplace à l'affichage.
+    // Laisser 10 ici affichait un badge déjà complet si le calcul venait à
+    // manquer — exactement le genre de faux positif qu'on ne veut pas.
+    currentValue: 0,
+>>>>>>> origin/main
     targetValue: 10.0,
     unit: "R",
     rewardXP: 650,

@@ -1,4 +1,8 @@
 import { Trade, TraderBadge } from "../types";
+<<<<<<< HEAD
+=======
+import { tradeRealizedR } from "./performanceStats";
+>>>>>>> origin/main
 
 /**
  * Calcule la progression EN DIRECT de chaque badge depuis les données réelles
@@ -36,6 +40,12 @@ export function computeBadgeProgress(badges: TraderBadge[], trades: Trade[]): Tr
  * voir `server/auth/routes.ts`) — jamais `badge-N` tel quel. On retrouve donc
  * le critère à appliquer par le SUFFIXE de l'id, pas par égalité stricte.
  */
+<<<<<<< HEAD
+=======
+/** Seuil de risque des badges « Maître du Risk 1% », en pourcentage du capital. */
+const MAX_RISK_PERCENT = 1;
+
+>>>>>>> origin/main
 const KNOWN_BADGE_IDS = [
   "badge-1", "badge-3", "badge-4", "badge-5",
   "badge-6", "badge-7", "badge-8",
@@ -189,6 +199,7 @@ function computeSingleBadgeProgress(
       };
     }
 
+<<<<<<< HEAD
     // badge-1, badge-21, badge-22, badge-23 (% de risque par trade — le tag
     // "Sur-risque (>1%)" n'est qu'auto-déclaré, son absence ne prouve rien),
     // badge-2 (Diplômé SMC Horizon, reposait sur le Module cours, retiré de
@@ -196,6 +207,63 @@ function computeSingleBadgeProgress(
     // données pour ce badge), badge-8 (cumul en "R"), badge-9 (score
     // d'examen) : aucune donnée suivie aujourd'hui ne permet de les calculer
     // honnêtement.
+=======
+    // Maître du Risk 1% et ses paliers — trades CONSÉCUTIFS dont le risque
+    // engagé est ≤ 1 %.
+    //
+    // Seuls les trades qui RENSEIGNENT `riskPercent` comptent : un trade qui
+    // l'omet ne prouve rien (il n'atteste ni un risque maîtrisé, ni un
+    // dépassement) et casse la série, plutôt que d'être compté comme conforme.
+    // C'est le même refus d'inventer une donnée que partout ailleurs ici — et
+    // la raison pour laquelle ces badges sont restés `trackable: false` tant
+    // que le champ n'existait pas.
+    case "badge-1":
+    case "badge-21":
+    case "badge-22":
+    case "badge-23": {
+      const targetByBadge: Record<string, number> = {
+        "badge-1": 15,
+        "badge-21": 30,
+        "badge-22": 50,
+        "badge-23": 100,
+      };
+      const target = targetByBadge[canonicalBadgeId(badgeId)];
+      const serie = computeRiskDisciplineStreak(trades);
+      return {
+        currentValue: serie,
+        targetValue: target,
+        progressPercentage: Math.min(100, Math.round((serie / target) * 100)),
+      };
+    }
+
+    // Cumul de Performance +10R — somme des R réalisés du journal.
+    //
+    // Ce badge était marqué « suivi pas encore disponible », au motif que le R
+    // exigeait le montant risqué en devise, donc le capital du compte au
+    // moment du trade, que rien ne conserve. C'est vrai de la voie monétaire,
+    // et faux de la voie géométrique : dans `PnL / risque engagé`, la taille
+    // de lot et la valeur du point s'annulent, et il reste
+    // `déplacement / |entrée − stop|` — voir `tradeRealizedR`. L'application
+    // faisait DÉJÀ exactement cette arithmétique pour « Capture du TP » et
+    // « Perte vs SL » : la refuser ici seulement était incohérent.
+    //
+    // L'autre motif invoqué — « supposerait une sortie unique de toute la
+    // position » — ne tient pas non plus : un `Trade` ne porte qu'UN
+    // `exitPrice`, la sortie unique n'est pas une hypothèse du calcul, c'est
+    // le modèle de données lui-même.
+    case "badge-8": {
+      const { cumul } = computeCumulativeR(trades);
+      const target = 10;
+      return {
+        currentValue: Number(cumul.toFixed(1)),
+        targetValue: target,
+        // Un cumul négatif reste une barre à 0 % : la progression ne recule
+        // pas en dessous de rien, et un pourcentage négatif ne s'affiche pas.
+        progressPercentage: Math.max(0, Math.min(100, Math.round((cumul / target) * 100))),
+      };
+    }
+
+>>>>>>> origin/main
     default:
       return null;
   }
@@ -211,6 +279,54 @@ function computeSingleBadgeProgress(
  * C'est un choix assumé plutôt qu'une évidence — documenté ici pour ne pas
  * le redécouvrir en lisant seulement le code.
  */
+<<<<<<< HEAD
+=======
+/**
+ * Nombre de trades CONSÉCUTIFS (en partant du plus récent) dont le risque
+ * engagé est renseigné et inférieur ou égal à 1 % du capital.
+ *
+ * Un trade sans `riskPercent` rompt la série au lieu d'être ignoré : la série
+ * doit attester d'une discipline observée, et sauter les trades non renseignés
+ * fabriquerait une série qui n'a jamais existé — un journal où le champ n'est
+ * jamais rempli afficherait alors une série parfaite.
+ *
+ * Contrairement à `computeDisciplineStreak`, on raisonne trade par trade et
+ * non jour par jour : le critère porte sur chaque position prise, pas sur une
+ * journée.
+ */
+export function computeRiskDisciplineStreak(trades: Trade[]): number {
+  // Trié ici, jamais supposé trié. Cette fonction se fiait à l'ordre du
+  // tableau (« App.tsx insère en tête »), ce qui n'est vrai que pour une
+  // saisie manuelle : un import CSV empile dans l'ordre du fichier, une
+  // édition de date laisse le trade à sa place, et un rechargement rend
+  // l'ordre de la base (`position`). Dans ces cas la série se calculait à
+  // partir d'un trade qui n'était pas le plus récent. `computeDisciplineStreak`
+  // juste en dessous triait déjà ses jours : les deux séries suivent
+  // désormais la même règle.
+  //
+  // Départage à date égale par l'heure quand elle est connue ; à défaut,
+  // l'ordre d'origine est conservé (tri stable) — inventer un ordre
+  // intra-journalier serait pire que garder celui de la saisie.
+  const parDateDesc = trades
+    .map((t, index) => ({ t, index }))
+    .sort((a, b) => {
+      if (a.t.date !== b.t.date) return a.t.date < b.t.date ? 1 : -1;
+      const heureA = a.t.time ?? "";
+      const heureB = b.t.time ?? "";
+      if (heureA !== heureB) return heureA < heureB ? 1 : -1;
+      return a.index - b.index;
+    })
+    .map((e) => e.t);
+
+  let serie = 0;
+  for (const t of parDateDesc) {
+    if (typeof t.riskPercent !== "number" || t.riskPercent > MAX_RISK_PERCENT) break;
+    serie += 1;
+  }
+  return serie;
+}
+
+>>>>>>> origin/main
 export function computeDisciplineStreak(trades: Trade[]): number {
   if (trades.length === 0) return 0;
 
@@ -234,3 +350,33 @@ export function computeDisciplineStreak(trades: Trade[]): number {
 
   return streak;
 }
+<<<<<<< HEAD
+=======
+
+/**
+ * Cumul des R réalisés du journal, et ce qui en a été écarté.
+ *
+ * Un trade non mesurable (position ouverte, prix de sortie non renseigné,
+ * niveaux incohérents) est COMPTÉ À PART, jamais traité comme un 0 R : un
+ * trade dont on ignore le résultat n'est pas un trade nul.
+ */
+export function computeCumulativeR(trades: Trade[]): {
+  cumul: number;
+  tradesMesures: number;
+  tradesNonMesurables: number;
+} {
+  let cumul = 0;
+  let mesures = 0;
+  let nonMesurables = 0;
+  for (const t of trades) {
+    const r = tradeRealizedR(t);
+    if (r === null) {
+      nonMesurables += 1;
+      continue;
+    }
+    cumul += r;
+    mesures += 1;
+  }
+  return { cumul, tradesMesures: mesures, tradesNonMesurables: nonMesurables };
+}
+>>>>>>> origin/main

@@ -13,6 +13,14 @@ const LEGACY_KEYS = {
     notifications: "horizon_notifications",
     badges: "horizon_badges",
     setups: "horizon_setups",
+<<<<<<< HEAD
+=======
+    // Sans cette entrée, `cacheState` ne recopiait pas les plans venus du
+    // serveur dans le cache local : un démarrage à froid sans réseau les
+    // affichait vides, alors qu'ils existaient bien en base.
+    tradingPlans: "horizon_trading_plans",
+    weeklyReviews: "horizon_weekly_reviews",
+>>>>>>> origin/main
   },
 } as const;
 
@@ -22,6 +30,30 @@ function readLegacy<T>(key: string): T | undefined {
     return raw ? (JSON.parse(raw) as T) : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * Clés laissées par des modules retirés de l'application (cours et leçons,
+ * messagerie coach, quiz, liste d'élèves — voir HANDOFF.md, « Ce qui n'existe
+ * plus »). Plus personne ne les lit, mais elles restent dans le navigateur et
+ * occupent le quota `localStorage`, partagé par toute l'origine : une purge
+ * ponctuelle vaut mieux qu'un cimetière qui grossit.
+ */
+const CLES_OBSOLETES = [
+  "horizon_modules",
+  "horizon_messages",
+  "horizon_quiz_results",
+  "horizon_enrolled_students",
+] as const;
+
+function purgerClesObsoletes(): void {
+  for (const cle of CLES_OBSOLETES) {
+    try {
+      localStorage.removeItem(cle);
+    } catch {
+      // Navigation privée ou stockage refusé : sans conséquence, on continue.
+    }
   }
 }
 
@@ -88,6 +120,11 @@ export function useBootstrap() {
 
     (async () => {
       try {
+        // Après `collectLegacyState` dans l'ordre du code mais avant tout
+        // usage : les clés purgées ici n'appartiennent qu'à des modules
+        // retirés, jamais à une collection encore reprise à l'amorçage.
+        purgerClesObsoletes();
+
         let serverState = await api.fetchState();
 
         if (!serverState.bootstrapped) {

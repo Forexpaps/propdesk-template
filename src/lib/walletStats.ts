@@ -109,11 +109,21 @@ export function computeRealizedPnl(trades: Trade[], accountId: string): number {
  * manualAdjustment` (dépôts/retraits/frais absents du journal, voir
  * `TradingAccount.manualAdjustment`).
  *
+<<<<<<< HEAD
  * Un compte sans trade rattaché garde son solde tel quel — retirer le
  * dernier trade lié à un compte ne doit pas silencieusement remettre son
  * solde au capital initial si ce compte avait un ajustement manuel
  * antérieur ; seul le PnL des trades *présents* est recalculé, jamais
  * "annulé" par leur absence.
+=======
+ * Le recalcul a lieu **même sans aucun trade rattaché**. Un retour anticipé
+ * existait ici, justifié par la crainte d'écraser un `manualAdjustment` — mais
+ * la formule ci-dessus le conserve précisément dans ce cas (`pnl` vaut 0, le
+ * solde retombe à `initialBalance + manualAdjustment`). Le raisonnement était
+ * donc faux, et l'effet réel était un solde figé : supprimer (ou détacher) le
+ * dernier trade d'un compte laissait son solde gonflé du PnL de trades qui
+ * n'existaient plus, sans aucun moyen de le corriger depuis l'interface.
+>>>>>>> origin/main
  *
  * Renvoie `accounts` à l'identique (même référence) quand rien ne bouge,
  * pour ne déclencher ni sauvegarde ni re-rendu inutile.
@@ -124,9 +134,12 @@ export function syncAccountsWithTrades(
 ): TradingAccount[] {
   let changed = false;
   const next = accounts.map((acc) => {
+<<<<<<< HEAD
     const linkedTrades = trades.filter((t) => t.accountId === acc.id);
     if (linkedTrades.length === 0) return acc;
 
+=======
+>>>>>>> origin/main
     const pnl = computeRealizedPnl(trades, acc.id);
     const newBalance = acc.initialBalance + pnl + (acc.manualAdjustment ?? 0);
 

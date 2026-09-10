@@ -1,5 +1,9 @@
 import { AppNotification, Trade, TradingPlan, TradingPlanData } from "../types";
+<<<<<<< HEAD
 import { FOREX_SESSIONS, isSessionActive } from "../components/TopHeader";
+=======
+import { FOREX_SESSIONS, isSessionActive } from "./sessions";
+>>>>>>> origin/main
 import { isRealizedDollarTrade } from "./performanceStats";
 
 /** Exportée pour `src/lib/pendingChanges.ts`, qui doit reconnaître une clé de plan namespacée par email sans connaître ce préfixe en dur. */
@@ -61,9 +65,14 @@ export function createEmptyPlan(name = "Nouveau plan"): TradingPlan {
 export const EMPTY_TRADING_PLANS: TradingPlanData = [];
 
 /**
+<<<<<<< HEAD
  * Même motif que `MindsetJournalModal.tsx` (`storageKey` prop) : côté
  * élève, namespacé par email pour qu'un poste partagé ne compare jamais les
  * trades d'un élève au plan d'un autre. Côté staff, clé partagée (bureau
+=======
+ * Namespacé par email côté élève pour qu'un poste partagé ne compare jamais
+ * les trades d'un élève au plan d'un autre. Côté staff, clé partagée (bureau
+>>>>>>> origin/main
  * commun), comme avant.
  */
 export function getTradingPlanStorageKey(storageKey?: string): string {
@@ -155,7 +164,46 @@ function matchesAny(haystack: string, needle: string): boolean {
 }
 
 /**
+<<<<<<< HEAD
  * Raisons de non-respect du plan pour CE trade, ou `[]` s'il est conforme.
+=======
+ * Identifiant STABLE d'une règle du plan. Le message, lui, contient les
+ * valeurs du trade (« actif hors plan (EURUSD) ») et ne peut donc pas servir
+ * de clé d'agrégation : sans ce code, compter « combien de fois ai-je pris un
+ * actif hors plan ce mois-ci ? » reviendrait à faire du texte libre une
+ * structure de données.
+ */
+export type PlanRuleCode =
+  | "actif_hors_plan"
+  | "setup_non_autorise"
+  | "session_non_autorisee"
+  | "max_trades_par_jour"
+  | "perte_quotidienne_max"
+  | "sans_plan_de_trade"
+  | "sur_risque_declare"
+  | "sur_risque_mesure";
+
+export interface PlanViolation {
+  code: PlanRuleCode;
+  /** Phrase affichée à l'utilisateur, valeurs du trade incluses. */
+  message: string;
+}
+
+/** Libellés courts pour le tableau de synthèse — la règle, pas l'incident. */
+export const PLAN_RULE_LABELS: Record<PlanRuleCode, string> = {
+  actif_hors_plan: "Actif hors plan",
+  setup_non_autorise: "Setup non autorisé",
+  session_non_autorisee: "Session non autorisée",
+  max_trades_par_jour: "Nombre de trades/jour dépassé",
+  perte_quotidienne_max: "Perte quotidienne max dépassée",
+  sans_plan_de_trade: "Trade auto-déclaré sans plan",
+  sur_risque_declare: "Sur-risque auto-déclaré",
+  sur_risque_mesure: "Risque engagé au-delà du plan",
+};
+
+/**
+ * Violations du plan pour CE trade, ou `[]` s'il est conforme.
+>>>>>>> origin/main
  * Chaque règle ne s'applique que si le champ correspondant du plan est
  * renseigné — un plan incomplet n'impose aucune contrainte sur ses champs
  * vides.
@@ -163,12 +211,22 @@ function matchesAny(haystack: string, needle: string): boolean {
  * `sameDayTrades` doit inclure ce trade lui-même (même date, l'appelant est
  * responsable du filtrage — voir les deux `handleAddTrade`/`handleUpdateTrade`
  * dans `App.tsx`).
+<<<<<<< HEAD
+=======
+ *
+ * Les `message` sont restés IDENTIQUES au caractère près lors du passage du
+ * texte libre à `PlanViolation` : les notifications déjà persistées ne
+ * stockent que la phrase rendue, et un changement de formulation aurait fait
+ * réapparaître comme « nouvelles » des alertes que l'utilisateur avait déjà
+ * lues.
+>>>>>>> origin/main
  */
 export function checkPlanViolations(
   trade: Trade,
   sameDayTrades: Trade[],
   plan: TradingPlan,
   startingCapital: number
+<<<<<<< HEAD
 ): string[] {
   const reasons: string[] = [];
 
@@ -178,6 +236,17 @@ export function checkPlanViolations(
 
   if (plan.authorizedSetups.trim() && trade.strategy.trim() && !matchesAny(plan.authorizedSetups, trade.strategy)) {
     reasons.push(`setup non autorisé (${trade.strategy})`);
+=======
+): PlanViolation[] {
+  const reasons: PlanViolation[] = [];
+
+  if (plan.trackedAssets.trim() && !matchesAny(plan.trackedAssets, trade.pair)) {
+    reasons.push({ code: "actif_hors_plan", message: `actif hors plan (${trade.pair})` });
+  }
+
+  if (plan.authorizedSetups.trim() && trade.strategy.trim() && !matchesAny(plan.authorizedSetups, trade.strategy)) {
+    reasons.push({ code: "setup_non_autorise", message: `setup non autorisé (${trade.strategy})` });
+>>>>>>> origin/main
   }
 
   if (plan.authorizedSessions.length > 0 && trade.time) {
@@ -190,7 +259,11 @@ export function checkPlanViolations(
       );
       const withinPlan = activeSessions.some((s) => authorizedForexSessions.includes(s));
       if (!withinPlan) {
+<<<<<<< HEAD
         reasons.push("session non autorisée");
+=======
+        reasons.push({ code: "session_non_autorisee", message: "session non autorisée" });
+>>>>>>> origin/main
       }
     }
   }
@@ -198,7 +271,14 @@ export function checkPlanViolations(
   const maxTradesPerDay = Number(plan.maxTradesPerDay);
   if (plan.maxTradesPerDay.trim() && Number.isFinite(maxTradesPerDay) && maxTradesPerDay > 0) {
     if (sameDayTrades.length > maxTradesPerDay) {
+<<<<<<< HEAD
       reasons.push(`limite de ${maxTradesPerDay} trade${maxTradesPerDay > 1 ? "s" : ""}/jour dépassée`);
+=======
+      reasons.push({
+        code: "max_trades_par_jour",
+        message: `limite de ${maxTradesPerDay} trade${maxTradesPerDay > 1 ? "s" : ""}/jour dépassée`,
+      });
+>>>>>>> origin/main
     }
   }
 
@@ -209,16 +289,61 @@ export function checkPlanViolations(
       .reduce((acc, t) => acc + t.pnl, 0);
     const dailyLossPercent = (Math.abs(dailyLoss) / startingCapital) * 100;
     if (dailyLossPercent > maxDailyLossPercent) {
+<<<<<<< HEAD
       reasons.push(`perte quotidienne max dépassée (${dailyLossPercent.toFixed(1)}%)`);
+=======
+      reasons.push({
+        code: "perte_quotidienne_max",
+        message: `perte quotidienne max dépassée (${dailyLossPercent.toFixed(1)}%)`,
+      });
+>>>>>>> origin/main
     }
   }
 
   if (trade.mistakes?.includes("Pas de plan de trade")) {
+<<<<<<< HEAD
     reasons.push("trade auto-déclaré sans plan");
   }
 
   if (plan.riskPerTradePercent.trim() && trade.mistakes?.includes("Sur-risque (>1%)")) {
     reasons.push("risque auto-déclaré au-delà du plan");
+=======
+    reasons.push({ code: "sans_plan_de_trade", message: "trade auto-déclaré sans plan" });
+  }
+
+  if (plan.riskPerTradePercent.trim() && trade.mistakes?.includes("Sur-risque (>1%)")) {
+    reasons.push({ code: "sur_risque_declare", message: "risque auto-déclaré au-delà du plan" });
+  }
+
+  // Comparaison NUMÉRIQUE du risque réellement saisi au seuil du plan — la
+  // seule règle qui MESURE au lieu de demander à l'utilisateur de reconnaître
+  // sa faute. Volontairement distincte du tag auto-déclaré juste au-dessus :
+  // les deux répondent à deux questions différentes (« ce que j'ai mesuré » vs
+  // « ce que j'ai reconnu »), et les voir se déclencher ensemble est informatif.
+  //
+  // `riskPerTradePercent` est une chaîne libre : « 1 » se compare, « 1 à 2 » ou
+  // « 1% » non. Même convention que `maxTradesPerDay` plus haut — une règle
+  // dont le seuil n'est pas un nombre ne s'applique pas, plutôt que de deviner
+  // un seuil que l'utilisateur n'a pas écrit.
+  //
+  // `riskPercent` absent → AUCUNE violation : l'absence n'est pas une faute
+  // (même parti pris que `tradesSansHeure` ailleurs).
+  const risqueMax = Number(plan.riskPerTradePercent);
+  if (
+    plan.riskPerTradePercent.trim() &&
+    Number.isFinite(risqueMax) &&
+    risqueMax > 0 &&
+    typeof trade.riskPercent === "number" &&
+    // Epsilon : le calculateur de position produit un `0.9999999996` pour un
+    // risque de 1 %. Sans cette tolérance, une saisie parfaitement conforme
+    // déclencherait une alerte.
+    trade.riskPercent - risqueMax > 1e-9
+  ) {
+    reasons.push({
+      code: "sur_risque_mesure",
+      message: `risque engagé ${trade.riskPercent}% au-delà du plan (${risqueMax}%)`,
+    });
+>>>>>>> origin/main
   }
 
   return reasons;
@@ -234,11 +359,19 @@ export function planAlertId(tradeId: string): string {
  * non vide (l'appelant retire déjà la notification quand ça ne l'est pas —
  * voir `upsertPlanAlert`).
  */
+<<<<<<< HEAD
 export function buildPlanAlertNotification(trade: Trade, reasons: string[]): AppNotification {
   return {
     id: planAlertId(trade.id),
     title: "⚠️ Non-respect du plan de trading",
     message: `${trade.pair} (${trade.date}) : ${reasons.join(" ; ")}.`,
+=======
+export function buildPlanAlertNotification(trade: Trade, reasons: PlanViolation[]): AppNotification {
+  return {
+    id: planAlertId(trade.id),
+    title: "⚠️ Non-respect du plan de trading",
+    message: `${trade.pair} (${trade.date}) : ${reasons.map((r) => r.message).join(" ; ")}.`,
+>>>>>>> origin/main
     time: "À l'instant",
     type: "risk",
     read: false,
@@ -253,7 +386,14 @@ export function buildPlanAlertNotification(trade: Trade, reasons: string[]): App
  * Les entrées excédentaires (les plus anciennes, en fin de liste — les plus
  * récentes sont toujours insérées en tête) sont abandonnées silencieusement.
  */
+<<<<<<< HEAD
 const MAX_STUDENT_NOTIFICATIONS = 300;
+=======
+/** Plafond de rétention du centre d'alertes — au-delà, les plus anciennes sont retirées.
+ *  Exporté pour être ANNONCÉ à l'écran : une notification qui disparaît sans explication
+ *  ressemble à un bug. */
+export const MAX_STUDENT_NOTIFICATIONS = 300;
+>>>>>>> origin/main
 
 /**
  * Upsert idempotent : ajoute/remplace la notification déterministe de ce
@@ -263,9 +403,156 @@ const MAX_STUDENT_NOTIFICATIONS = 300;
 export function upsertPlanAlert(
   notifications: AppNotification[],
   trade: Trade,
+<<<<<<< HEAD
   reasons: string[]
+=======
+  reasons: PlanViolation[]
+>>>>>>> origin/main
 ): AppNotification[] {
   const withoutExisting = notifications.filter((n) => n.id !== planAlertId(trade.id));
   if (reasons.length === 0) return withoutExisting;
   return [buildPlanAlertNotification(trade, reasons), ...withoutExisting].slice(0, MAX_STUDENT_NOTIFICATIONS);
 }
+<<<<<<< HEAD
+=======
+
+// ---------------------------------------------------------------------------
+// Agrégation : ce que coûtent les entorses au plan
+// ---------------------------------------------------------------------------
+
+export interface PlanRuleSummary {
+  code: PlanRuleCode;
+  label: string;
+  /** Nombre de trades enfreignant CETTE règle. */
+  occurrences: number;
+  /**
+   * Somme des PnL de ces trades. Nommé `pnl` et non `cout` : une entorse
+   * rentable existe, et la masquer derrière un mot qui suppose une perte
+   * serait mentir. L'UI choisit le mot, les données restent signées.
+   */
+  pnl: number;
+  /** Trades en infraction dont le PnL n'entre pas dans `pnl` (position ouverte ou PnL en %). */
+  tradesNonChiffrables: number;
+}
+
+export interface PlanComplianceSummary {
+  /** Trades rattachés à un plan qui existe encore — les seuls jugeables. */
+  tradesEvalues: number;
+  /**
+   * Trades sans `tradingPlanId`, ou dont le plan a été supprimé. Comptés à
+   * part et JAMAIS rangés parmi les conformes : ne pas avoir de plan n'est
+   * pas la même chose que respecter le sien.
+   */
+  tradesNonEvalues: number;
+  /**
+   * Trades évalués sur un plan qui fixe un risque maximal chiffré, mais dont
+   * `riskPercent` n'est pas renseigné : la règle la plus objective du plan
+   * n'a pas pu être vérifiée pour eux. Le dire vaut mieux que de les
+   * présenter comme conformes.
+   */
+  tradesRisqueNonVerifiable: number;
+  tradesEnInfraction: number;
+  /** PnL cumulé des trades en infraction (chaque trade compté UNE fois, quel que soit son nombre de règles enfreintes). */
+  pnlTotalEnInfraction: number;
+  /** Une ligne par règle réellement enfreinte, triée par PnL croissant (la plus coûteuse en tête). */
+  parRegle: PlanRuleSummary[];
+  /**
+   * Violations par id de trade. Une clé PRÉSENTE avec un tableau vide =
+   * « évalué et conforme » ; une clé ABSENTE = « non évaluable ». Exposée
+   * pour que `computePeriodComparison` n'ait pas à refaire cette passe.
+   */
+  violationsParTrade: Map<string, PlanViolation[]>;
+}
+
+/**
+ * Confronte TOUT le journal aux plans de trading, et chiffre les écarts.
+ *
+ * **Rien n'est persisté, tout est recalculé** depuis les plans ACTUELS : un
+ * trade d'il y a six mois est jugé avec les règles d'aujourd'hui. C'est un
+ * choix, et il doit être écrit à l'écran. Figer les violations au moment de la
+ * saisie en ferait un cache faux dès qu'un plan est édité — même famille de
+ * raisonnement que « `result` n'est jamais déduit du signe du PnL ».
+ */
+export function computePlanComplianceSummary(
+  trades: Trade[],
+  plans: TradingPlan[],
+  startingCapital: number
+): PlanComplianceSummary {
+  const plansById = new Map(plans.map((p) => [p.id, p]));
+
+  // Les règles « max trades/jour » et « perte quotidienne » ont besoin de tous
+  // les trades du même jour. Un `filter` par trade rendrait l'agrégation
+  // quadratique — invisible sur 4 trades, sensible sur plusieurs milliers.
+  const parJour = new Map<string, Trade[]>();
+  for (const t of trades) {
+    const jour = parJour.get(t.date);
+    if (jour) jour.push(t);
+    else parJour.set(t.date, [t]);
+  }
+
+  const violationsParTrade = new Map<string, PlanViolation[]>();
+  const stats = new Map<PlanRuleCode, { occurrences: number; pnl: number; tradesNonChiffrables: number }>();
+
+  let tradesEvalues = 0;
+  let tradesNonEvalues = 0;
+  let tradesRisqueNonVerifiable = 0;
+  let tradesEnInfraction = 0;
+  let pnlTotalEnInfraction = 0;
+
+  for (const trade of trades) {
+    const plan = trade.tradingPlanId ? plansById.get(trade.tradingPlanId) : undefined;
+    if (!plan) {
+      // Plan absent ou supprimé depuis : « introuvable » vaut « aucun plan »,
+      // jamais une erreur (voir le commentaire de `Trade.tradingPlanId`).
+      tradesNonEvalues += 1;
+      continue;
+    }
+    tradesEvalues += 1;
+
+    const seuilRisque = Number(plan.riskPerTradePercent);
+    if (
+      plan.riskPerTradePercent.trim() &&
+      Number.isFinite(seuilRisque) &&
+      seuilRisque > 0 &&
+      typeof trade.riskPercent !== "number"
+    ) {
+      tradesRisqueNonVerifiable += 1;
+    }
+
+    const violations = checkPlanViolations(trade, parJour.get(trade.date) ?? [trade], plan, startingCapital);
+    violationsParTrade.set(trade.id, violations);
+    if (violations.length === 0) continue;
+
+    const chiffrable = isRealizedDollarTrade(trade);
+    tradesEnInfraction += 1;
+    if (chiffrable) pnlTotalEnInfraction += trade.pnl;
+
+    // Un trade enfreignant plusieurs règles compte dans chacune : les PnL par
+    // règle ne s'excluent donc pas mutuellement, et leur somme peut recompter
+    // un même trade plusieurs fois — exactement comme les coûts par erreur
+    // taguée (`mistakeChartData`, `performanceStats.ts`). `pnlTotalEnInfraction`
+    // reste, lui, un total sans double comptage.
+    for (const v of violations) {
+      const s = stats.get(v.code) ?? { occurrences: 0, pnl: 0, tradesNonChiffrables: 0 };
+      s.occurrences += 1;
+      if (chiffrable) s.pnl += trade.pnl;
+      else s.tradesNonChiffrables += 1;
+      stats.set(v.code, s);
+    }
+  }
+
+  const parRegle: PlanRuleSummary[] = [...stats.entries()]
+    .map(([code, s]) => ({ code, label: PLAN_RULE_LABELS[code], ...s }))
+    .sort((a, b) => a.pnl - b.pnl);
+
+  return {
+    tradesEvalues,
+    tradesNonEvalues,
+    tradesRisqueNonVerifiable,
+    tradesEnInfraction,
+    pnlTotalEnInfraction,
+    parRegle,
+    violationsParTrade,
+  };
+}
+>>>>>>> origin/main

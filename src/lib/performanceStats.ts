@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { Trade, StudentProfile, EmotionState } from "../types";
+=======
+import { Trade, StudentProfile, EmotionState, TradingPlan } from "../types";
+>>>>>>> origin/main
 
 /**
  * Calculs purs de Rentabilité et du résumé Journal, extraits de
@@ -42,9 +46,30 @@ export function isRealizedDollarTrade(t: Trade): boolean {
   return (t.pnlUnit ?? "USD") !== "PERCENT" && t.result !== "OPEN";
 }
 
+<<<<<<< HEAD
 export interface PerformanceStats {
   equityData: { date: string; capital: number; pnl: number }[];
   strategyChartData: { strategy: string; winRate: number; pnl: number; tradesCount: number }[];
+=======
+/**
+ * `wins/(wins+losses)` — BREAKEVEN et OPEN au dénominateur dilueraient le taux
+ * sans jamais apparaître nulle part comme « neutres ». Au niveau module (et non
+ * enfermée dans `computePerformanceStats`) pour que toute nouvelle ventilation
+ * réutilise cette définition au lieu d'en recopier une variante.
+ */
+function winRateOf(s: CategoryStats): number {
+  return s.wins + s.losses > 0 ? Math.round((s.wins / (s.wins + s.losses)) * 100) : 0;
+}
+
+export interface PerformanceStats {
+  equityData: { date: string; capital: number; pnl: number }[];
+  /**
+   * Détail par setup, trié par PnL décroissant, « Non renseigné » en dernier.
+   * `renseigne: false` marque les trades sans stratégie saisie — comptés à part,
+   * jamais fondus dans un setup existant.
+   */
+  setupDetailData: { setup: string; tradesCount: number; winRate: number; pnl: number; renseigne: boolean }[];
+>>>>>>> origin/main
   emotionChartData: { emotion: string; winRate: number; pnl: number; tradesCount: number }[];
   totalTrades: number;
   wins: number;
@@ -106,6 +131,7 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   // Trades en $ ET clôturés uniquement : seuls ceux-ci entrent dans les totaux monétaires.
   const tradesEnDollars = trades.filter(isRealizedDollarTrade);
 
+<<<<<<< HEAD
   /** `wins/(wins+losses)` — BREAKEVEN/OPEN au dénominateur diluerait le taux, voir `isRealizedDollarTrade`. */
   const winRateOf = (s: CategoryStats): number =>
     s.wins + s.losses > 0 ? Math.round((s.wins / (s.wins + s.losses)) * 100) : 0;
@@ -132,6 +158,48 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   // 3. Performance par Émotion
   //
   // Préremplit les 6 émotions saisissables dans le Journal (`ALL_EMOTIONS`),
+=======
+  // 2. Détail par setup — « lequel de mes setups gagne vraiment ? », la
+  // question centrale d'un journal de trading.
+  //
+  // Remplace un `strategyChartData` qui était calculé depuis toujours et
+  // n'était rendu NULLE PART. Forme calquée sur `assetDetailData` : un setup a
+  // un nom long et trois nombres, un tableau se lit mieux qu'un graphique.
+  const SETUP_NON_RENSEIGNE = "Non renseigné";
+  const setupStats: Record<string, CategoryStats> = {};
+  trades.forEach((t) => {
+    // Un setup vide n'est pas fondu dans un autre ni écarté : il forme sa
+    // propre ligne. Le masquer laisserait croire que tous les trades sont
+    // rattachés à une stratégie identifiée.
+    const cle = t.strategy.trim() || SETUP_NON_RENSEIGNE;
+    if (!setupStats[cle]) setupStats[cle] = { wins: 0, losses: 0, total: 0, pnl: 0 };
+    setupStats[cle].total += 1;
+    if (t.result === "WIN") setupStats[cle].wins += 1;
+    if (t.result === "LOSS") setupStats[cle].losses += 1;
+    if (isRealizedDollarTrade(t)) setupStats[cle].pnl += t.pnl;
+  });
+
+  const setupDetailData = Object.keys(setupStats)
+    .map((setup) => ({
+      setup,
+      tradesCount: setupStats[setup].total,
+      winRate: winRateOf(setupStats[setup]),
+      pnl: setupStats[setup].pnl,
+      renseigne: setup !== SETUP_NON_RENSEIGNE,
+    }))
+    // Trié par PnL décroissant, « Non renseigné » épinglé en dernier quel que
+    // soit son résultat — ce n'est pas un setup, il ne concourt pas au
+    // classement (même règle que « Hors plan » dans `computePlanDetail`).
+    .sort((a, b) => {
+      if (!a.renseigne) return 1;
+      if (!b.renseigne) return -1;
+      return b.pnl - a.pnl;
+    });
+
+  // 3. Performance par Émotion
+  //
+  // Préremplit les 5 émotions saisissables dans le Journal (`ALL_EMOTIONS`),
+>>>>>>> origin/main
   // même celles jamais taguées — sinon un élève qui n'a par exemple jamais
   // trade "Anxieux" ne verrait jamais cette barre, alors que c'est justement
   // l'information utile (« je n'ai jamais (encore) tradé anxieux »).
@@ -143,10 +211,27 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
     Calm: { wins: 0, losses: 0, total: 0, pnl: 0 },
   };
   trades.forEach((t) => {
+<<<<<<< HEAD
     emotionStats[t.emotion].total += 1;
     if (t.result === "WIN") emotionStats[t.emotion].wins += 1;
     if (t.result === "LOSS") emotionStats[t.emotion].losses += 1;
     if (isRealizedDollarTrade(t)) emotionStats[t.emotion].pnl += t.pnl;
+=======
+    // Émotion inconnue du catalogue (trade restauré d'une sauvegarde éditée à
+    // la main, ou écrit par une version antérieure) : elle est IGNORÉE, jamais
+    // rangée dans une case voisine. Sans cette garde, `emotionStats[t.emotion]`
+    // valait `undefined` et l'écran Rentabilité entier plantait sur un
+    // « Cannot read properties of undefined » — une seule ligne douteuse
+    // rendait toute l'analyse inaccessible. Toutes les autres ventilations de
+    // ce fichier (setup, actif, jour, session) créent leur case à la volée ;
+    // celle-ci était la seule à supposer la clé présente.
+    const stats = emotionStats[t.emotion];
+    if (!stats) return;
+    stats.total += 1;
+    if (t.result === "WIN") stats.wins += 1;
+    if (t.result === "LOSS") stats.losses += 1;
+    if (isRealizedDollarTrade(t)) stats.pnl += t.pnl;
+>>>>>>> origin/main
   });
 
   const emotionChartData = ALL_EMOTIONS.map(({ id, label }) => ({
@@ -417,7 +502,11 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
 
   return {
     equityData,
+<<<<<<< HEAD
     strategyChartData,
+=======
+    setupDetailData,
+>>>>>>> origin/main
     emotionChartData,
     totalTrades,
     wins,
@@ -519,8 +608,21 @@ export interface PnlByPeriod {
   year: PeriodPnl;
 }
 
+<<<<<<< HEAD
 /** Lundi 00:00 de la semaine calendaire contenant `date` (ISO, jamais un décalage glissant de 7 jours). */
 function startOfWeek(date: Date): Date {
+=======
+/**
+ * Lundi 00:00 de la semaine calendaire contenant `date` (ISO, jamais un
+ * décalage glissant de 7 jours).
+ *
+ * Exportée : `periodComparison.ts` et `weeklySummary.ts` doivent découper les
+ * semaines EXACTEMENT comme `computePnlByPeriod` le fait ici. Une seconde
+ * définition ferait désigner deux fenêtres différentes par « la semaine
+ * dernière » et « Semaine N » sur le même écran.
+ */
+export function startOfWeek(date: Date): Date {
+>>>>>>> origin/main
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const day = d.getDay(); // 0 = dimanche
   const diffToMonday = day === 0 ? -6 : 1 - day;
@@ -571,3 +673,286 @@ export function computePnlByPeriod(trades: Trade[], reference: Date = new Date()
 
   return totals;
 }
+<<<<<<< HEAD
+=======
+
+// ---------------------------------------------------------------------------
+// Durée de détention
+// ---------------------------------------------------------------------------
+
+/**
+ * Durée de détention en minutes, ou `null` quand elle n'est pas calculable.
+ *
+ * Exige les DEUX horodatages complets (date + heure, à l'entrée comme à la
+ * sortie). `time`/`exitTime` étant optionnels, compléter une heure manquante
+ * par 00:00 fabriquerait une durée qui n'a jamais existé — même parti pris que
+ * la heatmap horaire, qui écarte les trades sans `time` plutôt que de les
+ * ranger à minuit.
+ *
+ * Les deux bornes sont parsées en UTC (suffixe "Z") : seule leur DIFFÉRENCE
+ * nous intéresse, et l'arithmétique UTC ignore les changements d'heure — un
+ * trade tenu pendant la nuit du passage à l'heure d'hiver ne gagne pas une
+ * heure fantôme. (`computePnlByPeriod` et `periodStart`, eux, restent en heure
+ * locale : ils comparent à « aujourd'hui », pas deux instants entre eux.)
+ */
+export function tradeDurationMinutes(t: Trade): number | null {
+  if (t.result === "OPEN" || !t.exitDate || !t.time || !t.exitTime) return null;
+  const debut = Date.parse(`${t.date}T${t.time}:00Z`);
+  const fin = Date.parse(`${t.exitDate}T${t.exitTime}:00Z`);
+  if (Number.isNaN(debut) || Number.isNaN(fin)) return null;
+  const minutes = (fin - debut) / 60_000;
+  // Sortie antérieure à l'entrée : saisie incohérente. Le formulaire borne
+  // `exitDate >= date` mais rien n'empêche 16:00 → 09:00 le même jour. Une
+  // durée négative dans une moyenne est pire qu'une durée absente.
+  return minutes < 0 ? null : minutes;
+}
+
+export interface DurationStats {
+  /** Moyenne en minutes, `null` si aucun trade exploitable. */
+  avgMinutes: number | null;
+  /** Médiane — bien plus représentative dès qu'un swing de plusieurs jours côtoie des scalps de 10 minutes. */
+  medianMinutes: number | null;
+  countedTrades: number;
+  /** Trades CLÔTURÉS écartés faute d'horodatage complet — affiché, jamais tu. */
+  skippedTrades: number;
+}
+
+export function computeDurationStats(trades: Trade[]): DurationStats {
+  const durees: number[] = [];
+  let skipped = 0;
+
+  for (const t of trades) {
+    // Une position ouverte n'a légitimement pas de durée : elle n'est pas
+    // « écartée », elle n'est simplement pas encore mesurable.
+    if (t.result === "OPEN") continue;
+    const d = tradeDurationMinutes(t);
+    if (d === null) skipped += 1;
+    else durees.push(d);
+  }
+
+  if (durees.length === 0) {
+    return { avgMinutes: null, medianMinutes: null, countedTrades: 0, skippedTrades: skipped };
+  }
+
+  const tri = [...durees].sort((a, b) => a - b);
+  const milieu = Math.floor(tri.length / 2);
+  const mediane = tri.length % 2 === 0 ? (tri[milieu - 1] + tri[milieu]) / 2 : tri[milieu];
+
+  return {
+    avgMinutes: durees.reduce((a, b) => a + b, 0) / durees.length,
+    medianMinutes: mediane,
+    countedTrades: durees.length,
+    skippedTrades: skipped,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Capture de la cible (« efficacité de sortie »)
+// ---------------------------------------------------------------------------
+
+export interface ExitRatios {
+  /** Part de la cible atteinte. 1 = sortie exactement au TP, 0 = sortie au prix d'entrée, >1 = au-delà du TP, <0 = sortie en perte. */
+  capture: number;
+  /** Part du risque planifié réellement encaissée. 1 = sortie exactement au SL, >1 = stop dépassé (slippage, ou stop déplacé). Négatif sur un gagnant — à n'agréger que sur les perdants. */
+  risqueConsomme: number;
+}
+
+/**
+ * Compare le prix de sortie réel aux niveaux planifiés (TP/SL), dans le sens du
+ * trade.
+ *
+ * Faute de MFE (plus haut atteint pendant la position), on ne peut PAS mesurer
+ * ce que le marché a réellement offert — seulement la part de l'objectif qu'on
+ * s'était fixé et qu'on a effectivement encaissée. D'où « capture de la cible »
+ * et non « efficacité » au sens académique : la métrique répond à « est-ce que
+ * je coupe mes gagnants avant mon TP ? », rien de plus.
+ *
+ * `null` dès qu'un ingrédient manque ou qu'il est incohérent — jamais un 0 de
+ * repli, qui se confondrait avec une vraie sortie au prix d'entrée.
+ */
+export function tradeExitRatios(t: Trade): ExitRatios | null {
+  // Position ouverte : rien n'est sorti, il n'y a rien à mesurer.
+  if (t.result === "OPEN") return null;
+
+  // `exitPrice` absent OU égal à 0 : dans les deux cas la sortie n'est pas
+  // renseignée. 0 n'est une cotation réelle pour aucun marché du Journal, et
+  // des trades saisis avant la correction du formulaire portent un 0 parasite —
+  // les exclure évite de polluer la moyenne rétroactivement.
+  if (!t.exitPrice) return null;
+
+  // Un seul facteur de sens : sur un SHORT, « aller dans le bon sens » c'est
+  // voir le prix BAISSER. Toutes les distances sont donc signées « en faveur du
+  // trade », jamais en valeur absolue — un Math.abs rendrait une sortie du
+  // mauvais côté indiscernable d'une bonne sortie.
+  const sens = t.direction === "LONG" ? 1 : -1;
+  const mouvement = sens * (t.exitPrice - t.entryPrice);
+  const cible = sens * (t.takeProfit - t.entryPrice);
+  const risque = sens * (t.entryPrice - t.stopLoss);
+
+  // TP du mauvais côté de l'entrée (ou confondu avec elle), SL idem : le setup
+  // lui-même est incohérent (un LONG dont le TP est SOUS son entrée). Aucun
+  // ratio n'a de sens, et diviser par 0 ou par un négatif inverserait le signe
+  // sans prévenir.
+  if (cible <= 0 || risque <= 0) return null;
+
+  return { capture: mouvement / cible, risqueConsomme: -mouvement / risque };
+}
+
+/**
+ * Résultat d'un trade exprimé en multiples du risque initialement engagé
+ * (« R »), ou `null` quand il n'est pas mesurable.
+ *
+ * **Le multiplicateur de l'instrument, la taille de lot et le capital
+ * s'annulent**, ce qui rend ce calcul possible sans aucune de ces données :
+ *
+ *     PnL          = déplacement × lot × valeur du point
+ *     risque engagé = |entrée − stop| × lot × valeur du point
+ *     R = PnL / risque engagé = déplacement / |entrée − stop|
+ *
+ * C'est pourquoi le R se mesure ici sur les seuls PRIX, sans avoir besoin du
+ * capital du compte au moment du trade — que rien ne conserve. Passer par le
+ * PnL en devise aurait exigé ce capital, et n'était donc pas faisable.
+ *
+ * Deux limites, à énoncer et non à masquer :
+ * - le R est GÉOMÉTRIQUE : il ignore frais, spread et swap que le PnL saisi
+ *   peut inclure. Un trade à −1,04 R sorti sous son stop reflète un vrai
+ *   glissement, pas une erreur de calcul ;
+ * - un trade sans prix de sortie renseigné (ou encore ouvert) n'est pas
+ *   mesurable et n'est jamais compté comme un 0.
+ *
+ * Délègue à `tradeExitRatios` pour que la géométrie n'existe qu'à UN endroit :
+ * `risqueConsomme` vaut `-déplacement / risque`, donc son opposé est
+ * exactement le R réalisé.
+ */
+export function tradeRealizedR(t: Trade): number | null {
+  const ratios = tradeExitRatios(t);
+  return ratios === null ? null : -ratios.risqueConsomme;
+}
+
+export interface ExitEfficiencyStats {
+  /** Capture moyenne de la cible sur les GAGNANTS. 0.7 = « en moyenne tu encaisses 70 % de ton TP ». */
+  captureMoyenneWins: number | null;
+  winsComptes: number;
+  /** Gagnants sortis AVANT le TP. Le compte brut parle plus qu'une moyenne sur un petit échantillon. */
+  winsSortisAvantTp: number;
+  /** Part du risque réellement encaissée sur les PERDANTS. >1 = stops dépassés — signal plus grave qu'une sortie prématurée. */
+  risqueMoyenLosses: number | null;
+  lossesComptes: number;
+  /** Trades clôturés écartés (pas de prix de sortie, ou niveaux incohérents). */
+  tradesNonExploitables: number;
+}
+
+/**
+ * Agrège `tradeExitRatios` en séparant gagnants et perdants.
+ *
+ * Moyenner la capture sur TOUS les trades serait trompeur : un perdant sorti au
+ * stop produit mécaniquement `-risque/cible`, ce qui tire la moyenne vers le bas
+ * sans rien dire sur la question posée. D'où deux indicateurs distincts.
+ *
+ * Le regroupement suit `result`, JAMAIS le signe de `capture` : `result` est
+ * choisi explicitement par l'utilisateur et n'est jamais déduit (règle de fond
+ * du Journal). Un trade marqué WIN dont la capture est négative est une
+ * incohérence de saisie qu'il faut laisser voir, pas reclasser en douce.
+ *
+ * Contrairement au reste de ce fichier, on ne filtre PAS sur
+ * `isRealizedDollarTrade` : ces ratios sont purement géométriques (des prix, pas
+ * de l'argent), un trade dont le PnL est en % y entre exactement comme un trade
+ * en $.
+ */
+export function computeExitEfficiency(trades: Trade[]): ExitEfficiencyStats {
+  const captures: number[] = [];
+  const risques: number[] = [];
+  let winsSortisAvantTp = 0;
+  let nonExploitables = 0;
+
+  for (const t of trades) {
+    if (t.result === "OPEN") continue;
+    const ratios = tradeExitRatios(t);
+    if (!ratios) {
+      nonExploitables += 1;
+      continue;
+    }
+    // BREAKEVEN exclu des deux moyennes : par construction il n'a ni gain ni
+    // perte à mesurer contre un objectif.
+    if (t.result === "WIN") {
+      captures.push(ratios.capture);
+      if (ratios.capture < 1) winsSortisAvantTp += 1;
+    } else if (t.result === "LOSS") {
+      risques.push(ratios.risqueConsomme);
+    }
+  }
+
+  const moyenne = (xs: number[]) => (xs.length > 0 ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+
+  return {
+    captureMoyenneWins: moyenne(captures),
+    winsComptes: captures.length,
+    winsSortisAvantTp,
+    risqueMoyenLosses: moyenne(risques),
+    lossesComptes: risques.length,
+    tradesNonExploitables: nonExploitables,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Ventilation par plan de trading
+// ---------------------------------------------------------------------------
+
+export interface PlanDetailRow {
+  /** `null` = trades hors plan (aucun `tradingPlanId`, ou plan supprimé depuis). */
+  planId: string | null;
+  planName: string;
+  tradesCount: number;
+  winRate: number;
+  pnl: number;
+}
+
+/**
+ * Ventilation par plan de trading — même forme que « Détail par Actif ».
+ *
+ * Un `tradingPlanId` introuvable (plan supprimé depuis la saisie) est rangé dans
+ * « Hors plan », jamais traité comme une erreur ni affiché comme un plan
+ * fantôme : c'est la règle que pose déjà le type `Trade`, dont le champ est
+ * optionnel par nature.
+ *
+ * Les plans sans aucun trade sont inclus avec des zéros — « ce plan n'est jamais
+ * utilisé » est une information en soi.
+ *
+ * Note : l'import CSV n'attribue aucun `tradingPlanId` (la colonne n'existe ni à
+ * l'export ni à l'import), donc tout trade importé apparaît « Hors plan ».
+ */
+export function computePlanDetail(trades: Trade[], plans: TradingPlan[]): PlanDetailRow[] {
+  const HORS_PLAN = "__hors_plan__";
+  const nomParId = new Map(plans.map((p) => [p.id, p.name]));
+
+  const buckets = new Map<string, CategoryStats>();
+  // Les plans existants d'abord, pour que ceux sans trade apparaissent aussi.
+  plans.forEach((p) => buckets.set(p.id, { wins: 0, losses: 0, total: 0, pnl: 0 }));
+
+  for (const t of trades) {
+    const cle = t.tradingPlanId && nomParId.has(t.tradingPlanId) ? t.tradingPlanId : HORS_PLAN;
+    if (!buckets.has(cle)) buckets.set(cle, { wins: 0, losses: 0, total: 0, pnl: 0 });
+    const b = buckets.get(cle)!;
+    b.total += 1;
+    if (t.result === "WIN") b.wins += 1;
+    if (t.result === "LOSS") b.losses += 1;
+    if (isRealizedDollarTrade(t)) b.pnl += t.pnl;
+  }
+
+  const lignes: PlanDetailRow[] = [...buckets.entries()].map(([cle, s]) => ({
+    planId: cle === HORS_PLAN ? null : cle,
+    planName: cle === HORS_PLAN ? "Hors plan" : (nomParId.get(cle) ?? "Hors plan"),
+    tradesCount: s.total,
+    winRate: winRateOf(s),
+    pnl: s.pnl,
+  }));
+
+  // Tri par PnL décroissant, « Hors plan » épinglé en dernier quel que soit son
+  // PnL : ce n'est pas un plan, il ne concourt pas au classement.
+  return lignes.sort((a, b) => {
+    if (a.planId === null) return 1;
+    if (b.planId === null) return -1;
+    return b.pnl - a.pnl;
+  });
+}
+>>>>>>> origin/main

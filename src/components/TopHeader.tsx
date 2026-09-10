@@ -17,6 +17,7 @@ import { TabType } from "./Sidebar";
  * — Londres/New York se recouvrent l'après-midi UTC, la session la plus
  * active de la journée).
  */
+<<<<<<< HEAD
 export const FOREX_SESSIONS: { name: string; startUTC: number; endUTC: number }[] = [
   { name: "Sydney", startUTC: 21, endUTC: 6 }, // traverse minuit UTC
   { name: "Tokyo", startUTC: 0, endUTC: 9 },
@@ -46,6 +47,12 @@ export function isForexMarketClosed(date: Date): boolean {
   if (day === 0 && hour < 21) return true;
   return false;
 }
+=======
+// Table des sessions déplacée dans `src/lib/sessions.ts` (logique pure,
+// testable sans React) et réexportée ici pour les appelants existants.
+export { FOREX_SESSIONS, isSessionActive, isForexMarketClosed } from "../lib/sessions";
+import { FOREX_SESSIONS, isSessionActive, isForexMarketClosed } from "../lib/sessions";
+>>>>>>> origin/main
 
 /** Nom de la ou des sessions actuellement ouvertes, ou `null` marché fermé. */
 function getActiveSessionLabel(date: Date): string | null {
