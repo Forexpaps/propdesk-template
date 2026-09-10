@@ -55,8 +55,6 @@ export function formatCurrency(amount: number): string {
 }
 
 /**
-<<<<<<< HEAD
-=======
  * Durée de détention lisible : « 45 min », « 2h15 », « 3j 4h ».
  *
  * On change d'unité plutôt que d'empiler les minutes : « 4320 minutes » ne dit
@@ -74,7 +72,6 @@ export function formatDuration(minutes: number): string {
 }
 
 /**
->>>>>>> origin/main
  * Convertit en nombre un prix/montant saisi librement, point et virgule à
  * l'emplacement choisi par qui tape (Journal de trading, Calculateurs) —
  * demande explicite du fondateur : un coach ou un élève doit pouvoir taper

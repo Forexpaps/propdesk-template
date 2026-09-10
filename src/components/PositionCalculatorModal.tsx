@@ -181,10 +181,7 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
         takeProfit: target1Num,
         lotSize: parseFloat(lots1.toFixed(3)),
         riskAmount: riskAmount1,
-<<<<<<< HEAD
-=======
         riskPercent: riskPercentNum,
->>>>>>> origin/main
         riskRewardRatio: parseFloat(rr1.toFixed(2)),
       });
     }

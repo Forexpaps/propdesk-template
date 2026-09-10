@@ -21,11 +21,7 @@ import { requireAuth, type AuthContext } from "./auth/middleware";
 import { createRateLimit } from "./middleware/rateLimit";
 import { getEconomicCalendar } from "./economicCalendar";
 import { getMarketData } from "./marketData";
-<<<<<<< HEAD
-import { DEFAULT_USER_ID } from "./db";
-=======
 import { DEFAULT_USER_ID, db } from "./db";
->>>>>>> origin/main
 // Catalogue fixe des badges — données pures (aucune dépendance React/DOM),
 // voir le commentaire de `backfillMissingBadges` plus bas pour pourquoi le
 // serveur en a besoin.
@@ -59,289 +55,6 @@ const publicDataRateLimit = createRateLimit({
   windowMs: 60_000,
   max: 60,
   message: "Trop de requêtes. Réessaie dans quelques instants.",
-<<<<<<< HEAD
-});
-
-/** Public : donnée non sensible, identique pour tout visiteur. */
-api.get(
-  "/economic-calendar",
-  publicDataRateLimit,
-  wrap(async (_req, res) => {
-    try {
-      const events = await getEconomicCalendar();
-      res.json({ events });
-    } catch (err) {
-      console.warn("[economic-calendar] Aucun cache disponible.", err);
-      res.status(503).json({ error: "Calendrier économique indisponible pour le moment." });
-    }
-  })
-);
-
-/** Public, même raisonnement que `/economic-calendar` ci-dessus. */
-api.get(
-  "/market-data",
-  publicDataRateLimit,
-  wrap(async (_req, res) => {
-    try {
-      const quotes = await getMarketData();
-      res.json({ quotes });
-    } catch (err) {
-      console.warn("[market-data] Aucun cache disponible.", err);
-      res.status(503).json({ error: "Données de marché indisponibles pour le moment." });
-    }
-  })
-);
-
-api.use("/auth", authRouter);
-
-/**
- * Barrière d'authentification.
- *
- * Tout ce qui est déclaré APRÈS cette ligne exige une session valide ; ce qui
- * précède reste public. L'ordre de déclaration rend donc l'exclusion
- * structurelle, ce qui vaut mieux qu'une liste à maintenir.
- *
- * Elle est ici, sur le routeur, et non en `app.use` : Vite est monté après l'API
- * dans `startServer()`, un middleware au niveau application casserait le
- * rechargement à chaud.
- */
-api.use(requireAuth);
-
-// Montée ici et non avec le routeur public plus haut : ces routes exigent une
-// session valide, donc doivent passer APRÈS la barrière.
-api.use("/auth", staffRouter);
-
-/**
- * Garantit une ligne `users` pour le bureau de données — utile seulement sur
- * une base migrée depuis un état antérieur ; sur une base neuve, `/auth/setup`
- * l'a déjà créée.
- */
-async function ensurePersonalUserRow(userId: string): Promise<void> {
-  if ((await getProfile(userId)) !== null) return;
-  await saveProfile(
-    {
-      name: "Utilisateur",
-      email: "",
-      avatar: "",
-      level: "Trader",
-      joinedDate: new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }),
-      startingCapital: 10000,
-      currentCapital: 10000,
-      isAdmin: true,
-    },
-    userId
-  );
-}
-
-/**
- * Rattrape les badges MANQUANTS par rapport au catalogue `initialTraderBadges`
- * — pas seulement quand la collection est totalement vide (`length === 0`) :
- * un ajout de nouveaux badges au catalogue doit aussi atteindre un compte déjà
- * peuplé. Idempotent — sans effet une fois que chaque badge du catalogue a sa
- * copie.
- */
-async function backfillMissingBadges(dataUserId: string): Promise<void> {
-  const existing = await listCollection<{ id: string; [key: string]: unknown }>("badges", dataUserId);
-  const isAlreadyPresent = (definitionId: string) => existing.some((b) => b.id === definitionId);
-
-  const missingDefinitions = initialTraderBadges.filter((def) => !isAlreadyPresent(def.id));
-  if (missingDefinitions.length === 0) return;
-
-  await replaceCollection("badges", [...existing, ...missingDefinitions.map((def) => ({ ...def }))], dataUserId);
-}
-
-/**
- * Resynchronise les badges DÉJÀ présents avec le catalogue actuel
- * (`initialTraderBadges`) — `backfillMissingBadges` n'AJOUTE que les badges
- * manquants, il ne met jamais à jour ceux déjà stockés. Sans cette fonction,
- * changer un `rewardXP` ou une description dans `src/data/mockData.ts`
- * resterait invisible : la copie déjà en base garderait ses anciennes
- * valeurs indéfiniment.
- *
- * `unlocked`/`unlockedAt` sont volontairement EXCLUS de la resynchronisation
- * — ce sont des états réclamés par l'utilisateur (`onClaimBadge`), jamais une
- * convention du catalogue. Les resynchroniser écraserait la progression déjà
- * acquise d'un compte (le fondateur actuel en a plusieurs) à chaque
- * changement du catalogue.
- */
-async function syncBadgeCatalog(dataUserId: string): Promise<void> {
-  const existing = await listCollection<{
-    id: string;
-    unlocked?: boolean;
-    unlockedAt?: string;
-    [key: string]: unknown;
-  }>("badges", dataUserId);
-  const byId = new Map(initialTraderBadges.map((def) => [def.id, def]));
-
-  let changed = false;
-  const next = existing.map((badge) => {
-    const def = byId.get(badge.id);
-    if (!def) return badge;
-    const synced = { ...def, unlocked: badge.unlocked, unlockedAt: badge.unlockedAt };
-    if (JSON.stringify(synced) === JSON.stringify(badge)) return badge;
-    changed = true;
-    return synced;
-  });
-
-  if (changed) await replaceCollection("badges", next, dataUserId);
-}
-
-/** Payload de démarrage : toutes les collections en un aller-retour, dans les formes exactes attendues par le client. */
-api.get(
-  "/state",
-  wrap(async (req, res) => {
-    const dataUserId = req.auth!.dataUserId;
-
-    await ensurePersonalUserRow(dataUserId);
-    await backfillMissingBadges(dataUserId);
-    await syncBadgeCatalog(dataUserId);
-
-    const collectionEntries = await Promise.all(
-      COLLECTION_NAMES.map(async (name) => {
-        const collection = await listCollection(name, dataUserId);
-        // Collection initialement vide (badges) : retourner undefined pour que
-        // le client tombe sur le fallback (mockData) au démarrage. Les autres
-        // collections (trades, accounts, etc.) retournent l'array même s'il
-        // est vide — c'est l'état correct.
-        if (collection.length === 0 && name === "badges") {
-          return [name, undefined] as const;
-        }
-        return [name, collection] as const;
-      })
-    );
-    const collections = Object.fromEntries(collectionEntries);
-
-    const profile = await getProfile<Record<string, unknown>>(dataUserId);
-    const versionEntries = await Promise.all(
-      COLLECTION_NAMES.map(async (name) => [name, await getCollectionVersion(name, dataUserId)] as const)
-    );
-
-    res.json({
-      bootstrapped: await isBootstrapped(),
-      student: profile ? { ...profile, isAdmin: true } : null,
-      collections,
-      versions: Object.fromEntries(versionEntries),
-    });
-  })
-);
-
-const collectionsRateLimit = createRateLimit({
-  windowMs: 15 * 60_000,
-  max: 60,
-  message: "Trop d'écritures à la base de données. Réessaie dans quelques minutes.",
-});
-
-/**
- * Cœur de l'écriture d'une collection, partagé par `PUT /collections/:name`
- * ET par la restauration de sauvegarde (`POST /state/restore`) — jamais
- * dupliqué, pour que les deux chemins appliquent exactement les mêmes règles.
- */
-async function writeCollectionForAuth(
-  auth: AuthContext,
-  name: CollectionName,
-  rawPayload: unknown,
-  /**
-   * Version lue par l'appelant à son dernier chargement — `undefined`
-   * désactive la vérification (restauration de sauvegarde : toujours
-   * autoritaire, jamais un client concurrent).
-   */
-  expectedVersion?: number
-): Promise<{ ok: true; count: number; version: number } | { ok: false; status: number; error: string }> {
-  const parsed = collectionPayloadSchema.safeParse(rawPayload);
-  if (!parsed.success) {
-    return { ok: false, status: 400, error: "Collection invalide." };
-  }
-
-  const dataToWrite = parsed.data;
-
-  let newVersion: number;
-  try {
-    newVersion = await replaceCollection(name, dataToWrite, auth.dataUserId, expectedVersion);
-  } catch (err) {
-    if (err instanceof CollectionOwnershipConflictError) {
-      // Un ou plusieurs `id` soumis appartiennent déjà à un autre bureau
-      // (voir le commentaire de `replaceCollection`) — rien n'a été écrit.
-      // Un id généré côté client (`Date.now()`) est entré en collision ;
-      // recharger régénère un id propre à la prochaine tentative.
-      return {
-        ok: false,
-        status: 409,
-        error: "Conflit de synchronisation : recharge la page et réessaie.",
-      };
-    }
-    if (err instanceof CollectionVersionConflictError) {
-      // Un autre onglet a écrit cette collection entre le chargement de
-      // CETTE session et maintenant — rien n'a été écrit, pour ne pas
-      // écraser cette autre modification.
-      return {
-        ok: false,
-        status: 409,
-        error: "Conflit de synchronisation : recharge la page et réessaie.",
-      };
-    }
-    throw err;
-  }
-  return { ok: true, count: dataToWrite.length, version: newVersion };
-}
-
-api.put(
-  "/collections/:name",
-  collectionsRateLimit,
-  wrap(async (req, res) => {
-    const name = req.params.name as CollectionName;
-    if (!COLLECTION_NAMES.includes(name)) {
-      res.status(404).json({ error: `Collection inconnue : ${req.params.name}` });
-      return;
-    }
-
-    // Corps `{ items, version }` — `version` est la valeur renvoyée par le
-    // dernier `GET /state` ou la dernière écriture réussie pour cette
-    // collection (voir `versions` dans la réponse de bootstrap plus bas, et
-    // `useSyncedState`/`api.ts` côté client). Absente ou non numérique :
-    // traitée comme "pas de vérification demandée" plutôt que rejetée, pour
-    // ne pas casser un appel direct à l'API qui ignorerait ce détail.
-    const body = req.body as { items?: unknown; version?: unknown };
-    const items = body && typeof body === "object" && "items" in body ? body.items : req.body;
-    const version = typeof body?.version === "number" ? body.version : undefined;
-
-    const result = await writeCollectionForAuth(req.auth!, name, items, version);
-    if (!result.ok) {
-      res.status(result.status).json({ error: result.error });
-      return;
-    }
-    res.json({ success: true, count: result.count, version: result.version });
-  })
-);
-
-const profileRateLimit = createRateLimit({
-  windowMs: 15 * 60_000,
-  max: 30,
-  message: "Trop de mises à jour du profil. Réessaie dans quelques minutes.",
-});
-
-api.put(
-  "/profile",
-  profileRateLimit,
-  wrap(async (req, res) => {
-    const parsed = profileSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({ error: "Profil invalide.", details: parsed.error.issues });
-      return;
-    }
-
-    // Forcé à `true`, jamais redérivé d'une valeur lue en base — cette instance
-    // n'a qu'un seul compte, avec tous les droits.
-    const profile: Record<string, unknown> = {
-      ...parsed.data,
-      isAdmin: true,
-    };
-
-    await saveProfile(profile, req.auth!.dataUserId);
-    res.json({ success: true });
-  })
-);
-
-=======
 });
 
 /** Public : donnée non sensible, identique pour tout visiteur. */
@@ -639,7 +352,6 @@ api.put(
   })
 );
 
->>>>>>> origin/main
 const stateImportRateLimit = createRateLimit({
   windowMs: 15 * 60_000,
   max: 10,
@@ -705,8 +417,6 @@ api.post(
   })
 );
 
-<<<<<<< HEAD
-=======
 /**
  * Captures d'écran — servies et reçues une par une, hors de la collection
  * `trades` (voir la table `trade_screenshots`, server/db.ts).
@@ -870,7 +580,6 @@ api.post(
   })
 );
 
->>>>>>> origin/main
 const stateRestoreRateLimit = createRateLimit({
   windowMs: 15 * 60_000,
   max: 5,

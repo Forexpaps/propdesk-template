@@ -2,11 +2,8 @@ import React from "react";
 import { Globe2 } from "lucide-react";
 import { FOREX_SESSIONS, isSessionActive, isForexMarketClosed } from "./TopHeader";
 import { MarketQuote } from "../lib/api";
-<<<<<<< HEAD
-=======
 import { Select } from "./Select";
 import { getTimezoneOffsetMinutes, timezoneOptions } from "../lib/timezone";
->>>>>>> origin/main
 
 /**
  * Position en pourcentage dans la zone "carte" (pas une vraie projection
@@ -61,8 +58,6 @@ interface MarketMapWidgetProps {
   now: Date;
   vix?: MarketQuote;
   nextHighImpact: NextHighImpactEvent | null;
-<<<<<<< HEAD
-=======
   /** Fuseau IANA choisi par le visiteur — cadre l'axe de la frise et l'heure de la prochaine annonce. */
   viewerTimeZone: string;
   onChangeViewerTimeZone: (timeZone: string) => void;
@@ -71,24 +66,10 @@ interface MarketMapWidgetProps {
 /** Ramène une heure UTC (0-24, peut être décimale) dans l'axe local d'un fuseau donné. */
 function toLocalHour(utcHour: number, offsetMinutes: number): number {
   return (((utcHour + offsetMinutes / 60) % 24) + 24) % 24;
->>>>>>> origin/main
 }
 
 /**
  * Vue d'ensemble des 4 places majeures — statut en direct (carte stylisée en
-<<<<<<< HEAD
- * haut), frise des horaires de session sur 24h UTC (en bas, avec un repère
- * "maintenant"), volatilité et prochaine annonce clé. Toutes les données
- * viennent de sources déjà utilisées ailleurs dans ce module
- * (`FOREX_SESSIONS`/`isSessionActive` du header, `quotes` du calendrier
- * macro) — aucune nouvelle source réseau.
- */
-export const MarketMapWidget: React.FC<MarketMapWidgetProps> = ({ now, vix, nextHighImpact }) => {
-  const marketClosed = isForexMarketClosed(now);
-  const hourUTC = now.getUTCHours();
-  const minuteUTC = now.getUTCMinutes();
-  const nowPercent = ((hourUTC + minuteUTC / 60) / 24) * 100;
-=======
  * haut), frise des horaires de session (en bas, avec un repère "maintenant"),
  * volatilité et prochaine annonce clé. Toutes les données viennent de
  * sources déjà utilisées ailleurs dans ce module (`FOREX_SESSIONS`/
@@ -115,7 +96,6 @@ export const MarketMapWidget: React.FC<MarketMapWidgetProps> = ({
   const offsetMinutes = getTimezoneOffsetMinutes(now, viewerTimeZone);
   const localNowHour = toLocalHour(hourUTC + minuteUTC / 60, offsetMinutes);
   const nowPercent = (localNowHour / 24) * 100;
->>>>>>> origin/main
 
   const openCities = CITIES.filter((city) => {
     const def = FOREX_SESSIONS.find((s) => s.name === city.session);
@@ -134,18 +114,12 @@ export const MarketMapWidget: React.FC<MarketMapWidgetProps> = ({
   return (
     <div className="bg-[#111615] border border-[#1B2320] rounded-xl overflow-hidden">
       {/* En-tête */}
-<<<<<<< HEAD
-      <div className="flex items-center gap-2.5 px-5 py-4">
-=======
       <div className="flex items-center gap-2.5 px-5 py-4 flex-wrap">
->>>>>>> origin/main
         <Globe2 className="w-5 h-5 text-[#00E676]" />
         <h3 className="text-sm font-bold text-white">Carte des marchés</h3>
         <span className="text-xs text-[#00E676] font-mono">
           {openCities.length} session{openCities.length > 1 ? "s" : ""} ouverte{openCities.length > 1 ? "s" : ""}
         </span>
-<<<<<<< HEAD
-=======
         <div className="ml-auto flex items-center gap-1.5">
           <Select
             value={viewerTimeZone}
@@ -160,7 +134,6 @@ export const MarketMapWidget: React.FC<MarketMapWidgetProps> = ({
             ))}
           </Select>
         </div>
->>>>>>> origin/main
       </div>
 
       {/* Carte stylisée */}
@@ -204,9 +177,6 @@ export const MarketMapWidget: React.FC<MarketMapWidgetProps> = ({
       <div className="px-5 py-4 border-t border-[#1B2320] space-y-2">
         {CITIES.map((city) => {
           const def = FOREX_SESSIONS.find((s) => s.name === city.session);
-<<<<<<< HEAD
-          const segments = def ? sessionSegments(def) : [];
-=======
           const localDef = def
             ? {
                 startUTC: toLocalHour(def.startUTC, offsetMinutes),
@@ -214,7 +184,6 @@ export const MarketMapWidget: React.FC<MarketMapWidgetProps> = ({
               }
             : null;
           const segments = localDef ? sessionSegments(localDef) : [];
->>>>>>> origin/main
           return (
             <div key={city.name} className="flex items-center gap-3">
               <span className="w-16 shrink-0 text-xs text-slate-400">{city.name}</span>
@@ -271,11 +240,7 @@ export const MarketMapWidget: React.FC<MarketMapWidgetProps> = ({
               </div>
               <div className="text-xs text-amber-400 font-mono mt-0.5">
                 {DAY_ABBR[nextHighImpact.eventTime.getDay()]}{" "}
-<<<<<<< HEAD
-                {formatCityTime(nextHighImpact.eventTime, Intl.DateTimeFormat().resolvedOptions().timeZone)}
-=======
                 {formatCityTime(nextHighImpact.eventTime, viewerTimeZone)}
->>>>>>> origin/main
               </div>
             </>
           ) : (

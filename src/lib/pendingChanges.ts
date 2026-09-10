@@ -40,11 +40,6 @@ const LABELS: Record<string, string> = {
   // périmé au rechargement suivant, sans jamais passer par
   // `PendingChangesBanner`.
   horizon_setups: "Setups",
-<<<<<<< HEAD
-};
-
-/** Clé `localStorage` → collection serveur. Absent pour profil. */
-=======
   // Même piège que `horizon_setups` juste au-dessus, et pour la même raison :
   // les plans de trading sont devenus une collection synchronisée (ils
   // vivaient avant en localStorage seul). Sans cette entrée, `markPending`
@@ -67,17 +62,12 @@ const LABELS: Record<string, string> = {
  * Une modification de plan faite hors ligne disparaissait donc en silence,
  * exactement le trou que `LABELS` devait fermer, déplacé d'un cran.
  */
->>>>>>> origin/main
 const COLLECTION_BY_KEY: Record<string, CollectionName> = {
   horizon_trades: "trades",
   horizon_accounts: "accounts",
   horizon_notifications: "notifications",
   horizon_badges: "badges",
   horizon_setups: "setups",
-<<<<<<< HEAD
-};
-
-=======
   horizon_trading_plans: "tradingPlans",
   horizon_weekly_reviews: "weeklyReviews",
 };
@@ -97,7 +87,6 @@ export function clesSansCollectionServeur(): string[] {
   );
 }
 
->>>>>>> origin/main
 function read(): string[] {
   try {
     const raw = localStorage.getItem(PENDING_KEY);
@@ -209,9 +198,6 @@ async function pushOne(localKey: string): Promise<void> {
   }
 
   const collection = COLLECTION_BY_KEY[localKey];
-<<<<<<< HEAD
-  if (!collection) return;
-=======
   // Lever, et non retourner : une clé connue de `LABELS` mais absente de
   // `COLLECTION_BY_KEY` doit échouer bruyamment (la modification reste alors en
   // attente et le bandeau la repropose) plutôt que d'être comptée comme envoyée
@@ -219,7 +205,6 @@ async function pushOne(localKey: string): Promise<void> {
   if (!collection) {
     throw new Error(`Aucune collection serveur pour « ${LABELS[localKey] ?? localKey} ».`);
   }
->>>>>>> origin/main
 
   // Une collection doit être un tableau : un cache corrompu ferait échouer la
   // validation serveur avec un message obscur, autant s'arrêter ici.

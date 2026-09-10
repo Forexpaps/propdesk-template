@@ -34,14 +34,6 @@ import { formatCurrency } from "../lib/format";
 import {
   StudentProfile,
   Trade,
-<<<<<<< HEAD
-} from "../types";
-import { TabType, SidebarItemKey } from "./Sidebar";
-import { computeDisciplineStreak } from "../lib/badges";
-import { computeWeeklySummary } from "../lib/weeklySummary";
-import { computeJournalSummary, computePnlByPeriod, isRealizedDollarTrade } from "../lib/performanceStats";
-import { TradingSessionsWidget } from "./TradingSessionsWidget";
-=======
   TradingPlanData,
   WeeklyReview,
 } from "../types";
@@ -53,7 +45,6 @@ import { computeJournalSummary, computePnlByPeriod, isRealizedDollarTrade } from
 import { TradingSessionsWidget } from "./TradingSessionsWidget";
 import { PeriodComparisonCard } from "./PeriodComparisonCard";
 import { WeeklyReviewBanner } from "./WeeklyReviewBanner";
->>>>>>> origin/main
 
 /**
  * En-tête de section — barre verticale colorée + titre, motif repris tel
@@ -72,27 +63,21 @@ const SectionHeader: React.FC<{ children: React.ReactNode; color?: string }> = (
 interface MainDashboardProps {
   student: StudentProfile;
   trades: Trade[];
-<<<<<<< HEAD
-=======
   /** Plans de trading — alimentent la ligne « Respect du plan » de la comparaison de périodes. Optionnel : l'écran reste complet sans aucun plan. */
   plans?: TradingPlanData;
   /** Revues hebdomadaires déjà écrites — pilotent le bandeau d'accueil. */
   weeklyReviews?: WeeklyReview[];
   /** Ouvre la modale de revue sur la semaine donnée (lundi ISO). */
   onOpenWeeklyReview: (semaine: string) => void;
->>>>>>> origin/main
   setActiveTab: (tab: TabType) => void;
 }
 
 export const MainDashboard: React.FC<MainDashboardProps> = ({
   student,
   trades,
-<<<<<<< HEAD
-=======
   plans = [],
   weeklyReviews = [],
   onOpenWeeklyReview,
->>>>>>> origin/main
   setActiveTab,
 }) => {
   // Calculate Metrics
@@ -154,8 +139,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
   const { avgRR, profitFactor } = computeJournalSummary(trades);
   const pnlByPeriod = computePnlByPeriod(trades);
 
-<<<<<<< HEAD
-=======
   // Tracé réel de la carte « PnL cumulé » — `null` sous deux trades, la carte
   // ne rend alors aucune courbe (voir `src/lib/sparkline.ts`).
   const sparklinePath = buildSparklinePath(buildCumulativePnlSeries(trades), 80, 30);
@@ -167,7 +150,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
     [trades, plans, student.startingCapital]
   );
 
->>>>>>> origin/main
   const firstName = student.name.split(" ")[0] || "Yoann";
 
   return (
@@ -177,18 +159,12 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
           Bonjour {firstName}.
         </h1>
-<<<<<<< HEAD
-        <p className="text-slate-400 text-xs sm:text-sm">
-          {computeWeeklySummary(trades)}
-        </p>
-=======
         <WeeklyReviewBanner
           trades={trades}
           plans={plans}
           reviews={weeklyReviews}
           onOpenReview={onOpenWeeklyReview}
         />
->>>>>>> origin/main
       </div>
 
       {/* 2. Top KPI Stat Cards */}
@@ -217,21 +193,6 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
             <div className={`text-xl font-black font-mono ${isPnLPositive ? "text-[#00E676]" : "text-rose-400"}`}>
               {isPnLPositive ? "+" : ""}
               {formatCurrency(totalPnL)}
-<<<<<<< HEAD
-            </div>
-            {/* Sparkline SVG */}
-            <div className="w-20 h-8">
-              <svg className="w-full h-full overflow-visible" viewBox="0 0 80 30">
-                <path
-                  d="M 0 25 Q 20 28, 40 15 T 80 5"
-                  fill="none"
-                  stroke="#00E676"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-=======
->>>>>>> origin/main
             </div>
             {/* Courbe réelle du PnL cumulé. Ce tracé était auparavant codé en
                 dur : toujours vert, toujours montant, même en perte. Sa couleur
@@ -298,14 +259,11 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
         </div>
       </div>
 
-<<<<<<< HEAD
-=======
       {/* 2ter. Progression période sur période — placée juste sous les KPI
           cumulés : « est-ce que je m'améliore ? » est la question de l'écran
           d'arrivée, et aucune autre partie de l'application n'y répond. */}
       <PeriodComparisonCard trades={trades} violationsParTrade={violationsParTrade} />
 
->>>>>>> origin/main
       {/* PnL par période — jour / semaine / mois / année en cours */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {(

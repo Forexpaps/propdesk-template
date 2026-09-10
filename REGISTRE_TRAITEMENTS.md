@@ -13,17 +13,10 @@ voir la note en bas de page pour la méthode. Les champs marqués
 
 | Champ | Valeur |
 |---|---|
-<<<<<<< HEAD
-| Nom | Thomas Gauthey |
-| Statut | Entrepreneur individuel (micro-entreprise) |
-| SIRET | [À COMPLÉTER — en cours d'attribution, voir `LegalNoticeModal.tsx`] |
-| Contact | th.gauthey99@gmail.com |
-=======
 | Nom | Forexpaps |
 | Statut | Entrepreneur individuel (micro-entreprise) |
 | SIRET | [À COMPLÉTER — en cours d'attribution, voir `LegalNoticeModal.tsx`] |
 | Contact | [À COMPLÉTER] |
->>>>>>> origin/main
 | DPO (délégué à la protection des données) | [À COMPLÉTER — facultatif pour une micro-entreprise sans traitement à grande échelle, mais note-le "Non applicable" explicitement plutôt que de laisser vide] |
 
 ---

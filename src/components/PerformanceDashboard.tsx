@@ -12,11 +12,6 @@ import {
   CartesianGrid,
 } from "recharts";
 import { LineChart, AlertTriangle, RotateCcw } from "lucide-react";
-<<<<<<< HEAD
-import { Trade, StudentProfile } from "../types";
-import { formatCurrency } from "../lib/format";
-import { computePerformanceStats, computePnlByPeriod, isRealizedDollarTrade } from "../lib/performanceStats";
-=======
 import { Trade, StudentProfile, TradingPlanData } from "../types";
 import { formatCurrency, formatDuration } from "../lib/format";
 import {
@@ -28,24 +23,10 @@ import {
   isRealizedDollarTrade,
 } from "../lib/performanceStats";
 import { computePlanComplianceSummary } from "../lib/planCompliance";
->>>>>>> origin/main
 
 interface PerformanceDashboardProps {
   student: StudentProfile;
   trades: Trade[];
-<<<<<<< HEAD
-}
-
-const tooltipStyle = {
-  contentStyle: { backgroundColor: "#0D1110", borderColor: "#1B2320", borderRadius: "10px", fontSize: "12px" },
-  labelStyle: { color: "#ffffff" },
-  itemStyle: { color: "#ffffff" },
-  // Sans ça, Recharts dessine par défaut un rectangle gris/blanc plein
-  // derrière toute la catégorie survolée (barres) — visible sur fond sombre.
-  cursor: { fill: "transparent" },
-};
-
-=======
   /** Plans de trading, pour la ventilation « Détail par plan ». Optionnel : la vue reste utilisable sans aucun plan défini. */
   plans?: TradingPlanData;
 }
@@ -72,7 +53,6 @@ const tooltipStyle = {
   cursor: { fill: "transparent" },
 };
 
->>>>>>> origin/main
 /** Micro-label en petites majuscules espacées, au-dessus d'une valeur. */
 const MicroLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <span className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">{children}</span>
@@ -178,12 +158,6 @@ function computeHeatmap(trades: Trade[]): HeatmapCellStats[][] {
   return grid;
 }
 
-<<<<<<< HEAD
-export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ student, trades }) => {
-  const stats = computePerformanceStats(student, trades);
-  const heatmap = useMemo(() => computeHeatmap(trades), [trades]);
-  const pnlByPeriod = useMemo(() => computePnlByPeriod(trades), [trades]);
-=======
 export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ student, trades, plans = [] }) => {
   const stats = computePerformanceStats(student, trades);
   const heatmap = useMemo(() => computeHeatmap(trades), [trades]);
@@ -199,7 +173,6 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
     [trades, plans, student.startingCapital]
   );
 
->>>>>>> origin/main
   const {
     equityData,
     totalTrades,
@@ -223,11 +196,6 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
     marketChartData,
     emotionChartData,
     assetDetailData,
-<<<<<<< HEAD
-    bestWinStreak,
-    worstLossStreak,
-  } = stats;
-=======
     setupDetailData,
     bestWinStreak,
     worstLossStreak,
@@ -249,7 +217,6 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
       `${r.setup} (${r.pnl >= 0 ? "+" : ""}${formatCurrency(r.pnl)}, ${r.tradesCount} trades, ${r.winRate} %)`;
     return `Ton setup le plus rentable : ${decrire(meilleur)}. Le plus coûteux : ${decrire(pire)}.`;
   }, [setupDetailData]);
->>>>>>> origin/main
 
   // Une carte par dimension, toutes affichées en même temps — plus de pilules
   // à cliquer pour comparer deux répartitions entre elles.
@@ -354,8 +321,6 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
         })}
       </div>
 
-<<<<<<< HEAD
-=======
       {/* Exécution : ce que disent les prix de sortie et les horodatages déjà
           saisis, jusqu'ici jamais exploités. Chaque carte affiche la taille de
           son échantillon — sur un journal qui démarre, mieux vaut « pas assez
@@ -417,7 +382,6 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
         />
       </div>
 
->>>>>>> origin/main
       {/* Courbe de capital — pleine largeur */}
       <Card className="p-5 space-y-4">
         <SectionHeader color="bg-[#00E676]">Courbe de capital</SectionHeader>
@@ -546,154 +510,6 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
             </div>
           )}
         </Card>
-<<<<<<< HEAD
-
-        <Card className="p-5 space-y-4">
-          <SectionHeader color="bg-purple-500">Psychologie</SectionHeader>
-          {trades.length === 0 ? (
-            <EmptyState>
-              Win rate quand l'émotion est forte vs faible. Tague ton état émotionnel sur chaque trade
-              dans le Journal.
-            </EmptyState>
-          ) : (
-            <div className="h-56 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={emotionChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
-                  <XAxis dataKey="emotion" stroke="#475569" fontSize={10} interval={0} angle={-15} textAnchor="end" />
-                  <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
-                  <Tooltip
-                    {...tooltipStyle}
-                    formatter={(value: any, _name: any, props: any) => [
-                      `${formatCurrency(Number(value))} (${props?.payload?.tradesCount ?? 0} trade${
-                        (props?.payload?.tradesCount ?? 0) > 1 ? "s" : ""
-                      })`,
-                      "PnL",
-                    ]}
-                  />
-                  <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
-                    {emotionChartData.map((entry, index) => (
-                      <Cell key={`cell-emotion-${index}`} fill={entry.tradesCount === 0 ? "#475569" : entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </Card>
-      </div>
-
-      {/* Où es-tu le meilleur ? — une carte par dimension, toutes visibles en
-          même temps : plus besoin de naviguer entre des pilules pour
-          comparer deux répartitions, chacune a sa propre section. */}
-      <div className="space-y-4">
-        <SectionHeader color="bg-amber-500">Où es-tu le meilleur ?</SectionHeader>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {bestWhereDimensions.map((dim) => (
-            <Card key={dim.label} className="p-5 space-y-4">
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wide">{dim.label}</h4>
-              {dim.data.length === 0 ? (
-                <EmptyState>Pas assez de données.</EmptyState>
-              ) : (
-                <div className="h-56 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={dim.data}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1B2320" />
-                      <XAxis
-                        dataKey="key"
-                        stroke="#475569"
-                        fontSize={11}
-                        interval={0}
-                        angle={dim.data.length > 6 ? -15 : 0}
-                        textAnchor={dim.data.length > 6 ? "end" : "middle"}
-                      />
-                      <YAxis stroke="#475569" fontSize={11} tickFormatter={(val) => formatCurrency(Number(val))} />
-                      <Tooltip
-                        {...tooltipStyle}
-                        formatter={(value: any, _name: any, props: any) => [
-                          `${formatCurrency(Number(value))} (${props?.payload?.tradesCount ?? 0} trade${
-                            (props?.payload?.tradesCount ?? 0) > 1 ? "s" : ""
-                          })`,
-                          "PnL",
-                        ]}
-                      />
-                      <Bar dataKey="pnl" radius={[6, 6, 0, 0]}>
-                        {dim.data.map((entry, index) => (
-                          <Cell key={`cell-${dim.label}-${index}`} fill={entry.pnl >= 0 ? "#10b981" : "#f43f5e"} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* Détail par actif — tableau exhaustif (tous les actifs, pas les 8
-          premiers de "Où es-tu le meilleur ?"), trié par PnL décroissant. */}
-      <Card className="p-5 space-y-4">
-        <SectionHeader color="bg-[#00E676]">Détail par Actif</SectionHeader>
-        {assetDetailData.length === 0 ? (
-          <EmptyState>Ajoute des trades pour voir le détail par actif.</EmptyState>
-        ) : (
-          <div className="overflow-x-auto -mx-1">
-            <table className="w-full text-sm min-w-[480px]">
-              <thead>
-                <tr className="border-b border-[#1B2320]">
-                  <th className="text-left px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Actif</th>
-                  <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Trades</th>
-                  <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">Win Rate</th>
-                  <th className="text-right px-3 py-2 text-[9px] uppercase tracking-wider text-slate-500 font-bold">PnL Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {assetDetailData.map((row) => (
-                  <tr key={row.asset} className="border-b border-[#1B2320] last:border-b-0">
-                    <td className="px-3 py-3 font-bold text-white">{row.asset}</td>
-                    <td className="px-3 py-3 text-right text-slate-300 font-mono">{row.tradesCount}</td>
-                    <td
-                      className={`px-3 py-3 text-right font-mono font-bold ${
-                        row.winRate >= 50 ? "text-[#00E676]" : "text-rose-400"
-                      }`}
-                    >
-                      {row.winRate}%
-                    </td>
-                    <td
-                      className={`px-3 py-3 text-right font-mono font-bold ${
-                        row.pnl >= 0 ? "text-[#00E676]" : "text-rose-400"
-                      }`}
-                    >
-                      {row.pnl >= 0 ? "+" : ""}
-                      {formatCurrency(row.pnl)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
-
-      {/* Meilleure / Pire série — plus longue suite de trades gagnants ou
-          perdants consécutifs. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <Card className="p-5 space-y-1">
-          <MicroLabel>Meilleure Série</MicroLabel>
-          <div className="text-2xl font-black font-mono text-[#00E676]">
-            {bestWinStreak} win{bestWinStreak > 1 ? "s" : ""}
-          </div>
-        </Card>
-        <Card className="p-5 space-y-1">
-          <MicroLabel>Pire Série</MicroLabel>
-          <div className="text-2xl font-black font-mono text-rose-400">
-            {worstLossStreak} loss{worstLossStreak > 1 ? "es" : ""}
-          </div>
-        </Card>
-      </div>
-
-=======
 
         <Card className="p-5 space-y-4">
           <SectionHeader color="bg-purple-500">Psychologie</SectionHeader>
@@ -1092,7 +908,6 @@ export const PerformanceDashboard: React.FC<PerformanceDashboardProps> = ({ stud
         </Card>
       </div>
 
->>>>>>> origin/main
       {/* Erreurs les plus fréquentes — conservé de l'ancienne version, pas dans
           la maquette de référence mais donnée réelle utile, jamais affichée
           ailleurs dans l'app. */}

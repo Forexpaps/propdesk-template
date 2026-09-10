@@ -5,11 +5,8 @@ import {
   AppNotification,
   TraderBadge,
   Setup,
-<<<<<<< HEAD
-=======
   TradingPlan,
   WeeklyReview,
->>>>>>> origin/main
 } from "../types";
 
 /** Collections synchronisées avec le serveur, dans les formes de src/types.ts. */
@@ -19,17 +16,12 @@ export interface ServerCollections {
   notifications: AppNotification[];
   badges: TraderBadge[];
   setups: Setup[];
-<<<<<<< HEAD
-=======
   tradingPlans: TradingPlan[];
   weeklyReviews: WeeklyReview[];
->>>>>>> origin/main
 }
 
 export type CollectionName = keyof ServerCollections;
 
-<<<<<<< HEAD
-=======
 /**
  * Une capture telle qu'elle voyage dans le fichier de sauvegarde : l'image
  * elle-même (base64) ET son identifiant d'origine, sans lequel les
@@ -42,7 +34,6 @@ export interface BackupScreenshot {
   createdAt: string;
 }
 
->>>>>>> origin/main
 /** Événement du calendrier économique — voir `server/economicCalendar.ts`. */
 export interface EconomicCalendarEvent {
   id: string;
@@ -189,8 +180,6 @@ export const api = {
   fetchMarketData: () =>
     request<{ quotes: MarketQuote[] }>("/api/market-data"),
 
-<<<<<<< HEAD
-=======
   /**
    * Envoie une capture et renvoie l'URL qui la sert. Les images ne transitent
    * plus dans le payload des trades : toute la collection partant en un seul
@@ -222,7 +211,6 @@ export const api = {
       body: JSON.stringify({ screenshots }),
     }),
 
->>>>>>> origin/main
   importState: (state: {
     student?: StudentProfile;
     collections?: Partial<ServerCollections>;

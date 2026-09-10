@@ -8,17 +8,10 @@ interface TradingPlanEditorModalProps {
   isOpen: boolean;
   onClose: () => void;
   /**
-<<<<<<< HEAD
-   * Namespace la persistance par compte (même motif que `MindsetJournalModal`)
-   * — email de l'élève côté élève, absent côté staff (clé partagée bureau,
-   * inchangé). Sans ça, un poste partagé comparerait les trades de l'un au
-   * plan de l'autre (voir `src/lib/planCompliance.ts`).
-=======
    * Namespace la persistance par compte — email de l'élève côté élève,
    * absent côté staff (clé partagée bureau, inchangé). Sans ça, un poste
    * partagé comparerait les trades de l'un au plan de l'autre (voir
    * `src/lib/planCompliance.ts`).
->>>>>>> origin/main
    */
   storageKey?: string;
   /**

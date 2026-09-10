@@ -1,26 +1,10 @@
 # PropDesk
 
 Tableau de bord de trading personnel : journal d'exécution, portefeuille,
-<<<<<<< HEAD
-analyse de rentabilité, calendrier macro, setups, plan de trading et suivi de
-mindset. Application **mono-utilisateur** — chaque déploiement n'a qu'un seul
-compte, avec ses propres données isolées. Aucune IA n'est utilisée nulle part
-dans l'application.
-
-> **⚠️ Usage personnel uniquement — voir [LICENSE](LICENSE).** Vous pouvez
-> librement cloner, déployer et modifier ce code pour votre propre usage
-> personnel (votre propre plateforme de trading, sur votre propre
-> hébergeur). **Toute exploitation commerciale est interdite** : vendre ce
-> code, faire payer l'accès à une instance qui en découle, ou l'utiliser
-> comme base pour vendre un produit en le présentant comme votre propre
-> création. Voir [LICENSE](LICENSE) pour les conditions complètes.
-
-=======
 analyse de rentabilité, calendrier macro, setups et plan de trading.
 Application **mono-utilisateur** — un seul compte, avec ses propres données
 isolées. Aucune IA n'est utilisée nulle part dans l'application.
 
->>>>>>> origin/main
 ## Démarrage en local
 
 Fonctionne à l'identique sur **macOS et Windows** — aucune commande ni
@@ -32,13 +16,8 @@ Prérequis : [Node.js](https://nodejs.org) 20+ et npm (sur Windows,
 l'installeur officiel les fournit tous les deux).
 
 ```bash
-<<<<<<< HEAD
-git clone https://github.com/Forexpaps/propdesk-template.git
-cd propdesk-template
-=======
 git clone https://github.com/Forexpaps/journal-de-trading.git
 cd journal-de-trading
->>>>>>> origin/main
 npm install
 ```
 
@@ -91,119 +70,12 @@ Aux accès suivants, l'application se souvient de la session et affiche
 directement le tableau de bord (ou l'écran de connexion si la session a
 expiré ou a été fermée).
 
-<<<<<<< HEAD
-## Déployer pour un usage personnel
-
-Chaque personne qui veut utiliser PropDesk pour elle-même doit déployer **sa
-propre instance**, avec sa propre base de données — il n'y a pas de mode
-multi-comptes partagé dans une même instance. Usage personnel uniquement,
-voir [LICENSE](LICENSE) : la revente du code ou d'un produit basé dessus
-n'est pas autorisée.
-
-### 1. Récupérer le code
-
-Cloner ce dépôt, ou cliquer sur **"Use this template"** sur sa page GitHub
-pour créer sa propre copie.
-
-### 2. Choisir un hébergeur
-
-L'application tourne sur **n'importe quel hébergeur Node.js** (`npm run
-build && npm start`) — un seul critère détermine s'il faut une étape
-supplémentaire : **son système de fichiers est-il persistant ?**
-
-- **Oui** (Railway, Render, Fly.io, un VPS, un Docker avec volume monté, une
-  machine perso...) → rien à faire, l'application fonctionne directement
-  avec sa base SQLite embarquée.
-- **Non** (fonctions serverless : Vercel, Netlify, AWS Lambda...) → il faut
-  une base accessible en réseau (Postgres ou Turso), voir plus bas.
-
-#### Option A — Railway (recommandé, le plus simple)
-
-Railway a un disque persistant ET une base Postgres en un clic — l'un ou
-l'autre fonctionne, au choix.
-
-1. Créer un compte sur [railway.app](https://railway.app), puis **New
-   Project → Deploy from GitHub repo**, et choisir votre copie du dépôt.
-2. Railway détecte `npm run build`/`npm start` automatiquement (sinon, les
-   définir dans Settings → Deploy).
-3. Choisir l'une des deux façons de stocker les données :
-   - **Le plus simple : rien configurer.** Railway donne un disque
-     persistant par défaut au service, la base SQLite embarquée (dans
-     `./data`) survit donc aux redémarrages sans rien ajouter.
-   - **Ou, si vous préférez une vraie base Postgres gérée** : dans le
-     projet Railway, cliquer **+ New → Database → Add PostgreSQL**. Railway
-     crée la base et l'attache automatiquement à votre service (variable
-     `DATABASE_URL`, visible dans l'onglet **Variables** du service). Il
-     suffit alors d'ajouter, dans les variables du service applicatif (pas
-     de la base), une variable `POSTGRES_URL` avec la même valeur que
-     `DATABASE_URL` (copier-coller, ou une référence Railway
-     `${{Postgres.DATABASE_URL}}`) — c'est le nom que `server/db.ts`
-     recherche.
-4. Une fois déployé, ouvrir l'URL fournie par Railway (onglet
-   **Settings → Networking → Generate Domain** si aucune n'est encore
-   visible) : le premier accès affiche l'écran d'installation.
-
-#### Option B — un autre hébergeur à disque persistant (Render, Fly.io, VPS...)
-
-1. Créer le service, en pointant vers votre copie du dépôt (build :
-   `npm run build`, démarrage : `npm start`).
-2. Si l'hébergeur le permet, monter un volume persistant et y faire pointer
-   `DATA_DIR` (ex. `DATA_DIR=/data`) — sinon la base par défaut (`./data`)
-   suffit tant que le disque du service lui-même survit aux redémarrages.
-3. Ouvrir l'URL fournie : le premier accès affiche l'écran d'installation.
-
-#### Option C — un hébergeur serverless (Vercel, Netlify...) : il faut une base externe
-
-**Aucune adaptation de code nécessaire** — `server/db.ts` détecte
-automatiquement la base disponible via l'une de ces deux variables
-d'environnement :
-
-- **`POSTGRES_URL`** — une base Postgres, **n'importe quel fournisseur** :
-  - Postgres natif de l'hébergeur si disponible (ex. onglet **Storage** →
-    **Create Database → Postgres** sur Vercel : la base est créée et
-    `POSTGRES_URL` définie automatiquement, rien à copier) ;
-  - ou un service Postgres géré indépendant si l'hébergeur n'en propose
-    pas — par exemple [neon.com](https://neon.com) (offre gratuite) :
-    créer un compte, un projet, puis copier la « Connection string »
-    fournie dans la variable `POSTGRES_URL` du projet.
-- **`TURSO_DATABASE_URL`** + **`TURSO_AUTH_TOKEN`** — alternative
-  SQLite-compatible via [Turso](https://turso.tech) (offre gratuite) :
-  ```bash
-  curl -sSfL https://get.tur.so/install.sh | bash
-  turso auth login
-  turso db create propdesk
-  turso db show propdesk --url          # → TURSO_DATABASE_URL
-  turso db tokens create propdesk        # → TURSO_AUTH_TOKEN
-  ```
-
-Définir l'une des deux dans les variables d'environnement du projet, puis
-déployer/redéployer — le premier accès à l'URL fournie affiche l'écran
-d'installation.
-
-Sans aucune des deux, l'application bascule sur un fichier SQLite local —
-inutilisable sur ce type d'hébergeur (d'où l'écran « Serveur injoignable »
-si vous déployez sans configurer l'une d'elles), mais c'est exactement ce
-qui permet à `npm run dev` de fonctionner en local sans aucun compte
-externe.
-
-=======
->>>>>>> origin/main
 ### Variables d'environnement utiles
 
 | Variable | Rôle | Défaut |
 |---|---|---|
 | `PORT` | Port d'écoute du serveur | `3000` |
-<<<<<<< HEAD
-| `DATA_DIR` | Dossier de la base SQLite locale (ignoré si `POSTGRES_URL` ou `TURSO_DATABASE_URL` est défini) | `./data` |
-| `POSTGRES_URL` | URL d'une base Postgres, tout fournisseur | absent = mode fichier local |
-| `TURSO_DATABASE_URL` | URL de la base Turso distante, si utilisée à la place de Postgres | absent = mode fichier local |
-| `TURSO_AUTH_TOKEN` | Jeton d'authentification Turso | absent = mode fichier local |
-
-Ordre de priorité si plusieurs sont définies : `POSTGRES_URL` d'abord, puis
-`TURSO_DATABASE_URL`, sinon fichier local.
-=======
 | `DATA_DIR` | Dossier de la base SQLite locale | `./data` |
->>>>>>> origin/main
 
 Voir [.env.example](.env.example) pour la liste complète.
 
@@ -216,11 +88,7 @@ seul port et aucun proxy à configurer.
 ```
 server.ts              point d'entrée : Express + Vite/statique
 server/
-<<<<<<< HEAD
-  db.ts                connexion base (fichier local, Postgres ou Turso) et schéma
-=======
   db.ts                connexion base (fichier local) et schéma
->>>>>>> origin/main
   repositories.ts      accès aux données (seul module qui parle à la base)
   routes.ts            routes /api/*
   schemas.ts           validation zod des entrées
@@ -232,11 +100,7 @@ src/
   hooks/               persistance locale et synchronisation serveur
   lib/api.ts           client typé de l'API
   components/          vues d'onglets et modales (journal, portefeuille,
-<<<<<<< HEAD
-                       rentabilité, macro, setups, plan de trading, mindset...)
-=======
                        rentabilité, macro, setups, plan de trading...)
->>>>>>> origin/main
 ```
 
 ### Navigation
@@ -260,13 +124,6 @@ Au tout premier lancement sur une base vide, les données présentes dans
 serveur) sont importées automatiquement. À défaut, la base est amorcée avec
 `src/data/mockData.ts`.
 
-<<<<<<< HEAD
-La base vit soit dans un fichier local (`DATA_DIR`, `./data` par défaut, hors
-du dépôt), soit dans une base Postgres ou Turso distante selon la variable
-d'environnement définie — voir « Choisir un hébergeur » plus haut.
-`server/db.ts` choisit automatiquement le bon moteur, sans aucun autre
-changement de code.
-=======
 La base vit dans un fichier local (`DATA_DIR`, `./data` par défaut, hors du
 dépôt). `server/db.ts` gère la connexion. Une copie de la base est faite
 automatiquement au démarrage du serveur (`server/backup.ts`, 20 copies
@@ -280,7 +137,6 @@ d'origine. C'est ce dernier point qui rend le fichier réellement complet : les
 captures vivent dans leur propre table, hors de la collection `trades`, et
 n'étaient donc pas exportées — une sauvegarde restaurée sur une machine neuve
 rendait tous les trades avec des images cassées.
->>>>>>> origin/main
 
 ### API
 
@@ -297,11 +153,6 @@ rendait tous les trades avec des images cassées.
 | PUT | `/api/profile` | profil |
 | POST | `/api/state/seed` | amorce avec le jeu de démonstration |
 | POST | `/api/state/import` | reprend un état venu de `localStorage` |
-<<<<<<< HEAD
-
-Toutes les routes exigent une session valide, **sauf** `/api/health`,
-`/api/auth/me`, `/api/auth/setup`, `/api/auth/login` et `/api/auth/logout`.
-=======
 | POST | `/api/state/restore` | restaure une sauvegarde JSON exportée |
 | POST | `/api/screenshots` | envoie une capture d'écran de trade |
 | GET | `/api/screenshots/:id` | sert une capture |
@@ -314,7 +165,6 @@ Toutes les routes exigent une session valide, **sauf** `/api/health`,
 `/api/auth/me`, `/api/auth/setup`, `/api/auth/login`, `/api/auth/logout`,
 `/api/economic-calendar` et `/api/market-data` (données publiques identiques
 pour tout visiteur).
->>>>>>> origin/main
 Toutes les entrées sont validées (zod).
 
 Limitations de débit par IP : `/api/auth/login` 10 par quart d'heure,
@@ -322,27 +172,16 @@ Limitations de débit par IP : `/api/auth/login` 10 par quart d'heure,
 
 ## Authentification
 
-<<<<<<< HEAD
-Cette application est pensée pour un déploiement **mono-utilisateur** : chaque
-instance (quel que soit l'hébergeur, votre propre base) n'accueille qu'un
-seul compte, celui créé à l'installation. Il n'y a pas de rôles ni de comptes
-=======
 Cette application est pensée pour un usage **mono-utilisateur** : un seul
 compte, celui créé à l'installation. Il n'y a pas de rôles ni de comptes
->>>>>>> origin/main
 secondaires — le compte connecté a systématiquement tous les droits sur ses
 propres données.
 
 Au premier démarrage, l'application détecte qu'aucun compte n'existe et
 affiche un écran d'installation : vous y choisissez uniquement un mot de
 passe (10 caractères minimum) — aucune adresse e-mail n'est demandée, la
-<<<<<<< HEAD
-connexion se fait par mot de passe seul, ce compte étant le seul de cette
-instance. **Les données déjà présentes sont conservées.**
-=======
 connexion se fait par mot de passe seul. **Les données déjà présentes sont
 conservées.**
->>>>>>> origin/main
 
 Les mots de passe sont hachés avec `scrypt` (`node:crypto`, aucune dépendance
 ajoutée), sel aléatoire, comparaison à temps constant. Les sessions sont des
@@ -356,13 +195,8 @@ Il n'y a pas de récupération par e-mail. La seule issue est de supprimer
 directement les identifiants en base, ce qui ramène l'écran d'installation au
 prochain chargement.
 
-<<<<<<< HEAD
-En local (mode fichier), avec la CLI `sqlite3` si elle est installée
-(présente par défaut sur macOS, à installer séparément sur Windows) :
-=======
 Avec la CLI `sqlite3` si elle est installée (présente par défaut sur macOS, à
 installer séparément sur Windows) :
->>>>>>> origin/main
 
 ```bash
 sqlite3 data/horizon.db "delete from staff_accounts; delete from sessions;"
@@ -376,22 +210,6 @@ librairie que le serveur (`@libsql/client`, déjà installée) :
 npx tsx -e "import {createClient} from '@libsql/client'; (async () => { const db = createClient({url: 'file:data/horizon.db'}); await db.execute('DELETE FROM staff_accounts'); await db.execute('DELETE FROM sessions'); })();"
 ```
 
-<<<<<<< HEAD
-Sur Postgres, quel que soit le fournisseur (souvent aussi accessible depuis
-une console SQL fournie par l'hébergeur) :
-
-```bash
-psql "$POSTGRES_URL" -c "delete from staff_accounts; delete from sessions;"
-```
-
-Sur Turso (si utilisé à la place de Postgres) :
-
-```bash
-turso db shell propdesk "delete from staff_accounts; delete from sessions;"
-```
-
-Vos données ne sont pas touchées : seuls les comptes sont à recréer.
-=======
 Vos données ne sont pas touchées : seuls les comptes sont à recréer.
 
 ## Tests
@@ -403,7 +221,6 @@ comparaison de périodes, revue hebdomadaire, filtres et tri, filet anti-perte
 hors catalogue, valeur non numérique importée d'un CSV). `npm run lint`
 (`tsc --noEmit`) vérifie le typage. Les composants React ne sont pas testés :
 la logique testable en a été extraite vers `src/lib/`.
->>>>>>> origin/main
 
 ## Limites connues
 
@@ -423,20 +240,6 @@ la logique testable en a été extraite vers `src/lib/`.
   comptes multiples sera additif — mais le cloisonnement des données par
   utilisateur reste à faire. La connexion se fait par mot de passe seul
   (aucune identification par email), cohérent avec ce modèle mono-compte.
-<<<<<<< HEAD
-- **Les modifications faites hors ligne ne sont pas rejouées** à la reconnexion.
-  Elles restent dans le cache local, mais le rechargement suivant reprend l'état
-  du serveur.
-- **Aucun test automatisé** : le projet n'a pas encore de runner.
-
-## Licence
-
-Usage personnel non commercial — voir [LICENSE](LICENSE). Vous pouvez
-librement copier, déployer et modifier ce code pour votre propre usage
-personnel. La vente du code, la vente d'accès à une instance qui en découle,
-ou son usage comme base pour vendre un produit en le présentant comme votre
-propre création sont interdits sans autorisation écrite de Thomas Gauthey.
-=======
 - **Une modification faite hors ligne n'est jamais rejouée toute seule.** Elle
   est retenue dans un registre local (`src/lib/pendingChanges.ts`) et un
   bandeau la propose explicitement à la reconnexion : c'est l'utilisateur qui
@@ -445,4 +248,3 @@ propre création sont interdits sans autorisation écrite de Thomas Gauthey.
 - **Les captures d'écran ne transitent pas par l'export CSV** du journal (ce
   format n'a pas de place pour des images) — seule la sauvegarde JSON les
   emporte.
->>>>>>> origin/main

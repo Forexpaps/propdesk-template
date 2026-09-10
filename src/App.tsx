@@ -11,14 +11,6 @@ import { PositionCalculatorModal } from "./components/PositionCalculatorModal";
 import { MacroDashboard } from "./components/MacroDashboard";
 import { UserProfileModal } from "./components/UserProfileModal";
 import { PendingChangesBanner } from "./components/PendingChangesBanner";
-<<<<<<< HEAD
-import { NotificationModal } from "./components/NotificationModal";
-import { MindsetJournalModal } from "./components/MindsetJournalModal";
-import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
-import { SyncErrorBanner } from "./components/SyncErrorBanner";
-import { ConfirmDialogHost, confirmDialog } from "./lib/confirmDialog";
-import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, getTradingPlanStorageKey, EMPTY_TRADING_PLANS, normalizeTradingPlans, renameSetupInPlans } from "./lib/planCompliance";
-=======
 import { WeeklyReviewModal } from "./components/WeeklyReviewModal";
 import { NotificationModal } from "./components/NotificationModal";
 import { TradingPlanEditorModal } from "./components/TradingPlanEditorModal";
@@ -29,7 +21,6 @@ import { ConfirmDialogHost, alertDialog, confirmDialog } from "./lib/confirmDial
 // de l'app passe par la collection serveur `staffTradingPlan`.
 import { EMPTY_WEEKLY_REVIEWS } from "./lib/weeklyReview";
 import { loadTradingPlan, checkPlanViolations, upsertPlanAlert, planAlertId, EMPTY_TRADING_PLANS, normalizeTradingPlans, renameSetupInPlans } from "./lib/planCompliance";
->>>>>>> origin/main
 import { upsertWalletRiskAlerts } from "./lib/walletAlerts";
 import { computeBadgeProgress } from "./lib/badges";
 import { listPending, describePending } from "./lib/pendingChanges";
@@ -50,10 +41,7 @@ import {
   TraderBadge,
   TradeDraft,
   TradingPlanData,
-<<<<<<< HEAD
-=======
   WeeklyReview,
->>>>>>> origin/main
   Setup,
 } from "./types";
 import { isTabType, type TabType as SidebarTabType } from "./components/Sidebar";
@@ -314,26 +302,6 @@ function TraderApp({
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   const [isTradingPlanOpen, setIsTradingPlanOpen] = useState(false);
 
-<<<<<<< HEAD
-  /**
-   * Plans de trading personnels du bureau staff — `localStorage` seul,
-   * jamais synchronisé au serveur (hors périmètre, voir le commentaire de
-   * `TradingPlanData` dans `src/types.ts`). Levé ici (plutôt que géré en
-   * interne par `TradingPlanEditorModal`) pour que `TradingJournal` puisse
-   * aussi lire la liste, son sélecteur "Plan de trading" en ayant besoin.
-   */
-  const [staffTradingPlan, setStaffTradingPlanState] = useState<TradingPlanData>(() => loadTradingPlan());
-  const setStaffTradingPlan = (next: TradingPlanData) => {
-    setStaffTradingPlanState(next);
-    try {
-      localStorage.setItem(getTradingPlanStorageKey(), JSON.stringify(next));
-    } catch {
-      // Quota dépassé ou navigation privée : rien à faire de plus ici.
-    }
-  };
-
-=======
->>>>>>> origin/main
   // Bandeau d'avertissement immédiat quand une sauvegarde échoue en
   // arrière-plan alors que l'app se croit en ligne — la donnée elle-même est
   // protégée par `markPending` dans `useSyncedState`, ce bandeau n'est qu'un
@@ -411,12 +379,6 @@ function TraderApp({
     reportSyncError
   );
 
-<<<<<<< HEAD
-  // Ébauche de trade poussée vers le Journal par le calculateur de position
-  const [journalDraft, setJournalDraft] = useState<TradeDraft | null>(null);
-
-  const [isMindsetModalOpen, setIsMindsetModalOpen] = useState<boolean>(false);
-=======
   /**
    * Plans de trading — désormais une collection serveur comme les autres.
    *
@@ -502,7 +464,6 @@ function TraderApp({
   // Ébauche de trade poussée vers le Journal par le calculateur de position
   const [journalDraft, setJournalDraft] = useState<TradeDraft | null>(null);
 
->>>>>>> origin/main
 
   // L'écriture dans localStorage est désormais assurée par usePersistentState.
 
@@ -549,14 +510,9 @@ function TraderApp({
     // Hors ligne, le cache local est la SEULE copie des données : le vider
     // serait une perte sèche. On refuse plutôt que de détruire en silence.
     if (!syncEnabled) {
-<<<<<<< HEAD
-      alert(
-        "Déconnexion impossible hors ligne : les modifications de cette session ne sont pas encore enregistrées sur le serveur. Reconnecte-toi au serveur avant de te déconnecter."
-=======
       await alertDialog(
         "Déconnexion impossible hors ligne : les modifications de cette session ne sont pas encore enregistrées sur le serveur. Reconnecte-toi au serveur avant de te déconnecter.",
         { title: "Déconnexion impossible" }
->>>>>>> origin/main
       );
       return;
     }
@@ -570,14 +526,9 @@ function TraderApp({
     // `localStorage.clear()` plus bas, en toute confiance. Trouvé en audit.
     const pending = listPending();
     if (pending.length > 0) {
-<<<<<<< HEAD
-      alert(
-        `Déconnexion impossible : ${describePending(pending).join(", ")} pas encore enregistré(e) sur le serveur. Réessaie dans quelques instants — si le problème persiste, recharge la page avant de te déconnecter.`
-=======
       await alertDialog(
         `Déconnexion impossible : ${describePending(pending).join(", ")} pas encore enregistré(e) sur le serveur. Réessaie dans quelques instants — si le problème persiste, recharge la page avant de te déconnecter.`,
         { title: "Déconnexion impossible" }
->>>>>>> origin/main
       );
       return;
     }
@@ -743,8 +694,6 @@ function TraderApp({
     tradesRef.current = trades;
   }, [trades]);
 
-<<<<<<< HEAD
-=======
   // Même miroir, même raison, pour les plans : `applyPlanCompliance` est appelé
   // depuis `handleAddTrade`/`handleUpdateTrade`, qui peuvent s'exécuter deux
   // fois dans un même lot de rendu (import CSV) et liraient sinon une closure
@@ -754,7 +703,6 @@ function TraderApp({
     plansRef.current = staffTradingPlan;
   }, [staffTradingPlan]);
 
->>>>>>> origin/main
   // Voir le commentaire équivalent dans `StudentAuthenticatedApp` — mêmes
   // alertes de risque portefeuille, pour les comptes du coach lui-même.
   React.useEffect(() => {
@@ -791,12 +739,6 @@ function TraderApp({
    * `storageKey`.
    */
   const applyPlanCompliance = (trade: Trade, allTrades: Trade[]) => {
-<<<<<<< HEAD
-    if (!trade.tradingPlanId) return;
-    const plans = loadTradingPlan();
-    const plan = plans.find((p) => p.id === trade.tradingPlanId);
-    if (!plan) return;
-=======
     // Les plans sont une collection SERVEUR depuis leur migration. Ce code
     // lisait encore `loadTradingPlan()`, c'est-à-dire l'ancienne clé
     // `localStorage` « horizon_trading_plan » (singulier) : aucun plan créé
@@ -814,7 +756,6 @@ function TraderApp({
       setNotifications((prev) => upsertPlanAlert(prev, trade, []));
       return;
     }
->>>>>>> origin/main
     const sameDayTrades = allTrades.filter((t) => t.date === trade.date);
     // `displayStudent.startingCapital`, pas `student.startingCapital` : ce
     // dernier n'est plus jamais tenu à jour depuis que le capital affiché
@@ -829,13 +770,10 @@ function TraderApp({
     const next = tradesRef.current.filter((t) => t.id !== id);
     tradesRef.current = next;
     setTrades(next);
-<<<<<<< HEAD
-=======
     // Un trade supprimé ne peut plus enfreindre quoi que ce soit : son alerte
     // n'a plus d'objet, et le centre d'alertes la gardait indéfiniment (elle
     // ne pointait même plus vers une ligne du journal).
     setNotifications((prev) => prev.filter((n) => n.id !== planAlertId(id)));
->>>>>>> origin/main
   };
 
   return (
@@ -855,10 +793,6 @@ function TraderApp({
         }}
         onLogout={handleLogout}
         onOpenTradingPlan={() => setIsTradingPlanOpen(true)}
-<<<<<<< HEAD
-        onOpenMindset={() => setIsMindsetModalOpen(true)}
-=======
->>>>>>> origin/main
         canManageSidebar={true}
         onToggleSidebarItem={(key) => {
           // Forme fonctionnelle obligatoire : deux bascules dans le même lot de
@@ -925,12 +859,9 @@ function TraderApp({
             <MainDashboard
               student={displayStudent}
               trades={trades}
-<<<<<<< HEAD
-=======
               plans={staffTradingPlan}
               weeklyReviews={weeklyReviews}
               onOpenWeeklyReview={(semaine) => setRevueOuverte(semaine)}
->>>>>>> origin/main
               setActiveTab={setActiveTab}
             />
           )}
@@ -974,10 +905,7 @@ function TraderApp({
             <PerformanceDashboard
               student={displayStudent}
               trades={trades}
-<<<<<<< HEAD
-=======
               plans={staffTradingPlan}
->>>>>>> origin/main
             />
           )}
 
@@ -1011,10 +939,7 @@ function TraderApp({
             stopLoss: calc.stopLoss,
             takeProfit: calc.takeProfit,
             lotSize: calc.lotSize,
-<<<<<<< HEAD
-=======
             riskPercent: calc.riskPercent,
->>>>>>> origin/main
             notes: `Position dimensionnée avec le calculateur : risque ${formatCurrency(
               calc.riskAmount
             )} pour un R:R de ${calc.riskRewardRatio}.`,
@@ -1033,12 +958,6 @@ function TraderApp({
         setups={setups}
       />
 
-<<<<<<< HEAD
-      {/* Mindset & Tilt Radar Modal */}
-      <MindsetJournalModal
-        isOpen={isMindsetModalOpen}
-        onClose={() => setIsMindsetModalOpen(false)}
-=======
       {/* Revue hebdomadaire — écriture ponctuelle, donc une modale et pas un
           onglet (voir `WeeklyReviewModal`). */}
       {/* Montée seulement à l'ouverture, et remontée à chaque semaine
@@ -1054,7 +973,6 @@ function TraderApp({
         reviews={weeklyReviews}
         onSave={handleSaveWeeklyReview}
         semaineInitiale={revueOuverte}
->>>>>>> origin/main
       />
       )}
 

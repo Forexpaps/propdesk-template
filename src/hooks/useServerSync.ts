@@ -13,14 +13,11 @@ const LEGACY_KEYS = {
     notifications: "horizon_notifications",
     badges: "horizon_badges",
     setups: "horizon_setups",
-<<<<<<< HEAD
-=======
     // Sans cette entrée, `cacheState` ne recopiait pas les plans venus du
     // serveur dans le cache local : un démarrage à froid sans réseau les
     // affichait vides, alors qu'ils existaient bien en base.
     tradingPlans: "horizon_trading_plans",
     weeklyReviews: "horizon_weekly_reviews",
->>>>>>> origin/main
   },
 } as const;
 

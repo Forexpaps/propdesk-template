@@ -30,9 +30,6 @@ const SAFE_MEDIA_URL_FIELDS = ["chartUrl", "avatar"] as const;
 const isSafeMediaUrl = (value: unknown): boolean =>
   value == null ||
   (typeof value === "string" &&
-<<<<<<< HEAD
-    (value === "" || /^https:\/\//.test(value) || /^data:image\//.test(value)));
-=======
     (value === "" ||
       /^https:\/\//.test(value) ||
       /^data:image\//.test(value) ||
@@ -41,7 +38,6 @@ const isSafeMediaUrl = (value: unknown): boolean =>
       // un chemin libre sous `/api/` ouvrirait la porte à des URLs pointant
       // vers d'autres routes.
       /^\/api\/screenshots\/shot-[A-Za-z0-9-]+$/.test(value)));
->>>>>>> origin/main
 
 /**
  * `Trade.chartUrls` (plusieurs captures d'écran labellisées — voir
@@ -86,8 +82,6 @@ const isValidInitialBalance = (value: unknown): boolean =>
   value == null || (typeof value === "number" && value > 0);
 
 /**
-<<<<<<< HEAD
-=======
  * `Trade.riskPercent` — part du capital engagée, en pourcentage.
  *
  * Absent est légitime (les trades antérieurs à ce champ n'en ont pas, et le
@@ -101,7 +95,6 @@ const isValidRiskPercent = (value: unknown): boolean =>
   value == null || (typeof value === "number" && Number.isFinite(value) && value > 0 && value <= 100);
 
 /**
->>>>>>> origin/main
  * Détecte un schéma d'URL dangereux (`javascript:`, `vbscript:`,
  * `data:text/html`) n'importe où dans un item de collection, quel que soit
  * le nom du champ ou sa profondeur d'imbrication.
@@ -166,12 +159,9 @@ const collectionItem = z
   })
   .refine((item) => !containsDangerousUrlScheme(item), {
     message: "URL invalide : les schémas javascript:/vbscript:/data:text/html sont interdits.",
-<<<<<<< HEAD
-=======
   })
   .refine((item) => isValidRiskPercent((item as Record<string, unknown>).riskPercent), {
     message: "Le risque engagé doit être un pourcentage entre 0 (exclu) et 100.",
->>>>>>> origin/main
   });
 
 export const collectionPayloadSchema = z

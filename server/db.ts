@@ -1,20 +1,10 @@
 import { createClient } from "@libsql/client";
-<<<<<<< HEAD
-import { Pool } from "pg";
-=======
->>>>>>> origin/main
 import fs from "fs";
 import path from "path";
 
 /**
-<<<<<<< HEAD
- * Forme minimale partagée par les deux moteurs possibles (libSQL et
- * Postgres) — c'est tout ce que `repositories.ts` et le reste du serveur
- * utilisent, jamais une API spécifique à l'un ou l'autre.
-=======
  * Forme minimale exposée par le client — c'est tout ce que
  * `repositories.ts` et le reste du serveur utilisent.
->>>>>>> origin/main
  */
 interface QueryResult {
   rows: Record<string, unknown>[];
@@ -31,8 +21,6 @@ interface DbClient {
   execute(query: Query): Promise<QueryResult>;
   transaction(mode?: "write" | "read"): Promise<DbTransaction>;
 }
-<<<<<<< HEAD
-=======
 
 /**
  * Connexion unique pour tout le serveur : toujours un fichier SQLite local
@@ -40,127 +28,9 @@ interface DbClient {
  * pensée pour tourner uniquement en local, sur cet ordinateur.
  */
 export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
->>>>>>> origin/main
 
-/**
- * Connexion unique pour tout le serveur, trois modes choisis par les
- * variables d'environnement présentes — indépendamment de l'hébergeur,
- * qu'il s'agisse de Vercel, Railway, Render, Fly.io, un VPS ou autre :
- *  - `POSTGRES_URL` : base Postgres, **n'importe quel fournisseur**
- *    (Postgres natif d'un hébergeur, Neon, Supabase, une instance
- *    auto-hébergée...) — utile sur un hébergeur dont le système de
- *    fichiers n'est pas persistant (fonctions serverless) ;
- *  - `TURSO_DATABASE_URL` : base SQLite distante chez Turso,
- *    `TURSO_AUTH_TOKEN` pour l'authentification — alternative à Postgres,
- *    même cas d'usage ;
- *  - aucune des deux (dev local, et tout hébergeur à disque persistant,
- *    Postgres ou pas) : fichier local dans DATA_DIR (./data par défaut) via
- *    libSQL en mode `file:`, aucun compte externe requis.
- *
- * Le reste du serveur ne parle qu'aux repositories, jamais à ce module
- * directement — et les repositories n'appellent que `execute`/`transaction`
- * ci-dessus, jamais une méthode propre à un moteur ou un hébergeur en
- * particulier. Ajouter un nouveau fournisseur de base ne demande donc de
- * toucher que ce fichier.
- */
-export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
+fs.mkdirSync(DATA_DIR, { recursive: true });
 
-<<<<<<< HEAD
-const usingPostgres = Boolean(process.env.POSTGRES_URL);
-const usingTurso = !usingPostgres && Boolean(process.env.TURSO_DATABASE_URL);
-const usingLocalFile = !usingPostgres && !usingTurso;
-
-if (usingLocalFile) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-/**
- * `?` (convention SQLite/libSQL, utilisée dans tout le reste du serveur) →
- * `$1, $2, ...` (convention Postgres). Sûr ici : aucune requête de ce
- * serveur ne contient de `?` littéral dans une chaîne SQL.
- */
-function toPostgresPlaceholders(sql: string): string {
-  let index = 0;
-  return sql.replace(/\?/g, () => `$${++index}`);
-}
-
-function normalizeQuery(query: Query): { sql: string; args: unknown[] } {
-  return typeof query === "string" ? { sql: query, args: [] } : { sql: query.sql, args: query.args ?? [] };
-}
-
-/**
- * Adapte `pg` (Postgres) à la même interface `execute`/`transaction` que
- * libSQL, pour que `repositories.ts` et le reste du serveur n'aient jamais
- * besoin de savoir lequel des deux moteurs est actif.
- */
-function createPostgresClient(connectionString: string): DbClient {
-  const pool = new Pool({
-    connectionString,
-    // La plupart des fournisseurs gérés (Vercel Postgres, Neon...) exigent
-    // TLS mais présentent un certificat que Node ne valide pas par défaut ;
-    // `sslmode=disable` explicite dans l'URL (dev local sans TLS) reste
-    // respecté par `pg` indépendamment de cette option.
-    ssl: connectionString.includes("sslmode=disable") ? undefined : { rejectUnauthorized: false },
-  });
-
-  async function execute(query: Query): Promise<QueryResult> {
-    const { sql, args } = normalizeQuery(query);
-    const result = await pool.query(toPostgresPlaceholders(sql), args);
-    return { rows: result.rows, rowsAffected: result.rowCount ?? 0 };
-  }
-
-  async function transaction(): Promise<DbTransaction> {
-    const client = await pool.connect();
-    await client.query("BEGIN");
-    let released = false;
-    const releaseOnce = () => {
-      if (!released) {
-        released = true;
-        client.release();
-      }
-    };
-    return {
-      async execute(query: Query): Promise<QueryResult> {
-        const { sql, args } = normalizeQuery(query);
-        const result = await client.query(toPostgresPlaceholders(sql), args);
-        return { rows: result.rows, rowsAffected: result.rowCount ?? 0 };
-      },
-      async commit() {
-        await client.query("COMMIT");
-      },
-      async rollback() {
-        await client.query("ROLLBACK");
-      },
-      close: releaseOnce,
-    };
-  }
-
-  return { execute, transaction };
-}
-
-/** libSQL renvoie déjà `rows`/`rowsAffected` — juste besoin d'adapter le type de retour de `transaction`. */
-function createLibsqlClient(url: string, authToken?: string): DbClient {
-  const client = createClient({ url, authToken });
-  return {
-    execute: (query: Query) => client.execute(query as never) as unknown as Promise<QueryResult>,
-    transaction: async (mode: "write" | "read" = "write") => {
-      const tx = await client.transaction(mode);
-      return {
-        execute: (query: Query) => tx.execute(query as never) as unknown as Promise<QueryResult>,
-        commit: () => tx.commit(),
-        rollback: () => tx.rollback(),
-        close: () => tx.close(),
-      };
-    },
-  };
-}
-
-export const db: DbClient = usingPostgres
-  ? createPostgresClient(process.env.POSTGRES_URL!)
-  : usingTurso
-  ? createLibsqlClient(process.env.TURSO_DATABASE_URL!, process.env.TURSO_AUTH_TOKEN)
-  : createLibsqlClient(`file:${path.join(DATA_DIR, "horizon.db")}`);
-=======
 /** libSQL renvoie déjà `rows`/`rowsAffected` — juste besoin d'adapter le type de retour de `transaction`. */
 function createLibsqlClient(url: string): DbClient {
   const client = createClient({ url });
@@ -179,7 +49,6 @@ function createLibsqlClient(url: string): DbClient {
 }
 
 export const db: DbClient = createLibsqlClient(`file:${path.join(DATA_DIR, "horizon.db")}`);
->>>>>>> origin/main
 
 /**
  * Toutes les collections partagent la même forme : un identifiant stable,
@@ -190,14 +59,8 @@ export const db: DbClient = createLibsqlClient(`file:${path.join(DATA_DIR, "hori
  * requêter et indexer ; les autres collections ne sont jamais lues autrement
  * qu'en entier, leur payload suffit.
  *
-<<<<<<< HEAD
- * Ces instructions sont écrites dans un sous-ensemble SQL commun à SQLite et
- * Postgres (types, `REFERENCES ... ON DELETE CASCADE`, `CREATE INDEX IF NOT
- * EXISTS` sont valables dans les deux) — aucune divergence nécessaire ici.
-=======
  * Ces instructions sont écrites en SQLite (types, `REFERENCES ... ON DELETE
  * CASCADE`, `CREATE INDEX IF NOT EXISTS`).
->>>>>>> origin/main
  */
 const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS meta (
@@ -248,9 +111,6 @@ const SCHEMA_STATEMENTS = [
     payload  TEXT NOT NULL
   )`,
 
-<<<<<<< HEAD
-  `CREATE TABLE IF NOT EXISTS trading_accounts (
-=======
   // Plans de trading. Vivaient auparavant dans le seul `localStorage` du
   // navigateur : ni en base, ni dans `GET /api/state`, donc absents du fichier
   // d'export « Exporter mes données » — vider le cache du navigateur suffisait
@@ -258,31 +118,23 @@ const SCHEMA_STATEMENTS = [
   // Les faire entrer ici les fait entrer dans la sauvegarde par la même
   // occasion, sans code dédié (tout est piloté par `TABLES`).
   `CREATE TABLE IF NOT EXISTS trading_plans (
->>>>>>> origin/main
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     position INTEGER NOT NULL,
     payload  TEXT NOT NULL
   )`,
 
-<<<<<<< HEAD
-  `CREATE TABLE IF NOT EXISTS notifications (
-=======
   // Revues hebdomadaires : ce que le trader a écrit sur sa semaine, et
   // l'objectif typé qu'il s'est fixé pour la suivante. Le VERDICT de cet
   // objectif n'est pas stocké — il se recalcule depuis les trades (voir
   // `src/lib/weeklyReview.ts`).
   `CREATE TABLE IF NOT EXISTS weekly_reviews (
->>>>>>> origin/main
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     position INTEGER NOT NULL,
     payload  TEXT NOT NULL
   )`,
 
-<<<<<<< HEAD
-  `CREATE TABLE IF NOT EXISTS badges (
-=======
   // Captures d'écran des trades, hors de la collection `trades`.
   //
   // Elles y vivaient en base64, à l'intérieur du payload : toute la collection
@@ -306,128 +158,12 @@ const SCHEMA_STATEMENTS = [
   `CREATE INDEX IF NOT EXISTS idx_trade_screenshots_user ON trade_screenshots(user_id)`,
 
   `CREATE TABLE IF NOT EXISTS trading_accounts (
->>>>>>> origin/main
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     position INTEGER NOT NULL,
     payload  TEXT NOT NULL
   )`,
 
-<<<<<<< HEAD
-  // Comptes staff : identité de connexion, DÉCOUPLÉE du bureau partagé.
-  //
-  // Plusieurs coachs peuvent avoir chacun leur propre email et mot de passe,
-  // tout en travaillant sur les MÊMES données (le bureau "users" reste
-  // singulier). C'est pourquoi il n'y a PAS de clé étrangère vers users(id) :
-  // un compte staff n'est pas "propriétaire" d'un bureau, il y accède.
-  //
-  // Aucun champ ici n'atteint jamais le client via /api/state : GET /api/state
-  // ne renvoie que le payload de "users", jamais cette table.
-  `CREATE TABLE IF NOT EXISTS staff_accounts (
-    id                   TEXT PRIMARY KEY,
-    name                 TEXT NOT NULL,
-    email                TEXT NOT NULL,
-    email_lower          TEXT NOT NULL UNIQUE,
-    password_hash        TEXT NOT NULL,
-    -- Vrai tant qu'un mot de passe temporaire d'invitation n'a pas été
-    -- remplacé par l'intéressé. Jamais vrai pour le premier compte (créé via
-    -- /auth/setup, qui choisit son propre mot de passe).
-    must_change_password INTEGER NOT NULL DEFAULT 0,
-    -- 2FA (TOTP), voir server/auth/twoFactor.ts. totp_secret : présent dès
-    -- qu'un compte a démarré une configuration, même non encore confirmée
-    -- (voir startTotpSetup) — totp_enabled_at NULL est ce qui distingue "en
-    -- cours de configuration" de "activé".
-    totp_secret           TEXT,
-    totp_enabled_at        TEXT,
-    -- Anti-rejeu : dernier pas de temps TOTP (30s) accepte pour ce compte.
-    -- Un code deja utilise pour ce pas (ou un pas anterieur) est refuse meme
-    -- s'il correspond encore dans la fenetre de tolerance de findMatchingTotpStep,
-    -- voir server/auth/twoFactor.ts.
-    totp_last_used_step   INTEGER,
-    created_at           TEXT NOT NULL,
-    updated_at           TEXT NOT NULL
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_staff_accounts_email ON staff_accounts(email_lower)`,
-
-  // Codes de récupération 2FA à usage unique, un hash SHA-256 par code (pas
-  // de sel : chaque code est déjà un secret aléatoire de forte entropie,
-  // même raisonnement que sessions.ts). used_at NULL = encore valide.
-  `CREATE TABLE IF NOT EXISTS staff_recovery_codes (
-    id         TEXT PRIMARY KEY,
-    staff_id   TEXT NOT NULL REFERENCES staff_accounts(id) ON DELETE CASCADE,
-    code_hash  TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    used_at    TEXT
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_staff_recovery_codes_staff ON staff_recovery_codes(staff_id)`,
-
-  // Défi 2FA en attente entre "mot de passe vérifié" et "session créée" —
-  // voir POST /auth/login puis POST /auth/login/2fa. Jeton à usage unique,
-  // courte durée de vie (5 min, voir twoFactor.ts), empreinte SHA-256 en
-  // base comme les sessions (server/auth/sessions.ts).
-  `CREATE TABLE IF NOT EXISTS staff_2fa_challenges (
-    token_hash TEXT PRIMARY KEY,
-    staff_id   TEXT NOT NULL REFERENCES staff_accounts(id) ON DELETE CASCADE,
-    created_at TEXT NOT NULL,
-    expires_at TEXT NOT NULL
-  )`,
-
-  // Sessions actives. La colonne id est le SHA-256 du jeton, jamais le jeton
-  // lui-même : le fichier de base vit en clair sur le disque (et dans le WAL, et
-  // dans les sauvegardes), une fuite ne doit pas permettre de rejouer les
-  // sessions.
-  //
-  // Les dates sont en ISO 8601 UTC : la comparaison lexicographique vaut alors
-  // comparaison chronologique, ce dont dépend le filtre sur expires_at.
-  `CREATE TABLE IF NOT EXISTS sessions (
-    id           TEXT PRIMARY KEY,
-    user_id      TEXT NOT NULL REFERENCES staff_accounts(id) ON DELETE CASCADE,
-    created_at   TEXT NOT NULL,
-    expires_at   TEXT NOT NULL,
-    last_seen_at TEXT NOT NULL,
-    user_agent   TEXT
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_sessions_user    ON sessions(user_id)`,
-  `CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)`,
-
-  // Journal de sécurité. Purge à 90 jours (les IP sont des données
-  // personnelles), jamais de mot de passe ni de jeton de session stocké ici.
-  // Pas de FK vers staff_accounts : un événement doit rester lisible même
-  // après révocation du compte concerné.
-  `CREATE TABLE IF NOT EXISTS security_events (
-    id            TEXT PRIMARY KEY,
-    created_at    TEXT NOT NULL,
-    event_type    TEXT NOT NULL,
-    severity      TEXT NOT NULL,          -- 'info' | 'warning' | 'critical'
-    account_kind  TEXT,                   -- 'staff' | 'student' | NULL
-    account_email TEXT,
-    ip_address    TEXT,
-    detail        TEXT NOT NULL DEFAULT ''
-  )`,
-  `CREATE INDEX IF NOT EXISTS idx_security_events_created ON security_events(created_at)`,
-  `CREATE INDEX IF NOT EXISTS idx_security_events_email   ON security_events(account_email)`,
-
-  // État opérationnel du verrouillage de compte, PAR (monde, email) — une
-  // seule ligne par compte, écrasée à chaque tentative de connexion.
-  // Distinct du journal ci-dessus (durée de vie et fréquence d'accès très
-  // différentes) : voir server/auth/loginLockout.ts.
-  `CREATE TABLE IF NOT EXISTS login_lockouts (
-    kind               TEXT NOT NULL,     -- 'staff' | 'student'
-    email_lower        TEXT NOT NULL,
-    failed_count       INTEGER NOT NULL DEFAULT 0,
-    window_started_at  TEXT NOT NULL,
-    locked_until       TEXT,
-    updated_at         TEXT NOT NULL,
-    -- Nombre de verrouillages déjà subis par ce compte — voir lockDurationFor
-    -- (loginLockout.ts) : chaque nouveau verrouillage allonge le suivant
-    -- (15 min, 1h, 4h, 24h), au lieu d'un verrouillage à durée fixe
-    -- indéfiniment répétable toutes les 15 minutes.
-    lock_count         INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (kind, email_lower)
-  )`,
-];
-
-=======
   `CREATE TABLE IF NOT EXISTS notifications (
     id       TEXT PRIMARY KEY,
     user_id  TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -555,20 +291,12 @@ const SCHEMA_STATEMENTS = [
   )`,
 ];
 
->>>>>>> origin/main
 /**
  * Migration ponctuelle : sépare l'identité de connexion (désormais
  * `staff_accounts`) de l'ancien modèle à un seul compte (`user_credentials`,
  * lié 1:1 au bureau partagé par une clé étrangère qui interdirait tout second
  * compte).
  *
-<<<<<<< HEAD
- * SQLite/libSQL uniquement — une base Postgres est toujours créée neuve avec
- * `staff_accounts` déjà dans sa forme finale (voir `SCHEMA_STATEMENTS`),
- * cette migration n'a donc jamais de raison de s'y exécuter.
- *
-=======
->>>>>>> origin/main
  * Le compte existant conserve exactement son `id` d'origine (celui qui était
  * `user_id` dans `user_credentials`, presque toujours `DEFAULT_USER_ID`) :
  * les sessions déjà émises restent donc valides, personne n'est déconnecté
@@ -695,16 +423,9 @@ async function migrateDropForum(): Promise<void> {
 
 /**
  * Ajoute `totp_secret`/`totp_enabled_at` à `staff_accounts` sur une base
-<<<<<<< HEAD
- * SQLite/libSQL EXISTANTE créée avant l'introduction de la 2FA — le `CREATE
- * TABLE IF NOT EXISTS` plus haut ne les crée que sur une base neuve, où ces
- * colonnes existent donc déjà. SQLite/libSQL uniquement (voir
- * `migrateToStaffAccounts`) : une base Postgres neuve les a toujours.
-=======
  * EXISTANTE créée avant l'introduction de la 2FA — le `CREATE TABLE IF NOT
  * EXISTS` plus haut ne les crée que sur une base neuve, où ces colonnes
  * existent donc déjà.
->>>>>>> origin/main
  */
 async function migrateAddTotpColumns(): Promise<void> {
   const columnsResult = await db.execute("PRAGMA table_info(staff_accounts)");
@@ -740,8 +461,6 @@ async function migrateAddLockCountColumn(): Promise<void> {
   await db.execute("ALTER TABLE login_lockouts ADD COLUMN lock_count INTEGER NOT NULL DEFAULT 0;");
 }
 
-<<<<<<< HEAD
-=======
 /**
  * Migration ponctuelle : sort les captures d'écran encodées en base64 du
  * payload des trades vers `trade_screenshots`, et remplace chacune par l'URL
@@ -857,7 +576,6 @@ export async function purgeOrphanScreenshots(): Promise<number> {
   return orphelines.length;
 }
 
->>>>>>> origin/main
 let initialized = false;
 
 /**
@@ -869,25 +587,6 @@ export async function initDb(): Promise<void> {
   if (initialized) return;
   initialized = true;
 
-<<<<<<< HEAD
-  if (usingLocalFile) {
-    // Pertinent seulement en mode fichier local : une base distante (Turso
-    // ou Postgres) gère elle-même son mode de journalisation, et WAL n'a pas
-    // de sens sur une connexion réseau. Non bloquant si le moteur libSQL
-    // local le refuse pour une raison quelconque.
-    try {
-      await db.execute("PRAGMA journal_mode = WAL;");
-    } catch (err) {
-      console.warn("[propdesk] PRAGMA journal_mode = WAL ignoré.", err);
-    }
-  }
-
-  if (!usingPostgres) {
-    // Postgres applique toujours les clés étrangères — pas de PRAGMA
-    // équivalent, et cette commande échouerait si on l'y envoyait.
-    await db.execute("PRAGMA foreign_keys = ON;");
-  }
-=======
   try {
     await db.execute("PRAGMA journal_mode = WAL;");
   } catch (err) {
@@ -895,31 +594,17 @@ export async function initDb(): Promise<void> {
   }
 
   await db.execute("PRAGMA foreign_keys = ON;");
->>>>>>> origin/main
 
   for (const statement of SCHEMA_STATEMENTS) {
     await db.execute(statement);
   }
 
-<<<<<<< HEAD
-  if (!usingPostgres) {
-    // Migrations SQLite/libSQL uniquement — une base Postgres est toujours
-    // créée neuve, directement dans sa forme finale (voir les commentaires
-    // de chaque migration ci-dessus).
-    await migrateToStaffAccounts();
-    await migrateAddTotpColumns();
-    await migrateAddLockCountColumn();
-  }
-  await migrateDropCoachSignals();
-  await migrateDropForum();
-=======
   await migrateToStaffAccounts();
   await migrateAddTotpColumns();
   await migrateAddLockCountColumn();
   await migrateDropCoachSignals();
   await migrateDropForum();
   await migrateScreenshotsOutOfTrades();
->>>>>>> origin/main
 }
 
 export async function getMeta(key: string): Promise<string | null> {

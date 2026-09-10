@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { Trade, StudentProfile, EmotionState } from "../types";
-=======
 import { Trade, StudentProfile, EmotionState, TradingPlan } from "../types";
->>>>>>> origin/main
 
 /**
  * Calculs purs de Rentabilité et du résumé Journal, extraits de
@@ -46,11 +42,6 @@ export function isRealizedDollarTrade(t: Trade): boolean {
   return (t.pnlUnit ?? "USD") !== "PERCENT" && t.result !== "OPEN";
 }
 
-<<<<<<< HEAD
-export interface PerformanceStats {
-  equityData: { date: string; capital: number; pnl: number }[];
-  strategyChartData: { strategy: string; winRate: number; pnl: number; tradesCount: number }[];
-=======
 /**
  * `wins/(wins+losses)` — BREAKEVEN et OPEN au dénominateur dilueraient le taux
  * sans jamais apparaître nulle part comme « neutres ». Au niveau module (et non
@@ -69,7 +60,6 @@ export interface PerformanceStats {
    * jamais fondus dans un setup existant.
    */
   setupDetailData: { setup: string; tradesCount: number; winRate: number; pnl: number; renseigne: boolean }[];
->>>>>>> origin/main
   emotionChartData: { emotion: string; winRate: number; pnl: number; tradesCount: number }[];
   totalTrades: number;
   wins: number;
@@ -131,34 +121,6 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   // Trades en $ ET clôturés uniquement : seuls ceux-ci entrent dans les totaux monétaires.
   const tradesEnDollars = trades.filter(isRealizedDollarTrade);
 
-<<<<<<< HEAD
-  /** `wins/(wins+losses)` — BREAKEVEN/OPEN au dénominateur diluerait le taux, voir `isRealizedDollarTrade`. */
-  const winRateOf = (s: CategoryStats): number =>
-    s.wins + s.losses > 0 ? Math.round((s.wins / (s.wins + s.losses)) * 100) : 0;
-
-  // 2. Performance par Stratégie
-  const strategyStats: Record<string, CategoryStats> = {};
-  trades.forEach((t) => {
-    if (!strategyStats[t.strategy]) {
-      strategyStats[t.strategy] = { wins: 0, losses: 0, total: 0, pnl: 0 };
-    }
-    strategyStats[t.strategy].total += 1;
-    if (t.result === "WIN") strategyStats[t.strategy].wins += 1;
-    if (t.result === "LOSS") strategyStats[t.strategy].losses += 1;
-    if (isRealizedDollarTrade(t)) strategyStats[t.strategy].pnl += t.pnl;
-  });
-
-  const strategyChartData = Object.keys(strategyStats).map((strat) => ({
-    strategy: strat,
-    winRate: winRateOf(strategyStats[strat]),
-    pnl: strategyStats[strat].pnl,
-    tradesCount: strategyStats[strat].total,
-  }));
-
-  // 3. Performance par Émotion
-  //
-  // Préremplit les 6 émotions saisissables dans le Journal (`ALL_EMOTIONS`),
-=======
   // 2. Détail par setup — « lequel de mes setups gagne vraiment ? », la
   // question centrale d'un journal de trading.
   //
@@ -199,7 +161,6 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
   // 3. Performance par Émotion
   //
   // Préremplit les 5 émotions saisissables dans le Journal (`ALL_EMOTIONS`),
->>>>>>> origin/main
   // même celles jamais taguées — sinon un élève qui n'a par exemple jamais
   // trade "Anxieux" ne verrait jamais cette barre, alors que c'est justement
   // l'information utile (« je n'ai jamais (encore) tradé anxieux »).
@@ -211,12 +172,6 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
     Calm: { wins: 0, losses: 0, total: 0, pnl: 0 },
   };
   trades.forEach((t) => {
-<<<<<<< HEAD
-    emotionStats[t.emotion].total += 1;
-    if (t.result === "WIN") emotionStats[t.emotion].wins += 1;
-    if (t.result === "LOSS") emotionStats[t.emotion].losses += 1;
-    if (isRealizedDollarTrade(t)) emotionStats[t.emotion].pnl += t.pnl;
-=======
     // Émotion inconnue du catalogue (trade restauré d'une sauvegarde éditée à
     // la main, ou écrit par une version antérieure) : elle est IGNORÉE, jamais
     // rangée dans une case voisine. Sans cette garde, `emotionStats[t.emotion]`
@@ -231,7 +186,6 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
     if (t.result === "WIN") stats.wins += 1;
     if (t.result === "LOSS") stats.losses += 1;
     if (isRealizedDollarTrade(t)) stats.pnl += t.pnl;
->>>>>>> origin/main
   });
 
   const emotionChartData = ALL_EMOTIONS.map(({ id, label }) => ({
@@ -502,11 +456,7 @@ export function computePerformanceStats(student: StudentProfile, trades: Trade[]
 
   return {
     equityData,
-<<<<<<< HEAD
-    strategyChartData,
-=======
     setupDetailData,
->>>>>>> origin/main
     emotionChartData,
     totalTrades,
     wins,
@@ -608,10 +558,6 @@ export interface PnlByPeriod {
   year: PeriodPnl;
 }
 
-<<<<<<< HEAD
-/** Lundi 00:00 de la semaine calendaire contenant `date` (ISO, jamais un décalage glissant de 7 jours). */
-function startOfWeek(date: Date): Date {
-=======
 /**
  * Lundi 00:00 de la semaine calendaire contenant `date` (ISO, jamais un
  * décalage glissant de 7 jours).
@@ -622,7 +568,6 @@ function startOfWeek(date: Date): Date {
  * dernière » et « Semaine N » sur le même écran.
  */
 export function startOfWeek(date: Date): Date {
->>>>>>> origin/main
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const day = d.getDay(); // 0 = dimanche
   const diffToMonday = day === 0 ? -6 : 1 - day;
@@ -673,8 +618,6 @@ export function computePnlByPeriod(trades: Trade[], reference: Date = new Date()
 
   return totals;
 }
-<<<<<<< HEAD
-=======
 
 // ---------------------------------------------------------------------------
 // Durée de détention
@@ -955,4 +898,3 @@ export function computePlanDetail(trades: Trade[], plans: TradingPlan[]): PlanDe
     return b.pnl - a.pnl;
   });
 }
->>>>>>> origin/main

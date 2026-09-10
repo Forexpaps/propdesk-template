@@ -33,21 +33,6 @@ export const initialTraderBadges: TraderBadge[] = [
     unit: "trades",
     rewardXP: 300,
   },
-<<<<<<< HEAD
-  {
-    id: "badge-3",
-    title: "Prop Firm Challenge Ready",
-    description: "Atteindre 10% de profit virtuel en backtest sans jamais dépasser 10% de Drawdown Max.",
-    iconName: "Zap",
-    category: "PROPFIRM",
-    unlocked: false,
-    progressPercentage: 0,
-    currentValue: 10,
-    targetValue: 10,
-    unit: "% profit",
-    rewardXP: 450,
-  },
-=======
   // `badge-3` (« Prop Firm Challenge Ready ») retiré : son critère portait sur
   // un profit « en backtest », module qui n'existe plus dans l'application —
   // il serait donc resté à 0 % indéfiniment, comme `badge-2` (Diplômé SMC) et
@@ -56,7 +41,6 @@ export const initialTraderBadges: TraderBadge[] = [
   // compte, tous deux déjà calculés par `computePerformanceStats`), mais cela
   // demanderait de passer le portefeuille à `computeBadgeProgress`, qui ne
   // reçoit aujourd'hui que les trades.
->>>>>>> origin/main
   {
     id: "badge-4",
     title: "Trader Discipliné (Zero FOMO)",
@@ -118,15 +102,11 @@ export const initialTraderBadges: TraderBadge[] = [
     category: "PERFORMANCE",
     unlocked: false,
     progressPercentage: 0,
-<<<<<<< HEAD
-    currentValue: 10.0,
-=======
     // 0 et non 10 : cette valeur du catalogue est recopiée en base par
     // `syncBadgeCatalog`, et `computeBadgeProgress` la remplace à l'affichage.
     // Laisser 10 ici affichait un badge déjà complet si le calcul venait à
     // manquer — exactement le genre de faux positif qu'on ne veut pas.
     currentValue: 0,
->>>>>>> origin/main
     targetValue: 10.0,
     unit: "R",
     rewardXP: 650,

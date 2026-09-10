@@ -1,8 +1,5 @@
 import { Trade, TraderBadge } from "../types";
-<<<<<<< HEAD
-=======
 import { tradeRealizedR } from "./performanceStats";
->>>>>>> origin/main
 
 /**
  * Calcule la progression EN DIRECT de chaque badge depuis les données réelles
@@ -40,12 +37,9 @@ export function computeBadgeProgress(badges: TraderBadge[], trades: Trade[]): Tr
  * voir `server/auth/routes.ts`) — jamais `badge-N` tel quel. On retrouve donc
  * le critère à appliquer par le SUFFIXE de l'id, pas par égalité stricte.
  */
-<<<<<<< HEAD
-=======
 /** Seuil de risque des badges « Maître du Risk 1% », en pourcentage du capital. */
 const MAX_RISK_PERCENT = 1;
 
->>>>>>> origin/main
 const KNOWN_BADGE_IDS = [
   "badge-1", "badge-3", "badge-4", "badge-5",
   "badge-6", "badge-7", "badge-8",
@@ -199,15 +193,6 @@ function computeSingleBadgeProgress(
       };
     }
 
-<<<<<<< HEAD
-    // badge-1, badge-21, badge-22, badge-23 (% de risque par trade — le tag
-    // "Sur-risque (>1%)" n'est qu'auto-déclaré, son absence ne prouve rien),
-    // badge-2 (Diplômé SMC Horizon, reposait sur le Module cours, retiré de
-    // l'app), badge-3 (module Replay, retiré de l'app — plus aucune source de
-    // données pour ce badge), badge-8 (cumul en "R"), badge-9 (score
-    // d'examen) : aucune donnée suivie aujourd'hui ne permet de les calculer
-    // honnêtement.
-=======
     // Maître du Risk 1% et ses paliers — trades CONSÉCUTIFS dont le risque
     // engagé est ≤ 1 %.
     //
@@ -263,7 +248,6 @@ function computeSingleBadgeProgress(
       };
     }
 
->>>>>>> origin/main
     default:
       return null;
   }
@@ -279,8 +263,6 @@ function computeSingleBadgeProgress(
  * C'est un choix assumé plutôt qu'une évidence — documenté ici pour ne pas
  * le redécouvrir en lisant seulement le code.
  */
-<<<<<<< HEAD
-=======
 /**
  * Nombre de trades CONSÉCUTIFS (en partant du plus récent) dont le risque
  * engagé est renseigné et inférieur ou égal à 1 % du capital.
@@ -326,7 +308,6 @@ export function computeRiskDisciplineStreak(trades: Trade[]): number {
   return serie;
 }
 
->>>>>>> origin/main
 export function computeDisciplineStreak(trades: Trade[]): number {
   if (trades.length === 0) return 0;
 
@@ -350,8 +331,6 @@ export function computeDisciplineStreak(trades: Trade[]): number {
 
   return streak;
 }
-<<<<<<< HEAD
-=======
 
 /**
  * Cumul des R réalisés du journal, et ce qui en a été écarté.
@@ -379,4 +358,3 @@ export function computeCumulativeR(trades: Trade[]): {
   }
   return { cumul, tradesMesures: mesures, tradesNonMesurables: nonMesurables };
 }
->>>>>>> origin/main

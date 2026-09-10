@@ -5,12 +5,8 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { api, apiErrorHandler } from "./server/routes";
-<<<<<<< HEAD
-import { initDb } from "./server/db";
-=======
 import { initDb, purgeOrphanScreenshots } from "./server/db";
 import { sauvegarderBase } from "./server/backup";
->>>>>>> origin/main
 import { startSessionCleanup } from "./server/auth/sessions";
 import { startSecurityEventCleanup } from "./server/auth/securityEvents";
 import { startLockoutCleanup } from "./server/auth/loginLockout";
@@ -113,8 +109,6 @@ async function startServer() {
   // le faisait better-sqlite3, il faut donc l'attendre explicitement ici.
   await initDb();
 
-<<<<<<< HEAD
-=======
   // Copie datée de la base, juste après l'ouverture et avant toute écriture —
   // `data/` étant exclu de git, c'est la seule sauvegarde qui ne dépende pas
   // d'un clic manuel sur « Exporter mes données ». Voir server/backup.ts.
@@ -126,7 +120,6 @@ async function startServer() {
     console.warn("[propdesk] Purge des captures orphelines impossible.", err)
   );
 
->>>>>>> origin/main
   // Hygiène : retire les sessions expirées au démarrage puis toutes les heures.
   startSessionCleanup();
   // Journal de sécurité : purge RGPD à 90 jours (IP = donnée personnelle).
@@ -171,10 +164,6 @@ async function startServer() {
     });
   }
 
-<<<<<<< HEAD
-  httpServer.listen(PORT, "0.0.0.0", () => {
-    console.log(`Serveur Académie Horizon démarré sur http://localhost:${PORT}`);
-=======
   /**
    * Interface d'écoute — `127.0.0.1` par défaut, c'est-à-dire cet ordinateur
    * et lui seul.
@@ -203,7 +192,6 @@ async function startServer() {
           "sans chiffrement. À n'utiliser que sur un réseau de confiance."
       );
     }
->>>>>>> origin/main
   });
 }
 

@@ -1,9 +1,6 @@
 import React, { useState } from "react";
 import { Bell, CheckCheck, Trash2, Zap, ArrowRight, ShieldAlert, Sparkles, Volume2, VolumeX, X, AlertCircle } from "lucide-react";
-<<<<<<< HEAD
-=======
 import { MAX_STUDENT_NOTIFICATIONS } from "../lib/planCompliance";
->>>>>>> origin/main
 import { AppNotification } from "../types";
 import { usePersistentState } from "../hooks/usePersistentState";
 
@@ -207,12 +204,6 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
           )}
         </div>
 
-<<<<<<< HEAD
-        {/* Footer info */}
-        <div className="p-3 bg-[#0D1110] border-t border-[#1B2320] text-[11px] text-slate-400 flex items-center justify-between">
-          <span>PropDesk Push Server: <strong className="text-[#00E676] font-mono">Connecté (Live)</strong></span>
-          <span className="font-mono text-[10px] text-slate-500">v2.4.0</span>
-=======
         {/* Pied de page. Annonçait « PropDesk Push Server: Connecté (Live) ·
             v2.4.0 » — il n'existe aucun serveur push, et ce numéro de version
             ne correspondait à rien. Remplacé par le seul fait vérifiable utile
@@ -224,7 +215,6 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({
             {notifications.length > 1 ? "s" : ""} · les plus anciennes sont retirées au-delà de{" "}
             <span className="font-mono text-slate-300">{MAX_STUDENT_NOTIFICATIONS}</span>
           </span>
->>>>>>> origin/main
         </div>
       </div>
     </div>

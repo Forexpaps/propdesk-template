@@ -5,14 +5,6 @@ Document de reprise, à lire avant de toucher au code. Écrit pour quelqu'un
 
 ## État au moment de l'écriture
 
-<<<<<<< HEAD
-- Branche : `main`, arbre de travail propre (`git status` clean).
-- Dernier commit : `5a02cea` — "Détaille les instructions de déploiement,
-  avec un guide pas à pas pour Railway".
-- `main` est à jour avec `origin/main` (rien à pousser).
-- Pas de tests automatisés dans le projet (`npm run lint` = `tsc --noEmit`
-  est la seule vérification statique disponible).
-=======
 - Branche : `main`.
 - `origin` pointe désormais vers un dépôt **privé** dédié à l'usage personnel
   (`journal-de-trading`), plus vers l'ancien dépôt public `propdesk-template`.
@@ -29,75 +21,11 @@ Document de reprise, à lire avant de toucher au code. Écrit pour quelqu'un
   testable en est extraite vers `src/lib/` — c'est la raison d'être de
   `tradeDraft.ts`, dont le contenu tenait auparavant en ligne dans
   `TradingJournal.tsx` et n'était donc couvert par rien.
->>>>>>> origin/main
 
 ## Qu'est-ce que PropDesk, aujourd'hui
 
 PropDesk est un tableau de bord de trading **personnel et mono-utilisateur** :
 journal d'exécution, portefeuille (comptes de trading), analyse de
-<<<<<<< HEAD
-rentabilité, calendrier macro, gestion de setups, plan de trading et suivi de
-mindset. Chaque déploiement n'héberge **qu'un seul compte**, créé une fois
-pour toutes à l'installation, avec ses propres données isolées. Il n'y a
-aucune notion de rôles, d'équipe, d'élèves ou de coachs — le compte connecté a
-systématiquement tous les droits sur ses propres données, et c'est le seul
-compte de l'instance. Aucune IA n'est utilisée nulle part dans l'application.
-
-Stack : React 19 + TypeScript + Vite côté client, Express côté serveur, un
-seul process Node sert l'API et l'app (pas de proxy à configurer). Le module
-`server/db.ts` abstrait trois moteurs de base de données possibles (détaillé
-plus bas).
-
-Licence : **usage personnel non commercial** (`LICENSE`, "Licence d'usage
-personnel non commercial", © Thomas Gauthey). N'importe qui peut cloner,
-déployer et modifier le code gratuitement pour son propre usage personnel
-(sa propre plateforme de trading, sur son propre hébergeur). Est en revanche
-interdit sans autorisation écrite : vendre le code ou l'accès à une instance
-qui en découle, l'utiliser comme base pour commercialiser un produit en le
-présentant comme sa propre création, retirer les mentions de copyright, ou
-s'en servir comme contexte fourni à un outil d'IA dans un but qui
-contreviendrait à ces interdictions.
-
-Authentification : **mot de passe seul, aucune adresse e-mail**. À la
-première visite, l'app détecte qu'aucun compte n'existe et affiche un écran
-d'installation où l'on choisit uniquement un mot de passe (10 caractères
-minimum). Il n'y a ni nom, ni email, ni photo à ce stade — le profil part
-vide et se complète plus tard depuis Profil & Options si on le souhaite.
-
-## Pièges et points d'attention avant de coder
-
-- **Pas de hot-reload sur le code serveur.** `npm run dev` lance `tsx
-  server.ts`, qui monte Vite en middleware pour le HMR du client — mais toute
-  modification de `server.ts` ou de `server/**` exige un redémarrage manuel
-  du process `tsx`. Le HMR client, lui, fonctionne normalement.
-
-- **`server/db.ts` choisit le moteur de base selon les variables
-  d'environnement présentes, silencieusement.** Ordre de priorité strict :
-  1. `POSTGRES_URL` défini → Postgres (`pg`), n'importe quel fournisseur.
-  2. Sinon, `TURSO_DATABASE_URL` défini → SQLite distant via Turso/libSQL
-     (`TURSO_AUTH_TOKEN` pour l'auth).
-  3. Sinon → fichier SQLite local, `DATA_DIR/horizon.db` (`DATA_DIR` par
-     défaut `./data`), via libSQL en mode `file:`.
-  Se tromper de variable (ou en laisser traîner une d'un ancien
-  environnement) change silencieusement la base utilisée — aucune erreur ne
-  le signale. `POSTGRES_URL` a toujours priorité sur Turso si les deux sont
-  présentes.
-
-- **`AuthStatus["server-error"]` est distinct de `"offline"`, et la
-  distinction est délibérée** (`src/hooks/useAuth.ts`). Si `/api/auth/me`
-  échoue en réseau, l'app ne bascule sur le cache `localStorage` (`offline`,
-  filet anti-perte de données) que si ce navigateur porte déjà une preuve
-  d'authentification antérieure (`localStorage["horizon_student"]` présent).
-  Un navigateur qui n'a **jamais** authentifié sur l'instance et qui tombe
-  sur un serveur injoignable voit un écran d'erreur explicite
-  (`ServerErrorScreen`, dans `src/App.tsx`), jamais l'application. Cela évite
-  qu'un serveur mal configuré (ex. base qui échoue à s'initialiser sur un
-  hébergement au disque non persistant) ne présente une fausse app
-  "connectée" à n'importe quel visiteur n'ayant jamais créé de compte. Ne pas
-  fusionner ces deux états en corrigeant/refactorant `useAuth.ts` sans
-  comprendre pourquoi ils existent séparément.
-
-=======
 rentabilité, calendrier macro, gestion de setups et plan de trading. Un seul
 compte, créé une fois pour toutes à l'installation, avec ses propres données
 isolées. Il n'y a aucune notion de rôles, d'équipe, d'élèves ou de coachs — le
@@ -144,7 +72,6 @@ vide et se complète plus tard depuis Profil & Options si on le souhaite.
   fusionner ces deux états en corrigeant/refactorant `useAuth.ts` sans
   comprendre pourquoi ils existent séparément.
 
->>>>>>> origin/main
 - **`NODE_ENV` gouverne silencieusement `trust proxy`, la CSP, HSTS et le
   flag `secure` des cookies de session** (voir les commentaires en tête de
   `server.ts`). Il n'y a pas de garde-fou strict (un `throw` casserait le
@@ -174,19 +101,12 @@ vide et se complète plus tard depuis Profil & Options si on le souhaite.
 ```
 server.ts                 point d'entrée unique : Express + Vite (dev) ou dist/ statique (prod)
 server/
-<<<<<<< HEAD
-  db.ts                    connexion base (fichier local libSQL / Postgres / Turso), schéma SQL, migrations
-=======
   db.ts                    connexion base (fichier local libSQL), schéma SQL, migrations
->>>>>>> origin/main
   repositories.ts          seul module qui exécute des requêtes SQL — accès aux données
   routes.ts                routes /api/* (état applicatif, collections, profil)
   schemas.ts               validation zod de toutes les entrées API
   seed.ts                  amorçage d'une base vide + import d'un état complet (reprise localStorage)
-<<<<<<< HEAD
-=======
   backup.ts                copie automatique du fichier de base au démarrage (20 conservées, 6 h d'intervalle mini)
->>>>>>> origin/main
   economicCalendar.ts      données du calendrier macro
   marketData.ts            données de marché (widget carte des marchés)
   middleware/rateLimit.ts  limitation de débit par IP
@@ -213,17 +133,6 @@ src/
     useNotificationSound.ts  son de notification
   lib/
     api.ts                   client typé de l'API
-<<<<<<< HEAD
-    badges.ts                calcul de progression des badges
-    pendingChanges.ts        suivi des modifications non encore envoyées au serveur (mode hors ligne)
-    planCompliance.ts        vérification du respect du plan de trading
-    walletAlerts.ts / walletStats.ts   alertes et calculs sur les comptes de trading
-    performanceStats.ts      calculs de rentabilité
-    weeklySummary.ts         synthèse hebdomadaire
-    format.ts / image.ts / confirmDialog.tsx   utilitaires divers
-  components/
-    Sidebar.tsx, TopHeader.tsx, MainDashboard.tsx        navigation et tableau de bord principal
-=======
     badges.ts                calcul de progression des badges, séries de discipline, cumul en R
     journalFilters.ts        tri des colonnes et fenêtres de période du Journal (logique pure)
     pendingChanges.ts        suivi des modifications non encore envoyées au serveur (mode hors ligne)
@@ -241,17 +150,12 @@ src/
     Sidebar.tsx, TopHeader.tsx, MainDashboard.tsx        navigation et tableau de bord principal
     PeriodComparisonCard.tsx                              « est-ce que je progresse ? » (semaine / mois)
     WeeklyReviewBanner.tsx, WeeklyReviewModal.tsx         rituel de revue hebdomadaire
->>>>>>> origin/main
     TradingJournal.tsx                                    journal d'exécution (chargé à la demande)
     PerformanceDashboard.tsx, EquityCurveChart.tsx        analyse de rentabilité (chargés à la demande)
     WalletManagement.tsx                                  portefeuille / comptes (chargé à la demande)
     SetupManagement.tsx                                   gestion des setups (chargé à la demande)
     MacroDashboard.tsx, MarketMapWidget.tsx, TradingSessionsWidget.tsx   calendrier macro et marché
-<<<<<<< HEAD
-    MindsetJournalModal.tsx, TradingPlanEditorModal.tsx   mindset et plan de trading
-=======
     TradingPlanEditorModal.tsx                            plan de trading
->>>>>>> origin/main
     PositionCalculatorModal.tsx, UserProfileModal.tsx, NotificationModal.tsx, ChangeOwnPasswordModal.tsx, TwoFactorSetupModal.tsx
     PendingChangesBanner.tsx, SyncErrorBanner.tsx          bannières d'état de synchronisation
     Select.tsx                                             utilitaire d'UI
@@ -305,13 +209,10 @@ est importé automatiquement ; à défaut, la base est amorcée avec
 | POST | `/api/state/seed` | amorce avec le jeu de démonstration |
 | POST | `/api/state/import` | reprend un état venu de `localStorage` (premier amorçage uniquement) |
 | POST | `/api/state/restore` | restaure une sauvegarde JSON exportée (à tout moment, hors premier amorçage) |
-<<<<<<< HEAD
-=======
 | POST | `/api/screenshots` | envoie une capture d'écran de trade (id généré) |
 | GET | `/api/screenshots/:id` | sert une capture (filtrée par `user_id`, cache immuable) |
 | GET | `/api/backup/screenshots` | toutes les captures — export de sauvegarde uniquement |
 | POST | `/api/backup/screenshots` | réinsère un lot de captures en conservant leur identifiant |
->>>>>>> origin/main
 
 Toutes les routes exigent une session valide, sauf `/api/health`,
 `/api/economic-calendar`, `/api/market-data`, `/api/auth/me`,
@@ -322,8 +223,6 @@ quart d'heure, `/api/auth/setup` 5 par quart d'heure.
 
 ## Décisions de fond à connaître
 
-<<<<<<< HEAD
-=======
 - **Rien de ce qui se recalcule n'est stocké.** Le verdict d'un objectif
   hebdomadaire (`src/lib/weeklyReview.ts`), les violations de plan agrégées
   (`computePlanComplianceSummary`) et les comparaisons de périodes
@@ -346,7 +245,6 @@ quart d'heure, `/api/auth/setup` 5 par quart d'heure.
   comme un verdict (ratios de sortie, win rate par setup, comparaison de
   périodes), en dessous de 5 trades la valeur reste AFFICHÉE mais en gris —
   c'est le verdict qu'on suspend, pas la donnée.
->>>>>>> origin/main
 - **Mono-utilisateur.** Le produit s'appelait auparavant "Académie de
   Trading" : coachs, élèves, cours vidéo, forum, messagerie, badges liés à la
   progression dans des modules. Toute cette couche a été retirée sur demande
@@ -361,45 +259,6 @@ quart d'heure, `/api/auth/setup` 5 par quart d'heure.
   récupération de mot de passe par email, la seule voie de secours est de
   supprimer directement les identifiants en base (voir README, "Mot de passe
   oublié").
-<<<<<<< HEAD
-- **Abstraction multi-moteurs de base (`server/db.ts`).** Ajoutée pour
-  permettre le déploiement sur des hébergeurs à disque éphémère
-  (fonctions serverless type Vercel), qui ne peuvent pas garder un fichier
-  SQLite local entre les invocations. Le reste du serveur ne parle jamais
-  qu'à `repositories.ts`, qui ne parle jamais qu'à l'interface commune
-  `execute`/`transaction` de `db.ts` — ajouter un nouveau fournisseur de base
-  ne touche que ce fichier.
-- **Licence "usage personnel, pas de revente".** Le code est partagé
-  librement pour que d'autres traders indépendants puissent s'en servir comme
-  outil personnel, mais pas pour qu'il devienne la base d'un produit
-  commercial concurrent revendu par quelqu'un d'autre.
-
-## Déploiement
-
-Résumé du README (`README.md`, section "Déployer pour un usage personnel") :
-
-- L'application tourne sur n'importe quel hébergeur Node.js
-  (`npm run build && npm start`).
-- **Hébergeur à disque persistant** (Railway, Render, Fly.io, VPS, Docker
-  avec volume monté...) : rien à configurer, la base SQLite embarquée
-  fonctionne directement. Railway en particulier a un disque persistant par
-  défaut sur ses services ; une base Postgres managée en un clic reste
-  possible en pointant `POSTGRES_URL` vers la même valeur que le
-  `DATABASE_URL` que Railway fournit.
-- **Hébergeur serverless** (Vercel, Netlify, AWS Lambda...) : il faut une
-  base accessible en réseau, via `POSTGRES_URL` (Postgres, n'importe quel
-  fournisseur — natif de l'hébergeur ou service tiers comme Neon) ou
-  `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` (Turso). Sans l'une des deux,
-  l'app bascule sur un fichier SQLite local inutilisable sur ce type
-  d'hébergeur, d'où l'écran "Serveur injoignable" en cas de déploiement mal
-  configuré.
-
-Variables d'environnement principales : `PORT` (défaut 3000), `DATA_DIR`
-(défaut `./data`, ignoré si `POSTGRES_URL`/`TURSO_DATABASE_URL` défini),
-`POSTGRES_URL`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `NODE_ENV`. Voir
-`.env.example` pour la liste complète et `README.md` pour le détail
-pas-à-pas (dont un guide Railway).
-=======
 - **Base de données à moteur unique (SQLite local).** Le support Postgres et
   Turso a été retiré de `server/db.ts` (et la dépendance `pg` du
   `package.json`) : l'application ne tourne plus qu'en local, sur cet
@@ -563,7 +422,6 @@ sans l'être dans `COLLECTION_BY_KEY` (le trou qui a coûté deux pertes de
 données), et `donneesAberrantes.test.ts` fige la résistance aux données que
 l'application n'a pas produite elle-même. Les composants React ne sont pas
 testés : quand une logique mérite un test, on l'extrait vers `src/lib/`.
->>>>>>> origin/main
 
 ## Limites connues (voir README, "Limites connues")
 
@@ -576,12 +434,6 @@ testés : quand une logique mérite un test, on l'extrait vers `src/lib/`.
 - Un seul compte par instance ; la connexion se fait par mot de passe seul.
   Le schéma est prêt pour du multi-comptes (chaque ligne a un `user_id`) mais
   le cloisonnement des données par utilisateur n'est pas implémenté.
-<<<<<<< HEAD
-- Les modifications faites hors ligne ne sont pas rejouées à la
-  reconnexion : elles restent dans le cache local, mais le rechargement
-  suivant reprend l'état du serveur.
-- Aucun test automatisé : le projet n'a pas de runner de tests.
-=======
 - Une modification faite hors ligne n'est jamais rejouée toute seule. Elle est
   retenue dans un registre local (`src/lib/pendingChanges.ts`) et
   `PendingChangesBanner` la propose explicitement à la reconnexion :
@@ -594,7 +446,6 @@ testés : quand une logique mérite un test, on l'extrait vers `src/lib/`.
   emporte.
 - Le R des badges de performance est géométrique : il ignore frais, spread et
   swap, et un trade sans prix de sortie n'entre pas dans le cumul.
->>>>>>> origin/main
 
 ## Ce qui n'existe plus (pour éviter de le réintroduire par réflexe)
 
@@ -603,11 +454,6 @@ staff, modules cours et vidéos (leçons, upload vidéo, programme), Annonces,
 Messagerie coach, Forum, module "Signaux & Analyses", écran de consultation
 du journal de sécurité (le journal côté serveur existe toujours, juste sans
 UI pour le consulter), Mentions légales/CGU et le footer qui les affichait,
-<<<<<<< HEAD
-connexion par email, `better-sqlite3`, hypothèse d'un déploiement Railway
-exclusif, catalogue de badges liés à la progression dans des cours, notions
-`isOwner`/permissions par coach/`enrolledStudents`.
-=======
 connexion par email, export PDF du rapport de performance (un commentaire de
 `WalletManagement.tsx` y fait encore référence, il est périmé),
 `better-sqlite3`, hypothèse d'un déploiement Railway
@@ -617,4 +463,3 @@ exclusif, catalogue de badges liés à la progression dans des cours, notions
 dans `server/db.ts` (et la dépendance `pg`), fichier `LICENSE` et
 `REGISTRE_TRAITEMENTS.md` (registre RGPD pour une activité de coaching
 multi-utilisateurs, sans objet pour un usage personnel).
->>>>>>> origin/main

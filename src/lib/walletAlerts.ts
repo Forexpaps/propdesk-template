@@ -1,12 +1,9 @@
 import { AppNotification, Trade, TradingAccount } from "../types";
 import { dailyLossPercent, daysSinceLastTrade, todayLocalISODate, totalDrawdownPercent } from "./walletStats";
-<<<<<<< HEAD
-=======
 // Un seul plafond de rétention pour tout le centre d'alertes, quelle que soit
 // l'origine de l'alerte — sinon la moitié des notifications serait bornée et
 // l'autre non, ce qui est exactement ce qui se passait ici.
 import { MAX_STUDENT_NOTIFICATIONS } from "./planCompliance";
->>>>>>> origin/main
 
 /**
  * Paliers de risque d'un portefeuille — mêmes seuils que le code couleur du
@@ -127,15 +124,9 @@ function buildDrawdownNotification(
 }
 
 /**
-<<<<<<< HEAD
- * Plafond de sécurité, même principe que `MAX_STUDENT_NOTIFICATIONS` dans
- * `planCompliance.ts` — improbable à atteindre ici (quelques paliers par
- * compte actif), mais évite toute croissance non bornée.
-=======
  * Plafond du nombre d'alertes AJOUTÉES en une seule passe. Ne borne que le
  * lot courant, pas la collection : voir le `slice` en fin de
  * `upsertWalletRiskAlerts` pour la rétention réelle.
->>>>>>> origin/main
  */
 const MAX_WALLET_ALERTS_APPENDED_PER_PASS = 50;
 
@@ -198,9 +189,6 @@ export function upsertWalletRiskAlerts(
   }
 
   if (toAppend.length === 0) return notifications;
-<<<<<<< HEAD
-  return [...toAppend, ...notifications];
-=======
   // Plafonné comme les alertes de plan (`upsertPlanAlert`). Le commentaire de
   // `MAX_WALLET_ALERTS_APPENDED_PER_PASS` affirmait que la croissance était
   // bornée « à quelques paliers par compte actif » — c'était faux : l'id du
@@ -210,5 +198,4 @@ export function upsertWalletRiskAlerts(
   // d'entrées que rien ne purgeait, et qui repartaient dans chaque
   // synchronisation.
   return [...toAppend, ...notifications].slice(0, MAX_STUDENT_NOTIFICATIONS);
->>>>>>> origin/main
 }

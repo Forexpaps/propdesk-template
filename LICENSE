@@ -1,9 +1,5 @@
 Licence d'usage personnel non commercial
-<<<<<<< HEAD
-Copyright © 2026 Thomas Gauthey. Tous droits non expressément accordés
-=======
 Copyright © 2026 Forexpaps. Tous droits non expressément accordés
->>>>>>> origin/main
 ci-dessous sont réservés.
 
 Cette licence régit l'utilisation du code source, de la structure et de la
@@ -25,11 +21,7 @@ tel que défini à la section 2.
 
 ## 2. Ce qui est strictement interdit
 
-<<<<<<< HEAD
-Sans autorisation écrite préalable et explicite de Thomas Gauthey, il est
-=======
 Sans autorisation écrite préalable et explicite de Forexpaps, il est
->>>>>>> origin/main
 interdit de :
 
   a. **Vendre** le Logiciel, en tout ou partie, sous quelque forme que ce
@@ -41,13 +33,8 @@ interdit de :
      commercialiser ou promouvoir** un produit, un service ou un
      « écosystème », en le présentant — explicitement ou implicitement —
      comme sa propre création originale ;
-<<<<<<< HEAD
-  d. Retirer, masquer ou altérer les mentions de copyright de Thomas
-     Gauthey présentes dans le Logiciel ou sa documentation ;
-=======
   d. Retirer, masquer ou altérer les mentions de copyright de Forexpaps
      présentes dans le Logiciel ou sa documentation ;
->>>>>>> origin/main
   e. Redistribuer le Logiciel (modifié ou non) à des tiers dans un cadre
      commercial, ou en vue de leur permettre d'en tirer un usage commercial ;
   f. Utiliser le Logiciel, en tout ou partie, comme entrée ou contexte
@@ -59,22 +46,14 @@ interdit de :
 ## 3. Attribution
 
 Toute instance déployée ou copie modifiée du Logiciel doit conserver la
-<<<<<<< HEAD
-mention de son auteur original (Thomas Gauthey) dans le code ou sa
-=======
 mention de son auteur original (Forexpaps) dans le code ou sa
->>>>>>> origin/main
 documentation. Se présenter comme l'auteur ou le créateur original du
 Logiciel constitue une violation de cette licence.
 
 ## 4. Absence de garantie
 
 Le Logiciel est fourni « tel quel », sans garantie d'aucune sorte, expresse
-<<<<<<< HEAD
-ou implicite. Thomas Gauthey ne pourra être tenu responsable d'aucun
-=======
 ou implicite. Forexpaps ne pourra être tenu responsable d'aucun
->>>>>>> origin/main
 dommage résultant de l'utilisation du Logiciel.
 
 ## 5. Résiliation
@@ -88,10 +67,5 @@ une contrefaçon exposant son auteur à des poursuites.
 ## 6. Contact
 
 Toute demande d'autorisation pour un usage non couvert par la section 1
-<<<<<<< HEAD
-(notamment tout usage commercial) doit être adressée directement à Thomas
-Gauthey.
-=======
 (notamment tout usage commercial) doit être adressée directement à
 Forexpaps.
->>>>>>> origin/main

@@ -17,11 +17,7 @@ export type TradeMistake =
   | "Revenge trading"
   | "FOMO / Chasing"
   | "Pas de plan de trade"
-<<<<<<< HEAD
-  | "Sur-trading";
-=======
   | "Over-trading";
->>>>>>> origin/main
 /**
  * Unité du champ `Trade.pnl`. Choisie librement par qui saisit le trade,
  * jamais déduite ni convertie — voir le commentaire de `Trade.pnl`.
@@ -329,8 +325,6 @@ export interface AppNotification {
 }
 
 // (Module Forum retiré — voir HANDOFF.md pour l'historique.)
-<<<<<<< HEAD
-=======
 
 // ---------------------------------------------------------------------------
 // Revue hebdomadaire
@@ -391,4 +385,3 @@ export interface WeeklyReview {
   createdAt: string;
   updatedAt: string;
 }
->>>>>>> origin/main

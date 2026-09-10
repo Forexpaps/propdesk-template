@@ -1,9 +1,5 @@
 import { AppNotification, Trade, TradingPlan, TradingPlanData } from "../types";
-<<<<<<< HEAD
-import { FOREX_SESSIONS, isSessionActive } from "../components/TopHeader";
-=======
 import { FOREX_SESSIONS, isSessionActive } from "./sessions";
->>>>>>> origin/main
 import { isRealizedDollarTrade } from "./performanceStats";
 
 /** Exportée pour `src/lib/pendingChanges.ts`, qui doit reconnaître une clé de plan namespacée par email sans connaître ce préfixe en dur. */
@@ -65,14 +61,8 @@ export function createEmptyPlan(name = "Nouveau plan"): TradingPlan {
 export const EMPTY_TRADING_PLANS: TradingPlanData = [];
 
 /**
-<<<<<<< HEAD
- * Même motif que `MindsetJournalModal.tsx` (`storageKey` prop) : côté
- * élève, namespacé par email pour qu'un poste partagé ne compare jamais les
- * trades d'un élève au plan d'un autre. Côté staff, clé partagée (bureau
-=======
  * Namespacé par email côté élève pour qu'un poste partagé ne compare jamais
  * les trades d'un élève au plan d'un autre. Côté staff, clé partagée (bureau
->>>>>>> origin/main
  * commun), comme avant.
  */
 export function getTradingPlanStorageKey(storageKey?: string): string {
@@ -164,9 +154,6 @@ function matchesAny(haystack: string, needle: string): boolean {
 }
 
 /**
-<<<<<<< HEAD
- * Raisons de non-respect du plan pour CE trade, ou `[]` s'il est conforme.
-=======
  * Identifiant STABLE d'une règle du plan. Le message, lui, contient les
  * valeurs du trade (« actif hors plan (EURUSD) ») et ne peut donc pas servir
  * de clé d'agrégation : sans ce code, compter « combien de fois ai-je pris un
@@ -203,7 +190,6 @@ export const PLAN_RULE_LABELS: Record<PlanRuleCode, string> = {
 
 /**
  * Violations du plan pour CE trade, ou `[]` s'il est conforme.
->>>>>>> origin/main
  * Chaque règle ne s'applique que si le champ correspondant du plan est
  * renseigné — un plan incomplet n'impose aucune contrainte sur ses champs
  * vides.
@@ -211,32 +197,18 @@ export const PLAN_RULE_LABELS: Record<PlanRuleCode, string> = {
  * `sameDayTrades` doit inclure ce trade lui-même (même date, l'appelant est
  * responsable du filtrage — voir les deux `handleAddTrade`/`handleUpdateTrade`
  * dans `App.tsx`).
-<<<<<<< HEAD
-=======
  *
  * Les `message` sont restés IDENTIQUES au caractère près lors du passage du
  * texte libre à `PlanViolation` : les notifications déjà persistées ne
  * stockent que la phrase rendue, et un changement de formulation aurait fait
  * réapparaître comme « nouvelles » des alertes que l'utilisateur avait déjà
  * lues.
->>>>>>> origin/main
  */
 export function checkPlanViolations(
   trade: Trade,
   sameDayTrades: Trade[],
   plan: TradingPlan,
   startingCapital: number
-<<<<<<< HEAD
-): string[] {
-  const reasons: string[] = [];
-
-  if (plan.trackedAssets.trim() && !matchesAny(plan.trackedAssets, trade.pair)) {
-    reasons.push(`actif hors plan (${trade.pair})`);
-  }
-
-  if (plan.authorizedSetups.trim() && trade.strategy.trim() && !matchesAny(plan.authorizedSetups, trade.strategy)) {
-    reasons.push(`setup non autorisé (${trade.strategy})`);
-=======
 ): PlanViolation[] {
   const reasons: PlanViolation[] = [];
 
@@ -246,7 +218,6 @@ export function checkPlanViolations(
 
   if (plan.authorizedSetups.trim() && trade.strategy.trim() && !matchesAny(plan.authorizedSetups, trade.strategy)) {
     reasons.push({ code: "setup_non_autorise", message: `setup non autorisé (${trade.strategy})` });
->>>>>>> origin/main
   }
 
   if (plan.authorizedSessions.length > 0 && trade.time) {
@@ -259,11 +230,7 @@ export function checkPlanViolations(
       );
       const withinPlan = activeSessions.some((s) => authorizedForexSessions.includes(s));
       if (!withinPlan) {
-<<<<<<< HEAD
-        reasons.push("session non autorisée");
-=======
         reasons.push({ code: "session_non_autorisee", message: "session non autorisée" });
->>>>>>> origin/main
       }
     }
   }
@@ -271,14 +238,10 @@ export function checkPlanViolations(
   const maxTradesPerDay = Number(plan.maxTradesPerDay);
   if (plan.maxTradesPerDay.trim() && Number.isFinite(maxTradesPerDay) && maxTradesPerDay > 0) {
     if (sameDayTrades.length > maxTradesPerDay) {
-<<<<<<< HEAD
-      reasons.push(`limite de ${maxTradesPerDay} trade${maxTradesPerDay > 1 ? "s" : ""}/jour dépassée`);
-=======
       reasons.push({
         code: "max_trades_par_jour",
         message: `limite de ${maxTradesPerDay} trade${maxTradesPerDay > 1 ? "s" : ""}/jour dépassée`,
       });
->>>>>>> origin/main
     }
   }
 
@@ -289,25 +252,14 @@ export function checkPlanViolations(
       .reduce((acc, t) => acc + t.pnl, 0);
     const dailyLossPercent = (Math.abs(dailyLoss) / startingCapital) * 100;
     if (dailyLossPercent > maxDailyLossPercent) {
-<<<<<<< HEAD
-      reasons.push(`perte quotidienne max dépassée (${dailyLossPercent.toFixed(1)}%)`);
-=======
       reasons.push({
         code: "perte_quotidienne_max",
         message: `perte quotidienne max dépassée (${dailyLossPercent.toFixed(1)}%)`,
       });
->>>>>>> origin/main
     }
   }
 
   if (trade.mistakes?.includes("Pas de plan de trade")) {
-<<<<<<< HEAD
-    reasons.push("trade auto-déclaré sans plan");
-  }
-
-  if (plan.riskPerTradePercent.trim() && trade.mistakes?.includes("Sur-risque (>1%)")) {
-    reasons.push("risque auto-déclaré au-delà du plan");
-=======
     reasons.push({ code: "sans_plan_de_trade", message: "trade auto-déclaré sans plan" });
   }
 
@@ -343,7 +295,6 @@ export function checkPlanViolations(
       code: "sur_risque_mesure",
       message: `risque engagé ${trade.riskPercent}% au-delà du plan (${risqueMax}%)`,
     });
->>>>>>> origin/main
   }
 
   return reasons;
@@ -359,19 +310,11 @@ export function planAlertId(tradeId: string): string {
  * non vide (l'appelant retire déjà la notification quand ça ne l'est pas —
  * voir `upsertPlanAlert`).
  */
-<<<<<<< HEAD
-export function buildPlanAlertNotification(trade: Trade, reasons: string[]): AppNotification {
-  return {
-    id: planAlertId(trade.id),
-    title: "⚠️ Non-respect du plan de trading",
-    message: `${trade.pair} (${trade.date}) : ${reasons.join(" ; ")}.`,
-=======
 export function buildPlanAlertNotification(trade: Trade, reasons: PlanViolation[]): AppNotification {
   return {
     id: planAlertId(trade.id),
     title: "⚠️ Non-respect du plan de trading",
     message: `${trade.pair} (${trade.date}) : ${reasons.map((r) => r.message).join(" ; ")}.`,
->>>>>>> origin/main
     time: "À l'instant",
     type: "risk",
     read: false,
@@ -386,14 +329,10 @@ export function buildPlanAlertNotification(trade: Trade, reasons: PlanViolation[
  * Les entrées excédentaires (les plus anciennes, en fin de liste — les plus
  * récentes sont toujours insérées en tête) sont abandonnées silencieusement.
  */
-<<<<<<< HEAD
-const MAX_STUDENT_NOTIFICATIONS = 300;
-=======
 /** Plafond de rétention du centre d'alertes — au-delà, les plus anciennes sont retirées.
  *  Exporté pour être ANNONCÉ à l'écran : une notification qui disparaît sans explication
  *  ressemble à un bug. */
 export const MAX_STUDENT_NOTIFICATIONS = 300;
->>>>>>> origin/main
 
 /**
  * Upsert idempotent : ajoute/remplace la notification déterministe de ce
@@ -403,18 +342,12 @@ export const MAX_STUDENT_NOTIFICATIONS = 300;
 export function upsertPlanAlert(
   notifications: AppNotification[],
   trade: Trade,
-<<<<<<< HEAD
-  reasons: string[]
-=======
   reasons: PlanViolation[]
->>>>>>> origin/main
 ): AppNotification[] {
   const withoutExisting = notifications.filter((n) => n.id !== planAlertId(trade.id));
   if (reasons.length === 0) return withoutExisting;
   return [buildPlanAlertNotification(trade, reasons), ...withoutExisting].slice(0, MAX_STUDENT_NOTIFICATIONS);
 }
-<<<<<<< HEAD
-=======
 
 // ---------------------------------------------------------------------------
 // Agrégation : ce que coûtent les entorses au plan
@@ -555,4 +488,3 @@ export function computePlanComplianceSummary(
     violationsParTrade,
   };
 }
->>>>>>> origin/main

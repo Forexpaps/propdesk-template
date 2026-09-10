@@ -2,10 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Plus,
   Search,
-<<<<<<< HEAD
-  Filter,
-=======
->>>>>>> origin/main
   ArrowUpRight,
   ArrowDownRight,
   ArrowUp,
@@ -37,11 +33,6 @@ import {
   TradingPlan,
   TradeScreenshot,
 } from "../types";
-<<<<<<< HEAD
-import { formatCurrency, parsePriceInput } from "../lib/format";
-import { resizeChartScreenshot } from "../lib/image";
-import { computeJournalSummary } from "../lib/performanceStats";
-=======
 import { formatCurrency, formatDuration, parsePriceInput } from "../lib/format";
 import { resizeChartScreenshot } from "../lib/image";
 import { computeJournalSummary, tradeDurationMinutes } from "../lib/performanceStats";
@@ -49,7 +40,6 @@ import { alertDialog, confirmDialog } from "../lib/confirmDialog";
 import { appliquerDraft } from "../lib/tradeDraft";
 import { periodStart, sortTrades, PeriodPreset, SortKey, SortState } from "../lib/journalFilters";
 import { api } from "../lib/api";
->>>>>>> origin/main
 import { Select } from "./Select";
 
 /** Valeur du sélecteur de compte quand aucun n'est choisi. */
@@ -119,8 +109,6 @@ function isDefaultScreenshotLabel(label: string): boolean {
 }
 
 /**
-<<<<<<< HEAD
-=======
  * Valeurs de départ d'une création — recalculées à chaque ouverture (la date du
  * jour et les ids d'emplacements de capture en dépendent), d'où une fonction et
  * non une constante.
@@ -172,7 +160,6 @@ function formulaireVierge() {
 }
 
 /**
->>>>>>> origin/main
  * Parseur CSV minimal, miroir exact de `csvCell` côté export : guillemets
  * doublés pour échapper un guillemet interne, cellules entre guillemets
  * pouvant contenir des virgules ou des sauts de ligne. Volontairement
@@ -247,8 +234,6 @@ const CSV_IMPORT_COLUMNS = [
   "Notes",
 ] as const;
 
-<<<<<<< HEAD
-=======
 /**
  * Colonnes reconnues à l'import mais NON exigées : un fichier produit par une
  * version antérieure de l'export (ou saisi à la main dans un tableur) n'en a
@@ -256,7 +241,6 @@ const CSV_IMPORT_COLUMNS = [
  */
 const CSV_OPTIONAL_COLUMNS = ["ID", "Plan", "Risque %"] as const;
 
->>>>>>> origin/main
 const CSV_MARKET_CATEGORIES: readonly MarketCategory[] = ["Forex", "Crypto", "Indices", "Matières Premières"];
 const CSV_DIRECTIONS: readonly TradeDirection[] = ["LONG", "SHORT"];
 const CSV_RESULTS: readonly TradeResult[] = ["WIN", "LOSS", "BREAKEVEN", "OPEN"];
@@ -269,8 +253,6 @@ function normalizeHeader(h: string): string {
 }
 
 /**
-<<<<<<< HEAD
-=======
  * Lit une cellule numérique d'un CSV : le nombre, ou `null` si la cellule ne
  * représente pas un nombre. Cellule vide = 0, comme `parsePriceInput`.
  *
@@ -287,7 +269,6 @@ function nombreCsv(raw: string): number | null {
 }
 
 /**
->>>>>>> origin/main
  * Captures réellement présentes d'un trade, pour l'affichage en lecture
  * seule (aperçu complet) — contrairement à `toScreenshotSlots`, ne force PAS
  * les 3 emplacements par défaut : un emplacement jamais rempli ne doit rien
@@ -310,11 +291,7 @@ const MISTAKE_OPTIONS: TradeMistake[] = [
   "Revenge trading",
   "FOMO / Chasing",
   "Pas de plan de trade",
-<<<<<<< HEAD
-  "Sur-trading",
-=======
   "Over-trading",
->>>>>>> origin/main
 ];
 
 /**
@@ -390,8 +367,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   const [selectedResult, setSelectedResult] = useState<string>("Tous");
   const [selectedEmotion, setSelectedEmotion] = useState<string>("Tous");
   const [selectedAccount, setSelectedAccount] = useState<string>(TOUS_COMPTES);
-<<<<<<< HEAD
-=======
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodPreset>("all");
 
   /**
@@ -401,7 +376,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
    * que ce soit l'état par défaut et non un tri sur `date`.
    */
   const [sort, setSort] = useState<SortState | null>(null);
->>>>>>> origin/main
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   /**
@@ -461,10 +435,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       "Take Profit",
       "Prix Sortie",
       "Taille Lot",
-<<<<<<< HEAD
-=======
       "Risque %",
->>>>>>> origin/main
       "PnL",
       "Unite PnL",
       "Ratio RR",
@@ -496,13 +467,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       t.riskRewardRatio,
       t.result,
       csvCell(t.strategy),
-<<<<<<< HEAD
-=======
       // Le plan est exporté par son NOM et non son id : un id ne veut rien dire
       // dans un tableur, et c'est le nom que l'import retrouve (même logique
       // que la colonne Compte juste au-dessus).
       csvCell(nomDuPlan(t.tradingPlanId) ?? "Hors plan"),
->>>>>>> origin/main
       t.emotion,
       csvCell((t.mistakes || []).join("; ")),
       csvCell(t.notes || "")
@@ -533,217 +501,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   };
 
   const importFileInputRef = useRef<HTMLInputElement>(null);
-<<<<<<< HEAD
-
-  /**
-   * Importe des trades depuis un CSV — miroir de `exportToCSV`, colonnes
-   * retrouvées PAR NOM (`CSV_IMPORT_COLUMNS`), pas par position, pour
-   * tolérer un fichier réordonné ou complété à la main dans Excel/Sheets.
-   *
-   * Chaque ligne valide devient un NOUVEAU trade (`onAddTrade`) — jamais une
-   * mise à jour. La colonne "ID" de l'export, si présente, est ignorée :
-   * réimporter son propre export ajoute donc des doublons plutôt que de les
-   * fusionner. Une ligne dont un champ obligatoire est manquant ou invalide
-   * (marché/direction/résultat hors des valeurs connues) est ignorée et
-   * comptée à part, jamais bloquante pour le reste du fichier.
-   */
-  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onerror = () => alert("Ce fichier n'a pas pu être lu.");
-    reader.onload = () => {
-      const text = String(reader.result ?? "");
-      const rows = parseCsv(text);
-      if (rows.length < 2) {
-        alert("Fichier CSV vide ou illisible.");
-        return;
-      }
-
-      const header = rows[0].map(normalizeHeader);
-      const columnIndex = Object.fromEntries(
-        CSV_IMPORT_COLUMNS.map((col) => [col, header.indexOf(normalizeHeader(col))])
-      ) as Record<(typeof CSV_IMPORT_COLUMNS)[number], number>;
-      const missing = CSV_IMPORT_COLUMNS.filter((col) => columnIndex[col] === -1);
-      if (missing.length > 0) {
-        alert(
-          `Ce fichier ne ressemble pas à un export du Journal — colonnes manquantes : ${missing.join(", ")}.`
-        );
-        return;
-      }
-
-      const get = (row: string[], col: (typeof CSV_IMPORT_COLUMNS)[number]) =>
-        (row[columnIndex[col]] ?? "").trim();
-
-      let imported = 0;
-      const errors: string[] = [];
-      // Distinct de `errors` : la ligne EST importée (contrairement à une
-      // ligne ignorée), seul son R:R est forcé à 0 faute de distance de
-      // risque — la saisie manuelle du même cas est bloquée avec un message
-      // explicite (`handleFormSubmit`), l'import CSV l'acceptait jusqu'ici en
-      // silence complet. Trouvé en audit.
-      const warnings: string[] = [];
-
-      rows.slice(1).forEach((row, idx) => {
-        const ligne = idx + 2; // +2 : 1-indexé + ligne d'en-tête
-
-        const pair = get(row, "Paire");
-        const date = get(row, "Date Entree");
-        const marketCategory = CSV_MARKET_CATEGORIES.find((m) => m === get(row, "Marche"));
-        const direction = CSV_DIRECTIONS.find((d) => d === get(row, "Direction"));
-        const result = CSV_RESULTS.find((r) => r === get(row, "Resultat"));
-
-        if (!pair || !date || !marketCategory || !direction || !result) {
-          const raison = !pair
-            ? "paire manquante"
-            : !date
-            ? "date d'entrée manquante"
-            : !marketCategory
-            ? `marché "${get(row, "Marche")}" inconnu`
-            : !direction
-            ? `direction "${get(row, "Direction")}" inconnue`
-            : `résultat "${get(row, "Resultat")}" inconnu`;
-          errors.push(`Ligne ${ligne} : ${raison}.`);
-          return;
-        }
-
-        const emotion = CSV_EMOTIONS.find((em) => em === get(row, "Emotion")) ?? "Disciplined";
-        const pnlUnit = CSV_PNL_UNITS.find((u) => u === get(row, "Unite PnL")) ?? "USD";
-
-        const entryPrice = parsePriceInput(get(row, "Prix Entree"));
-        const stopLoss = parsePriceInput(get(row, "Stop Loss"));
-        const takeProfit = parsePriceInput(get(row, "Take Profit"));
-        const exitPriceRaw = get(row, "Prix Sortie");
-        const lotSize = parsePriceInput(get(row, "Taille Lot"));
-        const pnl = parsePriceInput(get(row, "PnL"));
-
-        const accountName = get(row, "Compte");
-        const accountId =
-          accountName && accountName !== "Non rattache"
-            ? accounts.find((a) => a.name === accountName)?.id
-            : undefined;
-
-        const mistakesRaw = get(row, "Erreurs");
-        const mistakes = mistakesRaw
-          ? (mistakesRaw
-              .split(";")
-              .map((m) => m.trim())
-              .filter((m) => (MISTAKE_OPTIONS as string[]).includes(m)) as TradeMistake[])
-          : [];
-
-        const riskDiff = Math.abs(entryPrice - stopLoss);
-        const rewardDiff = Math.abs(takeProfit - entryPrice);
-        const riskRewardRatio = riskDiff > 0 ? Number((rewardDiff / riskDiff).toFixed(1)) : 0;
-        if (riskDiff === 0) {
-          warnings.push(`Ligne ${ligne} : Stop Loss = Prix d'entrée, R:R forcé à 0.`);
-        }
-
-        onAddTrade({
-          date,
-          time: get(row, "Heure Entree") || undefined,
-          exitDate: get(row, "Date Sortie") || undefined,
-          exitTime: get(row, "Heure Sortie") || undefined,
-          accountId,
-          pair,
-          marketCategory,
-          direction,
-          entryPrice,
-          stopLoss,
-          takeProfit,
-          exitPrice: exitPriceRaw ? parsePriceInput(exitPriceRaw) : undefined,
-          lotSize,
-          pnl,
-          pnlUnit,
-          riskRewardRatio,
-          result,
-          strategy: get(row, "Strategie"),
-          emotion,
-          mistakes,
-          notes: get(row, "Notes"),
-        });
-        imported++;
-      });
-
-      const parts = [`${imported} trade${imported > 1 ? "s" : ""} importé${imported > 1 ? "s" : ""}.`];
-      if (errors.length > 0) {
-        const affichees = errors.slice(0, 10);
-        const reste = errors.length - affichees.length;
-        parts.push(
-          `${errors.length} ligne${errors.length > 1 ? "s" : ""} ignorée${errors.length > 1 ? "s" : ""} :\n${affichees.join("\n")}${
-            reste > 0 ? `\n… et ${reste} de plus.` : ""
-          }`
-        );
-      }
-      if (warnings.length > 0) {
-        const affichees = warnings.slice(0, 10);
-        const reste = warnings.length - affichees.length;
-        parts.push(
-          `${warnings.length} avertissement${warnings.length > 1 ? "s" : ""} :\n${affichees.join("\n")}${
-            reste > 0 ? `\n… et ${reste} de plus.` : ""
-          }`
-        );
-      }
-      alert(parts.join("\n\n"));
-    };
-    reader.readAsText(file, "utf-8");
-  };
-
-  // New Trade Form state
-  const [formData, setFormData] = useState({
-    date: new Date().toISOString().split("T")[0],
-    time: "14:30",
-    exitDate: new Date().toISOString().split("T")[0],
-    exitTime: "16:00",
-    accountId: SANS_COMPTE,
-    pnl: "0",
-    pnlUnit: "USD" as PnlUnit,
-    pair: "EUR/USD",
-    marketCategory: "Forex" as MarketCategory,
-    direction: "LONG" as TradeDirection,
-    entryPrice: "1.0850",
-    stopLoss: "1.0830",
-    takeProfit: "1.0910",
-    exitPrice: "1.0910",
-    lotSize: "1",
-    strategy: "",
-    tradingPlanId: SANS_PLAN,
-    result: "OPEN" as TradeResult,
-    emotion: "Disciplined" as EmotionState,
-    mistakes: [] as TradeMistake[],
-    notes: "Validation FVG H1 + Chasse de liquidité.",
-    chartUrls: toScreenshotSlots({
-      chartUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&q=80&w=800",
-    }),
-  });
-
-  /** Valeurs par défaut d'une création. Recalculées à chaque ouverture. */
-  const formulaireVierge = () => ({
-    date: new Date().toISOString().split("T")[0],
-    time: "14:30",
-    exitDate: new Date().toISOString().split("T")[0],
-    exitTime: "16:00",
-    accountId: SANS_COMPTE,
-    pnl: "0",
-    pnlUnit: "USD" as PnlUnit,
-    pair: "EUR/USD",
-    marketCategory: "Forex" as MarketCategory,
-    direction: "LONG" as TradeDirection,
-    entryPrice: "1.085",
-    stopLoss: "1.083",
-    takeProfit: "1.091",
-    exitPrice: "1.091",
-    lotSize: "1",
-    strategy: "",
-    tradingPlanId: SANS_PLAN,
-    result: "OPEN" as TradeResult,
-    emotion: "Disciplined" as EmotionState,
-    mistakes: [] as TradeMistake[],
-    notes: "",
-    chartUrls: toScreenshotSlots(null),
-  });
-=======
 
   /**
    * Importe des trades depuis un CSV — miroir de `exportToCSV`, colonnes
@@ -971,7 +728,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
   // New Trade Form state — initialiseur paresseux (référence, pas appel).
   const [formData, setFormData] = useState(formulaireVierge);
->>>>>>> origin/main
 
   const ouvrirCreation = () => {
     setEditingTrade(null);
@@ -1002,10 +758,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       entryPrice: String(trade.entryPrice),
       stopLoss: String(trade.stopLoss),
       takeProfit: String(trade.takeProfit),
-<<<<<<< HEAD
-      exitPrice: String(trade.exitPrice ?? 0),
-      lotSize: String(trade.lotSize),
-=======
       // `?? 0` remplacé par une garde de véracité : `undefined` comme `0`
       // signifient « pas de prix de sortie » (voir handleFormSubmit), et un
       // "0" réaffiché dans le champ se réenregistrait tel quel au moindre
@@ -1013,7 +765,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       exitPrice: trade.exitPrice ? String(trade.exitPrice) : "",
       lotSize: String(trade.lotSize),
       riskPercent: trade.riskPercent !== undefined ? String(trade.riskPercent) : "",
->>>>>>> origin/main
       strategy: trade.strategy,
       tradingPlanId: trade.tradingPlanId ?? SANS_PLAN,
       result: trade.result,
@@ -1030,8 +781,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     setEditingTrade(null);
   };
 
-<<<<<<< HEAD
-=======
   /**
    * La suppression d'un trade est immédiate et irréversible : `handleDeleteTrade`
    * (App.tsx) retire l'entrée de la collection, qui part ensuite au serveur — ni
@@ -1047,7 +796,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     if (ok) onDeleteTrade(trade.id);
   };
 
->>>>>>> origin/main
   // Applique une ébauche venue du calculateur / de l'analyseur de setup, puis ouvre le formulaire.
   // Seules les clés fournies écrasent les valeurs par défaut ci-dessus.
   useEffect(() => {
@@ -1059,21 +807,10 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       // d'écran, tags d'erreur), l'annuler, puis appliquer une ébauche du
       // calculateur conservait silencieusement tous ces champs — absents de
       // `TradeDraft` — sur le nouveau trade créé depuis l'ébauche.
-<<<<<<< HEAD
-      const next = formulaireVierge();
-      (Object.keys(prefillDraft) as (keyof TradeDraft)[]).forEach((key) => {
-        const value = prefillDraft[key];
-        if (value !== undefined) {
-          (next as Record<string, unknown>)[key] = value;
-        }
-      });
-      return next;
-=======
       // Voir `appliquerDraft` : la conversion des nombres de l'ébauche en
       // chaînes n'est pas cosmétique, c'est elle qui rend l'enregistrement
       // possible.
       return appliquerDraft(formulaireVierge(), prefillDraft);
->>>>>>> origin/main
     });
     // Une ébauche est toujours une création : sans cela, elle viendrait écraser
     // un trade en cours d'édition resté ouvert.
@@ -1082,12 +819,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     onPrefillConsumed?.();
   }, [prefillDraft, onPrefillConsumed]);
 
-<<<<<<< HEAD
-  // Calculate Summary Statistics — partagé avec l'export PDF, voir
-  // src/lib/performanceStats.ts.
-  const { totalTrades, winTrades, lossTrades, breakevenTrades, winRate, totalPnL, profitFactor, avgRR, disciplineEmoPercent } =
-    computeJournalSummary(trades);
-=======
   // Terme normalisé UNE fois, et non à chaque trade × chaque champ.
   const terme = searchQuery.trim().toLowerCase();
 
@@ -1095,7 +826,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   // `new Date()` par trade serait inutile et non déterministe au passage de
   // minuit.
   const debutPeriode = periodStart(selectedPeriod);
->>>>>>> origin/main
 
   // Filtering
   const filteredTrades = trades.filter((t) => {
@@ -1116,11 +846,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       (selectedAccount === NON_RATTACHES
         ? nomDuCompte(t.accountId) === null
         : t.accountId === selectedAccount);
-<<<<<<< HEAD
-    return matchesPair && matchesMarket && matchesResult && matchesEmotion && matchesAccount;
-  });
-
-=======
     // Fenêtre appliquée à la date d'ENTRÉE : un trade ouvert le 30 mars et
     // clôturé le 2 avril compte pour mars. Même convention que
     // `computePnlByPeriod`. Une date illisible est exclue plutôt que comptée
@@ -1203,7 +928,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     );
   };
 
->>>>>>> origin/main
   const getResultLabel = (result: TradeResult): string => {
     switch (result) {
       case "WIN":
@@ -1251,131 +975,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     // erreur n'émettrait aucun évènement.
     e.target.value = "";
     if (!file) return;
-<<<<<<< HEAD
-
-    // Garde-fou sur le décodage, pas sur le stockage : après réduction, la
-    // taille du fichier d'origine n'a plus d'incidence.
-    if (file.size > 20 * 1024 * 1024) {
-      alert("L'image choisie est trop volumineuse (max 20 Mo). Choisis-en une autre.");
-      return;
-    }
-
-    setResizingSlotId(slotId);
-    try {
-      const url = await resizeChartScreenshot(file);
-      setFormData((prev) => ({
-        ...prev,
-        chartUrls: prev.chartUrls.map((s) => (s.id === slotId ? { ...s, url } : s)),
-      }));
-    } catch (err) {
-      console.error("[propdesk] Redimensionnement de la capture d'écran échoué.", err);
-      alert("Cette image n'a pas pu être lue. Essaie un autre fichier (JPEG, PNG ou WebP).");
-    } finally {
-      setResizingSlotId(null);
-    }
-  };
-
-  /** Vide l'image d'un emplacement (garde le libellé) — c'est ainsi qu'on "retire" une capture des 3 emplacements par défaut, toujours présents. */
-  const handleRemoveScreenshot = (slotId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      chartUrls: prev.chartUrls.map((s) => (s.id === slotId ? { ...s, url: "" } : s)),
-    }));
-  };
-
-  /** Ajoute un emplacement supplémentaire à libellé libre, en plus des 3 par défaut. */
-  const handleAddScreenshotSlot = () => {
-    setFormData((prev) => {
-      if (prev.chartUrls.length >= MAX_SCREENSHOT_SLOTS) return prev;
-      const numeroSupplementaire = prev.chartUrls.filter((s) => !isDefaultScreenshotLabel(s.label)).length + 1;
-      return {
-        ...prev,
-        chartUrls: [
-          ...prev.chartUrls,
-          { id: makeScreenshotId(), label: `Supplémentaire ${numeroSupplementaire}`, url: "" },
-        ],
-      };
-    });
-  };
-
-  /** Supprime entièrement un emplacement supplémentaire (libellé + image) — pas possible sur les 3 par défaut, toujours présents. */
-  const handleRemoveScreenshotSlot = (slotId: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      chartUrls: prev.chartUrls.filter((s) => s.id !== slotId),
-    }));
-  };
-
-  const handleScreenshotLabelChange = (slotId: string, label: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      chartUrls: prev.chartUrls.map((s) => (s.id === slotId ? { ...s, label } : s)),
-    }));
-  };
-
-  /**
-   * PnL et taille de lot saisis en texte libre, jamais en `type="number"` :
-   * un input number renvoie une `value` DOM vide dès que son contenu n'est
-   * pas un nombre valide pour le *locale* du navigateur (virgule au lieu du
-   * point, point superflu, "0" qu'on essaie d'effacer pour retaper devant).
-   * Le champ contrôlé réaffichait alors aussitôt "0", effaçant la saisie en
-   * cours. Ici, la valeur reste une chaîne pendant toute la frappe (virgule
-   * convertie en point) et n'est convertie en nombre qu'à la soumission.
-   */
-  const handleDecimalChange = (
-    field: "lotSize" | "pnl",
-    raw: string,
-    { allowNegative = false }: { allowNegative?: boolean } = {},
-  ) => {
-    const normalized = raw.replace(",", ".");
-    const pattern = allowNegative ? /^-?\d*\.?\d*$/ : /^\d*\.?\d*$/;
-    if (!pattern.test(normalized)) return;
-    setFormData((prev) => ({ ...prev, [field]: normalized }));
-  };
-
-  /**
-   * Champs de prix (entrée/SL/TP/sortie) : texte totalement libre, sans
-   * aucun formatage ni conversion pendant la frappe.
-   *
-   * Avant, ces champs utilisaient `ThousandsInput`, qui insère de force un
-   * point de milliers pendant la saisie (`4655,66` devenait `4.655,66` à
-   * l'affichage). Une bonne idée sur un indice à 5 chiffres, mais fausse et
-   * gênante sur un actif comme XAU/USD dont la cotation n'a jamais de
-   * regroupement par milliers — demande explicite du fondateur : un coach ou
-   * un élève doit pouvoir taper le point ET la virgule où il veut, sans que
-   * l'app ne réinterprète sa saisie. Seul filtre : chiffres et séparateurs
-   * (`.`/`,`), pour éviter une lettre égarée — aucune conversion, aucun
-   * caractère inséré.
-   */
-  const handlePriceChange = (
-    field: "entryPrice" | "stopLoss" | "takeProfit" | "exitPrice",
-    raw: string
-  ) => {
-    if (!/^[\d.,]*$/.test(raw)) return;
-    setFormData((prev) => ({ ...prev, [field]: raw }));
-  };
-
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Géométrie pure, indépendante de l'instrument : recalculable sans risque.
-    const risque = Math.abs(parsePriceInput(formData.entryPrice) - parsePriceInput(formData.stopLoss));
-    const gain = Math.abs(parsePriceInput(formData.takeProfit) - parsePriceInput(formData.entryPrice));
-
-    // `risque === 0` (stop = entrée) n'a pas de ratio R:R réel — l'ancien
-    // repli sur "1" enregistrait un 1:1 fictif, indiscernable d'un vrai
-    // trade 1:1, faussant silencieusement la moyenne R:R du Journal
-    // (`performanceStats.ts`). `riskRewardRatio` est un champ obligatoire du
-    // type `Trade` : plutôt que d'inventer une valeur, on bloque la saisie
-    // d'un setup sans distance de stop définie, invalide dans tous les cas.
-    if (risque === 0) {
-      alert("Le Stop Loss ne peut pas être égal au Prix d'Entrée — aucune distance de risque définie.");
-      return;
-    }
-
-    const riskReward = Number((gain / risque).toFixed(1));
-
-=======
 
     // Garde-fou sur le décodage, pas sur le stockage : après réduction, la
     // taille du fichier d'origine n'a plus d'incidence.
@@ -1538,7 +1137,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 
     const riskReward = Number((gain / risque).toFixed(1));
 
->>>>>>> origin/main
     // Le PnL vient du champ, jamais d'un recalcul ni d'une conversion.
     //
     // C'est **la** règle à ne pas casser. Aucune formule ne propose plus de
@@ -1557,17 +1155,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     // vécu sur sa plateforme.
     const result: TradeResult = formData.result;
 
-<<<<<<< HEAD
-    const champs = {
-      date: formData.date,
-      time: formData.time,
-      // `formulaireVierge()` pré-remplit exitDate/exitTime avec aujourd'hui
-      // 16:00 (pratique pour un trade déjà clôturé) — mais rien n'invite
-      // l'utilisateur à les vider spécifiquement pour "⏳ Position ouverte",
-      // qui s'affichait alors comme clôturée dans le tableau (seul indicateur
-      // visuel : la présence d'`exitDate`, voir plus bas). Une position
-      // ouverte n'a par définition aucune date de sortie. Trouvé en audit.
-=======
     // Les captures encore encodées en base64 sont envoyées maintenant, et
     // remplacées par l'URL qui les sert. Elles ne voyagent donc plus dans le
     // payload de la collection `trades`, dont le poids total finissait par
@@ -1606,7 +1193,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       // trois champs correspondants sont désormais aussi désactivés dans le
       // formulaire quand "⏳ Position ouverte" est choisi, pour que la règle
       // se voie au lieu de s'appliquer en silence.
->>>>>>> origin/main
       exitDate: result === "OPEN" ? undefined : formData.exitDate || undefined,
       exitTime: result === "OPEN" ? undefined : formData.exitTime || undefined,
       // `undefined` et non chaîne vide : le champ est optionnel, une chaîne
@@ -1622,10 +1208,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       entryPrice: parsePriceInput(formData.entryPrice),
       stopLoss: parsePriceInput(formData.stopLoss),
       takeProfit: parsePriceInput(formData.takeProfit),
-<<<<<<< HEAD
-      exitPrice: parsePriceInput(formData.exitPrice),
-      lotSize: Number(formData.lotSize),
-=======
       // Symétrique d'`exitDate`/`exitTime` ci-dessus. Le champ vide compte
       // autant que la position ouverte : `parsePriceInput("")` vaut 0, qui
       // s'écrivait jusqu'ici en base comme une vraie cotation à zéro —
@@ -1654,7 +1236,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
         const valeur = parsePriceInput(saisi);
         return Number.isFinite(valeur) && valeur > 0 ? valeur : undefined;
       })(),
->>>>>>> origin/main
       pnl,
       pnlUnit: formData.pnlUnit,
       riskRewardRatio: riskReward,
@@ -1666,11 +1247,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       // Emplacements vides (aucune image choisie) filtrés — un emplacement
       // "Après" jamais rempli ne doit pas être persisté comme s'il portait
       // une vraie capture.
-<<<<<<< HEAD
-      chartUrls: formData.chartUrls.filter((s) => s.url.trim() !== ""),
-=======
       chartUrls: remplies,
->>>>>>> origin/main
     };
 
     if (editingTrade) {
@@ -1754,9 +1331,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
       </div>
 
       {/* Metric Cards Bar */}
-<<<<<<< HEAD
-      <SectionHeader>Performance</SectionHeader>
-=======
       {/* Les cartes ci-dessous portent sur l'ensemble filtré : sans ce rappel,
           un filtre laissé actif fait croire à une chute (ou à un bond) du PnL. */}
       <SectionHeader>
@@ -1768,7 +1342,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
           </span>
         )}
       </SectionHeader>
->>>>>>> origin/main
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-[#111615] border border-[#1B2320] p-4 rounded-xl space-y-1">
           <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Taux de Réussite</div>
@@ -1860,10 +1433,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             <option value="WIN">Gagnants (WIN)</option>
             <option value="LOSS">Perdants (LOSS)</option>
             <option value="BREAKEVEN">Breakeven</option>
-<<<<<<< HEAD
-=======
             <option value="OPEN">Positions ouvertes</option>
->>>>>>> origin/main
           </Select>
 
           <Select
@@ -1878,8 +1448,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
             <option value="Anxious">Anxieux</option>
             <option value="Calm">Calme</option>
           </Select>
-<<<<<<< HEAD
-=======
 
           <Select
             value={selectedPeriod}
@@ -1903,7 +1471,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               Réinitialiser
             </button>
           )}
->>>>>>> origin/main
         </div>
       </div>
 
@@ -1920,13 +1487,8 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 <th className="py-3.5 px-4">Direction</th>
                 <th className="py-3.5 px-4">Entrée → TP / SL</th>
                 <th className="py-3.5 px-4">Stratégie & Émotion</th>
-<<<<<<< HEAD
-                <th className="py-3.5 px-4">R:R</th>
-                <th className="py-3.5 px-4 text-right">PnL Net</th>
-=======
                 {renderThTri("rr", "R:R")}
                 {renderThTri("pnl", "PnL Net", true)}
->>>>>>> origin/main
                 <th className="py-3.5 px-4 text-center">Actions</th>
               </tr>
             </thead>
@@ -2088,11 +1650,7 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                         {/* Delete trade */}
                         {!readOnly && (
                           <button
-<<<<<<< HEAD
-                            onClick={() => onDeleteTrade(trade.id)}
-=======
                             onClick={() => void demanderSuppression(trade)}
->>>>>>> origin/main
                             className="p-1.5 rounded-lg bg-[#1B2320] text-slate-400 hover:text-rose-400 hover:bg-[#232D29]"
                             title="Supprimer la saisie"
                           >
@@ -2191,15 +1749,12 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 </div>
               </div>
 
-<<<<<<< HEAD
-=======
               {positionOuverte && (
                 <p className="text-[10px] text-slate-500 -mt-2">
                   Position ouverte : la sortie (date, heure, prix) reste vide tant que le trade n'est pas clôturé.
                 </p>
               )}
 
->>>>>>> origin/main
               {/* Compte de rattachement. Volontairement **sans** `required` :
                   un trade peut légitimement n'appartenir à aucun portefeuille
                   suivi ici, et forcer un choix pousserait à en désigner un au
@@ -2314,16 +1869,11 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                     type="text"
                     inputMode="decimal"
                     value={formData.exitPrice}
-<<<<<<< HEAD
-                    onChange={(e) => handlePriceChange("exitPrice", e.target.value)}
-                    className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono"
-=======
                     disabled={positionOuverte}
                     onChange={(e) => handlePriceChange("exitPrice", e.target.value)}
                     className={`w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white font-mono ${
                       positionOuverte ? "opacity-40 cursor-not-allowed" : ""
                     }`}
->>>>>>> origin/main
                   />
                 </div>
 
@@ -2339,8 +1889,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   />
                 </div>
 
-<<<<<<< HEAD
-=======
                 {/* Volontairement SANS `required` : les trades saisis avant
                     l'ajout de ce champ n'en ont pas, et forcer une valeur
                     pousserait à en inventer une après coup. Les badges de
@@ -2360,7 +1908,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   />
                 </div>
 
->>>>>>> origin/main
                 {/* PnL net : toujours saisi à la main, dans l'unité de son
                     choix. Aucun calcul, aucune conversion — l'utilisateur
                     tape le chiffre qu'il lit sur sa propre plateforme. */}
@@ -2751,11 +2298,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                 </div>
               </div>
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
-<<<<<<< HEAD
-                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Taille de lot</div>
-                <div className="text-white font-mono">{selectedChartTrade.lotSize}</div>
-              </div>
-=======
                 <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Durée</div>
                 <div className="text-white font-mono">
                   {(() => {
@@ -2774,7 +2316,6 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   {selectedChartTrade.riskPercent !== undefined ? `${selectedChartTrade.riskPercent} %` : "—"}
                 </div>
               </div>
->>>>>>> origin/main
 
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
                 <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Prix d'entrée</div>
