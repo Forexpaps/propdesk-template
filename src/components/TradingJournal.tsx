@@ -396,6 +396,8 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
 
   const [selectedChartTrade, setSelectedChartTrade] = useState<Trade | null>(null);
+  /** Capture affichée en plein écran (zoom) au-dessus de l'aperçu du trade — `null` si aucune. */
+  const [zoomedScreenshot, setZoomedScreenshot] = useState<{ url: string; label: string } | null>(null);
   /** Id de l'emplacement dont l'image est en cours de redimensionnement, ou `null` — un seul upload à la fois. */
   const [resizingSlotId, setResizingSlotId] = useState<string | null>(null);
 
@@ -803,6 +805,16 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
     );
     if (ok) onDeleteTrade(trade.id);
   };
+
+  // Ferme la capture zoomée à l'échap, comme le clic sur le fond.
+  useEffect(() => {
+    if (!zoomedScreenshot) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setZoomedScreenshot(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [zoomedScreenshot]);
 
   // Applique une ébauche venue du calculateur / de l'analyseur de setup, puis ouvre le formulaire.
   // Seules les clés fournies écrasent les valeurs par défaut ci-dessus.
@@ -2275,13 +2287,18 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   {screenshots.map((shot) => (
                     <div key={shot.id} className="space-y-1.5">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{shot.label}</span>
-                      <div className="rounded-xl overflow-hidden border border-[#1B2320] bg-black max-h-[40vh] flex items-center justify-center">
+                      <button
+                        type="button"
+                        onClick={() => setZoomedScreenshot({ url: shot.url, label: shot.label })}
+                        className="w-full rounded-xl overflow-hidden border border-[#1B2320] bg-black max-h-[40vh] flex items-center justify-center cursor-zoom-in"
+                        title="Agrandir"
+                      >
                         <img
                           src={shot.url}
                           alt={`Capture ${shot.label} — ${selectedChartTrade.pair}`}
                           className="w-full h-full object-contain"
                         />
-                      </div>
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -2411,6 +2428,31 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               <p className="text-slate-300 leading-relaxed">{selectedChartTrade.notes || "Aucune note saisie."}</p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Capture en plein écran — au-dessus de l'aperçu du trade (z-[60] > 50) */}
+      {zoomedScreenshot && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setZoomedScreenshot(null)}
+        >
+          <button
+            onClick={() => setZoomedScreenshot(null)}
+            className="absolute top-4 right-4 p-2 rounded-lg bg-[#1B2320] text-slate-300 hover:text-white"
+            title="Fermer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          <span className="absolute top-4 left-4 text-xs font-bold text-slate-300 uppercase tracking-wide">
+            {zoomedScreenshot.label}
+          </span>
+          <img
+            src={zoomedScreenshot.url}
+            alt={zoomedScreenshot.label}
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>
