@@ -20,7 +20,7 @@ import { authRouter, staffRouter } from "./auth/routes";
 import { requireAuth, type AuthContext } from "./auth/middleware";
 import { createRateLimit } from "./middleware/rateLimit";
 import { getEconomicCalendar } from "./economicCalendar";
-import { getMarketData } from "./marketData";
+import { getMarketData, getFxRateToUsd } from "./marketData";
 import { DEFAULT_USER_ID, db } from "./db";
 // Catalogue fixe des badges — données pures (aucune dépendance React/DOM),
 // voir le commentaire de `backfillMissingBadges` plus bas pour pourquoi le
@@ -83,6 +83,32 @@ api.get(
     } catch (err) {
       console.warn("[market-data] Aucun cache disponible.", err);
       res.status(503).json({ error: "Données de marché indisponibles pour le moment." });
+    }
+  })
+);
+
+/**
+ * Public, même raisonnement que `/market-data` ci-dessus — sert le
+ * Calculateur de position (`PositionCalculatorModal.tsx`) pour convertir en
+ * USD un risque calculé dans la devise de cotation d'une paire (ex. JPY sur
+ * USD/JPY). `:currency` est un code ISO 3 lettres validé par
+ * `getFxRateToUsd` elle-même ; toute autre valeur retombe sur `null` →
+ * 503, jamais une requête Yahoo arbitraire.
+ */
+api.get(
+  "/fx-rate/:currency",
+  publicDataRateLimit,
+  wrap(async (req, res) => {
+    try {
+      const rate = await getFxRateToUsd(req.params.currency);
+      if (rate === null) {
+        res.status(503).json({ error: "Taux de change indisponible pour le moment." });
+        return;
+      }
+      res.json({ rate });
+    } catch (err) {
+      console.warn("[fx-rate] Échec.", err);
+      res.status(503).json({ error: "Taux de change indisponible pour le moment." });
     }
   })
 );

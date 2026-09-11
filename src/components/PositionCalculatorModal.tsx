@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Calculator, X, Check } from "lucide-react";
 import { formatCurrency, parsePriceInput } from "../lib/format";
 import { Select } from "./Select";
+import { api } from "../lib/api";
 
 interface PositionCalculatorModalProps {
   isOpen: boolean;
@@ -21,6 +22,19 @@ interface PositionCalculatorModalProps {
 }
 
 type AssetClass = "Forex" | "Indices" | "Crypto" | "Métaux";
+
+/**
+ * Devise de COTATION d'une paire Forex saisie librement ("EUR/USD",
+ * "eurusd", "USD-JPY"...) — `null` si la saisie ne correspond pas à deux
+ * codes ISO de 3 lettres. Sert à savoir si un taux de conversion vers USD
+ * est nécessaire pour le panneau "Taille de position & risque" (voir plus
+ * bas) : inutile sur EUR/USD (déjà coté en USD), indispensable sur USD/JPY
+ * (coté en JPY) ou une paire croisée comme EUR/GBP (coté en GBP).
+ */
+function quoteCurrencyOf(rawPair: string): string | null {
+  const letters = rawPair.toUpperCase().replace(/[^A-Z]/g, "");
+  return letters.length === 6 ? letters.slice(3, 6) : null;
+}
 
 const DEFAULT_CONTRACT: Record<AssetClass, number> = {
   Forex: 100000,
@@ -116,6 +130,42 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
   const [units4, setUnits4] = useState<string>("100000");
   const [direction4, setDirection4] = useState<"LONG" | "SHORT">("LONG");
 
+  // Taux de conversion devise de cotation → USD, pour le panneau 1 — voir
+  // `quoteCurrencyOf` et le commentaire au-dessus de `units1` plus bas.
+  const quoteCurrency = assetClass === "Forex" ? quoteCurrencyOf(pair) : null;
+  const needsConversion = !!quoteCurrency && quoteCurrency !== "USD";
+  const [fxRate, setFxRate] = useState<number | null>(1);
+  const [fxRateLoading, setFxRateLoading] = useState(false);
+
+  useEffect(() => {
+    if (!needsConversion) {
+      setFxRate(1);
+      setFxRateLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setFxRateLoading(true);
+    // Léger débounce : évite un appel réseau à chaque caractère tapé dans "Paire".
+    const timer = setTimeout(() => {
+      api
+        .fetchFxRate(quoteCurrency!)
+        .then(({ rate }) => {
+          if (!cancelled) setFxRate(rate);
+        })
+        .catch(() => {
+          if (!cancelled) setFxRate(null);
+        })
+        .finally(() => {
+          if (!cancelled) setFxRateLoading(false);
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsConversion, quoteCurrency]);
+
   if (!isOpen) return null;
 
   const handleAssetClass = (ac: AssetClass) => {
@@ -146,9 +196,17 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
   const isLong1 = target1Num >= entry1Num;
   const riskDiff1 = Math.abs(entry1Num - stop1Num);
   const rewardDiff1 = Math.abs(target1Num - entry1Num);
-  const units1 = riskDiff1 > 0 ? riskAmount1 / riskDiff1 : 0;
+  // `riskDiff1`/`rewardDiff1` sont dans la devise de COTATION de la paire —
+  // seulement en USD quand cette devise EST l'USD (EUR/USD, GBP/USD...).
+  // Sur USD/JPY (coté en JPY) ou une croisée comme EUR/GBP (coté en GBP), le
+  // risque en unités de compte doit être converti avant de dimensionner la
+  // position : sans `fxRate`, la taille calculée était juste uniquement pour
+  // les paires cotées en USD — silencieusement fausse sur les autres.
+  const conversionReady = !needsConversion || fxRate !== null;
+  const rate1 = needsConversion ? fxRate ?? 0 : 1;
+  const units1 = riskDiff1 > 0 && conversionReady && rate1 > 0 ? riskAmount1 / (riskDiff1 * rate1) : 0;
   const lots1 = contract1 > 0 ? units1 / contract1 : 0;
-  const potentialProfit1 = units1 * rewardDiff1;
+  const potentialProfit1 = units1 * rewardDiff1 * rate1;
   const rr1 = riskDiff1 > 0 ? rewardDiff1 / riskDiff1 : 0;
 
   // --- Panneau 2 : Risque / Rendement ---
@@ -168,8 +226,11 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
   // Entrée = stop : `riskDiff1` vaut 0, `units1`/`riskAmount1`/`rr1` valent
   // déjà silencieusement 0 (voir leurs gardes plus haut) — sans ce contrôle,
   // le bouton restait actif et poussait ces zéros tels quels dans le
-  // Journal sans le moindre avertissement, un trade inexploitable.
-  const canApply = riskDiff1 > 0;
+  // Journal sans le moindre avertissement, un trade inexploitable. Même
+  // logique pour `conversionReady` : appliquer une taille calculée sur un
+  // taux de conversion manquant serait la même classe de bug que celui
+  // qu'il corrige.
+  const canApply = riskDiff1 > 0 && conversionReady;
 
   const handleApply = () => {
     if (!canApply) return;
@@ -251,11 +312,38 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
                 <FieldInput label="Stop-loss" value={stop1} onChange={setStop1} />
                 <FieldInput label="Objectif" value={target1} onChange={setTarget1} />
               </div>
+              {needsConversion && (
+                <div className="text-[10px] font-mono">
+                  {fxRateLoading ? (
+                    <span className="text-slate-500">Récupération du taux {quoteCurrency}/USD…</span>
+                  ) : fxRate !== null ? (
+                    <span className="text-slate-400">
+                      1 {quoteCurrency} = {fxRate.toFixed(5)} USD{" "}
+                      <span className="text-slate-600">(taux en direct)</span>
+                    </span>
+                  ) : (
+                    <span className="text-rose-400">
+                      Taux {quoteCurrency}/USD indisponible — calcul suspendu.
+                    </span>
+                  )}
+                </div>
+              )}
               <div className="space-y-0">
-                <ResultRow label="Taille (unités)" value={units1.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} />
-                <ResultRow label="≈ Lots" value={lots1.toFixed(2)} valueClassName="text-blue-400" />
+                <ResultRow
+                  label="Taille (unités)"
+                  value={conversionReady ? units1.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) : "—"}
+                />
+                <ResultRow
+                  label="≈ Lots"
+                  value={conversionReady ? lots1.toFixed(2) : "—"}
+                  valueClassName="text-blue-400"
+                />
                 <ResultRow label="Perte maximale" value={`-${formatCurrency(riskAmount1)}`} valueClassName="text-rose-400" />
-                <ResultRow label="Profit potentiel" value={`+${formatCurrency(potentialProfit1)}`} valueClassName="text-[#00E676]" />
+                <ResultRow
+                  label="Profit potentiel"
+                  value={conversionReady ? `+${formatCurrency(potentialProfit1)}` : "—"}
+                  valueClassName="text-[#00E676]"
+                />
                 <ResultRow label="Ratio R:R" value={`1 : ${rr1.toFixed(2)}`} valueClassName="text-[#00E676]" />
               </div>
             </CalcCard>

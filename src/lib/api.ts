@@ -181,6 +181,15 @@ export const api = {
     request<{ quotes: MarketQuote[] }>("/api/market-data"),
 
   /**
+   * Taux de conversion d'une devise (code ISO 3 lettres) vers USD — voir
+   * `server/marketData.ts` `getFxRateToUsd`. Utilisé par le Calculateur de
+   * position pour convertir un risque exprimé dans la devise de cotation
+   * d'une paire (JPY, GBP...) avant de dimensionner une position en USD.
+   */
+  fetchFxRate: (currency: string) =>
+    request<{ rate: number }>(`/api/fx-rate/${encodeURIComponent(currency)}`),
+
+  /**
    * Envoie une capture et renvoie l'URL qui la sert. Les images ne transitent
    * plus dans le payload des trades : toute la collection partant en un seul
    * envoi, un journal d'une vingtaine de trades illustrés dépassait la limite

@@ -98,6 +98,38 @@ async function fetchQuote(entry: (typeof MARKET_SYMBOLS)[number]): Promise<Marke
   }
 }
 
+const fxCache = new Map<string, { rate: number; fetchedAt: number }>();
+const FX_CACHE_TTL_MS = 5 * 60 * 1000; // une cotation FX bouge peu à l'échelle d'un calcul de position
+
+/**
+ * Taux de conversion d'une devise vers USD (devise unique de l'application,
+ * voir `formatCurrency`) — nécessaire pour convertir en dollars un risque
+ * calculé dans la devise de COTATION d'une paire (ex. JPY sur USD/JPY, GBP
+ * sur EUR/GBP) avant de dimensionner une position (`PositionCalculatorModal`,
+ * panneau "Taille de position & risque"). Sans cette conversion, la taille
+ * calculée n'était juste que pour les paires cotées en USD (EUR/USD,
+ * GBP/USD...) — fausse sur USD/JPY, une paire croisée, etc.
+ *
+ * `1` si la devise est déjà USD (rien à convertir), `null` si le flux Yahoo
+ * Finance ne répond pas ET qu'aucun cache récent n'existe.
+ */
+export async function getFxRateToUsd(currency: string): Promise<number | null> {
+  const code = currency.trim().toUpperCase();
+  if (!/^[A-Z]{3}$/.test(code)) return null;
+  if (code === "USD") return 1;
+
+  const cached = fxCache.get(code);
+  if (cached && Date.now() - cached.fetchedAt < FX_CACHE_TTL_MS) return cached.rate;
+
+  // Symbole Yahoo "XXXUSD=X" = prix d'1 unité de XXX en USD — exactement le
+  // taux recherché, pas besoin d'inverser quoi que ce soit après coup.
+  const quote = await fetchQuote({ symbol: `${code}USD=X`, label: code });
+  if (!quote) return cached?.rate ?? null;
+
+  fxCache.set(code, { rate: quote.price, fetchedAt: Date.now() });
+  return quote.price;
+}
+
 async function fetchAllQuotes(): Promise<MarketQuote[]> {
   const settled = await Promise.all(MARKET_SYMBOLS.map(fetchQuote));
   const quotes = settled.filter((q): q is MarketQuote => q !== null);
