@@ -33,7 +33,9 @@ import {
   TradingPlan,
   TradeScreenshot,
 } from "../types";
-import { formatCurrency, formatDuration, parsePriceInput } from "../lib/format";
+import { formatCurrency, formatDateFr, formatDuration, parsePriceInput } from "../lib/format";
+import { ASSET_CATALOG, categoryForAsset } from "../lib/assets";
+import { usePersistentState } from "../hooks/usePersistentState";
 import { resizeChartScreenshot } from "../lib/image";
 import { computeJournalSummary, tradeDurationMinutes } from "../lib/performanceStats";
 import { alertDialog, confirmDialog } from "../lib/confirmDialog";
@@ -362,6 +364,12 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
 }) => {
   // Nommé `searchQuery` et non `searchPair` : la recherche couvre la paire, la
   // stratégie, les notes et le nom du compte.
+  /**
+   * Actifs tapés à la main, hors catalogue — réapparaissent dans la liste
+   * rapide au prochain trade. Local et privé (`usePersistentState`) : aucune
+   * synchronisation serveur pour une simple liste de suggestions.
+   */
+  const [customAssets, setCustomAssets] = usePersistentState<string[]>("horizon_custom_assets", []);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedMarket, setSelectedMarket] = useState<string>("Tous");
   const [selectedResult, setSelectedResult] = useState<string>("Tous");
@@ -1784,12 +1792,36 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
                   <label className="block text-xs font-semibold text-slate-400 mb-1">Paire / Actif</label>
                   <input
                     type="text"
+                    list="horizon-asset-suggestions"
                     value={formData.pair}
-                    onChange={(e) => setFormData({ ...formData, pair: e.target.value.toUpperCase() })}
+                    onChange={(e) => {
+                      const pair = e.target.value.toUpperCase();
+                      const categorieDetectee = categoryForAsset(pair);
+                      setFormData({
+                        ...formData,
+                        pair,
+                        // Ne remplace la catégorie que si l'actif saisi est reconnu — un
+                        // actif hors catalogue laisse le choix déjà fait par l'utilisateur.
+                        marketCategory: categorieDetectee ?? formData.marketCategory,
+                      });
+                    }}
+                    onBlur={() => {
+                      const pair = formData.pair.trim();
+                      if (!pair || categoryForAsset(pair)) return;
+                      setCustomAssets((prev) => (prev.includes(pair) ? prev : [...prev, pair]));
+                    }}
                     placeholder="ex: EUR/USD, NAS100"
                     className="w-full bg-[#0D1110] border border-[#1B2320] rounded-lg p-2.5 text-xs text-white uppercase font-bold"
                     required
                   />
+                  <datalist id="horizon-asset-suggestions">
+                    {ASSET_CATALOG.map((a) => (
+                      <option key={a.symbol} value={a.symbol} label={a.category} />
+                    ))}
+                    {customAssets.map((symbol) => (
+                      <option key={symbol} value={symbol} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>
@@ -2286,14 +2318,14 @@ export const TradingJournal: React.FC<TradingJournalProps> = ({
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
                 <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Entrée</div>
                 <div className="text-white font-mono">
-                  {selectedChartTrade.date} {selectedChartTrade.time}
+                  {formatDateFr(selectedChartTrade.date)} {selectedChartTrade.time}
                 </div>
               </div>
               <div className="bg-[#0D1110] border border-[#1B2320] rounded-lg p-3">
                 <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Sortie</div>
                 <div className="text-white font-mono">
                   {selectedChartTrade.exitDate
-                    ? `${selectedChartTrade.exitDate} ${selectedChartTrade.exitTime ?? ""}`
+                    ? `${formatDateFr(selectedChartTrade.exitDate)} ${selectedChartTrade.exitTime ?? ""}`
                     : "Position ouverte"}
                 </div>
               </div>
