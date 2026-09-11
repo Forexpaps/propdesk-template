@@ -3,6 +3,9 @@ import { Calculator, X, Check } from "lucide-react";
 import { formatCurrency, parsePriceInput } from "../lib/format";
 import { Select } from "./Select";
 import { api } from "../lib/api";
+import { ASSET_CATALOG, categoryForAsset } from "../lib/assets";
+import { usePersistentState } from "../hooks/usePersistentState";
+import { MarketCategory } from "../types";
 
 interface PositionCalculatorModalProps {
   isOpen: boolean;
@@ -41,6 +44,19 @@ const DEFAULT_CONTRACT: Record<AssetClass, number> = {
   Indices: 1,
   Crypto: 1,
   Métaux: 100,
+};
+
+/**
+ * `MarketCategory` (Journal, `src/types.ts`) → `AssetClass` (ce
+ * calculateur) — même catalogue d'actifs (`src/lib/assets.ts`) que le
+ * Journal, mais une nomenclature différente pour la classe "matières
+ * premières" (ici "Métaux", hérité de ce composant).
+ */
+const ASSET_CLASS_BY_CATEGORY: Record<MarketCategory, AssetClass> = {
+  Forex: "Forex",
+  Indices: "Indices",
+  Crypto: "Crypto",
+  "Matières Premières": "Métaux",
 };
 
 /** Micro-label en petites majuscules espacées — même motif que Rentabilité/Macro. */
@@ -110,6 +126,8 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
 }) => {
   const [assetClass, setAssetClass] = useState<AssetClass>("Forex");
   const [pair, setPair] = useState("EUR/USD");
+  /** Même registre que le Journal (`TradingJournal.tsx`) : un actif tapé ici réapparaît là-bas, et inversement. */
+  const [customAssets, setCustomAssets] = usePersistentState<string[]>("horizon_custom_assets", []);
   const [copied, setCopied] = useState(false);
 
   // Panneau 1 — Taille de position & risque
@@ -293,10 +311,32 @@ export const PositionCalculatorModal: React.FC<PositionCalculatorModalProps> = (
               <MicroLabel>Paire (pour le journal)</MicroLabel>
               <input
                 type="text"
+                list="horizon-calculator-asset-suggestions"
                 value={pair}
-                onChange={(e) => setPair(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value.toUpperCase();
+                  setPair(value);
+                  // Même comportement que le Journal : un actif reconnu du catalogue
+                  // renseigne sa classe automatiquement, un actif hors catalogue
+                  // laisse la classe déjà sélectionnée inchangée.
+                  const categorie = categoryForAsset(value);
+                  if (categorie) setAssetClass(ASSET_CLASS_BY_CATEGORY[categorie]);
+                }}
+                onBlur={() => {
+                  const value = pair.trim();
+                  if (!value || categoryForAsset(value)) return;
+                  setCustomAssets((prev) => (prev.includes(value) ? prev : [...prev, value]));
+                }}
                 className="bg-[#0D1110] border border-[#1B2320] rounded-lg px-2.5 py-1.5 text-white font-mono font-bold w-32 focus:outline-none focus:border-[#00E676]"
               />
+              <datalist id="horizon-calculator-asset-suggestions">
+                {ASSET_CATALOG.map((a) => (
+                  <option key={a.symbol} value={a.symbol} label={a.category} />
+                ))}
+                {customAssets.map((symbol) => (
+                  <option key={symbol} value={symbol} />
+                ))}
+              </datalist>
             </div>
           </div>
 
