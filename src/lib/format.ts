@@ -48,6 +48,20 @@ export function notificationTimestamp(time: string): number {
   return Number.isNaN(fr) ? 0 : fr;
 }
 
+/**
+ * "2026-09-11" (format natif d'un `<input type="date">`, tel que stocké dans
+ * `Trade.date`/`Trade.exitDate`) → "11/09/26" pour l'affichage — l'ISO n'est
+ * qu'un format d'échange, jamais ce qu'on montre à l'utilisateur.
+ * Toute valeur qui ne correspond pas exactement à ce format (vide,
+ * corrompue) est retournée telle quelle plutôt que de planter l'affichage.
+ */
+export function formatDateFr(isoDate: string): string {
+  const match = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return isoDate;
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year.slice(2)}`;
+}
+
 export function formatCurrency(amount: number): string {
   const rounded = Math.round(Math.abs(amount) * 100) / 100;
   const sign = amount < 0 && rounded !== 0 ? "-" : "";
